@@ -33,7 +33,7 @@ Prisma 7 + SQLite (better-sqlite3 driver adapter) · decimal.js.
 
 ## Getting started
 
-Requirements: Node.js 22+ and pnpm.
+Requirements: Node.js 24+ and pnpm.
 
 ```bash
 cp .env.example .env    # DATABASE_URL -> data/quoin.sqlite
