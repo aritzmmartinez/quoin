@@ -1,0 +1,53 @@
+// Prisma 7: ESM `prisma-client` generator with its own output; the URL lives in prisma.config.ts.
+generator client {
+  provider = "prisma-client"
+  output   = "../app/adapters/persistence/generated"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+/// Instrument master. Key = identifier (ISIN normally; symbol for crypto).
+model Instrument {
+  id         String   @id
+  name       String
+  type       String // ETF | STOCK | CRYPTO | BOND | COMMODITY | ...
+  currency   String // ISO 4217 (instrument's denomination currency)
+  assetClass String? // from TR: FUND | STOCK | CRYPTO | SYNTHETIC ...
+  createdAt  DateTime @default(now())
+
+  entries LedgerEntry[]
+}
+
+/// Immutable ledger: the source of truth. Positions, P&L, allocation... are DERIVED from here.
+model LedgerEntry {
+  id     String   @id // uuid
+  ts     DateTime // execution timestamp
+  type   String // BUY | SELL | DIVIDEND | FEE | DEPOSIT | WITHDRAWAL | INTEREST | TAX_WITHHOLDING | SPLIT
+  sleeve String? // CORE | TRADING | null (cash-level movements have no sleeve)
+
+  instrumentId String?
+  instrument   Instrument? @relation(fields: [instrumentId], references: [id])
+
+  // Money is ALWAYS a String (decimal) -> operated on with decimal.js.
+  // Never `number`, never the ORM's Decimal type on SQLite (confirmed read bug).
+  quantity    String? // quantity; fractions up to 10 decimals
+  price       String? // per-unit price, in the instrument's currency
+  grossAmount String // gross value of the operation, in `currency`
+  fees        String  @default("0")
+  taxWithheld String  @default("0")
+
+  currency String // operation currency (ISO 4217)
+  fxToBase String  @default("1") // rate to EUR at operation time
+
+  account    String  @default("trade-republic")
+  source     String  @default("MANUAL") // MANUAL | TR_CSV | ...
+  externalId String? // source transaction id (TR transaction_id) -> dedup key
+  note       String?
+  createdAt  DateTime @default(now())
+
+  @@unique([source, externalId]) // idempotent ingestion (NULLs are distinct in SQLite -> manual entries don't collide)
+  @@index([ts])
+  @@index([instrumentId])
+}

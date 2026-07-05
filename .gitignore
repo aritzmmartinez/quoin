@@ -1,0 +1,21 @@
+.DS_Store
+/node_modules/
+
+# React Router
+/.react-router/
+/build/
+
+# Secrets and environment — NEVER committed
+.env
+.env.local
+.env.*.local
+**/credentials*
+
+# User data — NEVER committed (public repo)
+/data/
+*.sqlite
+*.sqlite-*
+*.db
+
+# Prisma generated client (regenerated via `prisma generate`)
+/app/adapters/persistence/generated/
