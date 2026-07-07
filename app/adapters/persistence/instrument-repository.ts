@@ -4,7 +4,6 @@ import type { InstrumentRepository } from "~/core/ports";
 import { prisma } from "./db.server";
 import { instrumentToWriteData, rowToInstrument } from "./mappers";
 
-/** Prisma-backed instrument master. Domain never sees Prisma; rows are validated here. */
 export class PrismaInstrumentRepository implements InstrumentRepository {
   async upsert(instruments: readonly Instrument[]): Promise<void> {
     if (instruments.length === 0) return;

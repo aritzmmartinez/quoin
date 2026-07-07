@@ -14,14 +14,18 @@ describe("Money", () => {
   });
 
   it("subtracts, negates and scales exactly", () => {
-    expect(Money.fromString("3000").subtract(Money.fromString("1500")).toString()).toBe("1500");
+    expect(
+      Money.fromString("3000").subtract(Money.fromString("1500")).toString(),
+    ).toBe("1500");
     expect(Money.fromString("150").negate().toString()).toBe("-150");
     expect(Money.fromString("150").scaleBy("10").toString()).toBe("1500");
   });
 
   it("divides to a per-unit amount and rejects division by zero", () => {
     expect(Money.fromString("3000").divideBy("20").toString()).toBe("150");
-    expect(() => Money.fromString("100").divideBy("0")).toThrow(/division by zero/);
+    expect(() => Money.fromString("100").divideBy("0")).toThrow(
+      /division by zero/,
+    );
   });
 
   it("rejects invalid or non-finite input", () => {
@@ -43,12 +47,11 @@ describe("Money", () => {
   });
 
   it("formats in es-ES / EUR by default", () => {
-    // Normalize any Unicode space (nbsp / narrow nbsp) before the currency symbol.
     const normalize = (s: string) => s.replace(/\u00a0|\u202f/g, " ");
-    // Spanish grouping is min2 (CLDR/RAE): 4-digit numbers are NOT grouped,
-    // grouping only appears from 5 digits on.
     expect(normalize(Money.fromString("150").format())).toBe("150,00 €");
     expect(normalize(Money.fromString("1234.56").format())).toBe("1234,56 €");
-    expect(normalize(Money.fromString("12345.67").format())).toBe("12.345,67 €");
+    expect(normalize(Money.fromString("12345.67").format())).toBe(
+      "12.345,67 €",
+    );
   });
 });

@@ -1,0 +1,71 @@
+import { describe, it, expect, beforeEach } from "vitest";
+
+import type { Instrument, LedgerEvent } from "~/core/domain";
+import type {
+  InstrumentRepository,
+  LedgerEventFilter,
+  LedgerRepository,
+} from "~/core/ports";
+
+import { KrakenCsvAdapter } from "./adapter";
+
+class FakeInstrumentRepository implements InstrumentRepository {
+  upserted: Instrument[] = [];
+  async upsert(instruments: readonly Instrument[]): Promise<void> {
+    this.upserted.push(...instruments);
+  }
+  async list(): Promise<Instrument[]> {
+    return this.upserted;
+  }
+  async get(id: string): Promise<Instrument | null> {
+    return this.upserted.find((i) => i.id === id) ?? null;
+  }
+}
+
+class FakeLedgerRepository implements LedgerRepository {
+  appended: LedgerEvent[] = [];
+  async append(events: readonly LedgerEvent[]) {
+    this.appended.push(...events);
+    return { inserted: events.length, skipped: 0 };
+  }
+  async list(_filter?: LedgerEventFilter): Promise<LedgerEvent[]> {
+    return this.appended;
+  }
+}
+
+const HEADER =
+  "txid,refid,time,type,subtype,aclass,subclass,asset,wallet,amount,fee,balance";
+
+const CSV = [
+  HEADER,
+  `"x1","T1","2025-11-13 18:04:48","spend","","currency","fiat","EUR","spot / main",-150.0000,0,0.0`,
+  `"x2","T1","2025-11-13 18:04:48","receive","","currency","crypto","BTC","spot / main",0.0030000000,0,0.003`,
+  `"x3","D1","2025-11-17 13:38:00","deposit","","currency","fiat","EUR","spot / main",500.0000,0,500.0`,
+  `"x4","RW1","2025-11-25 23:25:20","reward","welcomebonus","currency","crypto","BTC","spot / main",0.0000057100,0,0.003`,
+  `"x5","RW2","2025-11-14 00:06:13","reward","welcomebonus","currency","crypto","SOL","spot / main",0.0017288700,0,0.001`,
+  `"x6","S1","2025-11-20 11:55:11","spend","","currency","crypto","PEPE","spot / main",-629732.00,0,0.68`,
+  `"x7","S1","2025-11-20 11:55:11","receive","","currency","crypto","SOL","spot / main",0.0208900000,0,0.02`,
+].join("\n");
+
+describe("KrakenCsvAdapter", () => {
+  let instruments: FakeInstrumentRepository;
+  let ledger: FakeLedgerRepository;
+  let adapter: KrakenCsvAdapter;
+
+  beforeEach(() => {
+    instruments = new FakeInstrumentRepository();
+    ledger = new FakeLedgerRepository();
+    adapter = new KrakenCsvAdapter(instruments, ledger);
+  });
+
+  it("imports BTC activity and EUR cash, discarding other crypto", async () => {
+    const summary = await adapter.import(CSV);
+
+    expect(summary.total).toBe(5);
+    expect(summary.imported).toBe(3);
+    expect(summary.discarded).toEqual({ "non-btc": 2 });
+    expect(summary.instruments).toBe(1);
+    expect(instruments.upserted[0]!.id).toBe("BTC");
+    expect(ledger.appended).toHaveLength(3);
+  });
+});
