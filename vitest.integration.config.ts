@@ -1,6 +1,8 @@
 import { defineConfig } from "vitest/config";
 import { fileURLToPath } from "node:url";
 
+// Integration tests only. Run with `pnpm test:integration`. Needs a real DB and the
+// generated Prisma client, so it's kept out of the default (unit) test run.
 export default defineConfig({
   resolve: {
     alias: {
@@ -8,11 +10,6 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["app/**/*.test.ts"],
-    exclude: [
-      "**/node_modules/**",
-      "**/dist/**",
-      "**/*.integration.test.ts",
-    ],
+    include: ["app/**/*.integration.test.ts"],
   },
 });
