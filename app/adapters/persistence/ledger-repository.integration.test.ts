@@ -5,11 +5,6 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 
 import type { Instrument, LedgerEvent } from "~/core/domain";
 
-// Integration test: runs against a real (temporary) SQLite database provisioned with
-// your real migrations (`prisma migrate deploy`). Excluded from the default unit run;
-// execute with `pnpm test:integration`. Requires the generated Prisma client and
-// better-sqlite3 (run it after `pnpm install`).
-
 let ledgerRepo: InstanceType<
   typeof import("./ledger-repository").PrismaLedgerRepository
 >;
@@ -18,8 +13,6 @@ let instrumentRepo: InstanceType<
 >;
 let disconnect: () => Promise<void>;
 
-// Project-relative path (Prisma resolves it from the project root) avoids the absolute
-// Windows path / file: URL issues a temp-dir path would cause.
 const tmpDir = "./.tmp";
 const dbPath = `${tmpDir}/it-${Date.now()}.sqlite`;
 
@@ -53,7 +46,6 @@ beforeAll(async () => {
   mkdirSync(tmpDir, { recursive: true });
   const dbUrl = `file:${dbPath}`;
   process.env.DATABASE_URL = dbUrl;
-  // Apply the committed migrations to the temp database (client already generated).
   execSync("pnpm exec prisma migrate deploy", {
     stdio: "ignore",
     env: { ...process.env, DATABASE_URL: dbUrl },
@@ -65,12 +57,10 @@ beforeAll(async () => {
   instrumentRepo = new PrismaInstrumentRepository();
   disconnect = () => prisma.$disconnect();
 
-  // Real ingestion flow in miniature: upsert instruments before appending entries.
   await instrumentRepo.upsert([instrument]);
 });
 
 afterAll(async () => {
-  // Close the SQLite handle before deleting the file (Windows would raise EPERM).
   if (disconnect) await disconnect();
   rmSync(tmpDir, { recursive: true, force: true });
 });

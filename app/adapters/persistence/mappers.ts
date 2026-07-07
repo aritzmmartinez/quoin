@@ -5,12 +5,6 @@ import {
   type LedgerEvent,
 } from "~/core/domain";
 
-/* ----------------------------- Ledger entries ----------------------------- */
-
-/**
- * Shape of a `LedgerEntry` row as stored (mirrors the Prisma model). Typed locally
- * so the mapper stays pure and testable without importing the generated client.
- */
 export interface LedgerEntryRow {
   id: string;
   ts: Date;
@@ -32,11 +26,6 @@ export interface LedgerEntryRow {
 
 export type LedgerEntryCreateData = Omit<LedgerEntryRow, never>;
 
-/**
- * Map a stored row into a validated domain event. The row's free-form `type`/`sleeve`
- * strings are validated against the domain schema here — the single point where "a DB
- * row is a valid event" is enforced. Throws on corrupt data instead of casting blindly.
- */
 export function rowToEvent(row: LedgerEntryRow): LedgerEvent {
   const base = {
     id: row.id,
@@ -84,7 +73,6 @@ export function rowToEvent(row: LedgerEntryRow): LedgerEvent {
   }
 }
 
-/** Map a domain event into row data for insertion. Exhaustive over the union. */
 export function eventToCreateData(event: LedgerEvent): LedgerEntryCreateData {
   const base = {
     id: event.id,
@@ -140,9 +128,6 @@ export function eventToCreateData(event: LedgerEvent): LedgerEntryCreateData {
   }
 }
 
-/* ------------------------------- Instruments ------------------------------ */
-
-/** Shape of an `Instrument` row as stored (mirrors the Prisma model). */
 export interface InstrumentRow {
   id: string;
   name: string;
@@ -153,7 +138,6 @@ export interface InstrumentRow {
 
 export type InstrumentWriteData = InstrumentRow;
 
-/** Map a stored row into a validated domain instrument (validates the `type` enum). */
 export function rowToInstrument(row: InstrumentRow): Instrument {
   return instrumentSchema.parse({
     id: row.id,
@@ -164,8 +148,9 @@ export function rowToInstrument(row: InstrumentRow): Instrument {
   });
 }
 
-/** Map a domain instrument into row data for create/update. */
-export function instrumentToWriteData(instrument: Instrument): InstrumentWriteData {
+export function instrumentToWriteData(
+  instrument: Instrument,
+): InstrumentWriteData {
   return {
     id: instrument.id,
     name: instrument.name,
