@@ -16,5 +16,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Core domain: Money (decimal.js), ledger event types, LedgerRepository port, and the computePositions projection (weighted-average cost) with unit tests
 - Ledger domain schemas (Zod, single source of truth for types and validation)
 - Persistence adapter: Prisma LedgerRepository (idempotent append, chronological list) with row<->event mappers and an integration test.
+- CSV ingestion for Trade Republic and Kraken on a shared ingestion layer (batch builder + persist step; card spending and non-BTC crypto filtered; dedup by source transaction id).
 
 [Unreleased]: https://github.com/aritzmmartinez/quoin/commits/main
