@@ -16,10 +16,12 @@ export type KrakenRow = z.infer<typeof krakenRowSchema>;
 export function parseKrakenCsv(csv: string): KrakenRow[] {
   const { data, errors } = Papa.parse<Record<string, string>>(csv, {
     header: true,
-    skipEmptyLines: true,
+    skipEmptyLines: "greedy",
   });
   if (errors.length > 0) {
     throw new Error(`CSV parse error: ${errors[0]!.message}`);
   }
-  return data.map((raw) => krakenRowSchema.parse(raw));
+  return data
+    .filter((raw) => (raw.type ?? "").trim() !== "")
+    .map((raw) => krakenRowSchema.parse(raw));
 }
