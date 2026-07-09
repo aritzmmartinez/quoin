@@ -1,5 +1,9 @@
 import type { Instrument, LedgerEvent } from "~/core/domain";
-import type { InstrumentRepository, LedgerRepository } from "~/core/ports";
+import {
+  ledgerDedupKey,
+  type InstrumentRepository,
+  type LedgerRepository,
+} from "~/core/ports";
 
 export type MappedItem =
   | { kind: "domain"; instrument: Instrument | null; event: LedgerEvent }
@@ -65,6 +69,30 @@ export async function persistBatch(
     total: batch.total,
     imported: inserted,
     duplicates: skipped,
+    discarded: batch.discarded,
+    errors: batch.errors,
+    instruments: batch.instruments.length,
+  };
+}
+
+export async function previewBatch(
+  ledger: LedgerRepository,
+  batch: MappedBatch,
+): Promise<ImportSummary> {
+  const existing = await ledger.existing(batch.events);
+  let duplicates = 0;
+  for (const event of batch.events) {
+    if (
+      event.externalId &&
+      existing.has(ledgerDedupKey(event.source, event.externalId))
+    ) {
+      duplicates += 1;
+    }
+  }
+  return {
+    total: batch.total,
+    imported: batch.events.length - duplicates,
+    duplicates,
     discarded: batch.discarded,
     errors: batch.errors,
     instruments: batch.instruments.length,

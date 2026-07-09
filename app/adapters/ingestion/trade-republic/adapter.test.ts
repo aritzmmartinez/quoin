@@ -24,6 +24,9 @@ class FakeInstrumentRepository implements InstrumentRepository {
 
 class FakeLedgerRepository implements LedgerRepository {
   appended: LedgerEvent[] = [];
+  async existing(): Promise<Set<string>> {
+    return new Set();
+  }
   private seen = new Set<string>();
   async append(events: readonly LedgerEvent[]) {
     let inserted = 0;
