@@ -4,6 +4,10 @@ import { Money } from "~/core/domain";
 
 const LOCALE = "es-ES";
 
+export function formatMoney(value: string, maximumFractionDigits = 2): string {
+  return Money.fromString(value).format({ maximumFractionDigits });
+}
+
 export function formatQuantity(
   value: string,
   maximumFractionDigits = 8,
