@@ -18,6 +18,7 @@ model Instrument {
   createdAt  DateTime @default(now())
 
   entries LedgerEntry[]
+  prices  PriceSnapshot[]
 }
 
 /// Immutable ledger: the source of truth. Positions, P&L, allocation... are DERIVED from here.
@@ -50,4 +51,26 @@ model LedgerEntry {
   @@unique([source, externalId]) // idempotent ingestion (NULLs are distinct in SQLite -> manual entries don't collide)
   @@index([ts])
   @@index([instrumentId])
+}
+
+/// Point-in-time price for an instrument, from a market-data provider.
+/// Append-only history: the latest price per instrument is max(asOf). This also
+/// feeds the "updated X ago" freshness indicator and future TWR/MWR.
+model PriceSnapshot {
+  id           String     @id @default(uuid())
+  instrumentId String
+  instrument   Instrument @relation(fields: [instrumentId], references: [id])
+
+  // Money is ALWAYS a String (decimal) -> operated on with decimal.js.
+  price    String // per-unit price, in `currency`
+  currency String // ISO 4217 as returned by the provider
+
+  asOf   DateTime // provider's quote timestamp (market time)
+  source String   @default("YAHOO") // provider id
+
+  createdAt DateTime @default(now()) // when we fetched/persisted it
+
+  @@unique([instrumentId, asOf]) // idempotent sync: same quote time won't duplicate
+  @@index([instrumentId])
+  @@index([asOf])
 }
