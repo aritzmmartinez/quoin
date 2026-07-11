@@ -28,4 +28,8 @@ export class PrismaInstrumentRepository implements InstrumentRepository {
     const row = await prisma.instrument.findUnique({ where: { id } });
     return row ? rowToInstrument(row) : null;
   }
+
+  async setQuoteSymbol(id: string, symbol: string | null): Promise<void> {
+    await prisma.instrument.update({ where: { id }, data: { quoteSymbol: symbol } });
+  }
 }

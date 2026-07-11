@@ -134,9 +134,10 @@ export interface InstrumentRow {
   type: string;
   currency: string;
   assetClass: string | null;
+  quoteSymbol: string | null;
 }
 
-export type InstrumentWriteData = InstrumentRow;
+export type InstrumentWriteData = Omit<InstrumentRow, "quoteSymbol">;
 
 export function rowToInstrument(row: InstrumentRow): Instrument {
   return instrumentSchema.parse({
@@ -145,6 +146,7 @@ export function rowToInstrument(row: InstrumentRow): Instrument {
     type: row.type,
     currency: row.currency,
     assetClass: row.assetClass,
+    quoteSymbol: row.quoteSymbol ?? null,
   });
 }
 

@@ -2,7 +2,7 @@ import "dotenv/config";
 
 import { exit } from "node:process";
 
-import { YahooMarketDataProvider, YAHOO_SYMBOLS } from "~/adapters/marketdata";
+import { YahooMarketDataProvider } from "~/adapters/marketdata";
 import {
   PrismaInstrumentRepository,
   PrismaPriceRepository,
@@ -13,20 +13,19 @@ import type { PriceSnapshot } from "~/core/ports";
 async function main(): Promise<void> {
   const instruments = await new PrismaInstrumentRepository().list();
 
-  const mapped = instruments
-    .map((instrument) => ({ instrument, symbol: YAHOO_SYMBOLS[instrument.id] }))
-    .filter(
-      (m): m is { instrument: (typeof instruments)[number]; symbol: string } =>
-        Boolean(m.symbol),
-    );
-  const unmapped = instruments.filter((i) => !YAHOO_SYMBOLS[i.id]);
-  const symbolToId = new Map(mapped.map((m) => [m.symbol, m.instrument.id]));
+  const mapped = instruments.filter(
+    (i): i is typeof i & { quoteSymbol: string } => Boolean(i.quoteSymbol),
+  );
+  const unmapped = instruments.filter((i) => !i.quoteSymbol);
+  const symbolToId = new Map(mapped.map((i) => [i.quoteSymbol, i.id]));
 
   console.log(
     `Instruments: ${instruments.length} | mapped: ${mapped.length} | unmapped: ${unmapped.length}`,
   );
   if (unmapped.length > 0) {
-    console.log("\nUnmapped (add them to YAHOO_SYMBOLS to include):");
+    console.log(
+      "\nNo quote symbol yet (set one with `pnpm prices:map <ISIN> <SYMBOL>`):",
+    );
     for (const i of unmapped) console.log(`  ${i.id}  ${i.name}`);
   }
   if (mapped.length === 0) {
@@ -35,7 +34,7 @@ async function main(): Promise<void> {
   }
 
   const provider = new YahooMarketDataProvider();
-  const quotes = await provider.getQuotes(mapped.map((m) => m.symbol));
+  const quotes = await provider.getQuotes(mapped.map((i) => i.quoteSymbol));
 
   const seen = new Set<string>();
   const snapshots: PriceSnapshot[] = [];
@@ -51,7 +50,7 @@ async function main(): Promise<void> {
       source: provider.source,
     });
   }
-  const failed = mapped.filter((m) => !seen.has(m.symbol));
+  const failed = mapped.filter((i) => !seen.has(i.quoteSymbol));
 
   const written = await new PrismaPriceRepository().saveMany(snapshots);
 
@@ -62,8 +61,10 @@ async function main(): Promise<void> {
     );
   }
   if (failed.length > 0) {
-    console.log("\nNo quote returned for (check the symbol on finance.yahoo.com):");
-    for (const m of failed) console.log(`  ${m.instrument.id}  (${m.symbol})`);
+    console.log(
+      "\nNo quote returned for (check the symbol on finance.yahoo.com):",
+    );
+    for (const i of failed) console.log(`  ${i.id}  (${i.quoteSymbol})`);
   }
 }
 
