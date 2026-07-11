@@ -17,5 +17,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ledger domain schemas (Zod, single source of truth for types and validation)
 - Persistence adapter: Prisma LedgerRepository (idempotent append, chronological list) with row<->event mappers and an integration test.
 - CSV ingestion for Trade Republic and Kraken on a shared ingestion layer (batch builder + persist step; card spending and non-BTC crypto filtered; dedup by source transaction id).
+- Portfolio screen (index route): server loader derives current holdings from the ledger (computePositions + trade metadata), joined with instrument data and sorted via URL search params. Shows instrument, type, quantity, average cost, invested amount and realized P&L, with expandable per-position detail (ISIN, currency, asset class, first/last trade, trade count). Reusable presentation layer: es-ES formatters, centralized Spanish copy, and design-system components (Card, SleeveChip, SignedMoney, sortable table). Market-derived columns (value, unrealized P&L, weight) intentionally deferred until a price provider exists. Closed positions are excluded from the holdings view
 
 [Unreleased]: https://github.com/aritzmmartinez/quoin/commits/main
