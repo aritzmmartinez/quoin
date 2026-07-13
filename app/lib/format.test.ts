@@ -3,10 +3,13 @@ import { describe, expect, it } from "vitest";
 import {
   formatDate,
   formatMoney,
+  formatPercent,
   formatQuantity,
+  formatRelativeTime,
   formatSignedMoney,
 } from "./format";
 
+/** Strip NBSP / thin spaces so assertions don't depend on ICU spacing details. */
 const norm = (s: string) => s.replace(/[\s\u00a0\u202f]/g, " ");
 
 describe("formatMoney", () => {
@@ -55,5 +58,25 @@ describe("formatDate", () => {
     const out = norm(formatDate("2026-07-01T10:00:00.000Z")).toLowerCase();
     expect(out).toContain("2026");
     expect(out).toContain("jul");
+  });
+});
+
+describe("formatPercent", () => {
+  it("renders a 0..1 fraction as a percentage with one decimal", () => {
+    expect(norm(formatPercent("0.1732"))).toContain("17,3");
+    expect(norm(formatPercent("0.1732"))).toContain("%");
+  });
+});
+
+describe("formatRelativeTime", () => {
+  const now = new Date("2026-07-12T12:00:00.000Z");
+  it("uses minutes for recent times", () => {
+    const out = formatRelativeTime("2026-07-12T11:55:00.000Z", now);
+    expect(out).toContain("minuto");
+  });
+  it("uses days for older times", () => {
+    // numeric:"auto" -> "hace 5 días" (and "ayer" for exactly one day)
+    const out = formatRelativeTime("2026-07-07T12:00:00.000Z", now);
+    expect(out.toLowerCase()).toContain("días");
   });
 });
