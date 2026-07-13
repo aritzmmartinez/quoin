@@ -9,4 +9,5 @@ export interface PriceSnapshot {
 export interface PriceRepository {
   saveMany(snapshots: readonly PriceSnapshot[]): Promise<number>;
   latest(): Promise<Map<string, PriceSnapshot>>;
+  deleteForInstrument(instrumentId: string): Promise<number>;
 }

@@ -2,7 +2,7 @@ import "dotenv/config";
 
 import { exit } from "node:process";
 
-import { YahooMarketDataProvider } from "~/adapters/marketdata";
+import { isFreshQuote, YahooMarketDataProvider } from "~/adapters/marketdata";
 import {
   PrismaInstrumentRepository,
   PrismaPriceRepository,
@@ -36,12 +36,21 @@ async function main(): Promise<void> {
   const provider = new YahooMarketDataProvider();
   const quotes = await provider.getQuotes(mapped.map((i) => i.quoteSymbol));
 
-  const seen = new Set<string>();
+  const now = new Date();
   const snapshots: PriceSnapshot[] = [];
+  const seen = new Set<string>();
+  const stale: { id: string; symbol: string; asOf: Date }[] = [];
+
   for (const q of quotes) {
     const instrumentId = symbolToId.get(q.symbol);
     if (!instrumentId) continue;
     seen.add(q.symbol);
+
+    if (!isFreshQuote(q, now)) {
+      stale.push({ id: instrumentId, symbol: q.symbol, asOf: q.asOf });
+      continue;
+    }
+
     snapshots.push({
       instrumentId,
       price: q.price,
@@ -50,21 +59,29 @@ async function main(): Promise<void> {
       source: provider.source,
     });
   }
-  const failed = mapped.filter((i) => !seen.has(i.quoteSymbol));
 
+  const noQuote = mapped.filter((i) => !seen.has(i.quoteSymbol));
   const written = await new PrismaPriceRepository().saveMany(snapshots);
 
-  console.log(`\nFetched ${quotes.length} quote(s), persisted ${written}:`);
+  console.log(`\nPersisted ${written} fresh quote(s):`);
   for (const s of snapshots) {
     console.log(
       `  ${s.instrumentId}  ${s.price} ${s.currency}  @ ${s.asOf.toISOString()}`,
     );
   }
-  if (failed.length > 0) {
+  if (stale.length > 0) {
+    console.log(
+      "\nStale quotes skipped (provider returned an old timestamp — try another venue):",
+    );
+    for (const s of stale) {
+      console.log(`  ${s.id}  (${s.symbol})  last @ ${s.asOf.toISOString()}`);
+    }
+  }
+  if (noQuote.length > 0) {
     console.log(
       "\nNo quote returned for (check the symbol on finance.yahoo.com):",
     );
-    for (const i of failed) console.log(`  ${i.id}  (${i.quoteSymbol})`);
+    for (const i of noQuote) console.log(`  ${i.id}  (${i.quoteSymbol})`);
   }
 }
 

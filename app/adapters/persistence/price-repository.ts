@@ -27,7 +27,7 @@ export class PrismaPriceRepository implements PriceRepository {
 
   async latest(): Promise<Map<string, PriceSnapshot>> {
     const rows = await prisma.priceSnapshot.findMany({
-      orderBy: [{ instrumentId: "asc" }, { asOf: "desc" }],
+      orderBy: [{ instrumentId: "asc" }, { createdAt: "desc" }],
     });
 
     const latest = new Map<string, PriceSnapshot>();
@@ -42,5 +42,12 @@ export class PrismaPriceRepository implements PriceRepository {
       });
     }
     return latest;
+  }
+
+  async deleteForInstrument(instrumentId: string): Promise<number> {
+    const { count } = await prisma.priceSnapshot.deleteMany({
+      where: { instrumentId },
+    });
+    return count;
   }
 }
