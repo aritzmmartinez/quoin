@@ -5,7 +5,9 @@ import {
   es,
   formatDate,
   formatMoney,
+  formatPercent,
   formatQuantity,
+  formatSignedMoney,
   instrumentTypeLabel,
   type PortfolioRow,
 } from "~/lib";
@@ -33,6 +35,8 @@ function Chevron({ open }: { open: boolean }) {
   );
 }
 
+/** One expandable position row. Expansion state is local. Market cells fall back
+ * to "—" when the instrument has no usable price. */
 export function PortfolioRowItem({ row }: { row: PortfolioRow }) {
   const [open, setOpen] = useState(false);
   const detailId = `pos-${row.key}`;
@@ -41,6 +45,7 @@ export function PortfolioRowItem({ row }: { row: PortfolioRow }) {
     { label: es.portfolio.detail.isin, value: row.instrumentId },
     { label: es.portfolio.detail.currency, value: row.currency ?? DASH },
     { label: es.portfolio.detail.assetClass, value: row.assetClass ?? DASH },
+    { label: es.portfolio.detail.realizedPnL, value: formatSignedMoney(row.realizedPnL).text },
     {
       label: es.portfolio.detail.firstTrade,
       value: row.firstTradeAt ? formatDate(row.firstTradeAt) : DASH,
@@ -54,6 +59,7 @@ export function PortfolioRowItem({ row }: { row: PortfolioRow }) {
 
   return (
     <li className="border-b border-border last:border-b-0">
+      {/* Mouse users can click anywhere on the row; keyboard users use the chevron button. */}
       <div
         className={`grid ${GRID_TEMPLATE} cursor-pointer items-center gap-2 px-5 py-3 transition-colors hover:bg-surface-2`}
         onClick={() => setOpen((o) => !o)}
@@ -77,25 +83,23 @@ export function PortfolioRowItem({ row }: { row: PortfolioRow }) {
             <span className="truncate text-sm font-medium">{row.name}</span>
             <SleeveChip sleeve={row.sleeve} />
           </div>
-          <div className="mt-0.5 text-[11.5px] text-muted">
-            {row.instrumentId}
-          </div>
+          <div className="mt-0.5 text-[11.5px] text-muted">{row.instrumentId}</div>
         </div>
 
         <div className="text-[13px] text-muted">
           {row.type ? instrumentTypeLabel(row.type) : DASH}
         </div>
-        <div className="text-right text-[13.5px]">
-          {formatQuantity(row.quantity)}
-        </div>
-        <div className="text-right text-[13.5px]">
-          {formatMoney(row.averageCost)}
+        <div className="text-right text-[13.5px]">{formatQuantity(row.quantity)}</div>
+        <div className="text-right text-[13.5px]">{formatMoney(row.averageCost)}</div>
+        <div className="text-right text-[13.5px]">{formatMoney(row.costBasis)}</div>
+        <div className="text-right text-[13.5px] font-medium">
+          {row.marketValue !== null ? formatMoney(row.marketValue) : DASH}
         </div>
         <div className="text-right text-[13.5px] font-medium">
-          {formatMoney(row.costBasis)}
+          {row.unrealizedPnL !== null ? <SignedMoney value={row.unrealizedPnL} /> : DASH}
         </div>
-        <div className="text-right text-[13.5px] font-medium">
-          <SignedMoney value={row.realizedPnL} />
+        <div className="text-right text-[13.5px] text-muted">
+          {row.weight !== null ? formatPercent(row.weight) : DASH}
         </div>
       </div>
 

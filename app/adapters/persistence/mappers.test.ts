@@ -66,6 +66,7 @@ const instrument: Instrument = {
   type: "ETF",
   currency: "EUR",
   assetClass: "FUND",
+  quoteSymbol: null,
 };
 
 describe("ledger mappers", () => {
@@ -88,13 +89,18 @@ describe("ledger mappers", () => {
 
   it("rejects a row with an unknown type", () => {
     const row = eventToCreateData(cash) as LedgerEntryRow;
-    expect(() => rowToEvent({ ...row, type: "MYSTERY" })).toThrow(/Unknown ledger entry type/);
+    expect(() => rowToEvent({ ...row, type: "MYSTERY" })).toThrow(
+      /Unknown ledger entry type/,
+    );
   });
 });
 
 describe("instrument mappers", () => {
   it("round-trips an instrument unchanged", () => {
-    const row = instrumentToWriteData(instrument) as InstrumentRow;
+    const row: InstrumentRow = {
+      ...instrumentToWriteData(instrument),
+      quoteSymbol: null,
+    };
     expect(rowToInstrument(row)).toEqual(instrument);
   });
 

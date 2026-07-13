@@ -28,6 +28,7 @@ export const instrumentSchema = z.object({
   type: instrumentTypeSchema,
   currency: z.string(),
   assetClass: z.string().nullish(),
+  quoteSymbol: z.string().nullish(),
 });
 export type Instrument = z.infer<typeof instrumentSchema>;
 

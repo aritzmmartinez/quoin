@@ -20,6 +20,10 @@ class FakeInstrumentRepository implements InstrumentRepository {
   async get(id: string): Promise<Instrument | null> {
     return this.upserted.find((i) => i.id === id) ?? null;
   }
+  async setQuoteSymbol(id: string, symbol: string | null): Promise<void> {
+    const instrument = this.upserted.find((i) => i.id === id);
+    if (instrument) instrument.quoteSymbol = symbol;
+  }
 }
 
 class FakeLedgerRepository implements LedgerRepository {

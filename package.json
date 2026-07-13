@@ -12,6 +12,8 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "ingest": "tsx scripts/ingest.ts",
+    "prices:sync": "tsx scripts/prices-sync.ts",
+    "prices:map": "tsx scripts/prices-map.ts",
     "postinstall": "prisma generate",
     "test": "vitest run",
     "test:watch": "vitest",

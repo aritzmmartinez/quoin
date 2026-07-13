@@ -27,15 +27,15 @@ Convention: internal imports always use the `~/...` alias.
 
 ### core
 - `domain/`      value objects (Money as string + decimal.js), ledger event types
-- `ports/`       interfaces: Repository, PriceProvider, FxProvider, ImportAdapter, TaxJurisdiction
-- `projections/` pure functions: positions, lots (FIFO), P&L, allocation, look-through
+- `ports/`       interfaces: `LedgerRepository`, `InstrumentRepository`, `MarketDataProvider`, `PriceRepository` (planned: `FxProvider`, `TaxJurisdiction`)
+- `projections/` pure functions: `computePositions` (average cost), `computeTradeMeta` (planned: FIFO lots, allocation, look-through)
 - `tax/`         TaxJurisdiction implementations (bizkaia, common, ...)
 
 ### adapters
-- `ingestion/`   TradeRepublicCsvAdapter (CSV -> events; filters card spending; dedup by transaction_id)
-- `persistence/` Prisma 7 + SQLite (schema, generated client, repositories)
-- `marketdata/`  quotes behind PriceProvider + manual fallback
-- `fx/`          exchange rates (ECB)
+- `ingestion/`   `TradeRepublicCsvAdapter` + `KrakenCsvAdapter` (CSV -> events; filter card spending / non-BTC crypto; dedup by transaction id)
+- `persistence/` Prisma 7 + SQLite (schema, generated client, ledger/instrument/price repositories)
+- `marketdata/`  `YahooMarketDataProvider` behind the `MarketDataProvider` port; `quoteSymbol` per instrument (local DB only)
+- `fx/`          (planned) exchange rates for non-EUR quotes
 
 ## Persistence (Prisma 7 + SQLite)
 
@@ -45,11 +45,13 @@ Convention: internal imports always use the `~/...` alias.
   (`app/adapters/persistence/generated/`, gitignored). The client lives where it can be used,
   and the lint boundary keeps `core` from importing it.
 - The connection URL lives in **`prisma.config.ts`** (Prisma 7), not in the datasource block.
-- **Model**: `Instrument` (master, key = ISIN or symbol) + `LedgerEntry` (immutable ledger).
-  Every amount/quantity is a `String` (decimal) -> operated on with decimal.js.
-  `@@unique([source, externalId])` makes ingestion idempotent.
-- The Prisma client and repositories (implementing core's `Repository` port) are wired in the
-  next step, together with the projections that consume them.
+- **Models**: `Instrument` (master, key = ISIN or symbol; optional `quoteSymbol` for price
+  lookups), `LedgerEntry` (immutable ledger), and `PriceSnapshot` (append-only price history,
+  `@@unique([instrumentId, asOf])`). Every amount/quantity/price is a `String` (decimal) ->
+  operated on with decimal.js. `@@unique([source, externalId])` makes ingestion idempotent.
+- Repositories implement core's ports (`LedgerRepository`, `InstrumentRepository`,
+  `PriceRepository`); the loader reads snapshots persisted by `prices:sync` and never hits the
+  network in a request.
 
 ### Database setup
 
@@ -70,8 +72,9 @@ pnpm run db:studio      # (optional) GUI to inspect the data
 
 ## Data and secrets (public repo)
 
-The code is public; data and credentials, NEVER. `data/`, `*.sqlite`, `.env` and
+The code is public; data and credentials, NEVER. `data/`, `*.sqlite`, `*.csv`, `.env` and
 `credentials*` are gitignored. `.env.example` documents the variables without values.
+Quote symbols (which reveal holdings) live only in the local DB, never in the repo.
 
 ## Stack
 
