@@ -31,8 +31,6 @@ import {
   totalUnrealizedPnL,
 } from "~/lib";
 
-// Positions are aggregated in the base currency; quotes are only used when they
-// match it (no FX conversion yet).
 const BASE_CURRENCY = "EUR";
 
 export function meta(_: Route.MetaArgs) {
@@ -41,6 +39,8 @@ export function meta(_: Route.MetaArgs) {
     { name: "description", content: "Tus posiciones actuales" },
   ];
 }
+
+export const handle = { title: es.portfolio.title };
 
 export async function loader({ request }: Route.LoaderArgs) {
   const sort = parseSort(new URL(request.url).searchParams);
@@ -88,9 +88,6 @@ export default function Portfolio({ loaderData }: Route.ComponentProps) {
     <main className="mx-auto max-w-6xl px-4 py-8 md:px-6">
       <header className="mb-4">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <h1 className="text-[22px] font-semibold tracking-tight">
-            {es.portfolio.title}
-          </h1>
           {rows.length > 0 && (
             <span className="text-[13px] text-muted">
               {es.portfolio.summary(rows.length, formatMoney(invested))}
@@ -98,7 +95,10 @@ export default function Portfolio({ loaderData }: Route.ComponentProps) {
             </span>
           )}
           {unrealized !== null && (
-            <SignedMoney value={unrealized} className="text-[13px] font-medium" />
+            <SignedMoney
+              value={unrealized}
+              className="text-[13px] font-medium"
+            />
           )}
         </div>
         {rows.length > 0 && (
@@ -124,9 +124,6 @@ export default function Portfolio({ loaderData }: Route.ComponentProps) {
 export function ErrorBoundary() {
   return (
     <main className="mx-auto max-w-6xl px-4 py-8 md:px-6">
-      <h1 className="mb-4 text-[22px] font-semibold tracking-tight">
-        {es.portfolio.title}
-      </h1>
       <Card>
         <PortfolioError onRetry={() => window.location.reload()} />
       </Card>

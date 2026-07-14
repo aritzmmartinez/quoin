@@ -4,10 +4,13 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useRouteLoaderData,
 } from "react-router";
 
 import type { Route } from "./+types/root";
 import "./app.css";
+
+type Theme = "light" | "dark";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -22,10 +25,17 @@ export const links: Route.LinksFunction = () => [
   },
 ];
 
+export function loader({ request }: Route.LoaderArgs) {
+  const cookie = request.headers.get("Cookie") ?? "";
+  const theme: Theme = cookie.includes("quoin-theme=light") ? "light" : "dark";
+  return { theme };
+}
+
 export function Layout({ children }: { children: React.ReactNode }) {
+  const data = useRouteLoaderData<typeof loader>("root");
+  const theme: Theme = data?.theme ?? "dark";
   return (
-    // dark by default; the theme toggle will switch this class (later step)
-    <html lang="es" className="dark">
+    <html lang="es" className={theme}>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />

@@ -1,4 +1,3 @@
-// reusable UI components (design system)
 export * from "./ui/Card";
 export * from "./ui/SleeveChip";
 export * from "./SignedMoney";
@@ -14,3 +13,7 @@ export * from "./instrument/MovementsList";
 export * from "./instrument/RangeSelector";
 export * from "./instrument/PriceChartWithTrades";
 export * from "./instrument/InvestedVsValue";
+export * from "./nav/AppSidebar";
+export * from "./nav/AppHeader";
+export * from "./nav/AppBottomNav";
+export * from "./ui/ThemeToggle";

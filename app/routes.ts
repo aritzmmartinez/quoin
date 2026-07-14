@@ -1,6 +1,13 @@
-import { type RouteConfig, index, route } from "@react-router/dev/routes";
+import {
+  type RouteConfig,
+  index,
+  layout,
+  route,
+} from "@react-router/dev/routes";
 
 export default [
-  index("routes/portfolio.tsx"),
-  route("instrument/:instrumentId", "routes/instrument.tsx"),
+  layout("routes/_shell.tsx", [
+    index("routes/portfolio.tsx"),
+    route("instrument/:instrumentId", "routes/instrument.tsx"),
+  ]),
 ] satisfies RouteConfig;

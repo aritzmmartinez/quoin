@@ -31,6 +31,12 @@ export function meta(_: Route.MetaArgs) {
   return [{ title: "Detalle de activo · Quoin" }];
 }
 
+export const handle = {
+  title: (data: unknown): string =>
+    (data as { instrument?: { name?: string } } | undefined)?.instrument
+      ?.name ?? es.instrument.viewFallback,
+};
+
 export async function loader({ params }: Route.LoaderArgs) {
   const id = params.instrumentId;
   const now = new Date();
