@@ -14,4 +14,6 @@ export * from "./instrument/RangeSelector";
 export * from "./instrument/PriceChartWithTrades";
 export * from "./instrument/InvestedVsValue";
 export * from "./nav/AppSidebar";
+export * from "./nav/AppHeader";
 export * from "./nav/AppBottomNav";
+export * from "./ui/ThemeToggle";

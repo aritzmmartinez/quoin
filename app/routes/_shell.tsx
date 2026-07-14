@@ -1,12 +1,13 @@
 import { Outlet } from "react-router";
 
-import { AppBottomNav, AppSidebar } from "~/components";
+import { AppBottomNav, AppHeader, AppSidebar } from "~/components";
 
 export default function Shell() {
   return (
     <div className="min-h-dvh md:flex">
       <AppSidebar />
-      <div className="flex-1 pb-16 md:pb-0">
+      <div className="flex flex-1 flex-col pb-16 md:pb-0">
+        <AppHeader />
         <Outlet />
       </div>
       <AppBottomNav />

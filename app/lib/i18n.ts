@@ -16,6 +16,9 @@ export const es = {
     movements: "Movimientos",
     soon: "Pronto",
   },
+  theme: {
+    toggle: "Cambiar tema",
+  },
   portfolio: {
     title: "Cartera",
     summary: (count: number, invested: string): string =>
@@ -54,6 +57,7 @@ export const es = {
   },
   instrument: {
     back: "Cartera",
+    viewFallback: "Activo",
     units: (n: string): string => `${n} uds`,
     value: "Valor",
     unrealizedPnL: "P&L no realizado",
