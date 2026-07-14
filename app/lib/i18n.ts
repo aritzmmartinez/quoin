@@ -8,9 +8,16 @@ import type { InstrumentType, Sleeve } from "~/core/domain";
  * Typed `as const` so keys are checked at compile time.
  */
 export const es = {
+  nav: {
+    brand: "Quoin",
+    overview: "Resumen",
+    portfolio: "Cartera",
+    allocation: "Asignación",
+    movements: "Movimientos",
+    soon: "Pronto",
+  },
   portfolio: {
     title: "Cartera",
-    /** e.g. "7 posiciones · 24.500,00 € aportado" */
     summary: (count: number, invested: string): string =>
       `${count} ${count === 1 ? "posición" : "posiciones"} · ${invested} aportado`,
     columns: {
@@ -32,7 +39,6 @@ export const es = {
       lastTrade: "Última operación",
       tradeCount: "Nº de operaciones",
     },
-    /** e.g. "Actualizado hace 1 día" */
     updatedAt: (relative: string): string => `Actualizado ${relative}`,
     noPrices: "Sin precios — ejecuta pnpm prices:sync",
     empty: {
@@ -118,5 +124,4 @@ export function instrumentTypeLabel(type: InstrumentType): string {
   return TYPE_LABELS[type];
 }
 
-/** Placeholder for a value that isn't available (e.g. optional metadata). */
 export const DASH = "—";
