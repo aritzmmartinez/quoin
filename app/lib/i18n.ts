@@ -46,6 +46,54 @@ export const es = {
     },
     expandLabel: "Ver detalle",
   },
+  instrument: {
+    back: "Cartera",
+    units: (n: string): string => `${n} uds`,
+    value: "Valor",
+    unrealizedPnL: "P&L no realizado",
+    kpis: {
+      twr: { label: "TWR", sub: "ponderada por tiempo" },
+      mwr: { label: "MWR / TIR", sub: "ponderada por dinero" },
+      totalInvested: { label: "Total aportado", sub: "suma de compras" },
+      buyCount: { label: "Aportaciones", sub: "compras realizadas" },
+      avgBuyAmount: { label: "Importe medio", sub: "por aportación" },
+    },
+    priceChart: {
+      title: "Precio y operaciones",
+      price: "Precio",
+      avgCost: "Coste medio",
+      buy: "Compra",
+      sell: "Venta",
+      empty: "Sin operaciones registradas.",
+      noPrice:
+        "Sin histórico de precio todavía — se construye con cada pnpm prices:sync.",
+    },
+    ivvChart: {
+      title: "Invertido vs. valor",
+      invested: "Aportado",
+      value: "Valor",
+      building:
+        "El valor se irá dibujando conforme el histórico de precio se acumule.",
+    },
+    movements: {
+      title: "Movimientos de este activo",
+      columns: {
+        date: "Fecha",
+        side: "Tipo",
+        quantity: "Uds",
+        price: "Precio",
+        amount: "Importe",
+      },
+      buy: "Compra",
+      sell: "Venta",
+      empty: "Sin movimientos.",
+    },
+    range: { m1: "1M", m6: "6M", y1: "1A", all: "Todo" },
+    notFound: {
+      title: "Instrumento no encontrado",
+      body: "No hay ningún instrumento con ese identificador.",
+    },
+  },
 } as const;
 
 const SLEEVE_LABELS: Record<Sleeve, string> = {
