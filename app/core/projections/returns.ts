@@ -41,7 +41,7 @@ function xirr(flows: readonly CashFlow[]): number | null {
   let lo = -0.9999;
   let hi = 10;
   let fLo = npv(lo);
-  let fHi = npv(hi);
+  const fHi = npv(hi);
   if (fLo === 0) return lo;
   if (fHi === 0) return hi;
   if (fLo * fHi > 0) return null;
@@ -52,7 +52,6 @@ function xirr(flows: readonly CashFlow[]): number | null {
     if (Math.abs(fMid) < 1e-7) return mid;
     if (fLo * fMid < 0) {
       hi = mid;
-      fHi = fMid;
     } else {
       lo = mid;
       fLo = fMid;
