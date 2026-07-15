@@ -37,6 +37,21 @@ describe("computeReturns", () => {
     expect(r.avgBuyAmount).toBe("800");
   });
 
+  it("counts fees as part of what was contributed", () => {
+    const events: LedgerEvent[] = [
+      trade({
+        ts: new Date("2026-01-01"),
+        quantity: "20",
+        grossAmount: "895.40",
+        fees: "1",
+      }),
+    ];
+    const r = computeReturns(events, "VWCE", "43.80", new Date("2026-07-15"));
+
+    expect(r.totalInvested).toBe("896.4");
+    expect(r.avgBuyAmount).toBe("896.4");
+  });
+
   it("TWR equals the security price return for a continuously held position", () => {
     const events: LedgerEvent[] = [
       trade({

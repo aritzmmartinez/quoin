@@ -73,8 +73,12 @@ export function computeReturns(
     .sort((a, b) => a.ts.getTime() - b.ts.getTime());
 
   const buys = trades.filter((t) => t.type === "BUY");
+
   const totalInvested = buys.reduce(
-    (sum, b) => sum.plus(baseAmount(b.grossAmount, b.fxToBase)),
+    (sum, b) =>
+      sum
+        .plus(baseAmount(b.grossAmount, b.fxToBase))
+        .plus(baseAmount(b.fees, b.fxToBase)),
     new Decimal(0),
   );
   const buyCount = buys.length;
