@@ -8,6 +8,10 @@ interface YahooChartResponse {
         regularMarketPrice?: number;
         regularMarketTime?: number;
       };
+      timestamp?: number[] | null;
+      indicators?: {
+        quote?: Array<{ close?: Array<number | null> | null }> | null;
+      } | null;
     }> | null;
     error?: unknown;
   };
@@ -40,4 +44,37 @@ export function parseYahooChart(json: unknown, symbol: string): Quote | null {
     currency,
     asOf: new Date(regularMarketTime * 1000),
   };
+}
+
+export function parseYahooChartHistory(json: unknown, symbol: string): Quote[] {
+  const result = (json as YahooChartResponse)?.chart?.result?.[0];
+  const currency = result?.meta?.currency;
+  const timestamps = result?.timestamp;
+  const closes = result?.indicators?.quote?.[0]?.close;
+
+  if (typeof currency !== "string" || !timestamps || !closes) return [];
+
+  const length = Math.min(timestamps.length, closes.length);
+  const quotes: Quote[] = [];
+
+  for (let i = 0; i < length; i += 1) {
+    const close = closes[i];
+    const timestamp = timestamps[i];
+    if (
+      typeof close !== "number" ||
+      !Number.isFinite(close) ||
+      typeof timestamp !== "number" ||
+      !Number.isFinite(timestamp)
+    ) {
+      continue;
+    }
+    quotes.push({
+      symbol,
+      price: close.toFixed(6),
+      currency,
+      asOf: new Date(timestamp * 1000),
+    });
+  }
+
+  return quotes.sort((a, b) => a.asOf.getTime() - b.asOf.getTime());
 }
