@@ -27,7 +27,7 @@ import {
   computeTopPositions,
 } from "~/core/projections";
 import {
-  computeRangeChange,
+  computeHeroChange,
   es,
   filterByRange,
   instrumentTypeLabel,
@@ -118,7 +118,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     allocation,
     top,
     range,
-    change: computeRangeChange(series),
+    change: computeHeroChange(range, series, summary),
     series: series.map((point) => ({
       t: point.t,
       invested: Number(point.invested),

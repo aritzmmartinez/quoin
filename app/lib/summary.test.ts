@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { computeRangeChange } from "./summary";
+import { computeHeroChange, computeRangeChange } from "./summary";
 
 const point = (t: number, invested: string, value: string) => ({
   t,
@@ -63,5 +63,36 @@ describe("computeRangeChange", () => {
 
     expect(change.abs).toBe("-20");
     expect(change.pct).toBeNull();
+  });
+});
+
+describe("computeHeroChange", () => {
+  const summary = { unrealizedPnL: "767.47", returnPct: "0.070000" };
+
+  it("reports current P&L all-time, ignoring the series' fee-laden start", () => {
+    const change = computeHeroChange(
+      "all",
+      [point(1, "101", "100"), point(2, "10920.97", "11688.44")],
+      summary,
+    );
+
+    expect(change.abs).toBe("767.47");
+    expect(change.pct).toBe("0.070000");
+  });
+
+  it("agrees with the P&L tile by construction, whatever the series says", () => {
+    const change = computeHeroChange("all", [], summary);
+
+    expect(change.abs).toBe(summary.unrealizedPnL);
+  });
+
+  it("measures a bounded window from its own start", () => {
+    const change = computeHeroChange(
+      "1y",
+      [point(1, "1000", "1100"), point(2, "1000", "1250")],
+      summary,
+    );
+
+    expect(change.abs).toBe("150");
   });
 });
