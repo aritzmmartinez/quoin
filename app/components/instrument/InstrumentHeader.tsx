@@ -50,7 +50,7 @@ export function InstrumentHeader({
   return (
     <header className="mb-6">
       <Link
-        to="/"
+        to="/cartera"
         className="mb-3 inline-flex items-center gap-1 text-[12.5px] text-muted transition-colors hover:text-text"
       >
         <BackArrow />

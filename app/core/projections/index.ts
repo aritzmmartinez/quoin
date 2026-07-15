@@ -4,3 +4,4 @@ export * from "./market-value";
 export * from "./cost-basis-timeline";
 export * from "./returns";
 export * from "./invested-vs-value";
+export * from "./portfolio";

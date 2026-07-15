@@ -19,6 +19,51 @@ export const es = {
   theme: {
     toggle: "Cambiar tema",
   },
+  range: {
+    label: "Rango temporal",
+    m1: "1M",
+    m6: "6M",
+    y1: "1A",
+    all: "Todo",
+  },
+  summary: {
+    title: "Resumen",
+    hero: {
+      label: "Valor total de la cartera",
+      rangeLabel: (range: string): string => `en ${range}`,
+      allTimeLabel: "desde el inicio",
+      unpriced: (count: number): string =>
+        count === 1
+          ? "1 posición sin valorar, excluida del total"
+          : `${count} posiciones sin valorar, excluidas del total`,
+      empty: "Aún no hay posiciones valoradas.",
+    },
+    chart: {
+      title: "Evolución de la cartera",
+      value: "Valor",
+      invested: "Aportado",
+      building: "Se necesitan al menos dos puntos para dibujar la evolución.",
+    },
+    stats: {
+      invested: {
+        label: "Total aportado",
+        sub: "Coste de las posiciones abiertas",
+      },
+      unrealized: { label: "P&L latente", sub: "Valor menos aportado" },
+      realized: { label: "P&L realizado", sub: "Beneficio de ventas cerradas" },
+      positions: { label: "Posiciones", sub: "Abiertas y valoradas" },
+    },
+    allocation: {
+      title: "Asignación",
+      link: "Ver detalle",
+      empty: "Sin datos de asignación.",
+    },
+    top: {
+      title: "Top posiciones",
+      link: "Ver cartera",
+      empty: "Sin posiciones valoradas.",
+    },
+  },
   portfolio: {
     title: "Cartera",
     summary: (count: number, invested: string): string =>
@@ -98,7 +143,6 @@ export const es = {
       sell: "Venta",
       empty: "Sin movimientos.",
     },
-    range: { m1: "1M", m6: "6M", y1: "1A", all: "Todo" },
     notFound: {
       title: "Instrumento no encontrado",
       body: "No hay ningún instrumento con ese identificador.",
