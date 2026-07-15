@@ -19,6 +19,13 @@ export const es = {
   theme: {
     toggle: "Cambiar tema",
   },
+  range: {
+    label: "Rango temporal",
+    m1: "1M",
+    m6: "6M",
+    y1: "1A",
+    all: "Todo",
+  },
   portfolio: {
     title: "Cartera",
     summary: (count: number, invested: string): string =>
@@ -98,7 +105,6 @@ export const es = {
       sell: "Venta",
       empty: "Sin movimientos.",
     },
-    range: { m1: "1M", m6: "6M", y1: "1A", all: "Todo" },
     notFound: {
       title: "Instrumento no encontrado",
       body: "No hay ningún instrumento con ese identificador.",

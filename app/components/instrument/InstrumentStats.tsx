@@ -1,6 +1,7 @@
-import { DASH, es, formatMoney, formatPercent } from "~/lib";
+import { es, formatMoney } from "~/lib";
 
 import { Card } from "../ui/Card";
+import { signClass, signedPercent } from "../ui/signed";
 
 export interface InstrumentKpis {
   twr: string | null;
@@ -8,19 +9,6 @@ export interface InstrumentKpis {
   totalInvested: string;
   buyCount: number;
   avgBuyAmount: string;
-}
-
-function pctClass(fraction: string | null): string {
-  if (fraction === null) return "";
-  const n = Number(fraction);
-  return n > 0 ? "text-positive" : n < 0 ? "text-negative" : "";
-}
-
-function signedPct(fraction: string | null): string {
-  if (fraction === null) return DASH;
-  const n = Number(fraction);
-  const body = formatPercent(String(Math.abs(n)));
-  return n < 0 ? `\u2212${body}` : n > 0 ? `+${body}` : body;
 }
 
 function Tile({
@@ -55,14 +43,14 @@ export function InstrumentStats({ kpis }: { kpis: InstrumentKpis }) {
         <Tile
           label={k.twr.label}
           sub={k.twr.sub}
-          value={signedPct(kpis.twr)}
-          valueClass={pctClass(kpis.twr)}
+          value={signedPercent(kpis.twr)}
+          valueClass={signClass(kpis.twr)}
         />
         <Tile
           label={k.mwr.label}
           sub={k.mwr.sub}
-          value={signedPct(kpis.mwr)}
-          valueClass={pctClass(kpis.mwr)}
+          value={signedPercent(kpis.mwr)}
+          valueClass={signClass(kpis.mwr)}
         />
         <Tile
           label={k.totalInvested.label}

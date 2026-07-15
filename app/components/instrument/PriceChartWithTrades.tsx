@@ -11,10 +11,10 @@ import {
   YAxis,
 } from "recharts";
 
-import { es, formatDate, formatMoney } from "~/lib";
+import { es, filterByRange, formatDate, formatMoney, type Range } from "~/lib";
 
 import { Card } from "../ui/Card";
-import { filterByRange, RangeSelector, type Range } from "./RangeSelector";
+import { RangeSelector } from "../ui/RangeSelector";
 
 export interface PriceChartDatum {
   t: number;
