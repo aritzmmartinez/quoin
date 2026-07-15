@@ -7,7 +7,8 @@ import {
 
 export default [
   layout("routes/_shell.tsx", [
-    index("routes/portfolio.tsx"),
+    index("routes/summary.tsx"),
+    route("cartera", "routes/portfolio.tsx"),
     route("instrument/:instrumentId", "routes/instrument.tsx"),
   ]),
 ] satisfies RouteConfig;

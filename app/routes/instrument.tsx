@@ -172,7 +172,7 @@ export function ErrorBoundary() {
   return (
     <main className="mx-auto max-w-5xl px-4 py-8 md:px-6">
       <Link
-        to="/"
+        to="/cartera"
         className="mb-4 inline-block text-[12.5px] text-muted transition-colors hover:text-text"
       >
         ← {es.instrument.back}
