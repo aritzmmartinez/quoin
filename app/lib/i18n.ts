@@ -26,6 +26,14 @@ export const es = {
     y1: "1A",
     all: "Todo",
   },
+  pagination: {
+    label: "Paginación",
+    previous: "Página anterior",
+    next: "Página siguiente",
+    status: (page: number, count: number): string => `${page} / ${count}`,
+    range: (from: number, to: number, total: number): string =>
+      `${from}–${to} de ${total}`,
+  },
   summary: {
     title: "Resumen",
     hero: {
@@ -64,6 +72,35 @@ export const es = {
       empty: "Sin posiciones valoradas.",
     },
   },
+  movements: {
+    title: "Movimientos",
+    summary: (count: number, net: string): string =>
+      `${count} ${count === 1 ? "movimiento" : "movimientos"} · ${net} de flujo neto`,
+    columns: {
+      date: "Fecha",
+      type: "Tipo",
+      instrument: "Instrumento",
+      quantity: "Uds",
+      price: "Precio",
+      costs: "Costes",
+      amount: "Importe",
+    },
+    types: {
+      BUY: "Compra",
+      SELL: "Venta",
+      DIVIDEND: "Dividendo",
+      DEPOSIT: "Ingreso",
+      WITHDRAWAL: "Retirada",
+      INTEREST: "Intereses",
+    },
+    empty: "Sin movimientos.",
+    emptyScreen: {
+      title: "Sin movimientos todavía",
+      body: "Importa tus operaciones con la CLI (pnpm ingest) para ver aquí el ledger completo.",
+    },
+    amountHint:
+      "El importe es el flujo de caja real: comisiones incluidas y retenciones descontadas.",
+  },
   portfolio: {
     title: "Cartera",
     summary: (count: number, invested: string): string =>
@@ -99,6 +136,11 @@ export const es = {
       retry: "Reintentar",
     },
     expandLabel: "Ver detalle",
+    sort: {
+      by: (column: string): string => `Ordenar por ${column}`,
+      asc: "orden ascendente",
+      desc: "orden descendente",
+    },
   },
   instrument: {
     back: "Cartera",
@@ -132,16 +174,6 @@ export const es = {
     },
     movements: {
       title: "Movimientos de este activo",
-      columns: {
-        date: "Fecha",
-        side: "Tipo",
-        quantity: "Uds",
-        price: "Precio",
-        amount: "Importe",
-      },
-      buy: "Compra",
-      sell: "Venta",
-      empty: "Sin movimientos.",
     },
     notFound: {
       title: "Instrumento no encontrado",
