@@ -15,6 +15,7 @@
     "prices:sync": "tsx scripts/prices-sync.ts",
     "prices:map": "tsx scripts/prices-map.ts",
     "prices:backfill": "tsx scripts/prices-backfill.ts",
+    "exposure:map": "tsx scripts/exposure-map.ts",
     "postinstall": "prisma generate",
     "test": "vitest run",
     "test:watch": "vitest",

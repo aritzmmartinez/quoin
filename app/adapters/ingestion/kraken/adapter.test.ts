@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 
-import type { Instrument, LedgerEvent } from "~/core/domain";
+import type { ExposureKind, Instrument, LedgerEvent } from "~/core/domain";
 import type {
   InstrumentRepository,
   LedgerEventFilter,
@@ -23,6 +23,17 @@ class FakeInstrumentRepository implements InstrumentRepository {
   async setQuoteSymbol(id: string, symbol: string | null): Promise<void> {
     const instrument = this.upserted.find((i) => i.id === id);
     if (instrument) instrument.quoteSymbol = symbol;
+  }
+  async setExposure(
+    id: string,
+    kind: ExposureKind | null,
+    leafId: string | null,
+  ): Promise<void> {
+    const instrument = this.upserted.find((i) => i.id === id);
+    if (instrument) {
+      instrument.exposureKind = kind;
+      instrument.exposureLeafId = leafId;
+    }
   }
 }
 

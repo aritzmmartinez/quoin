@@ -16,6 +16,8 @@ model Instrument {
   currency   String // ISO 4217 (instrument's denomination currency)
   assetClass String? // from TR: FUND | STOCK | CRYPTO | SYNTHETIC ...
   quoteSymbol String? // provider symbol for price quotes (e.g. "VWCE.DE"); set manually, never from ingestion
+  exposureKind   String? // COMPANY | EQUITY_FUND | BOND_FUND | COMMODITY | CRYPTO; set manually, never from ingestion
+  exposureLeafId String? // leaf identity for COMMODITY/CRYPTO (e.g. "XAU", "BTC"); defaults to the instrument id
   createdAt  DateTime @default(now())
 
   entries LedgerEntry[]
