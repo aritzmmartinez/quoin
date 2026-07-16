@@ -1,6 +1,11 @@
 import Decimal from "decimal.js";
 
-import type { InvestedVsValuePoint } from "~/core/projections";
+import type {
+  InvestedVsValuePoint,
+  PortfolioSummary,
+} from "~/core/projections";
+
+import type { Range } from "./range";
 
 export interface RangeChange {
   abs: string | null;
@@ -22,4 +27,15 @@ export function computeRangeChange(
   const pct = investedEnd.isZero() ? null : abs.div(investedEnd).toFixed(6);
 
   return { abs: abs.toString(), pct };
+}
+
+export function computeHeroChange(
+  range: Range,
+  series: readonly InvestedVsValuePoint[],
+  summary: Pick<PortfolioSummary, "unrealizedPnL" | "returnPct">,
+): RangeChange {
+  if (range === "all") {
+    return { abs: summary.unrealizedPnL, pct: summary.returnPct };
+  }
+  return computeRangeChange(series);
 }

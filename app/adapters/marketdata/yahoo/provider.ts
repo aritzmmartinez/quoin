@@ -1,6 +1,6 @@
-import type { MarketDataProvider, Quote } from "~/core/ports";
+import type { HistoryRange, MarketDataProvider, Quote } from "~/core/ports";
 
-import { parseYahooChart } from "./parse";
+import { parseYahooChart, parseYahooChartHistory } from "./parse";
 
 const BASE = "https://query1.finance.yahoo.com/v8/finance/chart";
 const HEADERS = { "User-Agent": "Mozilla/5.0 (compatible; quoin/price-sync)" };
@@ -10,6 +10,16 @@ async function fetchOne(symbol: string): Promise<Quote | null> {
   const res = await fetch(url, { headers: HEADERS });
   if (!res.ok) return null;
   return parseYahooChart(await res.json(), symbol);
+}
+
+async function fetchHistory(
+  symbol: string,
+  range: HistoryRange,
+): Promise<Quote[]> {
+  const url = `${BASE}/${encodeURIComponent(symbol)}?interval=1d&range=${range}`;
+  const res = await fetch(url, { headers: HEADERS });
+  if (!res.ok) return [];
+  return parseYahooChartHistory(await res.json(), symbol);
 }
 
 /**
@@ -28,5 +38,13 @@ export class YahooMarketDataProvider implements MarketDataProvider {
           r.status === "fulfilled" && r.value !== null,
       )
       .map((r) => r.value);
+  }
+
+  async getHistory(symbol: string, range: HistoryRange): Promise<Quote[]> {
+    try {
+      return await fetchHistory(symbol, range);
+    } catch {
+      return [];
+    }
   }
 }
