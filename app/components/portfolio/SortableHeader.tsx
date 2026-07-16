@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 
-import type { SortDir } from "~/lib";
+import { es, type SortDir } from "~/lib";
 
 export function SortableHeader({
   label,
@@ -15,15 +15,12 @@ export function SortableHeader({
   active: boolean;
   dir: SortDir;
 }) {
-  const state = active
-    ? dir === "asc"
-      ? ", orden ascendente"
-      : ", orden descendente"
-    : "";
+  const copy = es.portfolio.sort;
+  const state = active ? `, ${dir === "asc" ? copy.asc : copy.desc}` : "";
   return (
     <Link
       to={href}
-      aria-label={`Ordenar por ${label}${state}`}
+      aria-label={`${copy.by(label)}${state}`}
       className={`inline-flex items-center gap-1 text-[11px] font-medium tracking-wide text-muted transition-colors hover:text-text ${
         align === "right" ? "justify-self-end" : "justify-self-start"
       }`}

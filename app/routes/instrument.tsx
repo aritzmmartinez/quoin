@@ -5,10 +5,11 @@ import type { Route } from "./+types/instrument";
 import Decimal from "decimal.js";
 
 import {
+  Card,
   InstrumentHeader,
   InstrumentStats,
   InvestedVsValue,
-  MovementsList,
+  MovementsTable,
   PriceChartWithTrades,
 } from "~/components";
 import {
@@ -16,14 +17,14 @@ import {
   PrismaLedgerRepository,
   PrismaPriceRepository,
 } from "~/adapters/persistence";
-import { Money, type TradeEvent } from "~/core/domain";
+import { Money } from "~/core/domain";
 import {
   computeCostBasisTimeline,
   computeInvestedVsValueSeries,
   computePositions,
   computeReturns,
 } from "~/core/projections";
-import { es } from "~/lib";
+import { es, paginate, parsePage, toMovementRows } from "~/lib";
 
 const BASE_CURRENCY = "EUR";
 
@@ -37,9 +38,10 @@ export const handle = {
       ?.name ?? es.instrument.viewFallback,
 };
 
-export async function loader({ params }: Route.LoaderArgs) {
+export async function loader({ params, request }: Route.LoaderArgs) {
   const id = params.instrumentId;
   const now = new Date();
+  const page = parsePage(new URL(request.url).searchParams);
 
   const [instrument, events, history] = await Promise.all([
     new PrismaInstrumentRepository().get(id),
@@ -110,23 +112,13 @@ export async function loader({ params }: Route.LoaderArgs) {
     value: Number(pt.value),
   }));
 
-  const movements = events
-    .filter(
-      (e): e is TradeEvent =>
-        (e.type === "BUY" || e.type === "SELL") && e.instrumentId === id,
-    )
-    .sort((a, b) => b.ts.getTime() - a.ts.getTime())
-    .map((e) => {
-      const qty = new Decimal(e.quantity);
-      const amount = new Decimal(e.grossAmount).mul(e.fxToBase);
-      return {
-        t: e.ts.getTime(),
-        side: e.type as "BUY" | "SELL",
-        quantity: qty.toFixed(),
-        price: qty.isZero() ? "0" : amount.div(qty).toString(),
-        amount: amount.toString(),
-      };
-    });
+  const { items: movements, info: movementsPage } = paginate(
+    toMovementRows(
+      events.filter((e) => "instrumentId" in e && e.instrumentId === id),
+      [instrument],
+    ),
+    page,
+  );
 
   return {
     instrument: {
@@ -145,19 +137,36 @@ export async function loader({ params }: Route.LoaderArgs) {
     priceChartData,
     ivvData,
     movements,
+    movementsPage,
     hasSymbol: Boolean(instrument.quoteSymbol),
   };
 }
 
 export default function Instrument({ loaderData }: Route.ComponentProps) {
-  const { instrument, kpis, priceChartData, ivvData, movements } = loaderData;
+  const {
+    instrument,
+    kpis,
+    priceChartData,
+    ivvData,
+    movements,
+    movementsPage,
+  } = loaderData;
   return (
     <main className="mx-auto max-w-5xl px-4 py-8 md:px-6">
       <InstrumentHeader instrument={instrument} />
       <InstrumentStats kpis={kpis} />
       <PriceChartWithTrades data={priceChartData} />
       <InvestedVsValue data={ivvData} />
-      <MovementsList movements={movements} />
+      <Card className="overflow-hidden">
+        <div className="px-5 pb-3 pt-4 text-[14px] font-semibold">
+          {es.instrument.movements.title}
+        </div>
+        <MovementsTable
+          rows={movements}
+          info={movementsPage}
+          showInstrument={false}
+        />
+      </Card>
     </main>
   );
 }
