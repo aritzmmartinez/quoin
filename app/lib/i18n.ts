@@ -14,6 +14,7 @@ export const es = {
     portfolio: "Cartera",
     allocation: "Asignación",
     movements: "Movimientos",
+    instruments: "Instrumentos",
     soon: "Pronto",
   },
   theme: {
@@ -71,6 +72,31 @@ export const es = {
       link: "Ver cartera",
       empty: "Sin posiciones valoradas.",
     },
+  },
+  instruments: {
+    title: "Instrumentos",
+    intro:
+      "Tu bróker no dice qué es realmente cada fondo: Trade Republic etiqueta como FUND tanto un ETF de renta variable como un ETC de oro físico. Las acciones y la cripto se resuelven solas por su tipo; los ETC y los fondos de bonos los clasificas aquí, una vez. Esta clasificación vive solo en tu base de datos local y la ingesta nunca la pisa.",
+    unmappedHint: (count: number): string =>
+      count === 1
+        ? "1 instrumento sigue con el valor por defecto y queda sin desglosar."
+        : `${count} instrumentos siguen con el valor por defecto y quedan sin desglosar.`,
+    columns: {
+      instrument: "Instrumento",
+      exposure: "Exposición",
+      leaf: "Hoja",
+      resolvesTo: "Resuelve a",
+      held: "Valor",
+    },
+    defaultOption: "(por defecto del tipo)",
+    leafPlaceholder: "XAU, BTC…",
+    leafRequired: "Esta clase necesita una hoja (p. ej. XAU).",
+    invalid: "Datos no válidos.",
+    save: "Guardar",
+    saving: "…",
+    saved: "Guardado",
+    closed: "Cerrada",
+    empty: "Sin instrumentos. Importa tus operaciones con pnpm ingest.",
   },
   movements: {
     title: "Movimientos",

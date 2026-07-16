@@ -48,21 +48,17 @@ async function describe(id: string): Promise<void> {
   if (!instrument) return;
 
   const [leaf] = resolveIntrinsic(instrument);
-  const source = instrument.exposureKind
-    ? "explicit"
-    : `default from type=${instrument.type}`;
+  const source = instrument.exposureKind ? "explicit" : `default from type=${instrument.type}`;
 
   console.log(`${instrument.id}  ${instrument.name}`);
-  console.log(
-    `  exposureKind: ${instrument.exposureKind ?? "(none)"}  (${source})`,
-  );
+  console.log(`  exposureKind: ${instrument.exposureKind ?? "(none)"}  (${source})`);
   console.log(`  resolves to:  ${leaf?.leaf.kind}:${leaf?.leaf.id}`);
 
+  // The sanity check that prices:map lacks: on a closed position every derived
+  // number is zero, so a wrong mapping looks identical to a right one.
   const qty = await heldQuantity(id);
   if (qty.isZero()) {
-    console.log(
-      "  ⚠ position is CLOSED — nothing here will show up on the allocation screen.",
-    );
+    console.log("  ⚠ position is CLOSED — nothing here will show up on the allocation screen.");
   }
 }
 
@@ -80,8 +76,9 @@ async function main(): Promise<void> {
     for (const instrument of instruments) {
       const [leaf] = resolveIntrinsic(instrument);
       const mark = instrument.exposureKind ? " " : "·";
+      const resolved = leaf ? `${leaf.leaf.kind}:${leaf.leaf.id}` : "—";
       console.log(
-        `${mark} ${instrument.id.padEnd(14)} ${leaf?.leaf.kind.padEnd(11)} ${instrument.name}`,
+        `${mark} ${instrument.id.padEnd(14)} ${resolved.padEnd(28)} ${instrument.name}`,
       );
       if (leaf?.leaf.kind === "UNRESOLVED" && !instrument.exposureKind) {
         unmapped.push(instrument.id);
@@ -123,6 +120,8 @@ async function main(): Promise<void> {
   }
   const kind: ExposureKind = parsed.data;
 
+  // Gold's leaf is XAU, not its ISIN — two ETCs on the same metal must land on
+  // the same leaf or the concentration is silently split in two.
   if (KINDS_NEEDING_LEAF.includes(kind) && !leafArg) {
     console.error(`${kind} needs a leaf id.\n\n${USAGE}`);
     exit(1);
@@ -134,10 +133,7 @@ async function main(): Promise<void> {
 
 main()
   .catch((error: unknown) => {
-    console.error(
-      "\nMapping failed:",
-      error instanceof Error ? error.message : error,
-    );
+    console.error("\nMapping failed:", error instanceof Error ? error.message : error);
     exit(1);
   })
   .finally(() => prisma.$disconnect());

@@ -34,9 +34,8 @@ import {
   parseRange,
 } from "~/lib";
 
-import type { InstrumentType } from "~/core/domain";
+import { BASE_CURRENCY, type InstrumentType } from "~/core/domain";
 
-const BASE_CURRENCY = "EUR";
 const TOP_POSITIONS = 5;
 
 export function meta(_: Route.MetaArgs) {

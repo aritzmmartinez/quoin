@@ -14,6 +14,7 @@ import {
   PrismaLedgerRepository,
   PrismaPriceRepository,
 } from "~/adapters/persistence";
+import { BASE_CURRENCY } from "~/core/domain";
 import {
   computeMarketValues,
   computePositions,
@@ -31,7 +32,6 @@ import {
   totalUnrealizedPnL,
 } from "~/lib";
 
-const BASE_CURRENCY = "EUR";
 
 export function meta(_: Route.MetaArgs) {
   return [
