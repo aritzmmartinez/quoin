@@ -73,6 +73,49 @@ export const es = {
       empty: "Sin posiciones valoradas.",
     },
   },
+  allocation: {
+    intro:
+      "Posición directa + peso dentro de tus ETFs (look-through). El tramo sólido de la barra es lo que compraste tú; el apagado viaja dentro de un fondo.",
+    title: "Exposición real por valor",
+    thresholdMark: (weight: string): string => `\u250a umbral ${weight}`,
+    stats: {
+      total: "Total resuelto",
+      leaves: "Hojas resueltas",
+      unresolved: "Sin desglosar",
+    },
+    kinds: {
+      COMPANY: "empresa",
+      COMMODITY: "materia prima",
+      CRYPTO: "cripto",
+      UNRESOLVED: "sin desglosar",
+      GROUPED: "agrupado",
+    },
+    grouped: (count: number): string => `Otros (${count})`,
+    splitBoth: (direct: string, via: string): string =>
+      `${direct} directa \u00b7 ${via} vía ETFs`,
+    splitDirect: "posición directa",
+    splitVia: "vía ETFs",
+    direct: "posición directa",
+    insideFund: (weight: string): string => `${weight} del fondo`,
+    empty:
+      "Sin exposición que mostrar. Importa operaciones y sincroniza precios.",
+    reading: {
+      title: "Lectura",
+      lead: "Tu mayor concentración es ",
+      isA: ": un ",
+      breakdown: (direct: string, via: string): string =>
+        ` de la cartera \u2014 ${direct} en posición directa y ${via} a través de tus ETFs.`,
+      allDirect: " de la cartera, toda en posición directa.",
+      allVia: " de la cartera, toda a través de tus ETFs.",
+      over: (threshold: string): string => `Supera tu umbral del ${threshold}.`,
+      viaNote:
+        "La parte que va dentro de un fondo indexado no se puede recortar sin salirte del índice.",
+      top3: "Top 3 exposiciones",
+      analysed: "Valores analizados",
+      threshold: "Umbral configurado",
+      empty: "Todavía no hay exposición resuelta que leer.",
+    },
+  },
   holdings: {
     drop: "Arrastra aquí el CSV de posiciones del fondo",
     dropHint:
