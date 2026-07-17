@@ -1,0 +1,127 @@
+import Decimal from "decimal.js";
+
+import {
+  detectAsOfHint,
+  detectColumns,
+  detectTable,
+  type ColumnMap,
+  type IdentityKind,
+} from "./detect";
+import { looksLikeIsin, parseLooseNumber } from "./numbers";
+
+export interface ParsedHolding {
+  identity: string;
+  identityKind: IdentityKind;
+  name: string;
+  /** Fraction of the fund, as a decimal string: 4.4503% -> "0.044503". */
+  weight: string;
+}
+
+export interface ParsedHoldings {
+  columns: ColumnMap;
+  /** Every header, so the UI can offer an override for each detected column. */
+  headers: string[];
+  asOfHint: string | null;
+  holdings: ParsedHolding[];
+  /** Sum of the holdings' weights, as a fraction. */
+  covered: string;
+  /**
+   * 1 − covered: cash, derivatives, rounding and any row without a usable
+   * identity. Becomes the fund's UNRESOLVED leaf. Never dropped, never spread.
+   */
+  residual: string;
+  /** Rows folded into the residual rather than kept as leaves. */
+  foldedRows: number;
+}
+
+export class HoldingsParseError extends Error {}
+
+/** Rows an issuer uses for "everything else" carry no identity to speak of. */
+function hasUsableIdentity(raw: string, kind: IdentityKind): boolean {
+  const text = raw.trim();
+  if (text === "" || /^-+$/.test(text)) return false;
+  return kind === "ISIN" ? looksLikeIsin(text) : true;
+}
+
+/**
+ * Parse any issuer's holdings export.
+ *
+ * Deliberately has no per-issuer branch: the shape is always a table with an
+ * identity, a name and a weight, and everything else — header offset, language,
+ * number format, thousands separator — is detected. A seventh issuer should need
+ * no code.
+ */
+export function parseHoldingsCsv(
+  csv: string,
+  override?: Partial<ColumnMap>,
+): ParsedHoldings {
+  const table = detectTable(csv);
+  if (!table) {
+    throw new HoldingsParseError(
+      "No header row found: the file does not look like a holdings table.",
+    );
+  }
+
+  const detected = detectColumns(table);
+  const columns = { ...detected, ...override } as ColumnMap;
+
+  if (!columns.identity || !columns.weight || !columns.name) {
+    throw new HoldingsParseError(
+      "Could not tell which columns hold the identity, the name and the weight. No column adds up to about 100%, so this may not be a holdings file.",
+    );
+  }
+
+  const holdings: ParsedHolding[] = [];
+  let covered = new Decimal(0);
+  let total = new Decimal(0);
+  let foldedRows = 0;
+
+  for (const row of table.rows) {
+    const weight = parseLooseNumber(row[columns.weight] ?? "");
+    if (weight === null) {
+      foldedRows += 1;
+      continue;
+    }
+    total = total.plus(weight);
+
+    const identity = (row[columns.identity] ?? "").trim();
+    // Cash, FX forwards and an issuer's own "Otros/efectivo" bucket land here.
+    // They are real weight with no leaf, so they belong in the residual.
+    if (!hasUsableIdentity(identity, columns.identityKind) || weight.lte(0)) {
+      foldedRows += 1;
+      continue;
+    }
+
+    covered = covered.plus(weight);
+    holdings.push({
+      identity: columns.identityKind === "ISIN" ? identity.toUpperCase() : identity,
+      identityKind: columns.identityKind,
+      name: (row[columns.name] ?? "").trim() || identity,
+      weight: weight.div(100).toString(),
+    });
+  }
+
+  if (holdings.length === 0) {
+    throw new HoldingsParseError("No holdings with a usable identity were found.");
+  }
+
+  // An issuer whose identified holdings cover 99.48% is telling us the other
+  // 0.52% is cash, derivatives and rounding: that is the residual.
+  //
+  // The residual can be NEGATIVE, and that is not an error: a fund carrying
+  // negative cash (-0.58% in one real file) has equity holdings summing to more
+  // than 100%. Clamping it to zero would quietly discard the fact that the fund
+  // is slightly geared. Either way the weights still sum to exactly 1.
+  const coveredFraction = covered.div(100);
+  const residual = new Decimal(1).minus(coveredFraction);
+
+  return {
+    columns,
+    headers: table.headers,
+    asOfHint: detectAsOfHint(table.preamble),
+    holdings,
+    covered: coveredFraction.toString(),
+    residual: residual.toString(),
+    foldedRows,
+  };
+}
