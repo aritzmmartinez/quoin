@@ -106,13 +106,18 @@ This has caused misdirected generation more than once:
 - Remapping an `Instrument.quoteSymbol` **deletes** that instrument's existing snapshots.
   Two symbols' prices must never share a series.
 
-## Privacy — `quoteSymbol` and holdings
+## Privacy and the no-clobber rule
 
-`Instrument.quoteSymbol` lives **only** in the local, gitignored SQLite database. Never
-commit symbols, ISINs, quantities, holdings or broker exports — this repo is public and
-that data would publish the author's portfolio. `*.csv` is gitignored.
+`Instrument.quoteSymbol`, `exposureKind` and `exposureLeafId` are set by CLI and live
+**only** in the local, gitignored SQLite database. Never commit symbols, ISINs, quantities,
+holdings or broker exports — this repo is public and that data would publish the author's
+portfolio. `*.csv` is gitignored.
 
-Ingestion never writes `quoteSymbol`: a re-import must not clobber the mapping.
+Ingestion must never write those three columns. This is enforced by the type, not by
+convention — `InstrumentWriteData` is `Omit<InstrumentRow, "quoteSymbol" | "exposureKind" |
+"exposureLeafId">`. Ingestion upserts **every** instrument on **every** import, so any
+column it can write is a column it will eventually overwrite. If you widen that type, a
+re-import silently destroys hand-set mappings.
 
 ## Yahoo symbol mapping traps
 
@@ -127,6 +132,29 @@ ISIN itself, and always sanity-check the price magnitude.
   fund with a different entitlement per certificate — observed at 5.5x, 0.5x and 0.4x the
   correct line. Check the candidate price against the broker's own `amount / quantity` for
   a real trade before committing the mapping.
+
+## Exposure and look-through
+
+- **A leaf is not necessarily a company.** `LeafId` is `{ kind, id }` — gold is
+  `COMMODITY:XAU`, BTC is `CRYPTO:BTC`, a stock is `COMPANY:<ISIN>`. Making the kind
+  explicit is what keeps commodities and crypto from being special cases bolted onto a
+  company-shaped model.
+- **What cannot be decomposed is reported, not spread.** A fund with no holdings data
+  resolves to a single `UNRESOLVED` leaf carrying its own value. Pro-rating it across the
+  known leaves would invent a concentration that isn't there. Same rule as `unpricedCount`.
+- **`Instrument.type` cannot classify a fund.** Trade Republic maps both `FUND` and
+  `SYNTHETIC` to `"ETF"`, so a physical-gold ETC is stored as an ETF and is
+  indistinguishable from an index fund. The information is not in the CSV — a human sets it
+  once via `exposure:map`. Never infer it from the instrument name: an ETF of gold *miners*
+  has "Gold" in its name and resolves to companies, not to metal.
+- **`computeExposures` takes `Map<instrumentId, WeightedLeaf[]>`** — an array, always. Phase
+  one hands it one leaf of weight 1; issuer look-through will hand it many. The resolver is
+  the seam that changes; the projection is not.
+- **Contributions are kept, not summed.** "NVIDIA is 11.6%" is not actionable; "9.9% direct,
+  1.4% via FTSE" is. The provenance is lost in the fold, so the fold keeps it.
+  `weightInParent: null` marks a direct holding, distinct from a 100% constituent.
+- **Leaf totals are derived (`leafTotal`), never stored.** Storing both invites the day they
+  disagree — which is exactly how the fee bug happened.
 
 ## Projections
 

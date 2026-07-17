@@ -13,8 +13,8 @@ learning project.
 > (`Money`, event types, `computePositions` with average cost), CSV ingestion
 > (Trade Republic + Kraken), a Yahoo price provider with daily history, the app shell
 > and the summary / holdings / movements / asset-detail screens are in place. The
-> exposure model resolves positions to leaves, classified from the instruments screen or
-> the CLI; issuer look-through and the tax module are next — see the roadmap.
+> exposure model resolves positions to leaves; issuer look-through and the tax module
+> are next — see the roadmap.
 
 ## Why
 
@@ -97,7 +97,7 @@ on with decimal.js; data and secrets are never committed.
 - [x] Asset-detail view (price chart, invested-vs-value, TWR/MWR)
 - [x] App shell (sidebar / bottom nav, theme toggle) and summary screen
 - [x] Movements screen (full ledger, URL-driven pagination)
-- [x] Exposure model: leaves, intrinsic resolution, `exposure:map` + instruments screen
+- [x] Exposure model: leaves, intrinsic resolution, `exposure:map`
 - [ ] Allocation screen + issuer holdings import (true look-through, overlap)
 - [ ] Trading sleeve, watchlist and trade journal
 - [ ] Bizkaia foral tax module (FIFO lots)
