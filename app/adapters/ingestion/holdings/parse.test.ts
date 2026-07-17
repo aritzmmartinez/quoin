@@ -1,16 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import { parseAsOfHint } from "./detect";
 import { HoldingsParseError, parseHoldingsCsv } from "./parse";
 
-/**
- * Every fixture below is SYNTHETIC. The shapes are copied from real issuer
- * exports, but the funds and weights are invented: the set of funds whose
- * holdings get imported is the owner's portfolio, and this repository is public.
- * Same rule that keeps quoteSymbol out of the repo.
- */
-
-// Shape: dot decimals with a percent sign, ticker only, numeric Asian tickers,
-// and a Region column whose codes look exactly like tickers.
 const TICKER_STYLE = `Ticker,Holding name,% of market value,Sector,Region,Market value,Shares
 AAAA,Alpha Corp,4.4503%,Technology,US,"$3,387,048,086.07","16,927,623"
 6857,Beta Industries,2.6398%,Industrials,JP,"$2,009,099,894.76","5,386,038"
@@ -19,8 +11,6 @@ DDDD,Delta SA,0.9000%,Energy,FR,"$700,000,000.00","900,000"
 EEEE,Epsilon NV,90.0000%,Utilities,NL,"$100.00",1
 `;
 
-// Shape: comma decimals, leading space, an asset-class column, and a negative
-// futures line.
 const COMMA_STYLE = `ISIN code,Name,Asset class,Currency,Weight,Sector,Country
 TW0002330008,ALPHA SEMICONDUCTOR,EQUITY,TWD," 15,51%",Information Technology,Taiwan
 KR7005930003,BETA ELECTRONIC CO LTD,EQUITY,KRW," 6,90%",Information Technology,South Korea
@@ -28,8 +18,6 @@ US0000000001,GAMMA INC,EQUITY,USD," 76,50%",Financials,United States
 DE000C771U47,SOME INDEX FUT 09/26 EUREX,FUTURE,USD,"- 0,02%",,Supranationals
 `;
 
-// Shape: preamble title line, a non-breaking space spacer, U+2019 thousands
-// separators, weights with no percent sign, and negative cash.
 const PREAMBLE_STYLE = `\uFEFFFund Holdings as of,"15/Jul/2026"
 \u00a0
 Ticker,Name,Sector,Asset Class,Market Value,Weight (%),Notional Value,Shares,Price,Location,Exchange,Market Currency
@@ -38,8 +26,6 @@ Ticker,Name,Sector,Asset Class,Market Value,Weight (%),Notional Value,Shares,Pri
 "USD","USD CASH","Cash and/or Derivatives","Cash","-22’190’240","-0.58","-22’190’239.59","-22’190’239","100.00","United States","-","USD"
 `;
 
-// Shape: Spanish headers, a numbered index column, and an "everything else"
-// bucket whose identity is a dash.
 const SPANISH_STYLE = `Número,Nombre de la posición,Ticker,ISIN,Acciones,Valor de mercado,% de activos netos
 1,Alpha Corp,AAA US,CA13321L1085,3.541.827,$ 322.235.420.00,"14,64%"
 2,Beta Trust,B-B CN,CA85210A1049,8.744.183,$ 166.899.611.00,"85,35%"
@@ -48,8 +34,6 @@ const SPANISH_STYLE = `Número,Nombre de la posición,Ticker,ISIN,Acciones,Valor
 
 describe("parseHoldingsCsv — issuer agnosticism", () => {
   it("reads a ticker-only file and does not mistake Region for the identity", () => {
-    // Region holds "US", "JP", "GB" — perfectly ticker-shaped, but it repeats.
-    // An identity column is mostly unique; that is what separates them.
     const result = parseHoldingsCsv(TICKER_STYLE);
     expect(result.columns.identity).toBe("Ticker");
     expect(result.columns.identityKind).toBe("TICKER");
@@ -66,7 +50,8 @@ describe("parseHoldingsCsv — issuer agnosticism", () => {
     const result = parseHoldingsCsv(COMMA_STYLE);
     expect(result.columns.identity).toBe("ISIN code");
     expect(result.columns.identityKind).toBe("ISIN");
-    expect(result.holdings[0]?.weight).toBe("0.1551");
+    const alpha = result.holdings.find((h) => h.identity === "TW0002330008");
+    expect(alpha?.weight).toBe("0.1551");
   });
 
   it("skips a preamble, a BOM and a non-breaking space to find the header", () => {
@@ -103,15 +88,12 @@ describe("parseHoldingsCsv — the residual", () => {
   });
 
   it("goes negative when a fund carries negative cash, rather than clamping", () => {
-    // 40.43 + 60.15 = 100.58% of equity, financed by -0.58% of cash. Clamping
-    // would quietly hide that the fund is geared; the weights still sum to 1.
     const result = parseHoldingsCsv(PREAMBLE_STYLE);
     expect(result.covered).toBe("1.0058");
     expect(result.residual).toBe("-0.0058");
   });
 
   it("folds an issuer's own catch-all bucket", () => {
-    // "Otros/efectivo" carries a real weight and an identity of "--".
     const result = parseHoldingsCsv(SPANISH_STYLE);
     expect(result.holdings).toHaveLength(2);
     expect(result.foldedRows).toBe(1);
@@ -125,7 +107,12 @@ describe("parseHoldingsCsv — the residual", () => {
   });
 
   it("accounts for every scrap of weight: covered + residual is exactly 1", () => {
-    for (const csv of [TICKER_STYLE, COMMA_STYLE, PREAMBLE_STYLE, SPANISH_STYLE]) {
+    for (const csv of [
+      TICKER_STYLE,
+      COMMA_STYLE,
+      PREAMBLE_STYLE,
+      SPANISH_STYLE,
+    ]) {
       const { covered, residual } = parseHoldingsCsv(csv);
       expect(Number(covered) + Number(residual)).toBeCloseTo(1, 10);
     }
@@ -152,7 +139,9 @@ BBBB,Beta Corp,Energy,7
   it("accepts a column override when detection picks wrong", () => {
     const result = parseHoldingsCsv(TICKER_STYLE, { name: "Sector" });
     expect(result.columns.name).toBe("Sector");
-    expect(result.holdings[0]?.name).toBe("Technology");
+    expect(result.holdings.find((h) => h.identity === "AAAA")?.name).toBe(
+      "Technology",
+    );
   });
 
   it("reports every header so a person can correct the mapping", () => {
@@ -165,5 +154,106 @@ BBBB,Beta Corp,Energy,7
       "Market value",
       "Shares",
     ]);
+  });
+});
+
+describe("parseAsOfHint", () => {
+  it("reads a month name, which is unambiguous", () => {
+    expect(parseAsOfHint("15/Jul/2026")?.toISOString()).toBe(
+      "2026-07-15T00:00:00.000Z",
+    );
+  });
+
+  it("reads an ISO date", () => {
+    expect(parseAsOfHint("2026-07-15")?.toISOString()).toBe(
+      "2026-07-15T00:00:00.000Z",
+    );
+  });
+
+  it("resolves a numeric date when only one reading is possible", () => {
+    expect(parseAsOfHint("14/07/2026")?.toISOString()).toBe(
+      "2026-07-14T00:00:00.000Z",
+    );
+    expect(parseAsOfHint("7/17/2026")?.toISOString()).toBe(
+      "2026-07-17T00:00:00.000Z",
+    );
+  });
+
+  it("refuses to guess when both readings are possible", () => {
+    expect(parseAsOfHint("07/08/2026")).toBeNull();
+  });
+
+  it("returns null for no hint at all", () => {
+    expect(parseAsOfHint(null)).toBeNull();
+    expect(parseAsOfHint("as of last Tuesday")).toBeNull();
+  });
+});
+
+describe("parseHoldingsCsv — ordering", () => {
+  it("sorts by weight regardless of the order the issuer shipped", () => {
+    const csv = `ISIN code,Name,Weight
+US0000000001,Small Co,"1,00%"
+US0000000002,Huge Co,"80,00%"
+US0000000003,Medium Co,"19,00%"
+`;
+    const result = parseHoldingsCsv(csv);
+    expect(result.holdings.map((h) => h.name)).toEqual([
+      "Huge Co",
+      "Medium Co",
+      "Small Co",
+    ]);
+  });
+});
+
+const COLLIDING_STYLE = `Ticker,Holding name,% of market value,Sector,Region
+SAN,Banco Santander SA,20.00%,Financials,ES
+SAN,Sanofi SA,10.00%,Health Care,FR
+MRK,Merck & Co Inc,30.00%,Health Care,US
+MRK,Merck KGaA,5.00%,Health Care,DE
+ARRY,Array Technologies Inc,25.00%,Utilities,US
+ARRY,Array Technologies Inc,10.00%,Utilities,US
+`;
+
+describe("parseHoldingsCsv — a ticker is only unique within its venue", () => {
+  it("keeps two companies that share a ticker apart", () => {
+    const result = parseHoldingsCsv(COLLIDING_STYLE);
+    const santander = result.holdings.find((h) => h.identity === "SAN.ES");
+    const sanofi = result.holdings.find((h) => h.identity === "SAN.FR");
+    expect(santander?.name).toBe("Banco Santander SA");
+    expect(sanofi?.name).toBe("Sanofi SA");
+  });
+
+  it("finds the venue column without being told which it is", () => {
+    expect(parseHoldingsCsv(COLLIDING_STYLE).qualifier).toBe("Region");
+  });
+
+  it("adds up one holding split across two rows in the same venue", () => {
+    const result = parseHoldingsCsv(COLLIDING_STYLE);
+    expect(result.holdings.find((h) => h.identity === "ARRY.US")?.weight).toBe(
+      "0.35",
+    );
+  });
+
+  it("leaves every identity unique, which is what the database requires", () => {
+    const ids = parseHoldingsCsv(COLLIDING_STYLE).holdings.map(
+      (h) => h.identity,
+    );
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("needs no venue for an ISIN file: an ISIN carries its own country", () => {
+    expect(parseHoldingsCsv(COMMA_STYLE).qualifier).toBeNull();
+  });
+
+  it("adds no venue when tickers do not collide", () => {
+    expect(parseHoldingsCsv(TICKER_STYLE).qualifier).toBeNull();
+    expect(
+      parseHoldingsCsv(TICKER_STYLE).holdings.map((h) => h.identity),
+    ).toContain("AAAA");
+  });
+
+  it("still accounts for every scrap of weight after folding", () => {
+    const { covered, residual } = parseHoldingsCsv(COLLIDING_STYLE);
+    expect(Number(covered) + Number(residual)).toBeCloseTo(1, 10);
   });
 });

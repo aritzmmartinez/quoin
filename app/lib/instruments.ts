@@ -7,12 +7,13 @@ import {
   type Instrument,
   type InstrumentType,
 } from "~/core/domain";
-import { tradeMetaKey, type MarketValue, type Position } from "~/core/projections";
+import type { EtfHolding } from "~/core/ports";
+import {
+  tradeMetaKey,
+  type MarketValue,
+  type Position,
+} from "~/core/projections";
 
-/**
- * An instrument as the admin screen needs it: what it is, how it resolves, and
- * whether it is actually held. Serializable, so it crosses the loader boundary.
- */
 export interface InstrumentListItem {
   id: string;
   name: string;
@@ -20,25 +21,21 @@ export interface InstrumentListItem {
   quoteSymbol: string | null;
   exposureKind: ExposureKind | null;
   exposureLeafId: string | null;
-  /** e.g. "COMMODITY:XAU" — the leaf the current settings produce. */
   resolvesTo: string;
-  /** False when the resolution comes from the type default, not a mapping. */
   isExplicit: boolean;
   quantity: string;
-  /**
-   * A closed position derives every number as zero, so a wrong mapping looks
-   * exactly like a right one. Surfacing it is what the CLI lacked when the wrong
-   * S&P 500 symbol went unnoticed.
-   */
   isClosed: boolean;
-  /** Null when unpriced — never zero, which would read as "worth nothing". */
   value: string | null;
+  holdingsCount: number;
+  holdingsCovered: string | null;
+  holdingsAsOf: string | null;
 }
 
 export function toInstrumentListItems(
   instruments: readonly Instrument[],
   positions: readonly Position[],
   marketValues: ReadonlyMap<string, MarketValue>,
+  holdings: ReadonlyMap<string, EtfHolding[]> = new Map(),
 ): InstrumentListItem[] {
   const held = new Map<string, Decimal>();
   const valued = new Map<string, Decimal>();
@@ -67,6 +64,11 @@ export function toInstrumentListItems(
     const [leaf] = resolveIntrinsic(instrument);
     const quantity = held.get(instrument.id) ?? new Decimal(0);
     const value = valued.get(instrument.id);
+    const composition = holdings.get(instrument.id) ?? [];
+    const covered = composition.reduce(
+      (sum, h) => sum.plus(new Decimal(h.weight)),
+      new Decimal(0),
+    );
 
     return {
       id: instrument.id,
@@ -80,20 +82,24 @@ export function toInstrumentListItems(
       quantity: quantity.toFixed(),
       isClosed: quantity.isZero(),
       value: value ? value.toFixed(2) : null,
+      holdingsCount: composition.length,
+      holdingsCovered: composition.length > 0 ? covered.toString() : null,
+      holdingsAsOf: composition[0]?.asOf.toISOString() ?? null,
     };
   });
 
-  // By value, descending. The repository orders by id, which is right for an API
-  // and useless for a human: it puts "BTC" first purely because B sorts early.
-  // Closed positions are worth nothing, so they sink on their own; ties fall back
-  // to name so the order is stable rather than incidental.
   return items.sort((a, b) => {
-    const diff = new Decimal(b.value ?? 0).comparedTo(new Decimal(a.value ?? 0));
+    const diff = new Decimal(b.value ?? 0).comparedTo(
+      new Decimal(a.value ?? 0),
+    );
     return diff !== 0 ? diff : a.name.localeCompare(b.name, "es");
   });
 }
 
-/** Instruments still riding the type default and landing on UNRESOLVED. */
-export function needsMapping(items: readonly InstrumentListItem[]): InstrumentListItem[] {
-  return items.filter((i) => !i.isExplicit && i.resolvesTo.startsWith("UNRESOLVED"));
+export function needsMapping(
+  items: readonly InstrumentListItem[],
+): InstrumentListItem[] {
+  return items.filter(
+    (i) => !i.isExplicit && i.resolvesTo.startsWith("UNRESOLVED"),
+  );
 }
