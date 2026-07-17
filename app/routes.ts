@@ -10,6 +10,7 @@ export default [
     index("routes/summary.tsx"),
     route("cartera", "routes/portfolio.tsx"),
     route("movimientos", "routes/movements.tsx"),
+    route("instrumentos", "routes/instruments.tsx"),
     route("instrument/:instrumentId", "routes/instrument.tsx"),
   ]),
 ] satisfies RouteConfig;

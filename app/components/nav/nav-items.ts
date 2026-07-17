@@ -1,5 +1,6 @@
 import {
   ArrowLeftRight,
+  Boxes,
   LayoutDashboard,
   PieChart,
   Wallet,
@@ -20,4 +21,5 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { label: es.nav.portfolio, icon: Wallet, to: "/cartera" },
   { label: es.nav.allocation, icon: PieChart, to: null },
   { label: es.nav.movements, icon: ArrowLeftRight, to: "/movimientos" },
+  { label: es.nav.instruments, icon: Boxes, to: "/instrumentos" },
 ];

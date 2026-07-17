@@ -1,3 +1,9 @@
+/**
+ * The currency every projection reports in. Positions quoted elsewhere are
+ * converted to it (once FX exists) or excluded from valuation — never mixed.
+ */
+export const BASE_CURRENCY = "EUR";
+
 import Decimal from "decimal.js";
 
 Decimal.set({ precision: 40, toExpNeg: -30, toExpPos: 40 });

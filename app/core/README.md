@@ -8,7 +8,7 @@ Rule (enforced by lint, not by convention):
   and an adapter implements it.
 
 Contents:
-- `domain/`      value objects (Money as string + decimal.js), ledger event types (Zod schemas)
+- `domain/`      value objects (Money as string + decimal.js), ledger event types (Zod schemas), exposure leaves and intrinsic resolution
 - `ports/`       interfaces: `LedgerRepository`, `InstrumentRepository`, `MarketDataProvider`, `PriceRepository` (planned: `FxProvider`, `TaxJurisdiction`)
-- `projections/` pure functions: `computePositions` (average cost), `computeTradeMeta` (planned: FIFO lots, allocation, look-through)
+- `projections/` pure functions: `computePositions` (average cost), `computeTradeMeta`, `computeReturns` (TWR + XIRR), `computeAllocation`, `computeExposures` (look-through) (planned: FIFO lots)
 - `tax/`         (planned) `TaxJurisdiction` implementations (bizkaia, common, ...)

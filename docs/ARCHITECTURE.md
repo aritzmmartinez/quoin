@@ -26,9 +26,9 @@ no heavy plugins):
 Convention: internal imports always use the `~/...` alias.
 
 ### core
-- `domain/`      value objects (Money as string + decimal.js), ledger event types
+- `domain/`      value objects (Money as string + decimal.js), ledger event types, exposure leaves + `resolveIntrinsic`
 - `ports/`       interfaces: `LedgerRepository`, `InstrumentRepository`, `MarketDataProvider`, `PriceRepository` (planned: `FxProvider`, `TaxJurisdiction`)
-- `projections/` pure functions: `computePositions` (average cost), `computeTradeMeta` (planned: FIFO lots, allocation, look-through)
+- `projections/` pure functions: `computePositions` (average cost), `computeTradeMeta`, `computeReturns`, `computeAllocation`, `computeExposures` (look-through) (planned: FIFO lots)
 - `tax/`         TaxJurisdiction implementations (bizkaia, common, ...)
 
 ### adapters
@@ -45,8 +45,9 @@ Convention: internal imports always use the `~/...` alias.
   (`app/adapters/persistence/generated/`, gitignored). The client lives where it can be used,
   and the lint boundary keeps `core` from importing it.
 - The connection URL lives in **`prisma.config.ts`** (Prisma 7), not in the datasource block.
-- **Models**: `Instrument` (master, key = ISIN or symbol; optional `quoteSymbol` for price
-  lookups), `LedgerEntry` (immutable ledger), and `PriceSnapshot` (append-only price history,
+- **Models**: `Instrument` (master, key = ISIN or symbol; `quoteSymbol` for price lookups and
+  `exposureKind`/`exposureLeafId` for look-through — all three set by CLI, never by ingestion,
+  and omitted from `InstrumentWriteData` at the type level so a re-import cannot clobber them), `LedgerEntry` (immutable ledger), and `PriceSnapshot` (append-only price history,
   `@@unique([instrumentId, asOf])`). Every amount/quantity/price is a `String` (decimal) ->
   operated on with decimal.js. `@@unique([source, externalId])` makes ingestion idempotent.
 - Repositories implement core's ports (`LedgerRepository`, `InstrumentRepository`,

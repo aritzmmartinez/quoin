@@ -11,9 +11,10 @@ learning project.
 
 > **Status: early stage, actively built.** The immutable ledger, core domain
 > (`Money`, event types, `computePositions` with average cost), CSV ingestion
-> (Trade Republic + Kraken), the holdings screen and a Yahoo price provider are in
-> place. Allocation, look-through, the asset-detail view and the tax module are next
-> — see the roadmap.
+> (Trade Republic + Kraken), a Yahoo price provider with daily history, the app shell
+> and the summary / holdings / movements / asset-detail screens are in place. The
+> exposure model resolves positions to leaves; issuer look-through and the tax module
+> are next — see the roadmap.
 
 ## Why
 
@@ -52,11 +53,19 @@ pnpm ingest --broker=trade-republic path/to/export.csv   # CSV -> ledger (idempo
 pnpm ingest --broker=kraken path/to/ledgers.csv
 pnpm prices:map <ISIN> <SYMBOL>   # map an instrument to a Yahoo symbol, e.g. VWCE.DE
 pnpm prices:sync                  # fetch quotes for mapped instruments -> price snapshots
+pnpm prices:backfill [ISIN] [1y|2y|5y|10y|max]   # daily price history (default 5y)
+pnpm exposure:map                 # list how every instrument resolves for look-through
+pnpm exposure:map <ISIN> <KIND> [LEAF]           # e.g. XS2183935274 COMMODITY XAU
 ```
 
-Quote symbols live only in your local database (never in the repo), so a public
-clone never discloses your holdings. Prefer EUR venues (`.DE`, `.AS`, `.MC`) to
-avoid FX for now.
+Quote symbols and exposure classifications live only in your local database (never in
+the repo), so a public clone never discloses your holdings. Prefer EUR venues (`.DE`,
+`.AS`, `.MC`) to avoid FX for now.
+
+`exposure:map` exists because brokers do not report what a fund actually is: Trade
+Republic labels both equity ETFs and physical-gold ETCs as `FUND`, so an ETC arrives
+indistinguishable from an index fund. Stocks and crypto resolve from their type
+automatically; ETCs and bond funds need one command each, once.
 
 Other scripts:
 
@@ -67,6 +76,7 @@ pnpm run build          # production build
 pnpm run db:generate    # regenerate the Prisma client after a schema change
 pnpm run db:studio      # Prisma Studio (GUI to inspect the data)
 pnpm test               # Vitest (pure domain / projection / mapper tests)
+pnpm run test:integration   # migrations against a temporary SQLite database
 ```
 
 ## Architecture
@@ -82,10 +92,13 @@ on with decimal.js; data and secrets are never committed.
 - [x] Core domain: `Money`, ledger event types, repository ports, `computePositions` (average cost)
 - [x] CSV import: Trade Republic + Kraken adapters (filter card spending, dedup by transaction id)
 - [x] Holdings screen (sortable table, expandable per-position detail)
-- [x] Market data: Yahoo price provider, `PriceSnapshot` persistence, `prices:sync`
-- [ ] Surface market columns (value, unrealized P&L, weight) + price freshness in the UI
-- [ ] Asset-detail view (price chart, invested-vs-value, TWR/MWR)
-- [ ] Allocation + true look-through exposure
+- [x] Market data: Yahoo price provider, `PriceSnapshot` persistence, `prices:sync`, `prices:backfill`
+- [x] Surface market columns (value, unrealized P&L, weight) + price freshness in the UI
+- [x] Asset-detail view (price chart, invested-vs-value, TWR/MWR)
+- [x] App shell (sidebar / bottom nav, theme toggle) and summary screen
+- [x] Movements screen (full ledger, URL-driven pagination)
+- [x] Exposure model: leaves, intrinsic resolution, `exposure:map`
+- [ ] Allocation screen + issuer holdings import (true look-through, overlap)
 - [ ] Trading sleeve, watchlist and trade journal
 - [ ] Bizkaia foral tax module (FIFO lots)
 - [ ] DCF valuation module

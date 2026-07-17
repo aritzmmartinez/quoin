@@ -17,7 +17,7 @@ import {
   PrismaLedgerRepository,
   PrismaPriceRepository,
 } from "~/adapters/persistence";
-import { Money } from "~/core/domain";
+import { BASE_CURRENCY, Money } from "~/core/domain";
 import {
   computeCostBasisTimeline,
   computeInvestedVsValueSeries,
@@ -26,7 +26,6 @@ import {
 } from "~/core/projections";
 import { es, paginate, parsePage, toMovementRows } from "~/lib";
 
-const BASE_CURRENCY = "EUR";
 
 export function meta(_: Route.MetaArgs) {
   return [{ title: "Detalle de activo · Quoin" }];
@@ -112,6 +111,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     value: Number(pt.value),
   }));
 
+  // Shared with the global ledger: one definition of what a movement row is, so
+  // both screens agree on fees, signs and price marks.
   const { items: movements, info: movementsPage } = paginate(
     toMovementRows(
       events.filter((e) => "instrumentId" in e && e.instrumentId === id),
@@ -143,14 +144,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 }
 
 export default function Instrument({ loaderData }: Route.ComponentProps) {
-  const {
-    instrument,
-    kpis,
-    priceChartData,
-    ivvData,
-    movements,
-    movementsPage,
-  } = loaderData;
+  const { instrument, kpis, priceChartData, ivvData, movements, movementsPage } =
+    loaderData;
   return (
     <main className="mx-auto max-w-5xl px-4 py-8 md:px-6">
       <InstrumentHeader instrument={instrument} />

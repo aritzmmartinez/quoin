@@ -135,9 +135,14 @@ export interface InstrumentRow {
   currency: string;
   assetClass: string | null;
   quoteSymbol: string | null;
+  exposureKind: string | null;
+  exposureLeafId: string | null;
 }
 
-export type InstrumentWriteData = Omit<InstrumentRow, "quoteSymbol">;
+export type InstrumentWriteData = Omit<
+  InstrumentRow,
+  "quoteSymbol" | "exposureKind" | "exposureLeafId"
+>;
 
 export function rowToInstrument(row: InstrumentRow): Instrument {
   return instrumentSchema.parse({
@@ -147,6 +152,8 @@ export function rowToInstrument(row: InstrumentRow): Instrument {
     currency: row.currency,
     assetClass: row.assetClass,
     quoteSymbol: row.quoteSymbol ?? null,
+    exposureKind: row.exposureKind ?? null,
+    exposureLeafId: row.exposureLeafId ?? null,
   });
 }
 

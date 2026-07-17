@@ -8,6 +8,8 @@ export * from "./ui/signed";
 export * from "./SignedMoney";
 export * from "./charts/InvestedVsValueChart";
 export * from "./charts/DonutChart";
+export * from "./instruments/HoldingsUpload";
+export * from "./instruments/InstrumentsTable";
 export * from "./movements/MovementsTable";
 export * from "./movements/columns";
 export * from "./portfolio/PortfolioTable";

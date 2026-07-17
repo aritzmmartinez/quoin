@@ -16,10 +16,13 @@ model Instrument {
   currency   String // ISO 4217 (instrument's denomination currency)
   assetClass String? // from TR: FUND | STOCK | CRYPTO | SYNTHETIC ...
   quoteSymbol String? // provider symbol for price quotes (e.g. "VWCE.DE"); set manually, never from ingestion
+  exposureKind   String? // COMPANY | EQUITY_FUND | BOND_FUND | COMMODITY | CRYPTO; set manually, never from ingestion
+  exposureLeafId String? // leaf identity for COMMODITY/CRYPTO (e.g. "XAU", "BTC"); defaults to the instrument id
   createdAt  DateTime @default(now())
 
-  entries LedgerEntry[]
-  prices  PriceSnapshot[]
+  entries  LedgerEntry[]
+  prices   PriceSnapshot[]
+  holdings EtfHolding[]
 }
 
 /// Immutable ledger: the source of truth. Positions, P&L, allocation... are DERIVED from here.
@@ -74,4 +77,32 @@ model PriceSnapshot {
   @@unique([instrumentId, asOf]) // idempotent sync: same quote time won't duplicate
   @@index([instrumentId])
   @@index([asOf])
+}
+
+// A fund's published composition.
+//
+// Unlike PriceSnapshot, this is REPLACE-only, not append-only: a holdings file is
+// a snapshot of what the fund holds today, not an event that happened. Importing
+// replaces the fund's rows wholesale, because a constituent that left the index
+// must disappear — appending would keep it forever.
+//
+// The residual (1 - sum of weights) is DERIVED at read time, never stored: it is
+// the fund's cash, derivatives and rounding, and storing it next to the weights
+// invites the day the two disagree.
+model EtfHolding {
+  id           String     @id @default(uuid())
+  instrumentId String
+  instrument   Instrument @relation(fields: [instrumentId], references: [id])
+
+  identity     String // ISIN when the issuer publishes one, otherwise its ticker
+  identityKind String // ISIN | TICKER
+  name         String
+
+  weight String // fraction of the fund as a decimal string ("0.044503")
+
+  asOf      DateTime // the issuer's as-of date, confirmed by a human on import
+  createdAt DateTime @default(now())
+
+  @@unique([instrumentId, identity])
+  @@index([instrumentId])
 }

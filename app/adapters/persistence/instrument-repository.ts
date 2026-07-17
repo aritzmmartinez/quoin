@@ -1,4 +1,4 @@
-import type { Instrument } from "~/core/domain";
+import type { ExposureKind, Instrument } from "~/core/domain";
 import type { InstrumentRepository } from "~/core/ports";
 
 import { prisma } from "./db.server";
@@ -30,6 +30,20 @@ export class PrismaInstrumentRepository implements InstrumentRepository {
   }
 
   async setQuoteSymbol(id: string, symbol: string | null): Promise<void> {
-    await prisma.instrument.update({ where: { id }, data: { quoteSymbol: symbol } });
+    await prisma.instrument.update({
+      where: { id },
+      data: { quoteSymbol: symbol },
+    });
+  }
+
+  async setExposure(
+    id: string,
+    kind: ExposureKind | null,
+    leafId: string | null,
+  ): Promise<void> {
+    await prisma.instrument.update({
+      where: { id },
+      data: { exposureKind: kind, exposureLeafId: leafId },
+    });
   }
 }

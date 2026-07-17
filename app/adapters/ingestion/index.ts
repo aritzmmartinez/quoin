@@ -5,3 +5,4 @@ export * from "./trade-republic/row";
 export * from "./kraken/adapter";
 export * from "./kraken/map";
 export * from "./kraken/row";
+export * from "./holdings";

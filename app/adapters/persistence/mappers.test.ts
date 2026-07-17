@@ -67,6 +67,8 @@ const instrument: Instrument = {
   currency: "EUR",
   assetClass: "FUND",
   quoteSymbol: null,
+  exposureKind: null,
+  exposureLeafId: null,
 };
 
 describe("ledger mappers", () => {
@@ -100,8 +102,22 @@ describe("instrument mappers", () => {
     const row: InstrumentRow = {
       ...instrumentToWriteData(instrument),
       quoteSymbol: null,
+      exposureKind: null,
+      exposureLeafId: null,
     };
     expect(rowToInstrument(row)).toEqual(instrument);
+  });
+
+  it("never writes the manually-set columns, so a re-import cannot clobber them", () => {
+    const data = instrumentToWriteData({
+      ...instrument,
+      quoteSymbol: "VWCE.DE",
+      exposureKind: "EQUITY_FUND",
+      exposureLeafId: "X",
+    });
+    expect(data).not.toHaveProperty("quoteSymbol");
+    expect(data).not.toHaveProperty("exposureKind");
+    expect(data).not.toHaveProperty("exposureLeafId");
   });
 
   it("defaults a missing assetClass to null", () => {

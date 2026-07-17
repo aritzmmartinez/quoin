@@ -1,6 +1,8 @@
 import Decimal from "decimal.js";
 import { z } from "zod";
 
+import { exposureKindSchema } from "./exposure";
+
 export const decimalString = z.string().refine((value) => {
   try {
     return new Decimal(value).isFinite();
@@ -29,6 +31,8 @@ export const instrumentSchema = z.object({
   currency: z.string(),
   assetClass: z.string().nullish(),
   quoteSymbol: z.string().nullish(),
+  exposureKind: exposureKindSchema.nullish(),
+  exposureLeafId: z.string().nullish(),
 });
 export type Instrument = z.infer<typeof instrumentSchema>;
 

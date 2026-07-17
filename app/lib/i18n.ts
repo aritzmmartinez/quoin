@@ -14,6 +14,7 @@ export const es = {
     portfolio: "Cartera",
     allocation: "Asignación",
     movements: "Movimientos",
+    instruments: "Instrumentos",
     soon: "Pronto",
   },
   theme: {
@@ -71,6 +72,74 @@ export const es = {
       link: "Ver cartera",
       empty: "Sin posiciones valoradas.",
     },
+  },
+  holdings: {
+    drop: "Arrastra aquí el CSV de posiciones del fondo",
+    dropHint:
+      "Sirve el fichero tal cual lo descargas del emisor: no hace falta limpiarlo.",
+    unreadable: "No se ha podido leer el fichero.",
+    saveFailed: "El fichero se ha leído bien, pero ha fallado al guardar.",
+    qualifier: (column: string): string =>
+      `Un mismo ticker puede ser dos empresas en plazas distintas, así que se distinguen por «${column}».`,
+    leaves: "posiciones detectadas",
+    covered: "Cubierto",
+    residual: "Residuo",
+    asOf: "Fecha del dato:",
+    folded: (count: number): string =>
+      count === 1
+        ? "1 fila sin identidad va al residuo"
+        : `${count} filas sin identidad van al residuo`,
+    negativeResidual:
+      "El residuo es negativo porque el fondo lleva caja negativa: sus posiciones suman más del 100%. No es un error.",
+    columns: {
+      identity: "Identidad",
+      name: "Nombre",
+      weight: "Peso",
+    },
+    detected: "Detectado",
+    correct: "No es correcto",
+    showing: (shown: number, total: number): string =>
+      `Primeras ${shown} de ${total}, por peso`,
+    showAll: (total: number): string => `Ver las ${total}`,
+    showLess: "Ver menos",
+    filter: "Buscar por nombre o identidad…",
+    noMatches: "Ninguna coincide.",
+    confirm: "Importar",
+    importing: "Importando…",
+    cancel: "Cancelar",
+    replaces: "Sustituye la composición anterior de este fondo.",
+    summary: (count: number, covered: string): string =>
+      `${count} posiciones · ${covered}`,
+    none: "Sin composición",
+    import: "Importar CSV",
+    onlyEquityFunds: "Solo para fondos de renta variable.",
+    notAFund: "Este instrumento no es un fondo de renta variable.",
+  },
+  instruments: {
+    title: "Instrumentos",
+    intro:
+      "Tu bróker no dice qué es realmente cada fondo: Trade Republic etiqueta como FUND tanto un ETF de renta variable como un ETC de oro físico. Las acciones y la cripto se resuelven solas por su tipo; los ETC y los fondos de bonos los clasificas aquí, una vez. Esta clasificación vive solo en tu base de datos local y la ingesta nunca la pisa.",
+    unmappedHint: (count: number): string =>
+      count === 1
+        ? "1 instrumento sigue con el valor por defecto y queda sin desglosar."
+        : `${count} instrumentos siguen con el valor por defecto y quedan sin desglosar.`,
+    columns: {
+      instrument: "Instrumento",
+      exposure: "Exposición",
+      leaf: "Hoja",
+      resolvesTo: "Resuelve a",
+      composition: "Composición",
+      held: "Valor",
+    },
+    defaultOption: "(por defecto del tipo)",
+    leafPlaceholder: "XAU, BTC…",
+    leafRequired: "Esta clase necesita una hoja (p. ej. XAU).",
+    invalid: "Datos no válidos.",
+    save: "Guardar",
+    saving: "…",
+    saved: "Guardado",
+    closed: "Cerrada",
+    empty: "Sin instrumentos. Importa tus operaciones con pnpm ingest.",
   },
   movements: {
     title: "Movimientos",
