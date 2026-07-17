@@ -10,12 +10,16 @@ export function InstrumentsTable({ items }: { items: InstrumentListItem[] }) {
   const copy = es.instruments;
 
   if (items.length === 0) {
-    return <p className="px-5 py-10 text-center text-[13px] text-muted">{copy.empty}</p>;
+    return (
+      <p className="px-5 py-10 text-center text-[13px] text-muted">
+        {copy.empty}
+      </p>
+    );
   }
 
   return (
     <div className="overflow-x-auto">
-      <div className="min-w-[900px]">
+      <div className="min-w-225">
         <div className="grid grid-cols-[minmax(0,1.5fr)_150px_180px_120px_112px] gap-3 border-b border-border px-5 py-2 text-[11px] font-medium tracking-wide text-muted">
           <span>{copy.columns.instrument}</span>
           <span>{copy.columns.exposure}</span>
@@ -41,10 +45,9 @@ function InstrumentRow({ item }: { item: InstrumentListItem }) {
   const [leaf, setLeaf] = useState<string>(item.exposureLeafId ?? "");
 
   const needsLeaf = KINDS_NEEDING_LEAF.some((k) => k === kind);
-  const dirty = kind !== (item.exposureKind ?? "") || leaf !== (item.exposureLeafId ?? "");
+  const dirty =
+    kind !== (item.exposureKind ?? "") || leaf !== (item.exposureLeafId ?? "");
   const busy = fetcher.state !== "idle";
-  // The optimistic row is the submitted one, so "saved" shows against what the
-  // user actually sent rather than against the stale loader data.
   const saved = fetcher.data?.ok === true && !dirty;
   const error = fetcher.data?.ok === false ? fetcher.data.error : undefined;
 
@@ -55,7 +58,7 @@ function InstrumentRow({ item }: { item: InstrumentListItem }) {
         <div className="font-mono text-[11px] text-muted">
           {item.id}
           {item.isClosed && (
-            <span className="ml-2 rounded bg-surface-2 px-1.5 py-0.5 text-[10px] text-warning">
+            <span className="ml-2 rounded-full border border-border px-1.5 py-0.5 text-[10px] tracking-wide">
               {copy.closed}
             </span>
           )}
@@ -70,7 +73,7 @@ function InstrumentRow({ item }: { item: InstrumentListItem }) {
           value={kind}
           aria-label={copy.columns.exposure}
           onChange={(e) => setKind(e.target.value)}
-          className="w-full rounded-md border border-border bg-surface-1 px-2 py-1.5 text-[12px]"
+          className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-[12px]"
         >
           <option value="">{copy.defaultOption}</option>
           {KINDS.map((k) => (
@@ -89,7 +92,7 @@ function InstrumentRow({ item }: { item: InstrumentListItem }) {
             required={needsLeaf}
             aria-label={copy.columns.leaf}
             placeholder={needsLeaf ? copy.leafPlaceholder : DASH}
-            className="w-[92px] rounded-md border border-border bg-surface-1 px-2 py-1.5 text-[12px] disabled:opacity-40"
+            className="w-23 rounded-md border border-border bg-surface px-2 py-1.5 text-[12px] disabled:opacity-40"
           />
           <button
             type="submit"
@@ -105,7 +108,11 @@ function InstrumentRow({ item }: { item: InstrumentListItem }) {
         className={`font-mono text-[11px] ${item.resolvesTo.startsWith("UNRESOLVED") ? "text-muted" : ""}`}
         title={error}
       >
-        {error ? <span className="text-negative">{error}</span> : item.resolvesTo}
+        {error ? (
+          <span className="text-negative">{error}</span>
+        ) : (
+          item.resolvesTo
+        )}
       </span>
 
       <span className="text-right text-[12px] tabular-nums text-muted">

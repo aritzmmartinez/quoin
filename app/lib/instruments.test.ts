@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { Instrument } from "~/core/domain";
+import type { Instrument, Sleeve } from "~/core/domain";
 import type { MarketValue, Position } from "~/core/projections";
 import { tradeMetaKey } from "~/core/projections";
 
@@ -18,10 +18,20 @@ const instrument = (over: Partial<Instrument> = {}): Instrument => ({
   ...over,
 });
 
-const position = (id: string, qty: string, sleeve = "CORE"): Position =>
-  ({ instrumentId: id, sleeve, quantity: qty, costBasis: "0", realizedPnL: "0" }) as Position;
+const position = (id: string, qty: string, sleeve: Sleeve = "CORE"): Position =>
+  ({
+    instrumentId: id,
+    sleeve,
+    quantity: qty,
+    costBasis: "0",
+    realizedPnL: "0",
+  }) as Position;
 
-const priced = (id: string, value: string | null, sleeve = "CORE"): [string, MarketValue] => [
+const priced = (
+  id: string,
+  value: string | null,
+  sleeve: Sleeve = "CORE",
+): [string, MarketValue] => [
   tradeMetaKey(id, sleeve),
   { marketValue: value } as MarketValue,
 ];
@@ -76,7 +86,10 @@ describe("toInstrumentListItems", () => {
   it("sums quantity and value across sleeves of the same instrument", () => {
     const [item] = toInstrumentListItems(
       [instrument()],
-      [position("IE00BK5BQT80", "10"), position("IE00BK5BQT80", "5", "TRADING")],
+      [
+        position("IE00BK5BQT80", "10"),
+        position("IE00BK5BQT80", "5", "TRADING"),
+      ],
       new Map([
         priced("IE00BK5BQT80", "1000.00"),
         priced("IE00BK5BQT80", "500.00", "TRADING"),
@@ -87,13 +100,62 @@ describe("toInstrumentListItems", () => {
     expect(item?.isClosed).toBe(false);
   });
 
+  it("orders by value, so the biggest holding leads rather than the earliest id", () => {
+    const items = toInstrumentListItems(
+      [
+        instrument({ id: "BTC", name: "Bitcoin" }),
+        instrument({ id: "IE00BK5BQT80", name: "FTSE All-World" }),
+        instrument({ id: "US67066G1040", name: "NVIDIA" }),
+      ],
+      [
+        position("BTC", "1"),
+        position("IE00BK5BQT80", "1"),
+        position("US67066G1040", "1"),
+      ],
+      new Map([
+        priced("BTC", "1296.97"),
+        priced("IE00BK5BQT80", "4391.87"),
+        priced("US67066G1040", "1204.36"),
+      ]),
+    );
+    expect(items.map((i) => i.name)).toEqual([
+      "FTSE All-World",
+      "Bitcoin",
+      "NVIDIA",
+    ]);
+  });
+
+  it("sinks unpriced and closed positions below anything with a value", () => {
+    const items = toInstrumentListItems(
+      [
+        instrument({ id: "CLOSED", name: "Vendida" }),
+        instrument({ id: "HELD", name: "Abierta" }),
+      ],
+      [position("CLOSED", "0"), position("HELD", "1")],
+      new Map([priced("HELD", "100.00")]),
+    );
+    expect(items.map((i) => i.name)).toEqual(["Abierta", "Vendida"]);
+  });
+
+  it("breaks ties by name so the order is stable, not incidental", () => {
+    const items = toInstrumentListItems(
+      [
+        instrument({ id: "B", name: "Zeta" }),
+        instrument({ id: "A", name: "Alfa" }),
+      ],
+      [],
+      new Map(),
+    );
+    expect(items.map((i) => i.name)).toEqual(["Alfa", "Zeta"]);
+  });
+
   it("keeps every instrument, held or not", () => {
     const items = toInstrumentListItems(
       [instrument({ id: "A" }), instrument({ id: "B" })],
       [],
       new Map(),
     );
-    expect(items.map((i) => i.id)).toEqual(["A", "B"]);
+    expect(items).toHaveLength(2);
   });
 });
 
@@ -104,13 +166,15 @@ describe("needsMapping", () => {
         instrument({ id: "FUND_DEFAULT" }),
         instrument({ id: "FUND_EXPLICIT", exposureKind: "EQUITY_FUND" }),
         instrument({ id: "STOCK", type: "STOCK" }),
-        instrument({ id: "GOLD", exposureKind: "COMMODITY", exposureLeafId: "XAU" }),
+        instrument({
+          id: "GOLD",
+          exposureKind: "COMMODITY",
+          exposureLeafId: "XAU",
+        }),
       ],
       [],
       new Map(),
     );
-    // An explicit EQUITY_FUND still resolves to UNRESOLVED today, but it is a
-    // decision, not an omission — it must not be nagged about.
     expect(needsMapping(items).map((i) => i.id)).toEqual(["FUND_DEFAULT"]);
   });
 

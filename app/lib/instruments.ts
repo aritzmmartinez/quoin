@@ -63,7 +63,7 @@ export function toInstrumentListItems(
     }
   }
 
-  return instruments.map((instrument) => {
+  const items = instruments.map((instrument) => {
     const [leaf] = resolveIntrinsic(instrument);
     const quantity = held.get(instrument.id) ?? new Decimal(0);
     const value = valued.get(instrument.id);
@@ -81,6 +81,15 @@ export function toInstrumentListItems(
       isClosed: quantity.isZero(),
       value: value ? value.toFixed(2) : null,
     };
+  });
+
+  // By value, descending. The repository orders by id, which is right for an API
+  // and useless for a human: it puts "BTC" first purely because B sorts early.
+  // Closed positions are worth nothing, so they sink on their own; ties fall back
+  // to name so the order is stable rather than incidental.
+  return items.sort((a, b) => {
+    const diff = new Decimal(b.value ?? 0).comparedTo(new Decimal(a.value ?? 0));
+    return diff !== 0 ? diff : a.name.localeCompare(b.name, "es");
   });
 }
 
