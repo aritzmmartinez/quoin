@@ -1,4 +1,5 @@
 export * from "./ledger-repository";
+export * from "./holdings-repository";
 export * from "./instrument-repository";
 export * from "./price-repository";
 export * from "./mappers";
