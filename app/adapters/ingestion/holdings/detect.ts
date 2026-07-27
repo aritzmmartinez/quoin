@@ -7,6 +7,7 @@ import {
   looksNumeric,
   parseLooseNumber,
 } from "./numbers";
+import { countryShare, normaliseVenue } from "./venue";
 
 export type IdentityKind = "ISIN" | "TICKER";
 
@@ -18,11 +19,22 @@ export interface ColumnMap {
 }
 
 export interface DetectedTable {
+  /** Header cells, in order. Offered to the UI so a person can override. */
   headers: string[];
   rows: Record<string, string>[];
+  /** Cells above the header — where issuers hide the as-of date. */
   preamble: string[][];
 }
 
+/**
+ * Find the header row and read the table under it.
+ *
+ * Issuers put a BOM, a title line and a non-breaking space above the header, and
+ * no two agree on how many. Rather than a skip count per issuer, the header is
+ * the first row with at least three non-empty, non-numeric cells: a title line
+ * ("Fund Holdings as of", "15/Jul/2026") has two, a spacer has one, and a data
+ * row would have numbers in it.
+ */
 export function detectTable(csv: string): DetectedTable | null {
   const { data } = Papa.parse<string[]>(csv.replace(/^\uFEFF/, ""), {
     header: false,
@@ -55,6 +67,7 @@ export function detectTable(csv: string): DetectedTable | null {
   return null;
 }
 
+/** Blank or repeated header cells would silently collapse rows onto each other. */
 function dedupeHeaders(cells: string[]): string[] {
   const seen = new Map<string, number>();
   return cells.map((cell, i) => {
@@ -73,6 +86,15 @@ function toRecord(headers: string[], cells: string[]): Record<string, string> {
   return row;
 }
 
+/**
+ * The weight column is the one whose values sum to about 100.
+ *
+ * This is the whole trick, and it beats matching header names: it does not care
+ * about the issuer, the language ("Weight", "% de activos netos", "% of market
+ * value") or the number format, and it doubles as verification. If nothing sums
+ * to ~100, the file is not a holdings table and saying so is better than
+ * importing half of one.
+ */
 export function detectWeightColumn(
   headers: readonly string[],
   rows: readonly Record<string, string>[],
@@ -84,6 +106,7 @@ export function detectWeightColumn(
       .map((row) => parseLooseNumber(row[header] ?? ""))
       .filter((v): v is Decimal => v !== null);
 
+    // A weight column is numeric nearly everywhere; a stray "-" is fine.
     if (values.length < rows.length * 0.8) continue;
 
     const sum = values.reduce((acc, v) => acc.plus(v), new Decimal(0));
@@ -99,17 +122,28 @@ export function detectWeightColumn(
 
 const TICKER_HINTS = /ticker|symbol|s[ií]mbolo|c[oó]digo|code/i;
 
-function uniqueness(
-  header: string,
-  rows: readonly Record<string, string>[],
-): number {
+/**
+ * An identity column is mostly unique: roughly one row per instrument. That is
+ * the structural signal, and it separates a real Ticker column from a Region or
+ * Market Currency column whose codes look exactly like tickers — "US" repeats
+ * across half a global fund, "NVDA" appears once.
+ *
+ * The bar is deliberately low. A real ticker column is not perfectly unique: the
+ * cash and FX rows at the bottom of a fund repeat currency codes (EUR, KRW, BRL)
+ * and dragged one real file down to 0.75. The columns being excluded sit around
+ * 0.01, so there is no need to cut fine.
+ */
+function uniqueness(header: string, rows: readonly Record<string, string>[]): number {
   if (rows.length === 0) return 0;
-  const values = rows
-    .map((row) => (row[header] ?? "").trim())
-    .filter((v) => v !== "");
+  const values = rows.map((row) => (row[header] ?? "").trim()).filter((v) => v !== "");
   return values.length === 0 ? 0 : new Set(values).size / values.length;
 }
 
+/**
+ * Prefer a real ISIN. Vanguard and iShares ship ticker-only files, so the
+ * fallback matters — but a ticker is a weaker identity that only merges with
+ * other tickers, which is why leaf aliasing exists.
+ */
 export function detectIdentityColumn(
   headers: readonly string[],
   rows: readonly Record<string, string>[],
@@ -120,12 +154,15 @@ export function detectIdentityColumn(
       : rows.filter((row) => test(row[header] ?? "")).length / rows.length;
 
   for (const header of headers) {
-    if (share(header, looksLikeIsin) > 0.5)
-      return { column: header, kind: "ISIN" };
+    if (share(header, looksLikeIsin) > 0.5) return { column: header, kind: "ISIN" };
   }
 
   const tickerish = headers.filter((h) => share(h, looksLikeTicker) > 0.6);
 
+  // A column called "Ticker" that holds tickers is the ticker column, however
+  // many of them repeat. Uniqueness is a fallback for guessing blind, not a
+  // veto: a fund where the same ticker means two companies in two countries
+  // drags that score down, and that is exactly the file that needs it most.
   const hinted = tickerish.find((h) => TICKER_HINTS.test(h));
   if (hinted) return { column: hinted, kind: "TICKER" };
 
@@ -133,9 +170,13 @@ export function detectIdentityColumn(
   return guessed ? { column: guessed, kind: "TICKER" } : null;
 }
 
-const NAME_HINTS =
-  /name|nombre|description|descripci|holding|posici|security|titre|wertpapier/i;
+const NAME_HINTS = /name|nombre|description|descripci|holding|posici|security|titre|wertpapier/i;
 
+/**
+ * The only column detected by its header, because there is no structural signal
+ * that separates a name from a sector. If the hint misses, the longest text
+ * column is the better guess than nothing — and the UI lets a person fix it.
+ */
 export function detectNameColumn(
   headers: readonly string[],
   rows: readonly Record<string, string>[],
@@ -152,8 +193,7 @@ export function detectNameColumn(
     if (values.length === 0) continue;
     if (values.some(looksNumeric)) continue;
     const length = values.reduce((a, v) => a + v.length, 0) / values.length;
-    if (best === null || length > best.length)
-      best = { column: header, length };
+    if (best === null || length > best.length) best = { column: header, length };
   }
   return best?.column ?? null;
 }
@@ -164,6 +204,11 @@ const DATE_HINTS = [
   /(\d{1,2})[/.](\d{1,2})[/.](\d{4})/,
 ];
 
+/**
+ * Issuers stamp the as-of date in the title line. It is a hint, not a
+ * guarantee — the ambiguity between d/m/y and m/d/y is unresolvable from the
+ * string alone, so this only reports what it saw and a person confirms it.
+ */
 export function detectAsOfHint(preamble: readonly string[][]): string | null {
   for (const cells of preamble) {
     for (const cell of cells) {
@@ -198,24 +243,19 @@ export function detectColumns(table: DetectedTable): ColumnMap | null {
 }
 
 const MONTHS: Record<string, number> = {
-  jan: 0,
-  feb: 1,
-  mar: 2,
-  apr: 3,
-  may: 4,
-  jun: 5,
-  jul: 6,
-  aug: 7,
-  sep: 8,
-  oct: 9,
-  nov: 10,
-  dec: 11,
-  ene: 0,
-  abr: 3,
-  ago: 7,
-  dic: 11,
+  jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+  jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+  ene: 0, abr: 3, ago: 7, dic: 11,
 };
 
+/**
+ * Turn an as-of hint into a date, or admit it cannot.
+ *
+ * "15/Jul/2026" and "2026-07-15" are unambiguous. "07/08/2026" is not — the same
+ * six digits mean August in Madrid and July in New York, and nothing in the file
+ * says which. Rather than guess and be silently wrong by a month, that returns
+ * null and the caller falls back to today, which is at least honestly wrong.
+ */
 export function parseAsOfHint(hint: string | null): Date | null {
   if (!hint) return null;
 
@@ -228,9 +268,7 @@ export function parseAsOfHint(hint: string | null): Date | null {
 
   const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(hint.trim());
   if (iso) {
-    return new Date(
-      Date.UTC(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3])),
-    );
+    return new Date(Date.UTC(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3])));
   }
 
   const numeric = /^(\d{1,2})[/.](\d{1,2})[/.](\d{4})$/.exec(hint.trim());
@@ -238,19 +276,30 @@ export function parseAsOfHint(hint: string | null): Date | null {
     const first = Number(numeric[1]);
     const second = Number(numeric[2]);
     const year = Number(numeric[3]);
-    if (first > 12 && second <= 12)
-      return new Date(Date.UTC(year, second - 1, first));
-    if (second > 12 && first <= 12)
-      return new Date(Date.UTC(year, first - 1, second));
+    // Only decidable when one of the two cannot be a month.
+    if (first > 12 && second <= 12) return new Date(Date.UTC(year, second - 1, first));
+    if (second > 12 && first <= 12) return new Date(Date.UTC(year, first - 1, second));
     return null;
   }
 
   return null;
 }
 
-const QUALIFIER_HINTS =
-  /region|country|pa[ií]s|location|exchange|bolsa|venue|plaza/i;
+const QUALIFIER_HINTS = /region|country|pa[ií]s|location|exchange|bolsa|venue|plaza/i;
 
+/**
+ * Find the column that says WHERE a ticker trades.
+ *
+ * A ticker is only an identity within its venue. In one real global fund, SAN is
+ * Banco Santander in Madrid and Sanofi in Paris; MRK is Merck & Co in New York
+ * and Merck KGaA in Germany; 6526 is Socionext in Tokyo and Airoha in Taipei.
+ * Ninety collisions in a single file, and merging any of them would claim a
+ * holding that does not exist. This is the same reason a quote symbol is IBE.MC
+ * and not IBE.
+ *
+ * Detected structurally: the qualifier is whichever repeating column removes the
+ * most collisions. ISIN files need none — an ISIN already carries its country.
+ */
 export function detectQualifierColumn(
   headers: readonly string[],
   rows: readonly Record<string, string>[],
@@ -266,7 +315,7 @@ export function detectQualifierColumn(
       const key =
         qualifier === null
           ? identity
-          : `${identity}\u0000${(row[qualifier] ?? "").trim()}`;
+          : `${identity}\u0000${normaliseVenue(row[qualifier] ?? "")}`;
       if (seen.has(key)) clashes += 1;
       seen.add(key);
     }
@@ -280,29 +329,36 @@ export function detectQualifierColumn(
     (h) =>
       h !== identityColumn &&
       !exclude.includes(h) &&
+      // A qualifier repeats: it names a place, and places are coarser than
+      // companies. The bar only has to exclude a column that is itself an
+      // identity — a tighter one would depend on file size, since the same
+      // Region column scores 0.01 across four thousand rows and 0.67 across six.
       uniqueness(h, rows) < 0.9 &&
       rows.every((row) => !looksNumeric(row[h] ?? "")),
   );
 
-  let best: { column: string; clashes: number; length: number } | null = null;
+  let best: { column: string; clashes: number; country: number } | null = null;
   for (const column of candidates) {
     const clashes = collisions(column);
     if (clashes >= baseline) continue;
-    const length =
-      rows.reduce((a, row) => a + (row[column] ?? "").trim().length, 0) /
-      Math.max(rows.length, 1);
-    const hinted = QUALIFIER_HINTS.test(column);
-    const bestHinted = best ? QUALIFIER_HINTS.test(best.column) : false;
+
+    // A column of countries beats one of exchange names even when both
+    // disambiguate. Countries normalise across issuers and languages — "US",
+    // "United States" and "Estados Unidos" all fold to US — whereas "NASDAQ"
+    // and "New York Stock Exchange Inc." never will. Picking the normalisable
+    // one is what lets two issuers' files agree on an identity.
+    const country = countryShare(rows.map((row) => row[column] ?? ""));
 
     if (
       best === null ||
       clashes < best.clashes ||
-      (clashes === best.clashes && hinted && !bestHinted) ||
+      (clashes === best.clashes && country > best.country) ||
       (clashes === best.clashes &&
-        hinted === bestHinted &&
-        length < best.length)
+        country === best.country &&
+        QUALIFIER_HINTS.test(column) &&
+        !QUALIFIER_HINTS.test(best.column))
     ) {
-      best = { column, clashes, length };
+      best = { column, clashes, country };
     }
   }
 
