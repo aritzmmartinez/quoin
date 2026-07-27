@@ -13,11 +13,9 @@ const GRID = "grid-cols-[minmax(120px,180px)_minmax(0,1fr)_74px]";
 
 export function ExposureBars({
   rows,
-  grouped,
   threshold,
 }: {
   rows: ExposureRow[];
-  grouped: number;
   threshold: string;
 }) {
   const copy = es.allocation;
@@ -37,7 +35,6 @@ export function ExposureBars({
         <Row
           key={row.key}
           row={row}
-          grouped={grouped}
           scaleMax={scaleMax}
           threshold={threshold}
         />
@@ -48,12 +45,10 @@ export function ExposureBars({
 
 function Row({
   row,
-  grouped,
   scaleMax,
   threshold,
 }: {
   row: ExposureRow;
-  grouped: number;
   scaleMax: number;
   threshold: string;
 }) {
@@ -61,17 +56,15 @@ function Row({
   const [open, setOpen] = useState(false);
 
   const hot = isConcentrated(row.weight, threshold);
-  const expandable = !row.isGrouped && row.contributions.length > 1;
+  const expandable = row.contributions.length > 1;
   const pct = (v: string): number =>
     scaleMax === 0 ? 0 : (Number(v) / scaleMax) * 100;
 
   const direct = pct(row.direct);
   const via = pct(row.via);
 
-  const label = row.isGrouped ? copy.grouped(grouped) : row.name;
-  const sub = row.isGrouped
-    ? copy.kinds.GROUPED
-    : row.kind === "UNRESOLVED"
+  const sub =
+    row.kind === "UNRESOLVED"
       ? copy.kinds.UNRESOLVED
       : Number(row.direct) > 0 && Number(row.via) > 0
         ? copy.splitBoth(
@@ -101,9 +94,9 @@ function Row({
           )}
           <div className="min-w-0">
             <div
-              className={`truncate text-[13px] font-medium ${row.isGrouped || row.kind === "UNRESOLVED" ? "text-muted" : ""}`}
+              className={`truncate text-[13px] font-medium ${row.kind === "UNRESOLVED" ? "text-muted" : ""}`}
             >
-              {label}
+              {row.name}
             </div>
             <div className="truncate text-[10.5px] text-muted">{sub}</div>
           </div>

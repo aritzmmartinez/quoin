@@ -82,15 +82,16 @@ export const es = {
       total: "Total resuelto",
       leaves: "Hojas resueltas",
       unresolved: "Sin desglosar",
+      tail: (count: number): string => `Cola (${count} hojas < 0,5 %)`,
+      negativeUnresolved:
+        "El «sin desglosar» sale negativo porque alguno de tus fondos lleva caja negativa: sus posiciones suman más del 100 %.",
     },
     kinds: {
       COMPANY: "empresa",
       COMMODITY: "materia prima",
       CRYPTO: "cripto",
       UNRESOLVED: "sin desglosar",
-      GROUPED: "agrupado",
     },
-    grouped: (count: number): string => `Otros (${count})`,
     splitBoth: (direct: string, via: string): string =>
       `${direct} directa \u00b7 ${via} vía ETFs`,
     splitDirect: "posición directa",

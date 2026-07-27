@@ -24,7 +24,7 @@ import {
   formatPercent,
   parseThreshold,
   readingFor,
-  tailCount,
+  tailOf,
   toExposureRows,
 } from "~/lib";
 
@@ -70,15 +70,15 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   return {
     rows,
-    grouped: tailCount(exposures, summary.total),
-    reading: readingFor(rows, threshold),
+    tail: tailOf(exposures, summary.total),
+    reading: readingFor(rows, summary.resolvedLeafCount, threshold),
     summary,
     threshold,
   };
 }
 
 export default function Allocation({ loaderData }: Route.ComponentProps) {
-  const { rows, grouped, reading, summary, threshold } = loaderData;
+  const { rows, tail, reading, summary, threshold } = loaderData;
   const copy = es.allocation;
 
   const unresolvedShare =
@@ -100,14 +100,25 @@ export default function Allocation({ loaderData }: Route.ComponentProps) {
             </div>
             <div className="mt-4 flex flex-col gap-3">
               <Line
-                label={copy.stats.unresolved}
-                value={`${formatPercent(unresolvedShare, 1)} · ${formatMoney(summary.unresolved)}`}
-              />
-              <Line
                 label={copy.stats.leaves}
                 value={String(summary.resolvedLeafCount)}
               />
+              <Line
+                label={copy.stats.unresolved}
+                value={`${formatPercent(unresolvedShare, 1)} · ${formatMoney(summary.unresolved)}`}
+              />
+              {tail.count > 0 && (
+                <Line
+                  label={copy.stats.tail(tail.count)}
+                  value={`${formatPercent(tail.weight ?? "0", 1)} · ${formatMoney(tail.value)}`}
+                />
+              )}
             </div>
+            {Number(summary.unresolved) < 0 && (
+              <p className="mt-3 text-[11.5px] leading-[1.5] text-muted">
+                {copy.stats.negativeUnresolved}
+              </p>
+            )}
           </Card>
         </div>
 
@@ -119,7 +130,7 @@ export default function Allocation({ loaderData }: Route.ComponentProps) {
             </span>
           </div>
           <p className="mb-4 text-[12.5px] text-muted">{copy.intro}</p>
-          <ExposureBars rows={rows} grouped={grouped} threshold={threshold} />
+          <ExposureBars rows={rows} threshold={threshold} />
         </Card>
       </div>
     </main>

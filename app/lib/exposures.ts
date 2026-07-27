@@ -11,7 +11,6 @@ export interface ExposureRow {
   value: string;
   weight: string | null;
   contributions: Contribution[];
-  isGrouped: boolean;
   direct: string;
   via: string;
 }
@@ -26,14 +25,18 @@ export function isConcentrated(
   return weight !== null && new Decimal(weight).gt(threshold);
 }
 
+export interface Tail {
+  count: number;
+  value: string;
+  weight: string | null;
+}
+
 export function toExposureRows(
   exposures: readonly LeafExposure[],
   total: string,
   threshold: string = PRESENTATION_THRESHOLD,
 ): ExposureRow[] {
   const rows: ExposureRow[] = [];
-  let tail = new Decimal(0);
-  let tailCount = 0;
 
   for (const exposure of exposures) {
     const value = leafTotal(exposure);
@@ -41,8 +44,6 @@ export function toExposureRows(
 
     const alwaysShow = exposure.leaf.kind === "UNRESOLVED";
     if (!alwaysShow && weight !== null && new Decimal(weight).lt(threshold)) {
-      tail = tail.plus(new Decimal(value));
-      tailCount += 1;
       continue;
     }
 
@@ -54,40 +55,35 @@ export function toExposureRows(
       value,
       weight,
       contributions: exposure.contributions,
-      isGrouped: false,
       ...split(exposure, total),
-    });
-  }
-
-  if (tailCount > 0) {
-    const denominator = new Decimal(total);
-    rows.push({
-      key: "__tail__",
-      kind: "COMPANY",
-      id: "",
-      name: "",
-      value: tail.toFixed(2),
-      direct: "0",
-      via: "0",
-      weight: denominator.isZero() ? null : tail.div(denominator).toFixed(6),
-      contributions: [],
-      isGrouped: true,
     });
   }
 
   return rows;
 }
 
-export function tailCount(
+export function tailOf(
   exposures: readonly LeafExposure[],
   total: string,
   threshold: string = PRESENTATION_THRESHOLD,
-): number {
-  return exposures.filter((e) => {
-    if (e.leaf.kind === "UNRESOLVED") return false;
-    const weight = leafWeight(e, total);
-    return weight !== null && new Decimal(weight).lt(threshold);
-  }).length;
+): Tail {
+  const denominator = new Decimal(total);
+  let value = new Decimal(0);
+  let count = 0;
+
+  for (const exposure of exposures) {
+    if (exposure.leaf.kind === "UNRESOLVED") continue;
+    const weight = leafWeight(exposure, total);
+    if (weight === null || new Decimal(weight).gte(threshold)) continue;
+    value = value.plus(new Decimal(leafTotal(exposure)));
+    count += 1;
+  }
+
+  return {
+    count,
+    value: value.toFixed(2),
+    weight: denominator.isZero() ? null : value.div(denominator).toFixed(6),
+  };
 }
 
 function split(
@@ -123,9 +119,10 @@ export interface Reading {
 
 export function readingFor(
   rows: readonly ExposureRow[],
+  analysedCount: number,
   threshold: string = CONCENTRATION_THRESHOLD,
 ): Reading | null {
-  const real = rows.filter((r) => !r.isGrouped && r.kind !== "UNRESOLVED");
+  const real = rows.filter((r) => r.kind !== "UNRESOLVED");
   const top = real[0];
   if (!top || top.weight === null) return null;
 
@@ -140,7 +137,7 @@ export function readingFor(
     via: top.via,
     isOver: isConcentrated(top.weight, threshold),
     top3: top3.toFixed(6),
-    leafCount: real.length,
+    leafCount: analysedCount,
   };
 }
 

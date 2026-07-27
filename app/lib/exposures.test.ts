@@ -4,9 +4,10 @@ import type { LeafExposure } from "~/core/projections";
 
 import {
   CONCENTRATION_THRESHOLD,
+  readingFor,
   PRESENTATION_THRESHOLD,
   isConcentrated,
-  tailCount,
+  tailOf,
   toExposureRows,
 } from "./exposures";
 
@@ -45,22 +46,12 @@ describe("the two thresholds are different axes", () => {
 });
 
 describe("toExposureRows", () => {
-  it("folds the long tail into one row", () => {
+  it("leaves the long tail out of the rows entirely", () => {
     const rows = toExposureRows(
       [leaf("BIG", "5000"), leaf("SMALL", "10"), leaf("TINY", "5")],
       "10000",
     );
-    expect(rows.map((r) => r.key)).toEqual(["COMPANY:BIG", "__tail__"]);
-    expect(rows[1]?.value).toBe("15.00");
-    expect(rows[1]?.isGrouped).toBe(true);
-  });
-
-  it("adds no tail row when nothing falls below the threshold", () => {
-    const rows = toExposureRows(
-      [leaf("A", "5000"), leaf("B", "5000")],
-      "10000",
-    );
-    expect(rows.every((r) => !r.isGrouped)).toBe(true);
+    expect(rows.map((r) => r.key)).toEqual(["COMPANY:BIG"]);
   });
 
   it("never folds the unresolved leaf, however small", () => {
@@ -69,14 +60,6 @@ describe("toExposureRows", () => {
       "10000",
     );
     expect(rows.map((r) => r.kind)).toContain("UNRESOLVED");
-  });
-
-  it("drops attribution on the tail, which has nothing to attribute", () => {
-    const rows = toExposureRows(
-      [leaf("BIG", "5000"), leaf("SMALL", "1")],
-      "10000",
-    );
-    expect(rows.find((r) => r.isGrouped)?.contributions).toEqual([]);
   });
 
   it("keeps attribution on a real leaf", () => {
@@ -90,7 +73,7 @@ describe("toExposureRows", () => {
     expect(rows[0]?.weight).toBe("0.100000");
   });
 
-  it("accounts for every euro: rows sum to the total", () => {
+  it("accounts for every euro once the tail is added back", () => {
     const exposures = [
       leaf("A", "5000"),
       leaf("B", "3000"),
@@ -100,7 +83,10 @@ describe("toExposureRows", () => {
     ];
     const rows = toExposureRows(exposures, "10000");
     const sum = rows.reduce((acc, r) => acc + Number(r.value), 0);
-    expect(sum).toBeCloseTo(10000, 2);
+    expect(sum + Number(tailOf(exposures, "10000").value)).toBeCloseTo(
+      10000,
+      2,
+    );
   });
 
   it("survives a zero total without dividing by it", () => {
@@ -113,14 +99,57 @@ describe("toExposureRows", () => {
   });
 });
 
-describe("tailCount", () => {
-  it("counts what got folded, for the row's label", () => {
-    expect(
-      tailCount([leaf("BIG", "5000"), leaf("A", "1"), leaf("B", "2")], "10000"),
-    ).toBe(2);
+describe("tailOf", () => {
+  it("reports the tail as a fact: how many, how much, what share", () => {
+    const tail = tailOf(
+      [leaf("BIG", "5000"), leaf("A", "1"), leaf("B", "2")],
+      "10000",
+    );
+    expect(tail).toEqual({ count: 2, value: "3.00", weight: "0.000300" });
   });
 
   it("does not count the unresolved leaf, which never folds", () => {
-    expect(tailCount([leaf("FUND", "1", "UNRESOLVED")], "10000")).toBe(0);
+    expect(tailOf([leaf("FUND", "1", "UNRESOLVED")], "10000").count).toBe(0);
+  });
+
+  it("is empty-safe", () => {
+    expect(tailOf([], "0")).toEqual({ count: 0, value: "0.00", weight: null });
+  });
+});
+
+describe("readingFor", () => {
+  const rows = (...leaves: LeafExposure[]) => toExposureRows(leaves, "10000");
+
+  it("reports every leaf analysed, not the handful that fit on screen", () => {
+    const reading = readingFor(
+      rows(leaf("BIG", "5000"), leaf("SMALL", "1")),
+      5029,
+    );
+    expect(reading?.leafCount).toBe(5029);
+  });
+
+  it("names the biggest real leaf and splits it by route", () => {
+    const reading = readingFor(rows(leaf("NVDA", "1400", "COMPANY", 2)), 42);
+    expect(reading?.name).toBe("NVDA");
+    expect(Number(reading?.direct)).toBeGreaterThan(0);
+    expect(Number(reading?.via)).toBeGreaterThan(0);
+  });
+
+  it("skips the unresolved leaf, which is true but useless as a headline", () => {
+    const reading = readingFor(
+      rows(leaf("FUND", "9000", "UNRESOLVED"), leaf("REAL", "1000")),
+      2,
+    );
+    expect(reading?.name).toBe("REAL");
+  });
+
+  it("flags a leaf over the threshold", () => {
+    expect(readingFor(rows(leaf("BIG", "5000")), 1)?.isOver).toBe(true);
+    expect(readingFor(rows(leaf("SMALL", "600")), 1)?.isOver).toBe(false);
+  });
+
+  it("has nothing to say when there is no real leaf", () => {
+    expect(readingFor([], 0)).toBeNull();
+    expect(readingFor(rows(leaf("FUND", "9000", "UNRESOLVED")), 1)).toBeNull();
   });
 });
