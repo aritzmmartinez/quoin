@@ -9,6 +9,7 @@ export default [
   layout("routes/_shell.tsx", [
     index("routes/summary.tsx"),
     route("cartera", "routes/portfolio.tsx"),
+    route("asignacion", "routes/allocation.tsx"),
     route("movimientos", "routes/movements.tsx"),
     route("instrumentos", "routes/instruments.tsx"),
     route("instrument/:instrumentId", "routes/instrument.tsx"),

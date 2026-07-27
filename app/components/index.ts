@@ -1,3 +1,5 @@
+export * from "./allocation/ExposureBars";
+export * from "./allocation/ReadingCard";
 export * from "./ui/Card";
 export * from "./ui/SleeveChip";
 export * from "./ui/StatTile";
