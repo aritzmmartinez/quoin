@@ -5,10 +5,12 @@ import {
   PrismaInstrumentRepository,
   PrismaLedgerRepository,
   PrismaPriceRepository,
+  PrismaSecurityIdentityRepository,
 } from "~/adapters/persistence";
 import { Card, ExposureBars, PortfolioError, ReadingCard } from "~/components";
 import {
   BASE_CURRENCY,
+  canonicaliseLeaves,
   resolveWithHoldings,
   type WeightedLeaf,
 } from "~/core/domain";
@@ -40,12 +42,22 @@ export const handle = { title: es.nav.allocation };
 export async function loader({ request }: Route.LoaderArgs) {
   const threshold = parseThreshold(new URL(request.url).searchParams);
 
-  const [events, instruments, prices, holdings] = await Promise.all([
+  const [events, instruments, prices, holdings, identities] = await Promise.all([
     new PrismaLedgerRepository().list(),
     new PrismaInstrumentRepository().list(),
     new PrismaPriceRepository().latest(),
     new PrismaHoldingsRepository().all(),
+    // A plain table read. Resolution happened at import time; nothing here
+    // touches the network.
+    new PrismaSecurityIdentityRepository().all(),
   ]);
+
+  const canonical = new Map<string, string>();
+  for (const entry of identities.values()) {
+    if (entry.resolution.status === "resolved") {
+      canonical.set(entry.value, entry.resolution.canonicalId);
+    }
+  }
 
   const positions = computePositions(events);
   const marketValues = computeMarketValues(positions, prices, BASE_CURRENCY);
@@ -53,13 +65,16 @@ export async function loader({ request }: Route.LoaderArgs) {
   const resolutions = new Map<string, WeightedLeaf[]>(
     instruments.map((instrument) => [
       instrument.id,
-      resolveWithHoldings(
-        instrument,
-        (holdings.get(instrument.id) ?? []).map((h) => ({
-          identity: h.identity,
-          name: h.name,
-          weight: h.weight,
-        })),
+      canonicaliseLeaves(
+        resolveWithHoldings(
+          instrument,
+          (holdings.get(instrument.id) ?? []).map((h) => ({
+            identity: h.identity,
+            name: h.name,
+            weight: h.weight,
+          })),
+        ),
+        canonical,
       ),
     ]),
   );
@@ -115,6 +130,8 @@ export default function Allocation({ loaderData }: Route.ComponentProps) {
               )}
             </div>
             {Number(summary.unresolved) < 0 && (
+              // Honest, not broken: a fund carrying negative cash has holdings
+              // summing over 100%, so its residual is the shortfall.
               <p className="mt-3 text-[11.5px] leading-[1.5] text-muted">
                 {copy.stats.negativeUnresolved}
               </p>

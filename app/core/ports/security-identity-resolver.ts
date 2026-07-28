@@ -7,19 +7,8 @@
  * and `NVDA.US` from another and stays two leaves.
  */
 export interface RawIdentity {
-  /** `US67066G1040`, or `NVDA.US` for a venue-qualified ticker. */
   value: string;
   kind: "ISIN" | "TICKER";
-  /**
-   * The issuer's own name for the security, used ONLY to pick between candidates
-   * the provider already returned under one ticker.
-   *
-   * This is not the name-matching that was rejected earlier: that would have
-   * paired two leaves from different files by how alike their names looked,
-   * which fails silently and invents holdings. Here the candidate set is tiny
-   * and comes from Bloomberg — the question is merely which of the two
-   * companies Bloomberg lists under `SAN` is the one this file meant.
-   */
   name?: string;
 }
 
@@ -44,5 +33,7 @@ export interface SecurityIdentityResolver {
    * person can actually see converge before the long tail, which matters when an
    * unauthenticated caller is limited to a few hundred lookups a minute.
    */
-  resolve(identities: readonly RawIdentity[]): Promise<Map<string, IdentityResolution>>;
+  resolve(
+    identities: readonly RawIdentity[],
+  ): Promise<Map<string, IdentityResolution>>;
 }

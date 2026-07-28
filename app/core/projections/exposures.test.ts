@@ -272,3 +272,53 @@ describe("leafWeight", () => {
     expect(leafWeight(exposure!, "0")).toBeNull();
   });
 });
+
+describe("naming a leaf that several instruments reach", () => {
+  const leaf = { kind: "COMPANY" as const, id: "BBG001S5TZJ6" };
+
+  it("prefers the directly held position's name", () => {
+    // Once identities merge, the broker's "NVIDIA" and an issuer's "NVIDIA Corp"
+    // compete for one leaf. Without a rule the winner is whichever instrument
+    // happened to be iterated first, which is not a rule.
+    const exposures = computeExposures(
+      [position("FUND"), position("US67066G1040")],
+      new Map([priced("FUND", "1000"), priced("US67066G1040", "1200")]),
+      new Map<string, WeightedLeaf[]>([
+        ["FUND", [{ leaf, name: "NVIDIA Corp", weight: "0.05" }]],
+        ["US67066G1040", [{ leaf, name: "NVIDIA", weight: "1" }]],
+      ]),
+    );
+
+    expect(exposures).toHaveLength(1);
+    expect(exposures[0]?.name).toBe("NVIDIA");
+    expect(exposures[0]?.contributions).toHaveLength(2);
+  });
+
+  it("keeps both routes visible after the merge", () => {
+    // The merged number is not the point; "9.7% direct, 1.6% via the fund" is.
+    const exposures = computeExposures(
+      [position("FUND"), position("US67066G1040")],
+      new Map([priced("FUND", "1000"), priced("US67066G1040", "1200")]),
+      new Map<string, WeightedLeaf[]>([
+        ["FUND", [{ leaf, name: "NVIDIA Corp", weight: "0.05" }]],
+        ["US67066G1040", [{ leaf, name: "NVIDIA", weight: "1" }]],
+      ]),
+    );
+
+    const routes = exposures[0]?.contributions ?? [];
+    expect(routes.filter((c) => c.weightInParent === null)).toHaveLength(1);
+    expect(routes.filter((c) => c.weightInParent !== null)).toHaveLength(1);
+    expect(leafTotal(exposures[0]!)).toBe("1250");
+  });
+
+  it("falls back to the issuer's name when nothing is held directly", () => {
+    const exposures = computeExposures(
+      [position("FUND")],
+      new Map([priced("FUND", "1000")]),
+      new Map<string, WeightedLeaf[]>([
+        ["FUND", [{ leaf, name: "NVIDIA Corp", weight: "0.05" }]],
+      ]),
+    );
+    expect(exposures[0]?.name).toBe("NVIDIA Corp");
+  });
+});

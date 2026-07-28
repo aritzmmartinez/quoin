@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import Decimal from "decimal.js";
 
-import { resolveWithHoldings, type FundHolding } from "./exposure";
+import {
+  canonicaliseLeaves,
+  resolveWithHoldings,
+  type FundHolding,
+} from "./exposure";
 import type { Instrument } from "./ledger";
 
 const fund = (over: Partial<Instrument> = {}): Instrument => ({
@@ -138,5 +142,74 @@ describe("resolveWithHoldings", () => {
     const bonds = fund({ id: "IE00BGYWT403", exposureKind: "BOND_FUND" });
     const leaves = resolveWithHoldings(bonds, [holding("A", "1")]);
     expect(leaves[0]?.leaf.kind).toBe("UNRESOLVED");
+  });
+});
+
+describe("canonicaliseLeaves", () => {
+  const company = (id: string, name = id, weight = "1") => ({
+    leaf: { kind: "COMPANY" as const, id },
+    name,
+    weight,
+  });
+
+  it("brings an ISIN and a ticker to the same leaf", () => {
+    // The whole point: a direct position published as an ISIN and the same
+    // company inside a fund published as a ticker stop being two leaves.
+    const canonical = new Map([
+      ["US67066G1040", "BBG001S5TZJ6"],
+      ["NVDA.US", "BBG001S5TZJ6"],
+    ]);
+    const direct = canonicaliseLeaves([company("US67066G1040", "NVIDIA")], canonical);
+    const viaFund = canonicaliseLeaves([company("NVDA.US", "NVIDIA Corp")], canonical);
+
+    expect(direct[0]?.leaf).toEqual(viaFund[0]?.leaf);
+  });
+
+  it("keeps the raw identity when nothing was resolved", () => {
+    // Degrading is the safe failure: the leaf still carries its value, it just
+    // does not merge.
+    const leaves = canonicaliseLeaves([company("SAN.ES")], new Map());
+    expect(leaves[0]?.leaf).toEqual({ kind: "COMPANY", id: "SAN.ES" });
+  });
+
+  it("preserves name and weight", () => {
+    const canonical = new Map([["NVDA.US", "BBG001S5TZJ6"]]);
+    const [leaf] = canonicaliseLeaves(
+      [company("NVDA.US", "NVIDIA Corp", "0.044503")],
+      canonical,
+    );
+    expect(leaf?.name).toBe("NVIDIA Corp");
+    expect(leaf?.weight).toBe("0.044503");
+  });
+
+  it("leaves anything that is not a company alone", () => {
+    // Gold has no share class. Mapping these through would silently merge
+    // distinct things if an id ever collided with a company's.
+    const others = [
+      { leaf: { kind: "COMMODITY" as const, id: "XAU" }, name: "Gold", weight: "1" },
+      { leaf: { kind: "CRYPTO" as const, id: "BTC" }, name: "Bitcoin", weight: "1" },
+      {
+        leaf: { kind: "UNRESOLVED" as const, id: "IE00BK5BQT80" },
+        name: "FTSE",
+        weight: "1",
+      },
+    ];
+    const canonical = new Map([
+      ["XAU", "BBG_WRONG"],
+      ["BTC", "BBG_WRONG"],
+      ["IE00BK5BQT80", "BBG_WRONG"],
+    ]);
+    expect(canonicaliseLeaves(others, canonical)).toEqual(others);
+  });
+
+  it("is a no-op when the canonical id is the raw one", () => {
+    const leaves = [company("BBG001S5TZJ6")];
+    expect(canonicaliseLeaves(leaves, new Map([["BBG001S5TZJ6", "BBG001S5TZJ6"]]))).toEqual(
+      leaves,
+    );
+  });
+
+  it("handles an empty set", () => {
+    expect(canonicaliseLeaves([], new Map())).toEqual([]);
   });
 });

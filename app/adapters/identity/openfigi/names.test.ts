@@ -13,25 +13,18 @@ describe("normaliseCompanyName", () => {
   });
 
   it("keeps different companies apart", () => {
-    // The whole safety property: this must never make Merck & Co look like
-    // Merck KGaA, which is the collision it exists to resolve.
     expect(same("Merck & Co Inc", "Merck KGaA")).toBe(false);
     expect(same("Banco Santander SA", "Sanofi SA")).toBe(false);
   });
 
   it("keeps share classes apart when the issuer spells them out", () => {
-    // Single letters are deliberately not treated as noise, so the class marker
-    // survives and the right class can be picked.
     expect(same("Alphabet Inc Class A", "Alphabet Inc Class C")).toBe(false);
-    expect(same("Berkshire Hathaway Inc Class B", "Berkshire Hathaway Inc Class A")).toBe(
-      false,
-    );
+    expect(
+      same("Berkshire Hathaway Inc Class B", "Berkshire Hathaway Inc Class A"),
+    ).toBe(false);
   });
 
   it("collapses them when the issuer does not, which is why the caller refuses", () => {
-    // One real fund lists both Alphabet lines as plain "Alphabet Inc". The name
-    // cannot separate them, so several candidates match and the resolution stays
-    // ambiguous — the safe outcome, since they are separate securities anyway.
     expect(same("Alphabet Inc", "Alphabet Inc")).toBe(true);
   });
 
@@ -44,14 +37,16 @@ describe("normaliseCompanyName", () => {
 describe("namesAgree", () => {
   it("accepts a name clipped by one source but not the other", () => {
     expect(
-      namesAgree("TAIWAN SEMICONDUCTOR MANUFACT", "Taiwan Semiconductor Manufacturing Co Ltd"),
+      namesAgree(
+        "TAIWAN SEMICONDUCTOR MANUFACT",
+        "Taiwan Semiconductor Manufacturing Co Ltd",
+      ),
     ).toBe(true);
   });
 
   it("refuses a short prefix that would swallow an unrelated company", () => {
-    // "bank" must not reach "bank of america".
     expect(namesAgree("Bank", "Bank of America Corp")).toBe(false);
-    expect(namesAgree("SAP", "SAP SE")).toBe(true); // exact after noise removal
+    expect(namesAgree("SAP", "SAP SE")).toBe(true);
   });
 
   it("still keeps genuinely different companies apart", () => {

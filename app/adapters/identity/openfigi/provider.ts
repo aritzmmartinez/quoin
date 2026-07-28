@@ -31,15 +31,8 @@ const LIMITS = {
 
 export interface OpenFigiOptions {
   apiKey?: string | undefined;
-  /** Cap on how many identities to look up in one call. */
   maxIdentities?: number;
-  /** Injected for tests; defaults to global fetch. */
   fetchImpl?: typeof fetch;
-  /**
-   * Override the gap between requests. Only tests should pass this: the
-   * defaults are the published limits, and a suite that actually waits them out
-   * takes seconds per run for no benefit.
-   */
   minIntervalMs?: number;
   onProgress?: (done: number, total: number) => void;
 }
@@ -54,7 +47,9 @@ export class OpenFigiIdentityResolver implements SecurityIdentityResolver {
   private readonly maxIdentities: number;
   private readonly fetchImpl: typeof fetch;
   private readonly minIntervalMs: number | undefined;
-  private readonly onProgress: ((done: number, total: number) => void) | undefined;
+  private readonly onProgress:
+    | ((done: number, total: number) => void)
+    | undefined;
 
   constructor(options: OpenFigiOptions = {}) {
     this.apiKey = options.apiKey ?? process.env.OPENFIGI_API_KEY;
@@ -75,21 +70,18 @@ export class OpenFigiIdentityResolver implements SecurityIdentityResolver {
     let done = 0;
 
     for (const [index, group] of batches.entries()) {
-      // Sequential and spaced, like the price backfill: a burst against a free
-      // public endpoint earns a 429, and a 429 mid-import leaves half the
-      // portfolio merged and half not.
       const gap = this.minIntervalMs ?? limits.minIntervalMs;
       if (index > 0 && gap > 0) await sleep(gap);
 
       try {
         const results = await this.request(group);
-        for (const [value, resolution] of parseMappingResponse(group, results)) {
+        for (const [value, resolution] of parseMappingResponse(
+          group,
+          results,
+        )) {
           resolved.set(value, resolution);
         }
       } catch {
-        // A failed batch is not a failed import. These leaves keep their raw
-        // identity: they will not merge with their twin, but they still appear
-        // with the right value, and the next run retries them.
         for (const identity of group) {
           resolved.set(identity.value, { status: "not-found" });
         }
@@ -102,7 +94,9 @@ export class OpenFigiIdentityResolver implements SecurityIdentityResolver {
     return resolved;
   }
 
-  private async request(identities: readonly RawIdentity[]): Promise<MappingResult[]> {
+  private async request(
+    identities: readonly RawIdentity[],
+  ): Promise<MappingResult[]> {
     const response = await this.fetchImpl(ENDPOINT, {
       method: "POST",
       headers: {

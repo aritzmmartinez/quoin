@@ -20,7 +20,6 @@ describe("venueOf", () => {
 
 describe("toExchangeCode", () => {
   it("bridges ISO to Bloomberg where they differ", () => {
-    // The reason this table exists: they mostly do differ.
     expect(toExchangeCode("TW")).toBe("TT");
     expect(toExchangeCode("JP")).toBe("JT");
     expect(toExchangeCode("KR")).toBe("KS");
@@ -34,8 +33,6 @@ describe("toExchangeCode", () => {
   });
 
   it("returns null for anything unlisted, which means no filtering", () => {
-    // A missing entry costs nothing: the filter matches nothing and resolution
-    // falls through to the name exactly as before.
     expect(toExchangeCode("ZZ")).toBeNull();
     expect(toExchangeCode(null)).toBeNull();
     expect(toExchangeCode("")).toBeNull();

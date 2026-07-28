@@ -16,9 +16,6 @@ export function normaliseCompanyName(raw: string): string {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    // Dots and apostrophes are removed rather than spaced out: turning "S.A."
-    // into "s a" hides the legal form from the stripper below, so "Banco
-    // Santander, S.A." and "BANCO SANTANDER SA" would not agree.
     .replace(/[.'’`]/g, "")
     .replace(/[,\-()&/]/g, " ")
     .replace(NOISE, " ")
@@ -45,8 +42,6 @@ export function namesAgree(a: string, b: string): boolean {
   if (left === "" || right === "") return false;
   if (left === right) return true;
 
-  // Guard against a short name swallowing an unrelated longer one: "bank" must
-  // not match "bank of america".
   const shorter = left.length <= right.length ? left : right;
   const longer = left.length <= right.length ? right : left;
   if (shorter.length < 8) return false;

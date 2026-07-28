@@ -64,7 +64,6 @@ const BLOOMBERG_EXCHANGE: Record<string, string> = {
   PE: "PE",
 };
 
-/** The venue a qualified ticker carries: NVDA.US -> US, 2330.TW -> TW. */
 export function venueOf(value: string): string | null {
   const dot = value.lastIndexOf(".");
   if (dot === -1) return null;
@@ -72,7 +71,6 @@ export function venueOf(value: string): string | null {
   return venue === "" ? null : venue;
 }
 
-/** Null when we have no code for it, which simply means no filtering. */
 export function toExchangeCode(isoCountry: string | null): string | null {
   if (!isoCountry) return null;
   return BLOOMBERG_EXCHANGE[isoCountry.toUpperCase()] ?? null;

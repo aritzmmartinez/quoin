@@ -32,7 +32,10 @@ export class PrismaSecurityIdentityRepository implements SecurityIdentityReposit
         row.identity,
         {
           value: row.identity,
-          kind: row.identityKind === "ISIN" ? ("ISIN" as const) : ("TICKER" as const),
+          kind:
+            row.identityKind === "ISIN"
+              ? ("ISIN" as const)
+              : ("TICKER" as const),
           resolution: toResolution(row),
           source: row.source,
           resolvedAt: row.resolvedAt,
@@ -41,7 +44,9 @@ export class PrismaSecurityIdentityRepository implements SecurityIdentityReposit
     );
   }
 
-  async save(entries: readonly Omit<CachedIdentity, "resolvedAt">[]): Promise<number> {
+  async save(
+    entries: readonly Omit<CachedIdentity, "resolvedAt">[],
+  ): Promise<number> {
     if (entries.length === 0) return 0;
 
     await prisma.$transaction(
@@ -49,7 +54,9 @@ export class PrismaSecurityIdentityRepository implements SecurityIdentityReposit
         const data = {
           identityKind: entry.kind,
           canonicalId:
-            entry.resolution.status === "resolved" ? entry.resolution.canonicalId : null,
+            entry.resolution.status === "resolved"
+              ? entry.resolution.canonicalId
+              : null,
           status: entry.resolution.status,
           source: entry.source,
           resolvedAt: new Date(),
@@ -86,8 +93,6 @@ export class PrismaSecurityIdentityRepository implements SecurityIdentityReposit
         })
       ).map((row) => row.identity),
     );
-    // Order is preserved because callers sort by weight: the heaviest leaves
-    // must be looked up first when the budget runs out.
     return identities.filter((identity) => !known.has(identity.value));
   }
 }

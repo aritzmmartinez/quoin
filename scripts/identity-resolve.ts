@@ -47,8 +47,6 @@ async function identitiesByWeight(): Promise<RawIdentity[]> {
     { weight: Decimal; kind: RawIdentity["kind"]; name: string }
   >();
 
-  // A direct position has no weight inside a parent, so it leads: it is always
-  // one of the biggest leaves and it is the side of every pair a person owns.
   for (const instrument of instruments) {
     if (!looksLikeIsin(instrument.id)) continue;
     weights.set(instrument.id, {
@@ -65,8 +63,6 @@ async function identitiesByWeight(): Promise<RawIdentity[]> {
       weights.set(holding.identity, {
         weight: existing ? existing.weight.plus(weight) : weight,
         kind: holding.identityKind,
-        // Carried so an ambiguous ticker can be narrowed to the company this
-        // file actually meant.
         name: existing?.name ?? holding.name,
       });
     }
@@ -77,10 +73,6 @@ async function identitiesByWeight(): Promise<RawIdentity[]> {
     .map(([value, { kind, name }]) => ({ value, kind, name }));
 }
 
-/**
- * What the resolution actually bought: identities that now share a canonical id
- * are leaves that used to be counted twice.
- */
 async function report(cache: PrismaSecurityIdentityRepository): Promise<void> {
   const cached = await cache.all();
   const byCanonical = new Map<string, string[]>();
@@ -170,7 +162,8 @@ async function main(): Promise<void> {
 
   const entries = pending.slice(0, budget).map((identity) => ({
     ...identity,
-    resolution: resolved.get(identity.value) ?? ({ status: "not-found" } as const),
+    resolution:
+      resolved.get(identity.value) ?? ({ status: "not-found" } as const),
     source: resolver.source,
   }));
   await cache.save(entries);
