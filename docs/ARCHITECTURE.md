@@ -26,16 +26,55 @@ no heavy plugins):
 Convention: internal imports always use the `~/...` alias.
 
 ### core
-- `domain/`      value objects (Money as string + decimal.js), ledger event types, exposure leaves + `resolveIntrinsic`
-- `ports/`       interfaces: `LedgerRepository`, `InstrumentRepository`, `MarketDataProvider`, `PriceRepository` (planned: `FxProvider`, `TaxJurisdiction`)
+- `domain/`      value objects (Money as string + decimal.js), ledger event types, exposure leaves, `resolveIntrinsic` / `resolveWithHoldings` / `canonicaliseLeaves`
+- `ports/`       interfaces: `LedgerRepository`, `InstrumentRepository`, `MarketDataProvider`, `PriceRepository`, `HoldingsRepository`, `SecurityIdentityResolver`, `SecurityIdentityRepository` (planned: `FxProvider`, `TaxJurisdiction`)
 - `projections/` pure functions: `computePositions` (average cost), `computeTradeMeta`, `computeReturns`, `computeAllocation`, `computeExposures` (look-through) (planned: FIFO lots)
 - `tax/`         TaxJurisdiction implementations (bizkaia, common, ...)
 
 ### adapters
-- `ingestion/`   `TradeRepublicCsvAdapter` + `KrakenCsvAdapter` (CSV -> events; filter card spending / non-BTC crypto; dedup by transaction id)
-- `persistence/` Prisma 7 + SQLite (schema, generated client, ledger/instrument/price repositories)
+- `ingestion/`   `TradeRepublicCsvAdapter` + `KrakenCsvAdapter` (CSV -> events; filter card spending / non-BTC crypto; dedup by transaction id) and `holdings/`, one issuer-agnostic parser for fund compositions
+- `persistence/` Prisma 7 + SQLite (schema, generated client, ledger/instrument/price/holdings/identity repositories)
 - `marketdata/`  `YahooMarketDataProvider` behind the `MarketDataProvider` port; `quoteSymbol` per instrument (local DB only)
+- `identity/`    `OpenFigiIdentityResolver` behind the `SecurityIdentityResolver` port; maps an ISIN or a ticker to a share-class FIGI
 - `fx/`          (planned) exchange rates for non-EUR quotes
+
+#### The holdings parser has no per-issuer branch
+
+Six real issuer exports were used to build it and none of them needed a rule of its
+own. The trick is that the **weight column is the one whose values add up to about
+100**, a signal that survives translation, reformatting and rebranding — and that
+doubles as verification, since a file where nothing adds up is not a holdings table and
+saying so beats importing half of one. The identity column is picked by ISIN shape and
+then by being mostly unique, which is what stops a `Region` column of `US` and `JP` from
+passing as tickers.
+
+A ticker alone is not an identity: in one global fund `SAN` was Banco Santander in
+Madrid and Sanofi in Paris, `MRK` was Merck & Co and Merck KGaA, and `6526` was
+Socionext and Airoha — ninety collisions in one file. Identities therefore carry their
+venue (`SAN.ES`), folded to ISO country codes so two issuers spelling it `US` and
+`United States` agree. Same principle as a quote symbol being `IBE.MC` and not `IBE`.
+
+#### Canonical identity closes the gap between issuers
+
+Venue qualification is not enough, because issuers disagree on *what* to publish: some
+give an ISIN, others only a ticker, and they share hundreds of companies. Both are
+mapped to a **share-class FIGI**, the level that links one share class across countries.
+Composite FIGI would only link venues within a country and leave the gap open; the
+instrument-level FIGI is per listing and would leave every venue separate.
+
+Tickers are sent without an exchange code, because OpenFIGI speaks Bloomberg's exchange
+vocabulary rather than ISO. Every listing comes back and only unanimity resolves; when
+candidates disagree, the venue decides first (structured data) and the issuer's own name
+second. If neither decides, the resolution is refused — a leaf keeps its raw identity and
+still reports the right value, it just does not merge. A wrong merge would silently claim
+a holding that does not exist, which is worse than not merging.
+
+Resolution happens at import time and is cached permanently, misses included; no screen
+ever touches the network. Lookups run in descending weight order, which is what makes an
+unauthenticated run usable: the endpoint allows ten per request and twenty-five requests
+a minute, so five thousand constituents would take twenty minutes — but nearly all of
+them sit in the long tail, and a budget of a couple of hundred already covers every row
+a person can see.
 
 ## Persistence (Prisma 7 + SQLite)
 
@@ -46,10 +85,18 @@ Convention: internal imports always use the `~/...` alias.
   and the lint boundary keeps `core` from importing it.
 - The connection URL lives in **`prisma.config.ts`** (Prisma 7), not in the datasource block.
 - **Models**: `Instrument` (master, key = ISIN or symbol; `quoteSymbol` for price lookups and
-  `exposureKind`/`exposureLeafId` for look-through — all three set by CLI, never by ingestion,
-  and omitted from `InstrumentWriteData` at the type level so a re-import cannot clobber them), `LedgerEntry` (immutable ledger), and `PriceSnapshot` (append-only price history,
-  `@@unique([instrumentId, asOf])`). Every amount/quantity/price is a `String` (decimal) ->
-  operated on with decimal.js. `@@unique([source, externalId])` makes ingestion idempotent.
+  `exposureKind`/`exposureLeafId` for look-through — all three set by CLI or the instruments
+  screen, never by ingestion, and omitted from `InstrumentWriteData` at the type level so a
+  re-import cannot clobber them), `LedgerEntry` (immutable ledger), `PriceSnapshot`
+  (append-only price history, `@@unique([instrumentId, asOf])`), `EtfHolding` (a fund's
+  published composition) and `SecurityIdentity` (the identity cache). Every
+  amount/quantity/price/weight is a `String` (decimal) -> operated on with decimal.js.
+  `@@unique([source, externalId])` makes ingestion idempotent.
+- `EtfHolding` is **replace-only, not append-only** like price history: a holdings file is a
+  snapshot of what a fund holds today, not an event that happened, so appending would keep
+  constituents that have left the index. The residual — cash, derivatives and rounding — is
+  derived at read time and never stored beside the weights, because storing both invites the
+  day they disagree.
 - Repositories implement core's ports (`LedgerRepository`, `InstrumentRepository`,
   `PriceRepository`); the loader reads snapshots persisted by `prices:sync` and never hits the
   network in a request.
@@ -70,6 +117,12 @@ pnpm run db:studio      # (optional) GUI to inspect the data
 - **Money as a string + decimal.js.** Never `number`. Never the ORM's Decimal on SQLite.
 - **ISIN as the instrument key** (an identifier; crypto uses its symbol).
 - **Fragile integrations behind a port**, with manual/CSV import as the always-works fallback.
+- **What cannot be broken down is reported, never spread.** An undecomposed fund becomes an
+  `UNRESOLVED` leaf carrying its own value; pro-rating it across the leaves we do know would
+  invent a concentration. The same rule applies inside a fund: one published with only its top
+  ten resolves to eleven leaves, ten companies and a large unknown.
+- **Contributions are kept, not summed.** "NVIDIA 11.2%" is not actionable; "9.7% held
+  directly, 1.5% inside the index funds" is, because only the first part is a decision.
 
 ## Data and secrets (public repo)
 
@@ -79,6 +132,10 @@ Quote symbols (which reveal holdings) live only in the local DB, never in the re
 
 ## Stack
 
-React Router 8 (SSR) · React 19 · strict TypeScript · Tailwind v4 ·
-Lucide · React Hook Form + Zod · Sileo (toasts) · Recharts + Lightweight Charts ·
-SQLite + Prisma 7 (better-sqlite3 adapter) · decimal.js.
+React Router 8 (SSR) · React 19 · strict TypeScript (`noUncheckedIndexedAccess`) ·
+Tailwind v4 · Lucide · Zod · Recharts · Papa Parse ·
+SQLite + Prisma 7 (better-sqlite3 adapter) · decimal.js · Vitest.
+
+No form library: the one mutation in the app is a native React Router `action` validating
+with the same Zod schema the CLI uses, which works without JavaScript and keeps one source
+for the vocabulary.
