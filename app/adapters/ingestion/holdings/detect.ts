@@ -44,7 +44,7 @@ export function detectTable(csv: string): DetectedTable | null {
   const preamble: string[][] = [];
 
   for (let i = 0; i < data.length; i++) {
-    const cells = (data[i] ?? []).map((c) => (c ?? "").trim());
+    const cells = (data[i] ?? []).map((c) => unquote(c ?? ""));
     const filled = cells.filter((c) => c !== "" && c !== "\u00a0");
 
     const isHeader =
@@ -67,6 +67,23 @@ export function detectTable(csv: string): DetectedTable | null {
   return null;
 }
 
+/**
+ * Undo a pair of wrapping quotes the CSV reader left behind.
+ *
+ * A quoted field is only recognised when its opening quote sits flush against
+ * the delimiter. Some exports are pretty-printed with the columns padded into
+ * alignment — `, "United States"` — which puts a space in the way, so the reader
+ * hands back the quotes as part of the value and `"United States"` stops looking
+ * like a country. Cheap to undo, and the alternative is a file that parses into
+ * plausible nonsense.
+ */
+function unquote(cell: string): string {
+  const text = cell.trim();
+  return text.length >= 2 && text.startsWith('"') && text.endsWith('"')
+    ? text.slice(1, -1).trim()
+    : text;
+}
+
 /** Blank or repeated header cells would silently collapse rows onto each other. */
 function dedupeHeaders(cells: string[]): string[] {
   const seen = new Map<string, number>();
@@ -81,7 +98,7 @@ function dedupeHeaders(cells: string[]): string[] {
 function toRecord(headers: string[], cells: string[]): Record<string, string> {
   const row: Record<string, string> = {};
   headers.forEach((header, i) => {
-    if (header !== "") row[header] = (cells[i] ?? "").trim();
+    if (header !== "") row[header] = unquote(cells[i] ?? "");
   });
   return row;
 }
@@ -98,8 +115,8 @@ function toRecord(headers: string[], cells: string[]): Record<string, string> {
 export function detectWeightColumn(
   headers: readonly string[],
   rows: readonly Record<string, string>[],
-): { column: string; sum: Decimal } | null {
-  let best: { column: string; sum: Decimal } | null = null;
+): { column: string; sum: Decimal; scale: Decimal } | null {
+  let best: { column: string; sum: Decimal; scale: Decimal } | null = null;
 
   for (const header of headers) {
     const values = rows
@@ -110,10 +127,22 @@ export function detectWeightColumn(
     if (values.length < rows.length * 0.8) continue;
 
     const sum = values.reduce((acc, v) => acc.plus(v), new Decimal(0));
-    if (sum.lt(90) || sum.gt(101)) continue;
 
-    if (best === null || sum.minus(100).abs().lt(best.sum.minus(100).abs())) {
-      best = { column: header, sum };
+    // Most issuers publish percentages, some publish plain fractions. The two
+    // cannot be confused: a percentage column summing to 1 would mean a fund
+    // that is one percent invested, and a fraction column summing to 100 would
+    // mean a hundred times its own size.
+    const scale = sum.gte(90) && sum.lte(101)
+      ? new Decimal(100)
+      : sum.gte(0.9) && sum.lte(1.01)
+        ? new Decimal(1)
+        : null;
+    if (scale === null) continue;
+
+    const distance = sum.div(scale).minus(1).abs();
+    const bestDistance = best ? best.sum.div(best.scale).minus(1).abs() : null;
+    if (bestDistance === null || distance.lt(bestDistance)) {
+      best = { column: header, sum, scale };
     }
   }
 
@@ -219,6 +248,26 @@ export function detectAsOfHint(preamble: readonly string[][]): string | null {
     }
   }
   return null;
+}
+
+/**
+ * Drop a trailing total row, but only when it is the thing standing in the way.
+ *
+ * Plenty of exports end with a TOTAL line, which doubles the weight column and
+ * makes it sum to two hundred — so nothing looks like a weight and the whole
+ * file is rejected. Rather than guess at which rows are totals, this asks the
+ * question that matters: does removing the last row turn an unreadable file
+ * into a readable one? If it does not, the row stays, because a fund's smallest
+ * holding is also a last row.
+ */
+export function withoutTotalRow(table: DetectedTable): DetectedTable {
+  if (table.rows.length < 2) return table;
+  if (detectWeightColumn(table.headers, table.rows)) return table;
+
+  const trimmed = table.rows.slice(0, -1);
+  if (!detectWeightColumn(table.headers, trimmed)) return table;
+
+  return { ...table, rows: trimmed };
 }
 
 export function detectColumns(table: DetectedTable): ColumnMap | null {
