@@ -106,3 +106,24 @@ model EtfHolding {
   @@unique([instrumentId, identity])
   @@index([instrumentId])
 }
+
+// Cache of raw identity -> canonical id, so a lookup is paid for once ever.
+//
+// Resolution happens at IMPORT time and nothing else touches the network: the
+// allocation screen reads this table like any other row. Misses are cached too
+// — an identity the provider cannot place would otherwise be re-asked on every
+// import forever, and unauthenticated lookups are rationed by the minute.
+model SecurityIdentity {
+  identity     String @id // "US67066G1040" or "NVDA.US", exactly as published
+  identityKind String // ISIN | TICKER
+
+  /** Null when the provider found nothing, or found more than one candidate. */
+  canonicalId String?
+  /** resolved | not-found | ambiguous — kept so a miss can be explained. */
+  status String
+  source String
+
+  resolvedAt DateTime @default(now())
+
+  @@index([canonicalId])
+}
