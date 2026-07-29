@@ -257,3 +257,131 @@ describe("parseHoldingsCsv — a ticker is only unique within its venue", () => 
     expect(Number(covered) + Number(residual)).toBeCloseTo(1, 10);
   });
 });
+
+// Shape: an export pretty-printed into aligned columns, which puts a space
+// between the delimiter and the opening quote. A CSV reader only treats a field
+// as quoted when the quote sits flush against the comma, so the quotes come back
+// as part of every value.
+const PADDED_STYLE = `\uFEFF
+Ticker      , Name                        , Weight (%), Location
+"AAAA"      , "ALPHA CORP"                , "30.00"   , "United States"
+"CCCC"      , "GAMMA INC"                 , "25.00"   , "United States"
+"BBBB"      , "BETA AB"                   , "20.00"   , "Sweden"
+"6526"      , "DELTA KK"                  , "15.00"   , "Japan"
+"6526"      , "EPSILON CORP"              , "9.96"    , "Taiwan"
+`;
+
+describe("parseHoldingsCsv — exports that have been reformatted", () => {
+  it("survives padded columns and the loose quoting they cause", () => {
+    const result = parseHoldingsCsv(PADDED_STYLE);
+    expect(result.columns.identity).toBe("Ticker");
+    expect(result.holdings).toHaveLength(5);
+  });
+
+  it("does not leave quotes inside an identity", () => {
+    // Left alone this produced `AAAA."United States"`, which is a venue no other
+    // file will ever agree with.
+    const result = parseHoldingsCsv(PADDED_STYLE);
+    expect(result.holdings.map((h) => h.identity).sort()).toEqual([
+      "6526.JP",
+      "6526.TW",
+      "AAAA.US",
+      "BBBB.SE",
+      "CCCC.US",
+    ]);
+  });
+
+  it("does not leave quotes inside a name", () => {
+    const result = parseHoldingsCsv(PADDED_STYLE);
+    expect(result.holdings[0]?.name).toBe("ALPHA CORP");
+  });
+
+  it("keeps a quote that is part of the data", () => {
+    // Only a WRAPPING pair is removed, and only when both ends match.
+    const csv = `Ticker,Name,Weight (%)
+AAAA,ALPHA 12" PIPE CO,60.00
+BBBB,BETA CORP,40.00
+`;
+    const result = parseHoldingsCsv(csv);
+    expect(result.holdings.find((h) => h.identity === "AAAA")?.name).toBe(
+      'ALPHA 12" PIPE CO',
+    );
+  });
+});
+
+describe("parseHoldingsCsv — shapes other people's issuers will bring", () => {
+  it("reads a semicolon-delimited file, which is what European Excel writes", () => {
+    const csv = `ISIN;Nombre;Peso
+US67066G1040;NVIDIA Corp;4,45%
+US0378331005;Apple Inc;3,98%
+US5949181045;Microsoft Corp;91,57%
+`;
+    expect(parseHoldingsCsv(csv).holdings).toHaveLength(3);
+  });
+
+  it("reads a tab-delimited file", () => {
+    const csv = "ISIN\tName\tWeight\nUS67066G1040\tNVIDIA Corp\t40%\nUS0378331005\tApple Inc\t60%\n";
+    expect(parseHoldingsCsv(csv).holdings).toHaveLength(2);
+  });
+
+  it("reads weights published as fractions rather than percentages", () => {
+    // The two cannot be confused: a percentage column summing to 1 would be a
+    // fund that is one percent invested, and a fraction column summing to 100
+    // would be a hundred times its own size.
+    const csv = `ISIN,Name,Weight
+US67066G1040,NVIDIA Corp,0.4
+US0378331005,Apple Inc,0.6
+`;
+    const result = parseHoldingsCsv(csv);
+    expect(result.weightScale).toBe("1");
+    expect(result.holdings[0]?.weight).toBe("0.6");
+  });
+
+  it("still reads percentages, which is what most issuers publish", () => {
+    const csv = `ISIN,Name,Weight
+US67066G1040,NVIDIA Corp,40
+US0378331005,Apple Inc,60
+`;
+    const result = parseHoldingsCsv(csv);
+    expect(result.weightScale).toBe("100");
+    expect(result.holdings[0]?.weight).toBe("0.6");
+  });
+
+  it("drops a trailing total row, which would otherwise double the column", () => {
+    // A TOTAL line makes the weights sum to two hundred, so nothing looks like a
+    // weight and the whole file is rejected.
+    const csv = `ISIN,Name,Weight
+US67066G1040,NVIDIA Corp,40.00%
+US0378331005,Apple Inc,60.00%
+,TOTAL,100.00%
+`;
+    const result = parseHoldingsCsv(csv);
+    expect(result.holdings).toHaveLength(2);
+  });
+
+  it("keeps the last row when it is a holding, not a total", () => {
+    // A fund's smallest holding is also a last row. The trailing row is only
+    // dropped when dropping it turns an unreadable file into a readable one.
+    const csv = `ISIN,Name,Weight
+US67066G1040,NVIDIA Corp,40.00%
+US0378331005,Apple Inc,35.00%
+US5949181045,Microsoft Corp,25.00%
+`;
+    expect(parseHoldingsCsv(csv).holdings).toHaveLength(3);
+  });
+
+  it("reads Windows line endings", () => {
+    const csv = "ISIN,Name,Weight\r\nUS67066G1040,NVIDIA Corp,40%\r\nUS0378331005,Apple Inc,60%\r\n";
+    expect(parseHoldingsCsv(csv).holdings).toHaveLength(2);
+  });
+
+  it("keeps accented names intact", () => {
+    const csv = `ISIN,Name,Weight
+FR0000120578,Sanofi Société Anonyme,50%
+DE0007236101,Siemens Aktiengesellschaft,50%
+`;
+    expect(parseHoldingsCsv(csv).holdings.map((h) => h.name)).toContain(
+      "Sanofi Société Anonyme",
+    );
+  });
+});

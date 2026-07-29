@@ -5,6 +5,8 @@ import {
   detectColumns,
   detectQualifierColumn,
   detectTable,
+  detectWeightColumn,
+  withoutTotalRow,
   type ColumnMap,
   type IdentityKind,
 } from "./detect";
@@ -21,6 +23,8 @@ export interface ParsedHolding {
 
 export interface ParsedHoldings {
   columns: ColumnMap;
+  /** 100 when the issuer publishes percentages, 1 when it publishes fractions. */
+  weightScale: string;
   /**
    * Column used to tell same-ticker companies apart, when one was needed. Null
    * for ISIN files, which need none.
@@ -62,7 +66,8 @@ export function parseHoldingsCsv(
   csv: string,
   override?: Partial<ColumnMap>,
 ): ParsedHoldings {
-  const table = detectTable(csv);
+  const parsed = detectTable(csv);
+  const table = parsed ? withoutTotalRow(parsed) : null;
   if (!table) {
     throw new HoldingsParseError(
       "No header row found: the file does not look like a holdings table.",
@@ -71,6 +76,11 @@ export function parseHoldingsCsv(
 
   const detected = detectColumns(table);
   const columns = { ...detected, ...override } as ColumnMap;
+
+  // Re-measured rather than taken from detection, because an override can point
+  // at a different column with a different scale.
+  const scale =
+    detectWeightColumn([columns.weight], table.rows)?.scale ?? new Decimal(100);
 
   if (!columns.identity || !columns.weight || !columns.name) {
     throw new HoldingsParseError(
@@ -124,7 +134,7 @@ export function parseHoldingsCsv(
     // in Paris.
     const existing = byIdentity.get(key);
     if (existing) {
-      existing.weight = new Decimal(existing.weight).plus(weight.div(100)).toString();
+      existing.weight = new Decimal(existing.weight).plus(weight.div(scale)).toString();
       continue;
     }
 
@@ -132,7 +142,7 @@ export function parseHoldingsCsv(
       identity: key,
       identityKind: columns.identityKind,
       name: (row[columns.name] ?? "").trim() || identity,
-      weight: weight.div(100).toString(),
+      weight: weight.div(scale).toString(),
     });
   }
 
@@ -149,7 +159,7 @@ export function parseHoldingsCsv(
   // negative cash (-0.58% in one real file) has equity holdings summing to more
   // than 100%. Clamping it to zero would quietly discard the fact that the fund
   // is slightly geared. Either way the weights still sum to exactly 1.
-  const coveredFraction = covered.div(100);
+  const coveredFraction = covered.div(scale);
   const residual = new Decimal(1).minus(coveredFraction);
 
   // Sorted by weight, because the issuer's order is not a contract: one ships by
@@ -159,6 +169,7 @@ export function parseHoldingsCsv(
 
   return {
     columns,
+    weightScale: scale.toString(),
     qualifier,
     headers: table.headers,
     asOfHint: detectAsOfHint(table.preamble),

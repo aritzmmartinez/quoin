@@ -16,6 +16,7 @@
     "prices:map": "tsx scripts/prices-map.ts",
     "prices:backfill": "tsx scripts/prices-backfill.ts",
     "exposure:map": "tsx scripts/exposure-map.ts",
+    "identity:resolve": "tsx scripts/identity-resolve.ts",
     "postinstall": "prisma generate",
     "test": "vitest run",
     "test:watch": "vitest",

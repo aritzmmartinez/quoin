@@ -46,7 +46,14 @@ pnpm ingest --broker=<tr|kraken> <file>
 pnpm prices:sync                  # quote every mapped instrument
 pnpm prices:map <ISIN> <SYMBOL>   # set / show / --clear a Yahoo symbol
 pnpm prices:backfill [ISIN] [1y|2y|5y|10y|max]   # daily history, default 5y
+pnpm exposure:map                 # list how every instrument resolves
+pnpm exposure:map <ISIN> <KIND> [LEAF]           # e.g. XS2183935274 COMMODITY XAU
+pnpm identity:resolve [--limit N] [--all] [--retry-ambiguous] [--report]
 ```
+
+Fund compositions have **no command**: the CSV is dropped onto the fund's row in
+`/instrumentos`. That was a deliberate product decision — one more command is one more
+thing only the author can use.
 
 TypeScript is `strict` with `noUncheckedIndexedAccess`. Indexed access returns
 `T | undefined` — handle it, do not assert it away.
@@ -64,9 +71,13 @@ and it did not enforce this correctly.)
 - **core** — domain and pure projections. No Prisma, no `fetch`, no I/O, no clock.
   Anything from the outside is **injected**: e.g. `computeAllocation` receives a
   `Map<instrumentId, category>` because core cannot read `Instrument.type` from Prisma.
-- **adapters** — persistence (Prisma repositories), market data (Yahoo), ingestion (CSV).
+- **adapters** — persistence (Prisma repositories), market data (Yahoo), ingestion (broker
+  CSV + issuer holdings), identity (OpenFIGI).
   Keep parsing **pure and separately tested** from the I/O that feeds it
-  (`parseYahooChart`, `parseYahooChartHistory` are pure; the provider does the fetching).
+  (`parseYahooChart`, `parseHoldingsCsv`, `canonicalFrom` are pure; the providers fetch).
+  The holdings parser being pure is what lets the browser run it for a preview and the
+  server run the same function again to store — the client parses to show, the server
+  parses to keep, and the server trusts nothing it is handed.
 - **app** — routes, loaders, components.
 
 No monolithic files. Extract reusable primitives (`ui/`, `charts/`) rather than
@@ -108,10 +119,15 @@ This has caused misdirected generation more than once:
 
 ## Privacy and the no-clobber rule
 
-`Instrument.quoteSymbol`, `exposureKind` and `exposureLeafId` are set by CLI and live
-**only** in the local, gitignored SQLite database. Never commit symbols, ISINs, quantities,
-holdings or broker exports — this repo is public and that data would publish the author's
-portfolio. `*.csv` is gitignored.
+`Instrument.quoteSymbol`, `exposureKind` and `exposureLeafId` are set by CLI or the
+instruments screen and live **only** in the local, gitignored SQLite database. Never commit
+symbols, ISINs, quantities, holdings or broker exports — this repo is public and that data
+would publish the author's portfolio. `*.csv` is gitignored.
+
+**Test fixtures are synthetic, always.** This bites in a non-obvious place: the set of funds
+whose compositions get imported *is* the portfolio. A parser test using the real Vanguard
+and Amundi exports would disclose which funds are held, as surely as committing a
+`quoteSymbol` would. Copy the shape, invent the data.
 
 Ingestion must never write those three columns. This is enforced by the type, not by
 convention — `InstrumentWriteData` is `Omit<InstrumentRow, "quoteSymbol" | "exposureKind" |
@@ -147,14 +163,80 @@ ISIN itself, and always sanity-check the price magnitude.
   indistinguishable from an index fund. The information is not in the CSV — a human sets it
   once via `exposure:map`. Never infer it from the instrument name: an ETF of gold *miners*
   has "Gold" in its name and resolves to companies, not to metal.
-- **`computeExposures` takes `Map<instrumentId, WeightedLeaf[]>`** — an array, always. Phase
-  one hands it one leaf of weight 1; issuer look-through will hand it many. The resolver is
-  the seam that changes; the projection is not.
+- **`computeExposures` takes `Map<instrumentId, WeightedLeaf[]>`** — an array, always. That
+  seam paid off exactly as intended: when look-through landed, a fund went from one leaf to
+  nearly four thousand and the projection did not change a line. The resolver changes; the
+  projection does not.
+- **Three separate steps, and they stay separate.** `resolveIntrinsic` (what an instrument
+  is alone) → `resolveWithHoldings` (what a fund contains) → `canonicaliseLeaves` (what two
+  containers agree is the same thing). Folding canonicalisation into the resolvers would
+  make them untestable without a lookup table. It touches `COMPANY` leaves only: gold has no
+  share class, and mapping other kinds through would merge distinct things on an id clash.
+- **A merged leaf takes the direct position's name.** Once identities merge, the broker's
+  "NVIDIA" and an issuer's "NVIDIA Corp" compete for one leaf; without a rule the winner is
+  whichever instrument was iterated first, which is not a rule.
 - **Contributions are kept, not summed.** "NVIDIA is 11.6%" is not actionable; "9.9% direct,
   1.4% via FTSE" is. The provenance is lost in the fold, so the fold keeps it.
   `weightInParent: null` marks a direct holding, distinct from a 100% constituent.
 - **Leaf totals are derived (`leafTotal`), never stored.** Storing both invites the day they
   disagree — which is exactly how the fee bug happened.
+
+## Holdings import — one parser, no issuer branches
+
+Six real issuer exports built this and none needed a rule of its own. A seventh must need
+no code; if you find yourself adding `if (issuer === ...)`, the design has failed.
+
+- **The weight column is the one whose values add up to ~100** (or ~1 — some publish
+  fractions, and the two ranges cannot overlap). This survives language, layout and number
+  format, and doubles as verification: if nothing adds up, the file is not a holdings table,
+  and saying so beats importing half of one.
+- **The identity column is the one that is mostly unique**, after ISIN shape fails. This is
+  what stops a `Region` column of `US` and `JP` — perfectly ticker-shaped — from being taken
+  for tickers. A header hint (`Ticker`) is authoritative; uniqueness only breaks ties.
+- **A bare ticker is not an identity.** In one global fund `SAN` was Santander and Sanofi,
+  `MRK` was Merck & Co and Merck KGaA, `6526` was Socionext and Airoha — ninety collisions
+  in one file. Identities carry their venue (`SAN.ES`), folded to ISO country codes so two
+  issuers writing `US` and `United States` agree. Same principle as `IBE.MC` over `IBE`.
+- **Rows with no usable identity fold into the residual** — cash, FX forwards, an issuer's
+  own catch-all bucket. The residual can be **negative** when a fund carries negative cash;
+  that is honest, not a bug, and clamping it would hide that the fund is geared.
+- **`EtfHolding` is replace-only**, unlike append-only `PriceSnapshot`. A holdings file is a
+  snapshot of what a fund holds today, not an event that happened; appending would keep
+  constituents that have left the index.
+- **Several detector thresholds scale with file size.** A column is rejected as "not
+  categorical" above 90% distinct values, which is right for four thousand rows and
+  meaningless for four. It self-limits — a tiny fund cannot have ticker collisions — but
+  know it is there before trusting a small fixture.
+
+## Canonical identity (OpenFIGI)
+
+Issuers disagree on what to publish: some give an ISIN, some only a ticker, and they share
+hundreds of companies. 726 collisions were measured across six real funds, which is why
+manual aliasing was abandoned — 726 confirmations is not a system.
+
+- **`shareClassFIGI` is the level to use.** It links one share class across countries, which
+  is exactly the ISIN-versus-ticker gap. `compositeFIGI` only links venues within a country
+  and leaves the gap open; the instrument-level `figi` is per listing.
+- **Share classes are deliberately not merged.** GOOG/GOOGL, Berkshire A/B, Samsung ordinary
+  and preferred are separate securities with separate ISINs and prices. FIGI does not join
+  them either. Reporting them apart is correct, not untidy.
+- **Tickers are sent without `exchCode`.** OpenFIGI speaks Bloomberg's exchange vocabulary,
+  not ISO (Taiwan is `TT`, Germany `GR`, the UK `LN`). Every listing comes back and only
+  unanimity resolves; on disagreement the venue decides first and the issuer's name second.
+  `venues.ts` bridges ISO to Bloomberg — a table, accepted only because a wrong or missing
+  entry costs nothing: it narrows an already-ambiguous set, so at worst it filters nothing.
+- **Names are compared by containment, not equality**, because sources clip at different
+  widths. Safe only because the match must be **unique** among candidates, and prefixes
+  under 8 characters are refused so "Bank" cannot reach "Bank of America".
+- **Refusing is the correct failure.** An unresolved leaf keeps its raw identity and still
+  reports the right value; it simply does not merge. A wrong merge silently claims a holding
+  that does not exist.
+- **OpenFIGI v3 renamed the "not found" key from `error` to `warning`** (v2 shut down
+  2026-07-01). Checking only `error` swallows every miss in silence.
+- Resolution happens **at import**, is cached permanently including misses, and runs in
+  **descending weight order** — unauthenticated the endpoint allows 10 jobs per request and
+  25 requests a minute, so five thousand leaves is twenty minutes; ordering by weight means
+  a couple of hundred lookups already cover every row that is drawn.
 
 ## Projections
 
@@ -199,10 +281,25 @@ Append is idempotent: dedup by `source` + `externalId`.
 
 ## URL as state
 
-Sort order (Cartera) and chart range (Resumen) live in **URL search params**, written by
-the UI and read by the **loader**. No context, no state lifting, and the view stays
+Sort order (Cartera), chart range (Resumen), page (Movimientos) and concentration
+threshold (Asignación, `?umbral=20`) live in **URL search params**, written by the UI and
+read by the **loader**. No context, no state lifting, and the view stays
 shareable. A route opts into the header's range selector with `handle = { range: true }`;
 `handle.title` sets the header title.
+
+## Tailwind v4 — a nonexistent class is silent
+
+`bg-surface-1` and `text-warning` do not exist in this theme. Tailwind emits nothing for an
+unknown token and raises nothing, so **typecheck, lint and build all pass** and the element
+simply renders unstyled. Check `app/app.css` for the real tokens before inventing one:
+`--color-bg`, `--color-surface`, `--color-surface-2`, `--color-border`, `--color-text`,
+`--color-muted`, `--color-positive`, `--color-negative`, `--color-dn-1..5`.
+
+`dn-1..5` is a **greyscale ramp**, not a categorical palette. The design is monochrome and
+green/red are reserved as semantic signals — a category is not a warning.
+
+Also declare `color-scheme` when adding native controls: a `<select>` popup is drawn by the
+OS, and without it the panel comes back light while the options inherit white text.
 
 ## Testing
 

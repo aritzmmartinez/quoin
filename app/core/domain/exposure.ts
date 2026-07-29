@@ -156,3 +156,30 @@ export function resolveWithHoldings(
 
   return leaves.length > 0 ? leaves : intrinsic;
 }
+
+/**
+ * Replace each company leaf's raw identity with its canonical one.
+ *
+ * Kept as its own step rather than folded into the resolvers: resolution is
+ * about what an instrument contains, canonicalisation is about what two
+ * containers agree to call the same thing, and keeping them apart means the
+ * resolvers stay testable without a lookup table.
+ *
+ * Only COMPANY leaves are touched. A commodity, a crypto asset or an
+ * undecomposed fund has no share class to canonicalise, and mapping them
+ * through would silently merge distinct things if an id ever collided.
+ *
+ * A leaf with no entry keeps its raw identity, so it still appears with the
+ * right value — it simply does not merge with its twin.
+ */
+export function canonicaliseLeaves(
+  leaves: readonly WeightedLeaf[],
+  canonical: ReadonlyMap<string, string>,
+): WeightedLeaf[] {
+  return leaves.map((weighted) => {
+    if (weighted.leaf.kind !== "COMPANY") return weighted;
+    const canonicalId = canonical.get(weighted.leaf.id);
+    if (!canonicalId || canonicalId === weighted.leaf.id) return weighted;
+    return { ...weighted, leaf: { kind: "COMPANY", id: canonicalId } };
+  });
+}

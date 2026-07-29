@@ -49,11 +49,20 @@ export function computeExposures(
         contributions: [],
       };
 
+      const weightInParent = weight.equals(1) ? null : weight.toString();
+
+      // Once two identities merge, several names compete for one leaf: the
+      // broker's "NVIDIA" against an issuer's "NVIDIA Corp". A directly held
+      // position wins, because that is the name on the statement — and without
+      // a rule the winner would be whichever instrument happened to be iterated
+      // first.
+      if (weightInParent === null) exposure.name = weighted.name;
+
       exposure.contributions.push({
         instrumentId: position.instrumentId,
         instrumentName: weighted.name,
         value: value.mul(weight).toFixed(2),
-        weightInParent: weight.equals(1) ? null : weight.toString(),
+        weightInParent,
       });
 
       byLeaf.set(key, exposure);

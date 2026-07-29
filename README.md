@@ -9,12 +9,13 @@ and support for the Bizkaia *foral* tax regime that off-the-shelf trackers ignor
 The goal isn't to trade: it's to **understand** a portfolio, and to double as a
 learning project.
 
-> **Status: early stage, actively built.** The immutable ledger, core domain
-> (`Money`, event types, `computePositions` with average cost), CSV ingestion
+> **Status: v0.1.0, actively built.** The immutable ledger, core domain
+> (Money, event types, computePositions with average cost), CSV ingestion
 > (Trade Republic + Kraken), a Yahoo price provider with daily history, the app shell
-> and the summary / holdings / movements / asset-detail screens are in place. The
-> exposure model resolves positions to leaves; issuer look-through and the tax module
-> are next — see the roadmap.
+> and the summary / holdings / movements / asset-detail / instruments / allocation
+> screens are in place. Look-through works end to end: fund compositions are imported
+> from whatever CSV the issuer publishes, and holdings are matched across issuers by
+> canonical identity. The tax module is next — see the roadmap.
 
 ## Why
 
@@ -31,9 +32,9 @@ cost basis, P&L, allocation and look-through are all pure projections derived fr
 
 ## Tech stack
 
-React Router 8 (SSR) · React 19 · TypeScript (strict) · Tailwind v4 ·
-Lucide · React Hook Form + Zod · Sileo (toasts) · Recharts + Lightweight Charts ·
-Prisma 7 + SQLite (better-sqlite3 driver adapter) · decimal.js.
+React Router 8 (SSR) · React 19 · TypeScript (strict, with noUncheckedIndexedAccess) ·
+Tailwind v4 · Lucide · Zod · Recharts · Papa Parse ·
+Prisma 7 + SQLite (better-sqlite3 driver adapter) · decimal.js · Vitest.
 
 ## Getting started
 
@@ -56,7 +57,15 @@ pnpm prices:sync                  # fetch quotes for mapped instruments -> price
 pnpm prices:backfill [ISIN] [1y|2y|5y|10y|max]   # daily price history (default 5y)
 pnpm exposure:map                 # list how every instrument resolves for look-through
 pnpm exposure:map <ISIN> <KIND> [LEAF]           # e.g. XS2183935274 COMMODITY XAU
+pnpm identity:resolve             # give holdings a canonical id so duplicates merge
+pnpm identity:resolve --report    # what merged, and what is still ambiguous
 ```
+
+Fund compositions are imported from the **Instrumentos** screen: drop the issuer's
+holdings CSV onto the fund's row. One parser handles every issuer — the weight column
+is found by being the one that adds up to about 100, so it survives a different
+language, layout or number format without a rule per provider. There is no command
+for it on purpose.
 
 Quote symbols and exposure classifications live only in your local database (never in
 the repo), so a public clone never discloses your holdings. Prefer EUR venues (`.DE`,
@@ -66,6 +75,19 @@ the repo), so a public clone never discloses your holdings. Prefer EUR venues (`
 Republic labels both equity ETFs and physical-gold ETCs as `FUND`, so an ETC arrives
 indistinguishable from an index fund. Stocks and crypto resolve from their type
 automatically; ETCs and bond funds need one command each, once.
+
+`identity:resolve` exists because issuers disagree on what to publish. Some list an
+ISIN, others only a ticker, and they hold hundreds of the same companies — so the same
+business arrives as `US67066G1040` from one fund and `NVDA.US` from another and counts
+twice. Both are mapped to a share-class FIGI via [OpenFIGI](https://www.openfigi.com/),
+which links one share class across countries. Set `OPENFIGI_API_KEY` in `.env` for a
+free and far higher rate limit; without one it still works, just slower. Anything that
+cannot be resolved keeps its raw identity: it will not merge with its twin, but it
+still appears with the right value.
+
+Share classes are deliberately **not** merged. `GOOG` and `GOOGL`, or Berkshire A and
+B, are separate securities with separate ISINs and separate prices; reporting them
+apart is more correct than tidying them together.
 
 Other scripts:
 
@@ -98,7 +120,11 @@ on with decimal.js; data and secrets are never committed.
 - [x] App shell (sidebar / bottom nav, theme toggle) and summary screen
 - [x] Movements screen (full ledger, URL-driven pagination)
 - [x] Exposure model: leaves, intrinsic resolution, `exposure:map`
-- [ ] Allocation screen + issuer holdings import (true look-through, overlap)
+- [x] Instruments screen: classify exposure, import fund compositions by dropping a CSV
+- [x] Generic holdings parser: one parser for every issuer, no per-provider rules
+- [x] Allocation screen: true look-through, direct vs via-fund attribution, concentration threshold
+- [x] Canonical identity via OpenFIGI, so a company held directly and inside a fund counts once
+- [ ] Read `.xlsx` holdings directly (most issuers publish Excel, not CSV)
 - [ ] Trading sleeve, watchlist and trade journal
 - [ ] Bizkaia foral tax module (FIFO lots)
 - [ ] DCF valuation module
