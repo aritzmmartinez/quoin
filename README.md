@@ -9,8 +9,8 @@ and support for the Bizkaia *foral* tax regime that off-the-shelf trackers ignor
 The goal isn't to trade: it's to **understand** a portfolio, and to double as a
 learning project.
 
-> **Status: early stage, actively built.** The immutable ledger, core domain
-> (`Money`, event types, `computePositions` with average cost), CSV ingestion
+> **Status: v0.1.0, actively built.** The immutable ledger, core domain
+> (Money, event types, computePositions with average cost), CSV ingestion
 > (Trade Republic + Kraken), a Yahoo price provider with daily history, the app shell
 > and the summary / holdings / movements / asset-detail / instruments / allocation
 > screens are in place. Look-through works end to end: fund compositions are imported
@@ -32,7 +32,7 @@ cost basis, P&L, allocation and look-through are all pure projections derived fr
 
 ## Tech stack
 
-React Router 8 (SSR) · React 19 · TypeScript (strict, with `noUncheckedIndexedAccess`) ·
+React Router 8 (SSR) · React 19 · TypeScript (strict, with noUncheckedIndexedAccess) ·
 Tailwind v4 · Lucide · Zod · Recharts · Papa Parse ·
 Prisma 7 + SQLite (better-sqlite3 driver adapter) · decimal.js · Vitest.
 
