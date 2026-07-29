@@ -11,7 +11,16 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "postinstall": "prisma generate"
+    "ingest": "tsx scripts/ingest.ts",
+    "prices:sync": "tsx scripts/prices-sync.ts",
+    "prices:map": "tsx scripts/prices-map.ts",
+    "prices:backfill": "tsx scripts/prices-backfill.ts",
+    "exposure:map": "tsx scripts/exposure-map.ts",
+    "identity:resolve": "tsx scripts/identity-resolve.ts",
+    "postinstall": "prisma generate",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.8.0",
@@ -19,11 +28,16 @@
     "@react-router/node": "8.0.0",
     "@react-router/serve": "8.0.0",
     "better-sqlite3": "^12.11.1",
+    "decimal.js": "^10.6.0",
     "dotenv": "^17.4.2",
     "isbot": "^5.1.36",
+    "lucide-react": "^1.24.0",
+    "papaparse": "^5.5.4",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "react-router": "8.0.0"
+    "react-router": "8.0.0",
+    "recharts": "^2.15.4",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -31,15 +45,19 @@
     "@tailwindcss/vite": "^4.2.2",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22",
+    "@types/papaparse": "^5.5.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "eslint": "^10.6.0",
     "prisma": "^7.8.0",
     "tailwindcss": "^4.2.2",
+    "tsx": "^4.23.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.62.1",
-    "vite": "^8.0.3"
+    "vite": "^8.0.3",
+    "vitest": "^4.1.9"
   },
   "description": "Personal, open-source, local-first investment platform with portquoin analytics, look-through exposure and Bizkaia foral tax support.",
-  "license": "AGPL-3.0-only"
+  "license": "AGPL-3.0-only",
+  "packageManager": "pnpm@11.10.0"
 }

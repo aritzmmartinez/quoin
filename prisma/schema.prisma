@@ -15,9 +15,14 @@ model Instrument {
   type       String // ETF | STOCK | CRYPTO | BOND | COMMODITY | ...
   currency   String // ISO 4217 (instrument's denomination currency)
   assetClass String? // from TR: FUND | STOCK | CRYPTO | SYNTHETIC ...
+  quoteSymbol String? // provider symbol for price quotes (e.g. "VWCE.DE"); set manually, never from ingestion
+  exposureKind   String? // COMPANY | EQUITY_FUND | BOND_FUND | COMMODITY | CRYPTO; set manually, never from ingestion
+  exposureLeafId String? // leaf identity for COMMODITY/CRYPTO (e.g. "XAU", "BTC"); defaults to the instrument id
   createdAt  DateTime @default(now())
 
-  entries LedgerEntry[]
+  entries  LedgerEntry[]
+  prices   PriceSnapshot[]
+  holdings EtfHolding[]
 }
 
 /// Immutable ledger: the source of truth. Positions, P&L, allocation... are DERIVED from here.
@@ -50,4 +55,75 @@ model LedgerEntry {
   @@unique([source, externalId]) // idempotent ingestion (NULLs are distinct in SQLite -> manual entries don't collide)
   @@index([ts])
   @@index([instrumentId])
+}
+
+/// Point-in-time price for an instrument, from a market-data provider.
+/// Append-only history: the latest price per instrument is max(asOf). This also
+/// feeds the "updated X ago" freshness indicator and future TWR/MWR.
+model PriceSnapshot {
+  id           String     @id @default(uuid())
+  instrumentId String
+  instrument   Instrument @relation(fields: [instrumentId], references: [id])
+
+  // Money is ALWAYS a String (decimal) -> operated on with decimal.js.
+  price    String // per-unit price, in `currency`
+  currency String // ISO 4217 as returned by the provider
+
+  asOf   DateTime // provider's quote timestamp (market time)
+  source String   @default("YAHOO") // provider id
+
+  createdAt DateTime @default(now()) // when we fetched/persisted it
+
+  @@unique([instrumentId, asOf]) // idempotent sync: same quote time won't duplicate
+  @@index([instrumentId])
+  @@index([asOf])
+}
+
+// A fund's published composition.
+//
+// Unlike PriceSnapshot, this is REPLACE-only, not append-only: a holdings file is
+// a snapshot of what the fund holds today, not an event that happened. Importing
+// replaces the fund's rows wholesale, because a constituent that left the index
+// must disappear — appending would keep it forever.
+//
+// The residual (1 - sum of weights) is DERIVED at read time, never stored: it is
+// the fund's cash, derivatives and rounding, and storing it next to the weights
+// invites the day the two disagree.
+model EtfHolding {
+  id           String     @id @default(uuid())
+  instrumentId String
+  instrument   Instrument @relation(fields: [instrumentId], references: [id])
+
+  identity     String // ISIN when the issuer publishes one, otherwise its ticker
+  identityKind String // ISIN | TICKER
+  name         String
+
+  weight String // fraction of the fund as a decimal string ("0.044503")
+
+  asOf      DateTime // the issuer's as-of date, confirmed by a human on import
+  createdAt DateTime @default(now())
+
+  @@unique([instrumentId, identity])
+  @@index([instrumentId])
+}
+
+// Cache of raw identity -> canonical id, so a lookup is paid for once ever.
+//
+// Resolution happens at IMPORT time and nothing else touches the network: the
+// allocation screen reads this table like any other row. Misses are cached too
+// — an identity the provider cannot place would otherwise be re-asked on every
+// import forever, and unauthenticated lookups are rationed by the minute.
+model SecurityIdentity {
+  identity     String @id // "US67066G1040" or "NVDA.US", exactly as published
+  identityKind String // ISIN | TICKER
+
+  /** Null when the provider found nothing, or found more than one candidate. */
+  canonicalId String?
+  /** resolved | not-found | ambiguous — kept so a miss can be explained. */
+  status String
+  source String
+
+  resolvedAt DateTime @default(now())
+
+  @@index([canonicalId])
 }

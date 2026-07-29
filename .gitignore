@@ -13,6 +13,7 @@
 
 # User data — NEVER committed (public repo)
 /data/
+*.csv
 *.sqlite
 *.sqlite-*
 *.db

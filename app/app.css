@@ -1,13 +1,7 @@
 @import "tailwindcss";
 
-/* Class-based dark mode (.dark) so it can be toggled, not just via OS preference */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/*
- * Design tokens — Trade Republic aesthetic (see docs/design-brief).
- * Monochrome; green/red ONLY as a semantic signal.
- * Defined here so Tailwind generates utilities (bg-surface, text-muted, ...).
- */
 @theme {
   --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
 
@@ -33,8 +27,17 @@
   --radius-card: 16px;
 }
 
-/* light theme: enabled via .light on <html>; inverts the base, keeps semantics */
+:root {
+  color-scheme: dark;
+}
+
+option {
+  background-color: var(--color-surface);
+  color: var(--color-text);
+}
+
 .light {
+  color-scheme: light;
   --color-bg: #ffffff;
   --color-surface: #fafafa;
   --color-surface-2: #f0f0f0;
@@ -55,7 +58,6 @@ body {
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-sans);
-  /* tabular numerals app-wide: number columns stay aligned */
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
 }
