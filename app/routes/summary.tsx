@@ -132,16 +132,16 @@ export default function Summary({ loaderData }: Route.ComponentProps) {
 
   if (!hasPositions) {
     return (
-      <main className="mx-auto max-w-6xl px-4 py-8 md:px-6">
+      <>
         <Card>
           <PortfolioEmpty />
         </Card>
-      </main>
+      </>
     );
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 md:px-6">
+    <>
       <SummaryHero
         totalValue={summary.totalValue}
         changeAbs={change.abs}
@@ -167,16 +167,16 @@ export default function Summary({ loaderData }: Route.ComponentProps) {
         <AllocationCard rows={allocation} />
         <TopPositionsCard rows={top} />
       </div>
-    </main>
+    </>
   );
 }
 
 export function ErrorBoundary() {
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 md:px-6">
+    <>
       <Card>
         <PortfolioError onRetry={() => window.location.reload()} />
       </Card>
-    </main>
+    </>
   );
 }

@@ -147,7 +147,7 @@ export default function Instrument({ loaderData }: Route.ComponentProps) {
   const { instrument, kpis, priceChartData, ivvData, movements, movementsPage } =
     loaderData;
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8 md:px-6">
+    <>
       <InstrumentHeader instrument={instrument} />
       <InstrumentStats kpis={kpis} />
       <PriceChartWithTrades data={priceChartData} />
@@ -162,7 +162,7 @@ export default function Instrument({ loaderData }: Route.ComponentProps) {
           showInstrument={false}
         />
       </Card>
-    </main>
+    </>
   );
 }
 
@@ -174,7 +174,7 @@ export function ErrorBoundary() {
     : { title: es.portfolio.error.title, body: es.portfolio.error.body };
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8 md:px-6">
+    <>
       <Link
         to="/cartera"
         className="mb-4 inline-block text-[12.5px] text-muted transition-colors hover:text-text"
@@ -187,6 +187,6 @@ export function ErrorBoundary() {
           {copy.body}
         </p>
       </div>
-    </main>
+    </>
   );
 }

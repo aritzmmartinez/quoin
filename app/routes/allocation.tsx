@@ -102,7 +102,7 @@ export default function Allocation({ loaderData }: Route.ComponentProps) {
       : String(Number(summary.unresolved) / Number(summary.total));
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 md:px-6">
+    <>
       <div className="grid gap-4 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
         <div className="flex flex-col gap-4">
           <ReadingCard reading={reading} threshold={threshold} />
@@ -150,7 +150,7 @@ export default function Allocation({ loaderData }: Route.ComponentProps) {
           <ExposureBars rows={rows} threshold={threshold} />
         </Card>
       </div>
-    </main>
+    </>
   );
 }
 
@@ -165,10 +165,10 @@ function Line({ label, value }: { label: string; value: string }) {
 
 export function ErrorBoundary() {
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 md:px-6">
+    <>
       <Card>
         <PortfolioError onRetry={() => window.location.reload()} />
       </Card>
-    </main>
+    </>
   );
 }
