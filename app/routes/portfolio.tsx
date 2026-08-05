@@ -85,7 +85,7 @@ export default function Portfolio({ loaderData }: Route.ComponentProps) {
   const busy = navigation.state === "loading";
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 md:px-6">
+    <>
       <header className="mb-4">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           {rows.length > 0 && (
@@ -117,16 +117,16 @@ export default function Portfolio({ loaderData }: Route.ComponentProps) {
           <PortfolioTable rows={rows} sort={sort} busy={busy} />
         )}
       </Card>
-    </main>
+    </>
   );
 }
 
 export function ErrorBoundary() {
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 md:px-6">
+    <>
       <Card>
         <PortfolioError onRetry={() => window.location.reload()} />
       </Card>
-    </main>
+    </>
   );
 }
