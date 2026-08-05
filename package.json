@@ -37,6 +37,7 @@
     "react-dom": "^19.2.7",
     "react-router": "8.0.0",
     "recharts": "^2.15.4",
+    "xlsx": "^0.18.5",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -59,5 +60,5 @@
   },
   "description": "Personal, open-source, local-first investment platform with portquoin analytics, look-through exposure and Bizkaia foral tax support.",
   "license": "AGPL-3.0-only",
-  "packageManager": "pnpm@11.10.0"
+  "packageManager": "pnpm@11.18.0"
 }
