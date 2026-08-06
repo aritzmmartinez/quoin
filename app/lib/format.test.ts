@@ -66,6 +66,24 @@ describe("formatPercent", () => {
     expect(norm(formatPercent("0.1732"))).toContain("17,3");
     expect(norm(formatPercent("0.1732"))).toContain("%");
   });
+
+  it("floors a tiny non-zero weight to '<0,1 %' rather than '0,0 %'", () => {
+    const out = norm(formatPercent("0.0001344", 1, { floorNonZero: true }));
+    expect(out).toContain("<0,1");
+    expect(out).toContain("%");
+  });
+
+  it("does not floor an exact zero, even with the option on", () => {
+    expect(norm(formatPercent("0", 1, { floorNonZero: true }))).not.toContain(
+      "<",
+    );
+  });
+
+  it("does not floor a value that rounds to a visible figure", () => {
+    expect(
+      norm(formatPercent("0.006", 1, { floorNonZero: true })),
+    ).not.toContain("<");
+  });
 });
 
 describe("formatRelativeTime", () => {

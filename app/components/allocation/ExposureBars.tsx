@@ -68,8 +68,8 @@ function Row({
       ? copy.kinds.UNRESOLVED
       : Number(row.direct) > 0 && Number(row.via) > 0
         ? copy.splitBoth(
-            formatPercent(row.direct, 1),
-            formatPercent(row.via, 1),
+            formatPercent(row.direct, 1, { floorNonZero: true }),
+            formatPercent(row.via, 1, { floorNonZero: true }),
           )
         : Number(row.direct) > 0
           ? copy.splitDirect

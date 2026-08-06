@@ -45,6 +45,11 @@ async function preview(symbol: string, instrumentId: string): Promise<void> {
     console.log(
       `  → implied value: ${qty.toFixed(qty.isInteger() ? 0 : 4)} units = ${implied} ${quote.currency}`,
     );
+    if (qty.isZero()) {
+      console.log(
+        "  ⚠ position is closed (0 units held) — a zero implied value can't sanity-check this symbol against what you paid, so verify the venue by hand.",
+      );
+    }
   } catch {
     console.log("  (could not fetch a preview price — check your connection)");
   }
