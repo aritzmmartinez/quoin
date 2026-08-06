@@ -60,5 +60,5 @@
   },
   "description": "Personal, open-source, local-first investment platform with portquoin analytics, look-through exposure and Bizkaia foral tax support.",
   "license": "AGPL-3.0-only",
-  "packageManager": "pnpm@11.18.0"
+  "packageManager": "pnpm@11.20.0"
 }

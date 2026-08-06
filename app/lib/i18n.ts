@@ -155,7 +155,7 @@ export const es = {
     summary: (count: number, covered: string): string =>
       `${count} posiciones · ${covered}`,
     none: "Sin composición",
-    import: "Importar CSV",
+    import: "Importar composición",
     onlyEquityFunds: "Solo para fondos de renta variable.",
     notAFund: "Este instrumento no es un fondo de renta variable.",
   },
