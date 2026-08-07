@@ -25,11 +25,11 @@ export function ReadingCard({
             {copy.lead}
             <strong>{reading.name}</strong>
             {copy.isA}
-            <strong>{formatPercent(reading.total, 1)}</strong>
+            <strong>{formatPercent(reading.total, 2, { floorNonZero: true })}</strong>
             {Number(reading.direct) > 0 && Number(reading.via) > 0
               ? copy.breakdown(
-                  formatPercent(reading.direct, 1, { floorNonZero: true }),
-                  formatPercent(reading.via, 1, { floorNonZero: true }),
+                  formatPercent(reading.direct, 2, { floorNonZero: true }),
+                  formatPercent(reading.via, 2, { floorNonZero: true }),
                 )
               : Number(reading.via) > 0
                 ? copy.allVia

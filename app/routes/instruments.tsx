@@ -142,9 +142,7 @@ export default function Instruments({ loaderData }: Route.ComponentProps) {
   return (
     <>
       <header className="mb-4">
-        <p className="max-w-2xl text-[13px] text-muted">
-          {es.instruments.intro}
-        </p>
+        <p className="text-[13px] text-muted">{es.instruments.intro}</p>
         {unmapped > 0 && (
           <p className="mt-2 text-[13px] text-muted">
             {es.instruments.unmappedHint(unmapped)}

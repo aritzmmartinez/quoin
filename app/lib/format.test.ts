@@ -73,6 +73,15 @@ describe("formatPercent", () => {
     expect(out).toContain("%");
   });
 
+  it("keeps the floor precision-aware: two decimals floors to '<0,01 %'", () => {
+    expect(norm(formatPercent("0.00003", 2, { floorNonZero: true }))).toContain(
+      "<0,01",
+    );
+    const shown = norm(formatPercent("0.000134", 2, { floorNonZero: true }));
+    expect(shown).toContain("0,01");
+    expect(shown).not.toContain("<");
+  });
+
   it("does not floor an exact zero, even with the option on", () => {
     expect(norm(formatPercent("0", 1, { floorNonZero: true }))).not.toContain(
       "<",

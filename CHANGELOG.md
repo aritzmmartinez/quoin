@@ -13,9 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - A market-allocation export (weights by country, no securities) is no longer read as holdings with each country becoming a company: a column that is mostly country names can no longer be taken as the identity.
 - The weight column can no longer also be taken as the identity — short numeric weights have the shape of tickers, which let a numeric-weight allocation file slip through.
-- Allocation shows "<0,1 %" instead of "0,0 %" for a holding whose weight is tiny but real — a company reached only through a fund — so it reads as present, not absent.
-- `prices:map` warns when the position is closed (0 units held): a zero implied value can't sanity-check the symbol against what was paid, so the venue must be checked by hand.
-- `prices:backfill` warns when Yahoo silently degrades a long range to weekly candles.
+- Position weights are shown to two decimals with a "<0,01%" floor for a holding that is tiny but real — a company reached only through a fund — across Allocation and the holdings preview, so it reads as present, at its true magnitude, not "0,0 %".
+- prices:map warns when the position is closed (0 units held): a zero implied value can't sanity-check the symbol against what was paid, so the venue must be checked by hand.
+- prices:backfill warns when Yahoo silently degrades a long range to weekly candles.
 
 ## [0.1.0] - 2026-07-27
 

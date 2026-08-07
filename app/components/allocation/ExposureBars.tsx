@@ -68,8 +68,8 @@ function Row({
       ? copy.kinds.UNRESOLVED
       : Number(row.direct) > 0 && Number(row.via) > 0
         ? copy.splitBoth(
-            formatPercent(row.direct, 1, { floorNonZero: true }),
-            formatPercent(row.via, 1, { floorNonZero: true }),
+            formatPercent(row.direct, 2, { floorNonZero: true }),
+            formatPercent(row.via, 2, { floorNonZero: true }),
           )
         : Number(row.direct) > 0
           ? copy.splitDirect
@@ -133,7 +133,9 @@ function Row({
           <div
             className={`text-[13px] tabular-nums ${hot ? "font-medium text-negative" : ""}`}
           >
-            {row.weight === null ? "—" : formatPercent(row.weight, 2)}
+            {row.weight === null
+              ? "—"
+              : formatPercent(row.weight, 2, { floorNonZero: true })}
           </div>
           <div className="text-[10.5px] tabular-nums text-muted">
             {formatMoney(row.value)}
@@ -154,7 +156,9 @@ function Row({
               <span className="shrink-0">
                 {c.weightInParent === null
                   ? copy.direct
-                  : copy.insideFund(formatPercent(c.weightInParent, 2))}
+                  : copy.insideFund(
+                      formatPercent(c.weightInParent, 2, { floorNonZero: true }),
+                    )}
               </span>
               <span className="w-16 shrink-0 text-right tabular-nums">
                 {formatMoney(c.value)}
