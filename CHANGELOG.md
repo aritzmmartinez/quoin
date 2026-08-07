@@ -7,10 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-08
+
+### Added
+- Import fund holdings straight from an issuer's .xlsx, not only CSV — the format most issuers actually publish, so the file no longer has to be converted by hand. The workbook is rendered to CSV in the browser and fed to the existing parser unchanged; the holdings sheet is the one that parses, a disclaimer or cover sheet is skipped, and a workbook with two holdings-shaped sheets is refused rather than guessed. SheetJS loads only when a workbook is dropped and never enters the server bundle.
+
 ### Fixed
-- Classifying an instrument as a fund (`EQUITY_FUND`/`BOND_FUND`) no longer fails with
-  "Datos no válidos": the leaf input is disabled for kinds that don't need one, and a
-  disabled input isn't submitted, so an absent leaf is now accepted as "none".
+- A market-allocation export (weights by country, no securities) is no longer read as holdings with each country becoming a company: a column that is mostly country names can no longer be taken as the identity.
+- The weight column can no longer also be taken as the identity — short numeric weights have the shape of tickers, which let a numeric-weight allocation file slip through.
+- Classifying an instrument as a fund (EQUITY_FUND / BOND_FUND) no longer fails with "Datos no válidos": the leaf input is disabled for kinds that don't need one, and a disabled input isn't submitted, so an absent leaf is now accepted as "none".
+- Position weights are shown to two decimals with a "<0,01%" floor for a holding that is tiny but real — a company reached only through a fund — across Allocation and the holdings preview, so it reads as present, at its true magnitude, not "0,0 %".
+- prices:map warns when the position is closed (0 units held): a zero implied value can't sanity-check the symbol against what was paid, so the venue must be checked by hand.
+- prices:backfill warns when Yahoo silently degrades a long range to weekly candles.
 
 ## [0.1.0] - 2026-07-27
 
@@ -61,5 +69,6 @@ fund holdings must be supplied as CSV rather than the Excel most issuers publish
 Design rationale lives beside the code it explains, in `docs/ARCHITECTURE.md` and in the
 commit history — not here.
 
-[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/aritzmmartinez/quoin/compare/v0.2.0
 [0.1.0]: https://github.com/aritzmmartinez/quoin/releases/tag/v0.1.0

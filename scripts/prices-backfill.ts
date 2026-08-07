@@ -17,6 +17,19 @@ function isRange(value: string): value is HistoryRange {
   return (RANGES as readonly string[]).includes(value);
 }
 
+function medianGapDays(quotes: readonly { asOf: Date }[]): number {
+  if (quotes.length < 2) return 0;
+  const gaps = quotes
+    .slice(1)
+    .map(
+      (quote, i) =>
+        (quote.asOf.getTime() - quotes[i]!.asOf.getTime()) / 86_400_000,
+    )
+    .sort((a, b) => a - b);
+  const mid = Math.floor(gaps.length / 2);
+  return gaps.length % 2 === 0 ? (gaps[mid - 1]! + gaps[mid]!) / 2 : gaps[mid]!;
+}
+
 function usage(): string {
   return [
     "Usage: pnpm prices:backfill [ISIN] [range]",
@@ -87,8 +100,12 @@ async function main(): Promise<void> {
 
     const first = quotes[0]?.asOf.toISOString().slice(0, 10);
     const last = quotes[quotes.length - 1]?.asOf.toISOString().slice(0, 10);
+    const weekly =
+      medianGapDays(quotes) >= 4
+        ? "  ⚠ weekly candles — Yahoo degraded this range; try a shorter one for daily"
+        : "";
     console.log(
-      `  ${instrument.id}  (${instrument.quoteSymbol})  ${written} candle(s)  ${first} → ${last}  ${quotes[0]?.currency}`,
+      `  ${instrument.id}  (${instrument.quoteSymbol})  ${written} candle(s)  ${first} → ${last}  ${quotes[0]?.currency}${weekly}`,
     );
   }
 

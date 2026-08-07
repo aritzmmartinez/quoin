@@ -273,7 +273,9 @@ function Preview({
               {h.identity}
             </span>
             <span className="flex-1 truncate">{h.name}</span>
-            <span className="tabular-nums">{formatPercent(h.weight)}</span>
+            <span className="tabular-nums">
+              {formatPercent(h.weight, 2, { floorNonZero: true })}
+            </span>
           </li>
         ))}
       </ul>

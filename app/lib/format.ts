@@ -19,7 +19,10 @@ export function formatMoney(value: string, maximumFractionDigits = 2): string {
  * Format a share/unit quantity (not a currency). Supports fractional shares and
  * crypto precision (up to 8 decimals) without a currency symbol.
  */
-export function formatQuantity(value: string, maximumFractionDigits = 8): string {
+export function formatQuantity(
+  value: string,
+  maximumFractionDigits = 8,
+): string {
   return new Intl.NumberFormat(LOCALE, { maximumFractionDigits }).format(
     new Decimal(value).toNumber(),
   );
@@ -47,7 +50,8 @@ export function formatSignedMoney(
   });
 
   if (money.isZero()) return { text: magnitude, sign: "zero" };
-  if (money.isNegative()) return { text: `\u2212${magnitude}`, sign: "negative" };
+  if (money.isNegative())
+    return { text: `\u2212${magnitude}`, sign: "negative" };
   return { text: `+${magnitude}`, sign: "positive" };
 }
 
@@ -61,19 +65,39 @@ export function formatDate(iso: string): string {
 }
 
 /** Format a 0..1 fraction as an es-ES percentage, e.g. "0.1732" -> "17,3 %". */
-export function formatPercent(fraction: string, maximumFractionDigits = 1): string {
-  return new Intl.NumberFormat(LOCALE, {
+export function formatPercent(
+  fraction: string,
+  maximumFractionDigits = 1,
+  options: { floorNonZero?: boolean } = {},
+): string {
+  const value = new Decimal(fraction);
+  const formatter = new Intl.NumberFormat(LOCALE, {
     style: "percent",
     minimumFractionDigits: maximumFractionDigits,
     maximumFractionDigits,
-  }).format(new Decimal(fraction).toNumber());
+  });
+  if (
+    options.floorNonZero &&
+    value.gt(0) &&
+    value
+      .mul(100)
+      .toDecimalPlaces(maximumFractionDigits, Decimal.ROUND_HALF_UP)
+      .isZero()
+  ) {
+    const smallest = new Decimal(10).pow(-(maximumFractionDigits + 2));
+    return `<${formatter.format(smallest.toNumber())}`;
+  }
+  return formatter.format(value.toNumber());
 }
 
 /**
  * Human relative time in Spanish, e.g. "hace 5 minutos", "hace 1 día".
  * `now` is injectable for deterministic tests.
  */
-export function formatRelativeTime(iso: string, now: Date = new Date()): string {
+export function formatRelativeTime(
+  iso: string,
+  now: Date = new Date(),
+): string {
   const diffMs = new Date(iso).getTime() - now.getTime(); // negative in the past
   const rtf = new Intl.RelativeTimeFormat("es", { numeric: "auto" });
   const abs = Math.abs(diffMs);
