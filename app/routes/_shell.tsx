@@ -8,7 +8,9 @@ export default function Shell() {
       <AppSidebar />
       <div className="flex flex-1 flex-col pb-16 md:pb-0">
         <AppHeader />
-        <Outlet />
+        <main className="px-4 py-8 md:px-6">
+          <Outlet />
+        </main>
       </div>
       <AppBottomNav />
     </div>

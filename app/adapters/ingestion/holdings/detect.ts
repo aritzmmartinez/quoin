@@ -141,7 +141,16 @@ export function detectIdentityColumn(
       return { column: header, kind: "ISIN" };
   }
 
-  const tickerish = headers.filter((h) => share(h, looksLikeTicker) > 0.6);
+  // A column of short country names has the shape of tickers — "Japan", "China"
+  // and "India" all pass looksLikeTicker — so a market-allocation file (weights
+  // by country, no securities) would otherwise be read as holdings, with each
+  // country becoming a company. Excluding columns that are mostly country names
+  // shuts that door, and takes a stray Region or Location column with it.
+  const tickerish = headers.filter(
+    (h) =>
+      share(h, looksLikeTicker) > 0.6 &&
+      countryShare(rows.map((row) => row[h] ?? "")) < 0.5,
+  );
 
   const hinted = tickerish.find((h) => TICKER_HINTS.test(h));
   if (hinted) return { column: hinted, kind: "TICKER" };
@@ -207,7 +216,14 @@ export function detectColumns(table: DetectedTable): ColumnMap | null {
   const weight = detectWeightColumn(table.headers, table.rows);
   if (!weight) return null;
 
-  const identity = detectIdentityColumn(table.headers, table.rows);
+  // The identity is never the weight column. Short numeric weights ("61.7") have
+  // the shape of tickers, so a country-allocation file — whose only non-country
+  // column is its weight — would otherwise take its weight column as the
+  // identity. A real security identity is a different column from its weight.
+  const identity = detectIdentityColumn(
+    table.headers.filter((header) => header !== weight.column),
+    table.rows,
+  );
   if (!identity) return null;
 
   const name = detectNameColumn(table.headers, table.rows, [

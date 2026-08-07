@@ -55,7 +55,7 @@ export async function loader(_: Route.LoaderArgs) {
 const exposureForm = z.object({
   id: z.string().min(1),
   exposureKind: z.union([exposureKindSchema, z.literal("")]),
-  exposureLeafId: z.string().trim(),
+  exposureLeafId: z.string().trim().default(""),
 });
 
 const holdingsForm = z.object({
@@ -142,9 +142,7 @@ export default function Instruments({ loaderData }: Route.ComponentProps) {
   return (
     <main className="mx-auto max-w-6xl px-4 py-8 md:px-6">
       <header className="mb-4">
-        <p className="max-w-2xl text-[13px] text-muted">
-          {es.instruments.intro}
-        </p>
+        <p className="text-[13px] text-muted">{es.instruments.intro}</p>
         {unmapped > 0 && (
           <p className="mt-2 text-[13px] text-muted">
             {es.instruments.unmappedHint(unmapped)}

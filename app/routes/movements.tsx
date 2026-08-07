@@ -49,7 +49,7 @@ export default function Movements({ loaderData }: Route.ComponentProps) {
   const busy = navigation.state === "loading";
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 md:px-6">
+    <>
       <header className="mb-4">
         {info.total > 0 && (
           <>
@@ -79,16 +79,16 @@ export default function Movements({ loaderData }: Route.ComponentProps) {
           <MovementsTable rows={rows} info={info} />
         )}
       </Card>
-    </main>
+    </>
   );
 }
 
 export function ErrorBoundary() {
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 md:px-6">
+    <>
       <Card>
         <PortfolioError onRetry={() => window.location.reload()} />
       </Card>
-    </main>
+    </>
   );
 }

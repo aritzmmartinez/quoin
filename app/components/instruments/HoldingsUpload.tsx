@@ -32,22 +32,20 @@ export function HoldingsUpload({
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
 
-  function read(file: File, next: Override = {}) {
-    file
-      .text()
-      .then((text) => {
-        try {
-          setPreview(parseHoldingsCsv(text, next));
-          setCsv(text);
-          setError(null);
-        } catch (e) {
-          setPreview(null);
-          setError(
-            e instanceof HoldingsParseError ? e.message : copy.unreadable,
-          );
-        }
-      })
-      .catch(() => setError(copy.unreadable));
+  async function read(file: File, next: Override = {}) {
+    try {
+      const text = /\.xlsx$/i.test(file.name)
+        ? (
+            await import("~/adapters/ingestion/holdings/xlsx")
+          ).xlsxToHoldingsCsv(await file.arrayBuffer())
+        : await file.text();
+      setPreview(parseHoldingsCsv(text, next));
+      setCsv(text);
+      setError(null);
+    } catch (e) {
+      setPreview(null);
+      setError(e instanceof HoldingsParseError ? e.message : copy.unreadable);
+    }
   }
 
   function reparse(next: Override) {
@@ -90,7 +88,7 @@ export function HoldingsUpload({
           <input
             ref={inputRef}
             type="file"
-            accept=".csv,text/csv"
+            accept=".csv,.xlsx,text/csv"
             className="hidden"
             onChange={(e) => {
               const file = e.target.files?.[0];
@@ -275,7 +273,9 @@ function Preview({
               {h.identity}
             </span>
             <span className="flex-1 truncate">{h.name}</span>
-            <span className="tabular-nums">{formatPercent(h.weight)}</span>
+            <span className="tabular-nums">
+              {formatPercent(h.weight, 2, { floorNonZero: true })}
+            </span>
           </li>
         ))}
       </ul>

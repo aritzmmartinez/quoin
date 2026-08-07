@@ -118,9 +118,9 @@ export const es = {
     },
   },
   holdings: {
-    drop: "Arrastra aquí el CSV de posiciones del fondo",
+    drop: "Arrastra aquí el CSV o Excel de posiciones del fondo",
     dropHint:
-      "Sirve el fichero tal cual lo descargas del emisor: no hace falta limpiarlo.",
+      "Sirve el fichero tal cual lo descargas del emisor, CSV o .xlsx: no hace falta limpiarlo ni convertirlo.",
     unreadable: "No se ha podido leer el fichero.",
     saveFailed: "El fichero se ha leído bien, pero ha fallado al guardar.",
     qualifier: (column: string): string =>
@@ -155,7 +155,7 @@ export const es = {
     summary: (count: number, covered: string): string =>
       `${count} posiciones · ${covered}`,
     none: "Sin composición",
-    import: "Importar CSV",
+    import: "Importar composición",
     onlyEquityFunds: "Solo para fondos de renta variable.",
     notAFund: "Este instrumento no es un fondo de renta variable.",
   },

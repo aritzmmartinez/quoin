@@ -17,6 +17,8 @@ learning project.
 > from whatever CSV the issuer publishes, and holdings are matched across issuers by
 > canonical identity. The tax module is next — see the roadmap.
 
+![Quoin — pantalla de Asignación con look-through](docs/allocation_dark.png)
+
 ## Why
 
 Existing trackers do charts and dividends well, but none of them:
