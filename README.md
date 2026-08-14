@@ -73,6 +73,13 @@ Quote symbols and exposure classifications live only in your local database (nev
 the repo), so a public clone never discloses your holdings. Prefer EUR venues (`.DE`,
 `.AS`, `.MC`) to avoid FX for now.
 
+Two databases, on purpose. `data/quoin.sqlite` is the ledger — real trades, and the only
+thing here that cannot be regenerated. `data/dev.sqlite` is scratch: point `DATABASE_URL`
+at it, run `pnpm db:seed` for a synthetic portfolio, and develop against that. Commands
+that destroy data refuse to run against the ledger, and refuse just as firmly when they
+cannot tell which database they have been handed. Take a snapshot with `pnpm db:backup`
+before anything you have not done before.
+
 `exposure:map` exists because brokers do not report what a fund actually is: Trade
 Republic labels both equity ETFs and physical-gold ETCs as `FUND`, so an ETC arrives
 indistinguishable from an index fund. Stocks and crypto resolve from their type
@@ -99,6 +106,8 @@ pnpm run lint           # eslint (includes the layer boundaries)
 pnpm run build          # production build
 pnpm run db:generate    # regenerate the Prisma client after a schema change
 pnpm run db:studio      # Prisma Studio (GUI to inspect the data)
+pnpm run db:backup      # VACUUM INTO data/backups/, keeping the last 30
+pnpm run db:seed        # synthetic portfolio -> the scratch database
 pnpm test               # Vitest (pure domain / projection / mapper tests)
 pnpm run test:integration   # migrations against a temporary SQLite database
 ```

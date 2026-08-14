@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "env": {
+    "DATABASE_URL": "file:./data/dev.sqlite"
+  },
+  "permissions": {
+    "deny": [
+      "Bash(prisma migrate reset*)",
+      "Bash(pnpm prisma migrate reset*)",
+      "Bash(pnpm exec prisma migrate reset*)",
+      "Bash(npx prisma migrate reset*)",
+      "Bash(prisma db push*)",
+      "Bash(pnpm prisma db push*)",
+      "Bash(pnpm exec prisma db push*)",
+      "Bash(npx prisma db push*)",
+      "Bash(rm -rf*)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Read(./data/quoin.sqlite)",
+      "Read(./data/backups/**)",
+      "Edit(./data/**)",
+      "Write(./data/**)",
+      "Edit(./.env)",
+      "Write(./.env)"
+    ],
+    "allow": [
+      "Bash(pnpm typecheck)",
+      "Bash(pnpm lint)",
+      "Bash(pnpm test)",
+      "Bash(pnpm test:integration)",
+      "Bash(pnpm build)",
+      "Bash(pnpm db:seed)",
+      "Bash(pnpm db:backup)",
+      "Bash(pnpm db:generate)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git branch*)",
+      "Bash(git show*)"
+    ]
+  }
+}

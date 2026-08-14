@@ -42,6 +42,8 @@ pnpm test:integration             # migrate deploy against a temp sqlite db
 pnpm db:generate                  # prisma generate
 pnpm db:migrate                   # prisma migrate dev
 pnpm db:studio
+pnpm db:backup                    # VACUUM INTO data/backups/, keeps the last 30
+pnpm db:seed [--anchor=YYYY-MM-DD]   # synthetic portfolio into the scratch database
 pnpm ingest --broker=<tr|kraken> <file>
 pnpm prices:sync                  # quote every mapped instrument
 pnpm prices:map <ISIN> <SYMBOL>   # set / show / --clear a Yahoo symbol
@@ -116,6 +118,50 @@ This has caused misdirected generation more than once:
 - `PriceSnapshot` is append-only and idempotent via `@@unique([instrumentId, asOf])`.
 - Remapping an `Instrument.quoteSymbol` **deletes** that instrument's existing snapshots.
   Two symbols' prices must never share a series.
+
+## The live ledger — never the agent's target
+
+`data/quoin.sqlite` holds real trades and is the only thing in this project that cannot
+be regenerated. Prices re-sync, holdings re-import, the Prisma client regenerates; a
+destroyed ledger is fourteen months of broker exports re-entered by hand.
+
+Three defences, and it is worth knowing which one actually carries the weight:
+
+1. **The environment override — this is the load-bearing one.** `.claude/settings.json`
+   sets `DATABASE_URL` to the scratch database for the session, and `dotenv` does not
+   overwrite a variable already in the environment, so it beats `.env` without anyone
+   having to remember. Everything that reads `DATABASE_URL` is pointed away from the
+   ledger by default rather than by discipline.
+2. **`assertScratchDatabase` in `scripts/lib/db-target.ts`** — the programmatic barrier
+   for code in this repo. It is an **allow-list**: the target must be exactly
+   `data/dev.sqlite`. "Not the ledger" would wave through `data/quoin.sqlite.bak`, a
+   mistyped path, or a snapshot under `data/backups/` — every one a file nobody chose to
+   destroy. It also **fails closed**: unset, in-memory or non-`file:` refuses too,
+   because a guard that passes when it cannot tell what it is guarding is not a guard.
+   Run it as the *first* link of a destructive chain (`scripts/db-guard.ts`), never the
+   second — `db:seed` used to run `prisma migrate deploy` before the guard spoke.
+3. **The deny-list in `.claude/settings.json` — a speed bump, not a barrier.** Do not
+   rely on it and do not describe it as protection. It matches *invocation patterns*, so
+   it catches `pnpm prisma migrate reset` and misses a wrapper script, an unlisted
+   package.json alias, or three lines of TypeScript calling `fs.unlink`. Its job is to
+   make the obvious destructive command require a deliberate second step.
+
+**Deny rules govern the agent's own file tools, not its child processes.** `Read(./data/quoin.sqlite)`
+stops the agent from opening the ledger with the Read tool; it does nothing to a process
+launched through bash. That is exactly why `pnpm db:backup` can read and copy the 8.9 MB
+ledger while that rule is in force. Useful, but do not mistake it for a sandbox.
+
+- **`pnpm db:backup` deliberately ignores `DATABASE_URL`** and always snapshots the live
+  ledger. A backup command that followed the environment would archive the scratch
+  database and report success. It is the one script that opens the irreplaceable file on
+  purpose, so it checks its own work: `PRAGMA integrity_check` plus a per-table row-count
+  comparison against the source, **before** rotating. `VACUUM INTO` returning cleanly
+  says the statement ran, not that the result opens — and a bad snapshot that still
+  counted as one would push the oldest good backup out of the 30-file window, so a single
+  corrupt copy would cost two. A failed verification deletes the copy and exits non-zero.
+- The seed is **synthetic and stays synthetic** — same reason fixtures are (see *Privacy*).
+  It encodes the shapes that have caused bugs: `fees ≠ 0`, an unpriced position, a fund
+  with no holdings, two funds sharing constituents, a partial sell.
 
 ## Privacy and the no-clobber rule
 

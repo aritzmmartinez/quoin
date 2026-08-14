@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- pnpm db:backup snapshots the ledger with VACUUM INTO — a consistent copy rather than a file copy that might catch the database mid-write — into data/backups/, keeping the last 30. It always backs up the live ledger and deliberately ignores DATABASE_URL, so it cannot quietly archive a scratch database and report success. Each snapshot is checked with PRAGMA integrity_check and a per-table row-count comparison before it counts as one: a copy that fails is deleted rather than kept, because a bad snapshot that still counted would push the oldest good one out of the window. Rotation only ever removes files matching the timestamped name it generates, so a copy you put there by hand stays put.
+- pnpm db:seed fills a scratch database with a synthetic portfolio, so development never needs the real one. Everything in it is invented, and the shape includes the cases that have caused bugs: fees on every purchase, an unpriced position, a fund with no holdings, two funds sharing constituents, and a partial sell.
+- Destructive commands refuse to run against the live ledger, and refuse just as firmly when DATABASE_URL is unset or does not resolve to a local SQLite file — a guard that passes when it cannot tell what it is guarding is not a guard.
+
 ## [0.2.0] - 2026-08-08
 
 ### Added
