@@ -14,15 +14,8 @@ import {
   scratchDatabasePath,
 } from "./db-target";
 
-/**
- * The guard that stands between an agent session and fourteen months of trades.
- * It is worth more tests than its size suggests: every branch here is the one that
- * has to hold when everything else has already gone wrong.
- */
-
 const SCRATCH = "file:./data/dev.sqlite";
 
-/** Sessions run with DATABASE_URL already set, so tests of the fallback must clear it. */
 function withoutDatabaseUrl(): void {
   const original = process.env.DATABASE_URL;
 
@@ -79,7 +72,9 @@ describe("isRealDatabase", () => {
   });
 
   it("does not mistake the scratch database for it", () => {
-    expect(isRealDatabase(resolve(PROJECT_ROOT, "data/dev.sqlite"))).toBe(false);
+    expect(isRealDatabase(resolve(PROJECT_ROOT, "data/dev.sqlite"))).toBe(
+      false,
+    );
   });
 
   it("is not fooled by a path that merely ends the same way", () => {
@@ -89,7 +84,6 @@ describe("isRealDatabase", () => {
   });
 
   it("compares case-insensitively on Windows, where the two are one file", () => {
-    // Same assertion both ways round: on POSIX a case-shifted path IS another file.
     expect(isRealDatabase(realDatabasePath().toUpperCase())).toBe(
       process.platform === "win32",
     );
@@ -130,22 +124,25 @@ describe("assertScratchDatabase", () => {
     expect(() => assertScratchDatabase("seed")).toThrow(/live ledger/);
   });
 
-  // The whole reason this is an allow-list. A "not the ledger" check passes every one
-  // of these, and each is a file nobody chose to destroy.
   it.each([
-    ["a backup of the ledger", "file:./data/backups/quoin-20260809-2233.sqlite"],
+    [
+      "a backup of the ledger",
+      "file:./data/backups/quoin-20260809-2233.sqlite",
+    ],
     ["a near-miss typo", "file:./data/quoin.sqlit"],
     ["a plausible sibling", "file:./data/quoin-old.sqlite"],
     ["somewhere else entirely", "file:./data/production.sqlite"],
     ["the demo database it replaced", "file:./data/demo.sqlite"],
-  ])("refuses %s, which is not the ledger but is not scratch either", (_l, url) => {
-    process.env.DATABASE_URL = url;
-    expect(() => assertScratchDatabase("seed")).toThrow(
-      /is not the scratch database/,
-    );
-  });
+  ])(
+    "refuses %s, which is not the ledger but is not scratch either",
+    (_l, url) => {
+      process.env.DATABASE_URL = url;
+      expect(() => assertScratchDatabase("seed")).toThrow(
+        /is not the scratch database/,
+      );
+    },
+  );
 
-  // Fails closed: "cannot tell" must never read as "safe".
   it.each([
     ["unset", undefined],
     ["in-memory", "file::memory:"],
@@ -165,11 +162,17 @@ describe("assertScratchDatabase", () => {
   });
 
   it("points at the scratch database in every refusal, so the fix is in the error", () => {
-    for (const url of [undefined, "file:./data/quoin.sqlite", "file:./data/other.sqlite"]) {
+    for (const url of [
+      undefined,
+      "file:./data/quoin.sqlite",
+      "file:./data/other.sqlite",
+    ]) {
       if (url === undefined) delete process.env.DATABASE_URL;
       else process.env.DATABASE_URL = url;
 
-      expect(() => assertScratchDatabase("seed")).toThrow(SCRATCH_DATABASE_FILE);
+      expect(() => assertScratchDatabase("seed")).toThrow(
+        SCRATCH_DATABASE_FILE,
+      );
     }
   });
 });

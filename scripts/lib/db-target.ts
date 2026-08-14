@@ -21,7 +21,6 @@ export const REAL_DATABASE_FILE = "data/quoin.sqlite";
  */
 export const SCRATCH_DATABASE_FILE = "data/dev.sqlite";
 
-/** `DATABASE_URL` resolves from the project ROOT, not from `prisma/schema.prisma`. */
 export const PROJECT_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 
 export function realDatabasePath(): string {
@@ -32,11 +31,6 @@ export function scratchDatabasePath(): string {
   return resolve(PROJECT_ROOT, SCRATCH_DATABASE_FILE);
 }
 
-/**
- * Absolute path of the SQLite file a `file:` URL points at, or null when the URL is
- * missing or is not a local file (`:memory:`, a remote datasource, a malformed value).
- * Null means "unknown", never "safe" — callers must treat it as a refusal.
- */
 export function databasePath(url = process.env.DATABASE_URL): string | null {
   if (!url) return null;
   if (!url.startsWith("file:")) return null;
@@ -47,7 +41,6 @@ export function databasePath(url = process.env.DATABASE_URL): string | null {
   return resolve(PROJECT_ROOT, target);
 }
 
-/** Windows paths differ only in case; comparing them literally would miss a match. */
 function samePath(a: string, b: string): boolean {
   return process.platform === "win32"
     ? a.toLowerCase() === b.toLowerCase()
@@ -62,23 +55,6 @@ export function isScratchDatabase(path: string): boolean {
   return samePath(path, scratchDatabasePath());
 }
 
-/**
- * Refuse to continue unless the command is pointed at the scratch database.
- *
- * This is an **allow-list**, and the distinction matters more than it looks. "Refuse
- * the ledger" would wave through `data/quoin.sqlite.bak`, a mistyped `data/quoin.sqlit`,
- * or a path some future script computes wrongly — every one of them a file nobody chose
- * to destroy. Naming the single permitted target means a new safe database is an
- * explicit edit here, not an accident.
- *
- * Fails closed for the same reason: an unset or unparseable `DATABASE_URL` refuses too.
- * A guard that passes when it cannot tell what it is guarding is not a guard, and the
- * cost of a false refusal is one explicit env var, against an irreplaceable file.
- *
- * This is the backstop, not the main defence. The main defence is that agents run with
- * `DATABASE_URL` already pointing at the scratch database (see `.claude/settings.json`),
- * so nothing has to remember to call this.
- */
 export function assertScratchDatabase(action: string): string {
   const url = process.env.DATABASE_URL;
   const target = databasePath(url);
@@ -91,7 +67,6 @@ export function assertScratchDatabase(action: string): string {
     );
   }
 
-  // Called out separately: the generic message below is true but underplays this one.
   if (isRealDatabase(target)) {
     throw new Error(
       `Refusing to ${action}: DATABASE_URL points at the live ledger ` +
