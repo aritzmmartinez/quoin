@@ -38,6 +38,7 @@ export function SummaryStats({
         sub={s.realized.sub}
         value={formatSignedMoney(realizedPnL).text}
         valueClass={signClass(realizedPnL)}
+        to="/realizado"
       />
       <StatTile
         label={s.positions.label}
