@@ -51,6 +51,8 @@ pnpm prices:backfill [ISIN] [1y|2y|5y|10y|max]   # daily history, default 5y
 pnpm exposure:map                 # list how every instrument resolves
 pnpm exposure:map <ISIN> <KIND> [LEAF]           # e.g. XS2183935274 COMMODITY XAU
 pnpm identity:resolve [--limit N] [--all] [--retry-ambiguous] [--report]
+pnpm target:set                       # show the savings-plan target in force today
+pnpm target:set <file> [--from=YYYY-MM-DD] [--name=…] [--note=…]   # record a version
 ```
 
 Fund compositions have **no command**: the CSV is dropped onto the fund's row in
@@ -311,9 +313,68 @@ manual aliasing was abandoned — 726 confirmations is not a system.
   do measure against their own start (`computeRangeChange`), and measure the change in
   **unrealised P&L**, never in value — otherwise a contribution looks like a gain.
 
+## Portfolio target (the savings plan)
+
+- **Versions are resolved by `activeFrom`, never by `createdAt`.** `getActiveTarget(targets,
+  asOf)` picks the latest `activeFrom <= asOf` — the same rule that makes `latest()` order
+  prices by `asOf`. A plan recorded late belongs to the past it was written for. `createdAt`
+  breaks an exact `activeFrom` tie and nothing else.
+- **A target is never edited in place.** The repository exposes `create` / `list` / `remove`
+  and no update: changing the plan records the next version, so "what was I aiming at in
+  March" stays answerable. Reusing an id fails, deliberately.
+- **The amount is stored, the weight is derived.** The plan is written in euros per month,
+  so euros are the fact and `deriveTargetWeights` is a view of them. Storing both is the
+  same mistake as storing `leafTotal`. Deriving the other way round — weights times a total
+  — silently rewrites every line the day the total changes.
+- **`PortfolioTargetLine.instrumentId` has no foreign key on purpose.** A plan can name
+  something never bought, which has no `Instrument` row until the first import. Such a line
+  keeps its full weight; dropping it would overstate every other line.
+- **The join is exact id equality at read time, so a mistyped id is a ghost line.** It is
+  indistinguishable from "not bought yet" and stays that way forever. `findIdMismatches`
+  refuses a plan whose id differs from an imported one only in case (CLI and screen both),
+  while an id resembling nothing imported is accepted with a warning — that one is the
+  feature. Ids are compared, never rewritten: ingestion stores the broker's `symbol`
+  verbatim, so normalising here would only move the mismatch.
+- One line per instrument per version (`@@unique([targetId, instrumentId])`) — two would
+  split that instrument's weight in half without saying so.
+
 ## Fiscal
 
 Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never régimen común.
+
+## Kraken rewards
+
+- **A reward is an acquisition with no counter-leg**, so its value comes from the price
+  history at the moment of receipt, injected as `PriceAt` — `mapGroup` stays pure and never
+  fetches. Zero cost hid the income *and* inflated every future realised gain by the whole
+  value of the units.
+- **No price for that day means discard (`reward-unpriced`), never zero.** A discard is
+  counted and printed; a zero is a wrong number that looks like data. Fix by running
+  `prices:backfill` and importing again — dedup by `refid` makes re-import safe.
+- **The lookup never reaches forward.** `priceLookupFrom` takes the last close at or before
+  the timestamp, within 7 days; a later candle is information that did not exist yet.
+- Scope is still BTC-only by choice (`isBtc` in `map.ts`). Measured on a real export:
+  87% of refid groups are discarded as `non-btc` — SOL and ETH `earn`, plus `welcomebonus`
+  in five assets. `pnpm ingest` prints the count under one label, so the breakdown by asset
+  is not visible from the summary.
+
+## Ledger entry types
+
+`LedgerEntry.type` is constrained at the database to exactly what `ledgerEventSchema`
+models: `BUY | SELL | DIVIDEND | DEPOSIT | WITHDRAWAL | INTEREST`. Adding a type means
+adding it in **both** places, in the same change.
+
+- **A row the database accepts but the domain refuses is a delayed outage.** `rowToEvent`
+  throws on an unknown type, and `list()` maps every row, so one bad row takes down every
+  screen that reads the ledger — far from the insert that caused it. One seeded `FEE` row
+  did exactly that.
+- **No broker emits a fee event.** Trade Republic reports fees as a column on the trade and
+  Kraken as `fee` on the ledger row, which is why `fees` and `taxWithheld` are columns.
+  `FEE`, `TAX_WITHHOLDING` and `SPLIT` were advertised in the schema comment for months and
+  never modelled anywhere.
+- **The CHECK lives only in migration SQL** — Prisma cannot express it in `schema.prisma`
+  for SQLite. A future migration that rebuilds `LedgerEntry` (SQLite rebuilds the table for
+  most column changes) will silently drop it. Re-add it in that migration.
 
 ## CSV ingestion
 

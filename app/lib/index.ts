@@ -7,3 +7,4 @@ export * from "./pagination";
 export * from "./portfolio";
 export * from "./range";
 export * from "./summary";
+export * from "./target";

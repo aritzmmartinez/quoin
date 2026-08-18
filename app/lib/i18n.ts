@@ -185,6 +185,48 @@ export const es = {
     closed: "Cerrada",
     empty: "Sin instrumentos. Importa tus operaciones con pnpm ingest.",
   },
+  target: {
+    title: "Objetivo",
+    intro:
+      "Tu plan de aportación mensual. Los importes son el dato; el peso se deriva de ellos. Un objetivo no se edita: cuando el plan cambia, guardas una versión nueva con su fecha de vigencia, para que siga sabiéndose qué objetivo estaba vigente en cada fecha.",
+    none: "Aún no hay ningún objetivo guardado. Crea la primera versión abajo o usa pnpm target:set.",
+    activeFrom: (date: string): string => `Vigente desde el ${date}`,
+    columns: {
+      instrument: "Instrumento",
+      amount: "Importe mensual",
+      weight: "Peso",
+    },
+    total: "Total mensual",
+    notHeld: "Sin posición todavía",
+    notImported: "Sin importar todavía",
+    history: {
+      title: "Versiones",
+      active: "Vigente",
+      summary: (lines: number, total: string): string =>
+        `${lines} ${lines === 1 ? "línea" : "líneas"} · ${total} al mes`,
+      delete: "Eliminar",
+      deleting: "…",
+      empty: "Sin versiones.",
+    },
+    form: {
+      title: "Nueva versión",
+      name: "Nombre",
+      namePlaceholder: "Plan de aportación",
+      activeFrom: "Vigente desde",
+      note: "Nota",
+      notePlaceholder: "Por qué cambia el plan",
+      lines: "Líneas",
+      linesHint:
+        "Una por línea: identificador del instrumento e importe mensual. Puedes incluir un instrumento que aún no tengas en cartera.",
+      linesPlaceholder: "IE00B3RBWM25 300\nIE00BKM4GZ66 75",
+      submit: "Guardar versión",
+      saving: "Guardando…",
+      invalid: "Datos no válidos.",
+      idMismatch: (pairs: string): string =>
+        `No se ha guardado nada. Estos identificadores no coinciden con los importados: ${pairs}. Una línea se une a su instrumento por identificador exacto, así que nunca resolverían.`,
+      saveFailed: "No se ha podido guardar la versión.",
+    },
+  },
   movements: {
     title: "Movimientos",
     summary: (count: number, net: string): string =>
