@@ -29,7 +29,18 @@ model Instrument {
 model LedgerEntry {
   id     String   @id // uuid
   ts     DateTime // execution timestamp
-  type   String // BUY | SELL | DIVIDEND | FEE | DEPOSIT | WITHDRAWAL | INTEREST | TAX_WITHHOLDING | SPLIT
+  /// BUY | SELL | DIVIDEND | DEPOSIT | WITHDRAWAL | INTEREST — and nothing else.
+  ///
+  /// This list is exactly what `ledgerEventSchema` models, enforced by a CHECK
+  /// constraint because the two must not drift: `rowToEvent` throws on a type it
+  /// cannot read, so a row the database accepts but the domain refuses takes the
+  /// whole app down on the next read, not at the insert that caused it.
+  ///
+  /// FEE, TAX_WITHHOLDING and SPLIT used to be listed here and were never
+  /// modelled. No broker emits them either: Trade Republic reports fees as a
+  /// column on the trade and Kraken as `fee` on the ledger row, which is why
+  /// `fees` and `taxWithheld` are columns rather than event types.
+  type   String
   sleeve String? // CORE | TRADING | null (cash-level movements have no sleeve)
 
   instrumentId String?

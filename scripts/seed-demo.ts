@@ -109,7 +109,7 @@ const INSTRUMENTS: readonly DemoInstrument[] = [
   {
     id: "LU00DEMO0006",
     name: "Demo Global Aggregate Bond Fund",
-    type: "FUND",
+    type: "ETF",
     currency: "EUR",
     assetClass: "FUND",
     quoteSymbol: null,
@@ -421,7 +421,7 @@ function buildLedger(
   const custody = new Date(
     Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth() - 2, 28, 23, 0),
   );
-  cash(custody, "FEE", new Decimal(2.5), "custody fee");
+  cash(custody, "WITHDRAWAL", new Decimal(2.5), "custody fee");
 
   return rows;
 }
