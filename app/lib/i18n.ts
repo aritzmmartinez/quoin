@@ -297,6 +297,35 @@ export const es = {
       desc: "orden descendente",
     },
   },
+  realized: {
+    title: "Realizado",
+    intro:
+      "Cada venta cerrada, con el coste que consumió en el momento de venderla. Las comisiones de compra ya van dentro del coste; las de venta se restan del bruto.",
+    avcoWarning:
+      "Cálculo AVCO (coste medio ponderado), el mismo criterio que la cartera. No coincide con el criterio fiscal FIFO: en la declaración cada venta se empareja con las compras más antiguas, así que el resultado por operación será otro.",
+    summary: (count: number, result: string): string =>
+      `${count} ${count === 1 ? "venta" : "ventas"} · ${result} de resultado`,
+    columns: {
+      date: "Fecha",
+      name: "Instrumento",
+      quantity: "Uds",
+      price: "Precio",
+      grossAmount: "Bruto",
+      fees: "Comisiones",
+      costBasis: "Coste",
+      realizedPnL: "Resultado",
+      returnPct: "%",
+      holdingDays: "Días",
+    },
+    days: (count: number): string => `${count} d`,
+    sales: (count: number): string =>
+      `${count} ${count === 1 ? "venta" : "ventas"}`,
+    total: "Total",
+    empty: {
+      title: "Sin ventas todavía",
+      body: "Cuando vendas algo, aquí aparecerá el resultado de cada operación.",
+    },
+  },
   instrument: {
     back: "Cartera",
     viewFallback: "Activo",

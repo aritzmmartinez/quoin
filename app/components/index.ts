@@ -14,6 +14,8 @@ export * from "./instruments/HoldingsUpload";
 export * from "./instruments/InstrumentsTable";
 export * from "./movements/MovementsTable";
 export * from "./movements/columns";
+export * from "./realized/RealizedTable";
+export * from "./realized/columns";
 export * from "./portfolio/PortfolioTable";
 export * from "./portfolio/PortfolioRowItem";
 export * from "./portfolio/SortableHeader";
