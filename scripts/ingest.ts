@@ -16,17 +16,15 @@ import {
 import {
   PrismaInstrumentRepository,
   PrismaLedgerRepository,
+  PrismaPriceRepository,
   prisma,
 } from "~/adapters/persistence";
 
-const ADAPTERS = {
-  "trade-republic": TradeRepublicCsvAdapter,
-  kraken: KrakenCsvAdapter,
-} as const;
+const BROKERS = ["trade-republic", "kraken"] as const;
 
-type Broker = keyof typeof ADAPTERS;
+type Broker = (typeof BROKERS)[number];
 
-const USAGE = `Usage: pnpm ingest --broker=<${Object.keys(ADAPTERS).join("|")}> <file.csv> [--yes]`;
+const USAGE = `Usage: pnpm ingest --broker=<${BROKERS.join("|")}> <file.csv> [--yes]`;
 
 function printSummary(title: string, summary: ImportSummary): void {
   const discarded = Object.entries(summary.discarded)
@@ -63,18 +61,21 @@ async function main(): Promise<void> {
   const broker = values.broker;
   const file = positionals[0];
 
-  if (!broker || !(broker in ADAPTERS) || !file) {
+  if (!broker || !BROKERS.includes(broker as Broker) || !file) {
     console.error(USAGE);
     exit(1);
   }
 
   const instruments = new PrismaInstrumentRepository();
   const ledger = new PrismaLedgerRepository();
-  const adapter = new ADAPTERS[broker as Broker](instruments, ledger);
+  const adapter =
+    broker === "kraken"
+      ? new KrakenCsvAdapter(instruments, ledger, new PrismaPriceRepository())
+      : new TradeRepublicCsvAdapter(instruments, ledger);
 
   const csv = readFileSync(resolve(file), "utf8");
 
-  const batch = adapter.plan(csv);
+  const batch = await adapter.plan(csv);
   const preview = await previewBatch(ledger, batch);
   printSummary(`Preview (${broker})`, preview);
 

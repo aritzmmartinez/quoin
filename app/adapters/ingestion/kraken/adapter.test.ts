@@ -5,6 +5,8 @@ import type {
   InstrumentRepository,
   LedgerEventFilter,
   LedgerRepository,
+  PriceRepository,
+  PriceSnapshot,
 } from "~/core/ports";
 
 import { KrakenCsvAdapter } from "./adapter";
@@ -51,6 +53,22 @@ class FakeLedgerRepository implements LedgerRepository {
   }
 }
 
+class FakePriceRepository implements PriceRepository {
+  constructor(private readonly snapshots: PriceSnapshot[] = []) {}
+  async saveMany(): Promise<number> {
+    return 0;
+  }
+  async latest(): Promise<Map<string, PriceSnapshot>> {
+    return new Map();
+  }
+  async deleteForInstrument(): Promise<number> {
+    return 0;
+  }
+  async historyFor(instrumentId: string): Promise<PriceSnapshot[]> {
+    return this.snapshots.filter((s) => s.instrumentId === instrumentId);
+  }
+}
+
 const HEADER =
   "txid,refid,time,type,subtype,aclass,subclass,asset,wallet,amount,fee,balance";
 
@@ -70,10 +88,22 @@ describe("KrakenCsvAdapter", () => {
   let ledger: FakeLedgerRepository;
   let adapter: KrakenCsvAdapter;
 
+  const btcAt = (asOf: string, price: string): PriceSnapshot => ({
+    instrumentId: "BTC",
+    price,
+    currency: "EUR",
+    asOf: new Date(asOf),
+    source: "YAHOO",
+  });
+
   beforeEach(() => {
     instruments = new FakeInstrumentRepository();
     ledger = new FakeLedgerRepository();
-    adapter = new KrakenCsvAdapter(instruments, ledger);
+    adapter = new KrakenCsvAdapter(
+      instruments,
+      ledger,
+      new FakePriceRepository([btcAt("2025-11-25T00:00:00Z", "80000")]),
+    );
   });
 
   it("imports BTC activity and EUR cash, discarding other crypto", async () => {
@@ -85,5 +115,25 @@ describe("KrakenCsvAdapter", () => {
     expect(summary.instruments).toBe(1);
     expect(instruments.upserted[0]!.id).toBe("BTC");
     expect(ledger.appended).toHaveLength(3);
+  });
+
+  it("gives the imported reward the market value it had that day", async () => {
+    await adapter.import(CSV);
+
+    const reward = ledger.appended.find((e) => e.note === "kraken-reward");
+    expect(reward?.type).toBe("BUY");
+    if (reward?.type === "BUY") {
+      expect(reward.price).toBe("80000");
+      expect(reward.grossAmount).toBe("0.4568");
+    }
+  });
+
+  it("discards the reward when no price is available for it", async () => {
+    const blind = new KrakenCsvAdapter(instruments, ledger);
+
+    const summary = await blind.import(CSV);
+
+    expect(summary.discarded).toEqual({ "non-btc": 2, "reward-unpriced": 1 });
+    expect(summary.imported).toBe(2);
   });
 });

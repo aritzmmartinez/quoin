@@ -3,6 +3,7 @@ import {
   Boxes,
   LayoutDashboard,
   PieChart,
+  Target,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
@@ -21,5 +22,6 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { label: es.nav.portfolio, icon: Wallet, to: "/cartera" },
   { label: es.nav.allocation, icon: PieChart, to: "/asignacion" },
   { label: es.nav.movements, icon: ArrowLeftRight, to: "/movimientos" },
+  { label: es.target.title, icon: Target, to: "/objetivo" },
   { label: es.nav.instruments, icon: Boxes, to: "/instrumentos" },
 ];
