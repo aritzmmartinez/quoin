@@ -1,13 +1,47 @@
 import Decimal from "decimal.js";
 
 import {
+  Money,
   cashEventSchema,
   tradeEventSchema,
   type Instrument,
 } from "~/core/domain";
+import type { PriceSnapshot } from "~/core/ports";
 
 import type { MappedItem } from "../ingest";
 import type { KrakenRow } from "./row";
+
+export type PriceAt = (instrumentId: string, ts: Date) => string | null;
+
+const MAX_PRICE_AGE_DAYS = 7;
+
+export function priceLookupFrom(snapshots: readonly PriceSnapshot[]): PriceAt {
+  const byInstrument = new Map<string, PriceSnapshot[]>();
+  for (const snapshot of snapshots) {
+    const list = byInstrument.get(snapshot.instrumentId) ?? [];
+    list.push(snapshot);
+    byInstrument.set(snapshot.instrumentId, list);
+  }
+  for (const list of byInstrument.values()) {
+    list.sort((a, b) => a.asOf.getTime() - b.asOf.getTime());
+  }
+
+  return (instrumentId, ts) => {
+    const history = byInstrument.get(instrumentId);
+    if (!history) return null;
+
+    let candidate: PriceSnapshot | null = null;
+    for (const snapshot of history) {
+      if (snapshot.asOf.getTime() > ts.getTime()) break;
+      candidate = snapshot;
+    }
+    if (!candidate) return null;
+
+    const ageDays =
+      (ts.getTime() - candidate.asOf.getTime()) / (24 * 60 * 60 * 1000);
+    return ageDays > MAX_PRICE_AGE_DAYS ? null : candidate.price;
+  };
+}
 
 const BTC: Instrument = {
   id: "BTC",
@@ -43,15 +77,10 @@ export function groupByRefid(rows: KrakenRow[]): Map<string, KrakenRow[]> {
   return groups;
 }
 
-/**
- * Map a refid group to a domain contribution, or flag it for discard.
- *
- * Scope (per configuration): BTC only, plus EUR cash movements. Non-BTC crypto
- * (rewards, earns, crypto-to-crypto swaps) is discarded as "non-btc"; anything
- * unrecognized as "unsupported". Everything enters the CORE sleeve.
- *
- */
-export function mapGroup(rows: KrakenRow[]): MappedItem {
+export function mapGroup(
+  rows: KrakenRow[],
+  priceAt: PriceAt = () => null,
+): MappedItem {
   const refid = rows[0]!.refid;
   const spend = rows.find((r) => r.type === "spend");
   const receive = rows.find((r) => r.type === "receive");
@@ -78,7 +107,7 @@ export function mapGroup(rows: KrakenRow[]): MappedItem {
       case "reward":
       case "earn":
         return isBtc(row)
-          ? reward(refid, row)
+          ? reward(refid, row, priceAt)
           : { kind: "discard", reason: "non-btc" };
       default:
         return { kind: "discard", reason: "unsupported" };
@@ -119,19 +148,26 @@ function trade(
   };
 }
 
-function reward(refid: string, row: KrakenRow): MappedItem {
+function reward(refid: string, row: KrakenRow, priceAt: PriceAt): MappedItem {
+  const ts = parseTime(row.time);
+  const price = priceAt("BTC", ts);
+  if (price === null) return { kind: "discard", reason: "reward-unpriced" };
+
+  const quantity = abs(row.amount);
+  const grossAmount = Money.fromString(price).scaleBy(quantity).toString();
+
   return {
     kind: "domain",
     instrument: BTC,
     event: tradeEventSchema.parse({
       id: crypto.randomUUID(),
-      ts: parseTime(row.time),
+      ts,
       type: "BUY",
       instrumentId: "BTC",
       sleeve: "CORE",
-      quantity: abs(row.amount),
-      price: "0",
-      grossAmount: "0",
+      quantity,
+      price,
+      grossAmount,
       fees: "0",
       currency: "EUR",
       fxToBase: "1",
