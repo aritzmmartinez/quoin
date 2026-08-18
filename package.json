@@ -11,6 +11,8 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
+    "db:backup": "tsx scripts/db-backup.ts",
+    "db:seed": "tsx scripts/db-guard.ts \"seed the demo database\" && prisma migrate deploy && tsx scripts/seed-demo.ts",
     "ingest": "tsx scripts/ingest.ts",
     "prices:sync": "tsx scripts/prices-sync.ts",
     "prices:map": "tsx scripts/prices-map.ts",

@@ -10,6 +10,9 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["app/**/*.integration.test.ts"],
+    include: [
+      "app/**/*.integration.test.ts",
+      "scripts/**/*.integration.test.ts",
+    ],
   },
 });
