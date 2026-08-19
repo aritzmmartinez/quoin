@@ -64,6 +64,23 @@ export function formatDate(iso: string): string {
   }).format(new Date(iso));
 }
 
+/**
+ * Format a "YYYY-MM" period as an es-ES month, e.g. "2026-07" -> "julio de 2026".
+ *
+ * Built and formatted in UTC on purpose: the period is a label, not an instant,
+ * and constructing it in local time would render the previous month for anyone
+ * west of Greenwich.
+ */
+export function formatPeriod(period: string): string {
+  const [year, month] = period.split("-").map(Number);
+  if (!year || !month) return period;
+  return new Intl.DateTimeFormat(LOCALE, {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month - 1, 1)));
+}
+
 /** Format a 0..1 fraction as an es-ES percentage, e.g. "0.1732" -> "17,3 %". */
 export function formatPercent(
   fraction: string,

@@ -17,6 +17,7 @@
     "prices:sync": "tsx scripts/prices-sync.ts",
     "prices:map": "tsx scripts/prices-map.ts",
     "prices:backfill": "tsx scripts/prices-backfill.ts",
+    "ipc:sync": "tsx scripts/ipc-sync.ts",
     "exposure:map": "tsx scripts/exposure-map.ts",
     "target:set": "tsx scripts/target-set.ts",
     "identity:resolve": "tsx scripts/identity-resolve.ts",

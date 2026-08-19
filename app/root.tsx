@@ -8,6 +8,7 @@ import {
 } from "react-router";
 
 import type { Route } from "./+types/root";
+import { parseBasis } from "~/lib/basis";
 import "./app.css";
 
 type Theme = "light" | "dark";
@@ -28,7 +29,7 @@ export const links: Route.LinksFunction = () => [
 export function loader({ request }: Route.LoaderArgs) {
   const cookie = request.headers.get("Cookie") ?? "";
   const theme: Theme = cookie.includes("quoin-theme=light") ? "light" : "dark";
-  return { theme };
+  return { theme, basis: parseBasis(cookie) };
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {

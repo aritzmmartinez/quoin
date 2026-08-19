@@ -27,6 +27,24 @@ export const es = {
     y1: "1A",
     all: "Todo",
   },
+  basis: {
+    label: "Base de cálculo",
+    nominal: "Nominal",
+    real: "Real",
+    nominalHint: "Euros corrientes, sin ajustar por inflación",
+    realHint: "Euros ajustados por el IPC",
+    reference: (period: string): string => `en euros de ${period}`,
+    synced: (relative: string): string => `IPC actualizado ${relative}`,
+    neverSynced: "IPC sin fecha de actualización",
+    perFlow:
+      "Cada aportación se ajusta con el IPC de su propio mes, no el total de golpe.",
+    lag: "El valor de mercado es el de hoy: el IPC del mes en curso aún no está publicado, así que la referencia va unas semanas por detrás.",
+    noIndex:
+      "No hay datos de IPC guardados. Ejecuta pnpm ipc:sync para descargarlos del INE.",
+    gaps: (periods: string): string =>
+      `Faltan datos de IPC para ${periods}. No se ajusta nada: rellenar un hueco por interpolación inventaría un nivel de precios que nadie ha medido. Vuelve a ejecutar pnpm ipc:sync.`,
+    showingNominal: "Se muestran importes nominales.",
+  },
   pagination: {
     label: "Paginación",
     previous: "Página anterior",

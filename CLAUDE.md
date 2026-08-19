@@ -51,6 +51,7 @@ pnpm prices:backfill [ISIN] [1y|2y|5y|10y|max]   # daily history, default 5y
 pnpm exposure:map                 # list how every instrument resolves
 pnpm exposure:map <ISIN> <KIND> [LEAF]           # e.g. XS2183935274 COMMODITY XAU
 pnpm identity:resolve [--limit N] [--all] [--retry-ambiguous] [--report]
+pnpm ipc:sync [--force-rebase]        # INE consumer price index, national + Bizkaia
 pnpm target:set                       # show the savings-plan target in force today
 pnpm target:set <file> [--from=YYYY-MM-DD] [--name=…] [--note=…]   # record a version
 ```
@@ -312,6 +313,47 @@ manual aliasing was abandoned — 726 confirmations is not a system.
   already equals −fees, so subtracting endpoints returns the fees as a gain. Bounded ranges
   do measure against their own start (`computeRangeChange`), and measure the change in
   **unrealised P&L**, never in value — otherwise a contribution looks like a gain.
+
+## Inflation and real returns
+
+- **Real "aportado" is not the deflated total.** Every contribution entered with a
+  different purchasing power, so each one is restated at **its own month** inside the AVCO
+  fold and only then averaged. `walkAvco`, `computeCostBasisTimeline` and
+  `computeInvestedVsValueSeries` all take an optional `Revalue` for exactly this; deflating
+  the finished total applies one month's index to money that arrived across years and
+  inflates real P&L. `computeInvestedVsValueSeries` restates **both** lines — invested at
+  each contribution's date, value at each price mark's — because restating one turns plain
+  inflation into a gap between them.
+- **The month of a trade is Madrid's, never UTC's.** `periodOf` formats through `Intl` with
+  an explicit `timeZone`. Spain is +1 in winter and +2 in summer, so the last hour(s) of
+  every month are already the next month locally, by a different amount either side of the
+  DST switch — a fixed offset does not fix it. Any test touching periods must include a
+  month boundary in both March/October, or the bug is invisible.
+- **INE's `Fecha` is a trap for the same reason.** It is epoch-ms anchored to Europe/Madrid,
+  so April 2026 arrives as `1774994400000` = `2026-03-31T22:00Z`. The month is already in
+  the payload as `Anyo` + `FK_Periodo`; `parseIneSeries` uses those and never `Fecha`.
+- **Series ids are found, not guessed.** `TABLAS_OPERACION/IPC` → `SERIES_TABLA/24077`
+  (national, one series) and `SERIES_TABLA/24081` (provincial, 53). National general is
+  `IPC290751`, Bizkaia `IPC308320`. `DATOS_SERIE/{COD}?nult=1000` returns the whole series
+  (295 months from 2002-01). A period with no data is simply absent — never an error, never
+  a zero, so gap detection is entirely ours.
+- **`InflationIndex` rows carry their `base`, unlike `PriceSnapshot`.** A past price is a
+  fact that never changes; a past index level is republished at a new reference year every
+  few years. Append-only alone would keep the old levels beside the new ones and every
+  ratio spanning the boundary would be wrong, in the flattering direction. `ipc:sync`
+  refuses on a base change and prints `--force-rebase`, which replaces the series wholesale;
+  `InflationIndex.from` throws on a mixed-base set.
+- **The base year is derived, not stored twice.** It is by definition the year whose twelve
+  months average 100 (`deriveBaseYear`, tolerance 0.05 — measured error 0.0002, nearest
+  other year ~2.5 away). No single qualifying year means refuse, not guess.
+- **The reference month is the last one published, and it lags.** INE publishes month M in
+  mid-M+1, so amounts are restated into `to = latestPeriod()` while market value stays at
+  today's price. That few-week residual is stated on screen, not absorbed. A flow **later**
+  than the reference is left nominal (nobody has measured that month); a flow **earlier**
+  than it with no level is a hole, and a hole disables real mode for the whole view and
+  names the months. Same rule as `UNRESOLVED` and a missing candle: reported, never spread.
+- `real.server.ts` is deliberately **not** exported from `app/lib/index.ts` — that barrel is
+  what components import, and it would pull Prisma into the client bundle.
 
 ## Portfolio target (the savings plan)
 
