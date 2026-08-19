@@ -1,6 +1,6 @@
 import Decimal from "decimal.js";
 
-import type { LedgerEvent } from "../domain";
+import { Money, type LedgerEvent, type Revalue } from "../domain";
 import { computeCostBasisTimeline } from "./cost-basis-timeline";
 
 export interface InvestedVsValuePoint {
@@ -20,9 +20,12 @@ export function computeInvestedVsValueSeries(
   priceHistory: readonly PricePoint[],
   currentPrice: string | null,
   now: Date = new Date(),
+  revalue?: Revalue,
 ): InvestedVsValuePoint[] {
-  const timeline = computeCostBasisTimeline(events, instrumentId);
+  const timeline = computeCostBasisTimeline(events, instrumentId, revalue);
   if (timeline.length === 0) return [];
+
+  const restate: Revalue = revalue ?? ((money) => money);
 
   type Mark =
     | {
@@ -65,7 +68,10 @@ export function computeInvestedVsValueSeries(
     series.push({
       t: mark.t,
       invested,
-      value: quantity.mul(mark.price).toString(),
+      value: restate(
+        Money.fromString(mark.price).scaleBy(quantity),
+        new Date(mark.t),
+      ).toString(),
     });
   }
 

@@ -3,6 +3,7 @@ import Decimal from "decimal.js";
 import {
   Money,
   type LedgerEvent,
+  type Revalue,
   type Sleeve,
   type TradeEvent,
 } from "../domain";
@@ -37,12 +38,16 @@ function isTrade(event: LedgerEvent): event is TradeEvent {
   return event.type === "BUY" || event.type === "SELL";
 }
 
-export function walkAvco(events: readonly LedgerEvent[]): AvcoWalk {
+export function walkAvco(
+  events: readonly LedgerEvent[],
+  revalue?: Revalue,
+): AvcoWalk {
   const trades = events
     .filter(isTrade)
     .slice()
     .sort((a, b) => a.ts.getTime() - b.ts.getTime());
 
+  const restate: Revalue = revalue ?? ((money) => money);
   const lots = new Map<string, AvcoLot>();
   const sales: AvcoSale[] = [];
 
@@ -62,8 +67,14 @@ export function walkAvco(events: readonly LedgerEvent[]): AvcoWalk {
     }
 
     const quantity = new Decimal(trade.quantity);
-    const gross = Money.fromString(trade.grossAmount).scaleBy(trade.fxToBase);
-    const fees = Money.fromString(trade.fees).scaleBy(trade.fxToBase);
+    const gross = restate(
+      Money.fromString(trade.grossAmount).scaleBy(trade.fxToBase),
+      trade.ts,
+    );
+    const fees = restate(
+      Money.fromString(trade.fees).scaleBy(trade.fxToBase),
+      trade.ts,
+    );
 
     if (trade.type === "BUY") {
       lot.acquiredAt = blendAcquisition(lot, quantity, trade.ts);

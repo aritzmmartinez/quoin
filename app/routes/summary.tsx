@@ -7,6 +7,7 @@ import {
 } from "~/adapters/persistence";
 import {
   AllocationCard,
+  BasisNotice,
   Card,
   PortfolioEmpty,
   PortfolioError,
@@ -35,6 +36,7 @@ import {
 } from "~/lib";
 
 import { BASE_CURRENCY, type InstrumentType } from "~/core/domain";
+import { resolveRealView } from "~/lib/real.server";
 
 const TOP_POSITIONS = 5;
 
@@ -45,7 +47,7 @@ export function meta(_: Route.MetaArgs) {
   ];
 }
 
-export const handle = { title: es.summary.title, range: true };
+export const handle = { title: es.summary.title, range: true, basis: true };
 
 export async function loader({ request }: Route.LoaderArgs) {
   const range = parseRange(new URL(request.url).searchParams);
@@ -57,7 +59,8 @@ export async function loader({ request }: Route.LoaderArgs) {
     priceRepository.latest(),
   ]);
 
-  const positions = computePositions(events);
+  const real = await resolveRealView(request, events);
+  const positions = computePositions(events, real.revalue);
   const marketValues = computeMarketValues(positions, prices, BASE_CURRENCY);
   const summary = computePortfolioSummary(positions, marketValues);
 
@@ -103,6 +106,7 @@ export async function loader({ request }: Route.LoaderArgs) {
         ? (prices.get(id)?.price ?? null)
         : null,
       now,
+      real.revalue,
     ),
   );
 
@@ -117,6 +121,13 @@ export async function loader({ request }: Route.LoaderArgs) {
     allocation,
     top,
     range,
+    real: {
+      basis: real.basis,
+      active: real.active,
+      reference: real.reference,
+      missing: real.missing,
+      hasIndex: real.hasIndex,
+    },
     change: computeHeroChange(range, series, summary),
     series: series.map((point) => ({
       t: point.t,
@@ -127,7 +138,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export default function Summary({ loaderData }: Route.ComponentProps) {
-  const { summary, allocation, top, range, change, series } = loaderData;
+  const { summary, allocation, top, range, change, series, real } = loaderData;
   const hasPositions = summary.pricedCount > 0 || summary.unpricedCount > 0;
 
   if (!hasPositions) {
@@ -142,6 +153,8 @@ export default function Summary({ loaderData }: Route.ComponentProps) {
 
   return (
     <>
+      <BasisNotice {...real} />
+
       <SummaryHero
         totalValue={summary.totalValue}
         changeAbs={change.abs}

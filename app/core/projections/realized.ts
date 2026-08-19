@@ -1,6 +1,6 @@
 import Decimal from "decimal.js";
 
-import type { LedgerEvent, Sleeve } from "../domain";
+import type { LedgerEvent, Revalue, Sleeve } from "../domain";
 
 import { walkAvco } from "./avco";
 
@@ -23,8 +23,9 @@ export interface RealizedSale {
 
 export function computeRealizedGains(
   events: readonly LedgerEvent[],
+  revalue?: Revalue,
 ): RealizedSale[] {
-  return walkAvco(events).sales.map((sale) => {
+  return walkAvco(events, revalue).sales.map((sale) => {
     const { trade } = sale;
     const costBasis = sale.costRemoved;
 

@@ -6,7 +6,7 @@ import {
   PrismaInstrumentRepository,
   PrismaLedgerRepository,
 } from "~/adapters/persistence";
-import { Card, PortfolioError, RealizedTable } from "~/components";
+import { BasisNotice, Card, PortfolioError, RealizedTable } from "~/components";
 import { computeRealizedGains } from "~/core/projections";
 import {
   es,
@@ -16,6 +16,7 @@ import {
   realizedTotals,
   toRealizedRows,
 } from "~/lib";
+import { resolveRealView } from "~/lib/real.server";
 
 export function meta(_: Route.MetaArgs) {
   return [
@@ -24,7 +25,7 @@ export function meta(_: Route.MetaArgs) {
   ];
 }
 
-export const handle = { title: es.realized.title };
+export const handle = { title: es.realized.title, basis: true };
 
 export async function loader({ request }: Route.LoaderArgs) {
   const sort = parseRealizedSort(new URL(request.url).searchParams);
@@ -34,17 +35,28 @@ export async function loader({ request }: Route.LoaderArgs) {
     new PrismaInstrumentRepository().list(),
   ]);
 
-  const rows = toRealizedRows(computeRealizedGains(events), instruments);
+  const real = await resolveRealView(request, events);
+  const rows = toRealizedRows(
+    computeRealizedGains(events, real.revalue),
+    instruments,
+  );
 
   return {
     years: groupRealizedByYear(rows, sort),
     totals: realizedTotals(rows),
     sort,
+    real: {
+      basis: real.basis,
+      active: real.active,
+      reference: real.reference,
+      missing: real.missing,
+      hasIndex: real.hasIndex,
+    },
   };
 }
 
 export default function Realized({ loaderData }: Route.ComponentProps) {
-  const { years, totals, sort } = loaderData;
+  const { years, totals, sort, real } = loaderData;
   const navigation = useNavigation();
   const busy = navigation.state === "loading";
 
@@ -66,6 +78,8 @@ export default function Realized({ loaderData }: Route.ComponentProps) {
           {es.realized.avcoWarning}
         </p>
       </header>
+
+      <BasisNotice {...real} />
 
       <Card>
         {totals.count === 0 ? (

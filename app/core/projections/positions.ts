@@ -1,4 +1,4 @@
-import { Money, type LedgerEvent, type Sleeve } from "../domain";
+import { Money, type LedgerEvent, type Revalue, type Sleeve } from "../domain";
 
 import { walkAvco } from "./avco";
 
@@ -27,9 +27,15 @@ export interface Position {
  *
  * FIFO tax lots are a separate projection (required by tax rules) and intentionally
  * not computed here.
+ *
+ * With a `revalue`, the cost basis comes back in real terms: each purchase is
+ * deflated at its own date inside the walk, never the finished total.
  */
-export function computePositions(events: readonly LedgerEvent[]): Position[] {
-  return [...walkAvco(events).lots.values()].map((lot) => {
+export function computePositions(
+  events: readonly LedgerEvent[],
+  revalue?: Revalue,
+): Position[] {
+  return [...walkAvco(events, revalue).lots.values()].map((lot) => {
     const averageCost = lot.quantity.isZero()
       ? Money.zero()
       : lot.costBasis.divideBy(lot.quantity);

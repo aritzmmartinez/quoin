@@ -90,6 +90,37 @@ model PriceSnapshot {
   @@index([asOf])
 }
 
+/// A consumer price index level for one month, used to restate past euros in
+/// today's purchasing power.
+///
+/// Append-only and idempotent by (series, period), like PriceSnapshot — with one
+/// difference that earns the extra `base` column: a past PRICE is a fact that
+/// never changes, while a past INDEX LEVEL does. Statistics offices rebase every
+/// few years and republish the whole series against the new reference year, so
+/// the same month arrives with a different number that means the same thing.
+///
+/// Storing the base is what lets `ipc:sync` notice. On a rebase it refuses the
+/// write and says how to replace the series, because the unique constraint alone
+/// would silently keep the old rows and accept the new ones next to them, and
+/// every ratio spanning the boundary would be wrong — in the direction that
+/// looks like a gain.
+model InflationIndex {
+  id     String @id @default(uuid())
+  series String // logical series: "ES" (national) | "BI" (Bizkaia)
+  period String // "YYYY-MM", the month the level refers to
+
+  // Money-like: ALWAYS a String (decimal) -> operated on with decimal.js.
+  indexValue String
+  base       String // reference year the level is 100 in, e.g. "2025"
+
+  source String @default("INE")
+
+  createdAt DateTime @default(now())
+
+  @@unique([series, period]) // idempotent sync: the same month won't duplicate
+  @@index([series])
+}
+
 // A fund's published composition.
 //
 // Unlike PriceSnapshot, this is REPLACE-only, not append-only: a holdings file is
