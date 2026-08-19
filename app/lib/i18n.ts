@@ -33,8 +33,11 @@ export const es = {
     real: "Real",
     nominalHint: "Euros corrientes, sin ajustar por inflación",
     realHint: "Euros ajustados por el IPC",
-    active: (period: string): string =>
-      `Importes en euros de ${period}. Cada aportación se ajusta con el IPC de su propio mes, no el total de golpe.`,
+    reference: (period: string): string => `en euros de ${period}`,
+    synced: (relative: string): string => `IPC actualizado ${relative}`,
+    neverSynced: "IPC sin fecha de actualización",
+    perFlow:
+      "Cada aportación se ajusta con el IPC de su propio mes, no el total de golpe.",
     lag: "El valor de mercado es el de hoy: el IPC del mes en curso aún no está publicado, así que la referencia va unas semanas por detrás.",
     noIndex:
       "No hay datos de IPC guardados. Ejecuta pnpm ipc:sync para descargarlos del INE.",

@@ -18,6 +18,7 @@ export interface RealView {
   reference: string | null;
   missing: string[];
   hasIndex: boolean;
+  syncedAt: string | null;
   revalue?: Revalue;
 }
 
@@ -27,6 +28,7 @@ const NOMINAL = (basis: Basis): RealView => ({
   reference: null,
   missing: [],
   hasIndex: true,
+  syncedAt: null,
 });
 
 export async function resolveRealView(
@@ -36,9 +38,11 @@ export async function resolveRealView(
   const basis = parseBasis(request.headers.get("Cookie"));
   if (basis === "nominal") return NOMINAL(basis);
 
-  const points = await new PrismaInflationRepository().list(
-    DEFAULT_INFLATION_SERIES,
-  );
+  const repository = new PrismaInflationRepository();
+  const [points, syncedAt] = await Promise.all([
+    repository.list(DEFAULT_INFLATION_SERIES),
+    repository.lastSyncedAt(DEFAULT_INFLATION_SERIES),
+  ]);
   const index = InflationIndex.from(DEFAULT_INFLATION_SERIES, points);
 
   if (index.size === 0) {
@@ -53,6 +57,7 @@ export async function resolveRealView(
       reference: resolved.reference,
       missing: resolved.missing,
       hasIndex: true,
+      syncedAt: syncedAt?.toISOString() ?? null,
     };
   }
 
@@ -62,6 +67,7 @@ export async function resolveRealView(
     reference: resolved.reference,
     missing: [],
     hasIndex: true,
+    syncedAt: syncedAt?.toISOString() ?? null,
     revalue: resolved.revalue,
   };
 }

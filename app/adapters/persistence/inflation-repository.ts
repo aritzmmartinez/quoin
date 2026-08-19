@@ -37,6 +37,15 @@ export class PrismaInflationRepository implements InflationRepository {
     }));
   }
 
+  async lastSyncedAt(series: string): Promise<Date | null> {
+    const row = await prisma.inflationIndex.findFirst({
+      where: { series },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true },
+    });
+    return row?.createdAt ?? null;
+  }
+
   async deleteSeries(series: string): Promise<number> {
     const { count } = await prisma.inflationIndex.deleteMany({
       where: { series },

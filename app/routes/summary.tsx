@@ -127,6 +127,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       reference: real.reference,
       missing: real.missing,
       hasIndex: real.hasIndex,
+      syncedAt: real.syncedAt,
     },
     change: computeHeroChange(range, series, summary),
     series: series.map((point) => ({

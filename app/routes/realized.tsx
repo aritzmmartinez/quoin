@@ -51,6 +51,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       reference: real.reference,
       missing: real.missing,
       hasIndex: real.hasIndex,
+      syncedAt: real.syncedAt,
     },
   };
 }

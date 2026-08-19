@@ -25,11 +25,6 @@ export class PrismaTargetRepository implements TargetRepository {
     );
   }
 
-  /**
-   * `create`, never `upsert`: a target is a version. Reusing an id would edit a
-   * plan that a past date still resolves to, so the unique constraint failing is
-   * the correct outcome, not something to smooth over.
-   */
   async create(target: PortfolioTarget): Promise<void> {
     await prisma.portfolioTarget.create({
       data: {
