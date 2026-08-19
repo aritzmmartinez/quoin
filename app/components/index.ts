@@ -32,6 +32,7 @@ export * from "./instrument/InvestedVsValue";
 export * from "./summary/SummaryHero";
 export * from "./summary/PortfolioValueChart";
 export * from "./summary/SummaryStats";
+export * from "./summary/SummaryReturns";
 export * from "./summary/AllocationCard";
 export * from "./summary/TopPositionsCard";
 export * from "./target/TargetLines";

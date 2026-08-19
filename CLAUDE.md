@@ -54,6 +54,8 @@ pnpm identity:resolve [--limit N] [--all] [--retry-ambiguous] [--report]
 pnpm ipc:sync [--force-rebase]        # INE consumer price index, national + Bizkaia
 pnpm target:set                       # show the savings-plan target in force today
 pnpm target:set <file> [--from=YYYY-MM-DD] [--name=…] [--note=…]   # record a version
+pnpm twr:explain [--top=N]            # print the portfolio TWR chain, worst link first
+pnpm twr:explain --around=YYYY-MM-DD  # open one link: holdings and implied prices at both ends
 ```
 
 Fund compositions have **no command**: the CSV is dropped onto the fund's row in
@@ -299,6 +301,31 @@ manual aliasing was abandoned — 726 confirmations is not a system.
 - **TWR excludes fees on purpose** — it uses price marks (`grossAmount / quantity`), and a
   fee is not a price. TWR = how the **asset** did. MWR/XIRR = how **my money** did. Their
   divergence under DCA is the point, not a bug.
+- **`xirr` is one shared solver** (`projections/xirr.ts`), Newton-Raphson with bisection
+  behind it. It returns `null` — never a stand-in number — for fewer than two flows, for
+  flows that all carry the same sign (the IRR is undefined), and for non-convergence. The
+  UI states the absence. `newtonRate` is exported only so a test can prove the fallback
+  engages; it is not part of the projection surface.
+- **A compounded TWR is unauditable as a scalar.** `explainPortfolioTwr` returns the chain
+  link by link — denominator, flow, ratio — and `pnpm twr:explain` sorts them by distance
+  from 1. Reach for it before believing or "fixing" a headline figure: the classic failure
+  is a sub-period whose `startValue` is near zero, where a few euros of price movement
+  become a large percentage that then multiplies every later link. Note the flow **is**
+  subtracted (`(V_end − flow) / V_start`), so a sell-and-rebuy rotation does not inflate a
+  link by itself, and the series is the **merged** portfolio, so a small denominator means
+  the whole portfolio was small — usually at the head of the series.
+- **An extreme link has two possible causes and they need opposite fixes.** A real move on a
+  position of pennies is a denominator problem; a bad `PriceSnapshot` is a *data* problem,
+  and a floor applied over it hides the symptom while the wrong price still feeds every
+  valuation. `--around=<date>` prints each instrument's **implied price** (value ÷ quantity)
+  at both ends plus the raw snapshots either side, flagging any close ≥2× the previous one.
+  Check the magnitude before touching the projection — same trap as a venue line quoting
+  5.5× the right one.
+- **`computePortfolioReturns` is nominal even when the basis switch says real.** Its flows
+  are the euros that left the bank, so deflating the value series without them would quote
+  a real return against nominal money. The Resumen loader builds a second, un-deflated
+  series for it. Portfolio TWR is **not** an average of the per-instrument TWRs — a return
+  is not additive.
 - Valuation is **EUR-base only, no FX**. Every mapped instrument quotes in EUR. A fund
   named "USD Acc" states the fund's *denomination* currency, not the currency of the line
   being bought — it needs no conversion.

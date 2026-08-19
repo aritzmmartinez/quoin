@@ -20,6 +20,7 @@
     "ipc:sync": "tsx scripts/ipc-sync.ts",
     "exposure:map": "tsx scripts/exposure-map.ts",
     "target:set": "tsx scripts/target-set.ts",
+    "twr:explain": "tsx scripts/twr-explain.ts",
     "identity:resolve": "tsx scripts/identity-resolve.ts",
     "postinstall": "prisma generate",
     "test": "vitest run",
