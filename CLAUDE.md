@@ -379,6 +379,11 @@ manual aliasing was abandoned — 726 confirmations is not a system.
   than the reference is left nominal (nobody has measured that month); a flow **earlier**
   than it with no level is a hole, and a hole disables real mode for the whole view and
   names the months. Same rule as `UNRESOLVED` and a missing candle: reported, never spread.
+- **`latestPeriod()` and `lastSyncedAt` are different questions and both are shown.**
+  `latestPeriod()` is the newest month INE has published — what the euros on screen *mean*.
+  `lastSyncedAt` is when we last asked — whether anybody has checked for a newer one. A
+  fresh sync of a month-old index is normal; a stale sync of the same index is not, and one
+  timestamp cannot say which is the case. Do not collapse them into "updated".
 - `real.server.ts` is deliberately **not** exported from `app/lib/index.ts` — that barrel is
   what components import, and it would pull Prisma into the client bundle.
 
@@ -491,10 +496,15 @@ must pass.
 
 ## Workflow
 
-- Branches `feature/*`, `fix/*`, `chore/*` cut from `develop`. PRs target `develop`.
+- Branches `feat/*`, `fix/*`, `chore/*` cut from `develop`. PRs target `develop`.
+  (`feature/*` is the older prefix, still on the merged branches; match the commit type.)
   `main` is untouched until a release.
 - Conventional Commits (`feat:`, `fix:`, `chore:`, `refactor:`).
 - `CHANGELOG.md` follows Keep a Changelog, with an `[Unreleased]` section.
+- **The version lives in `package.json`.** Bump it with `pnpm version <patch|minor|major>`,
+  which writes the field, commits and tags. It is stated in **three** places — that field,
+  the `CHANGELOG.md` heading and the README status line — and nothing links them, so a
+  release edits all three or the repo starts disagreeing with itself.
 - No "Known limitations" sections in docs — open a GitHub issue instead.
 
 ## Working agreement
