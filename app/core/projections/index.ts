@@ -10,3 +10,4 @@ export * from "./exposures";
 export * from "./invested-vs-value";
 export * from "./portfolio";
 export * from "./real";
+export * from "./rebalance";

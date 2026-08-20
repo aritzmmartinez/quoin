@@ -321,6 +321,13 @@ manual aliasing was abandoned — 726 confirmations is not a system.
   at both ends plus the raw snapshots either side, flagging any close ≥2× the previous one.
   Check the magnitude before touching the projection — same trap as a venue line quoting
   5.5× the right one.
+- **`computeRebalance` has no "surplus" phase and cannot have one.** The two-phase
+  waterfall (fill the deficits, then spread the leftover by target weight) is a natural
+  design and its second phase is unreachable: weights sum to 1, so `Σ ideal =
+  totalValue + contribution` and `Σ (ideal − value) = contribution` exactly, while
+  clamping each term at zero can only raise the sum. The total deficit is therefore
+  always ≥ the contribution. A contribution big enough to fill every deficit is one
+  that lands every line exactly on its ideal with nothing left over.
 - **`computePortfolioReturns` is nominal even when the basis switch says real.** Its flows
   are the euros that left the bank, so deflating the value series without them would quote
   a real return against nominal money. The Resumen loader builds a second, un-deflated
@@ -462,9 +469,17 @@ Append is idempotent: dedup by `source` + `externalId`.
 
 ## URL as state
 
-Sort order (Cartera), chart range (Resumen), page (Movimientos) and concentration
-threshold (Asignación, `?umbral=20`) live in **URL search params**, written by the UI and
-read by the **loader**. No context, no state lifting, and the view stays
+Sort order (Cartera), chart range (Resumen), page (Movimientos), concentration threshold
+(Asignación, `?umbral=20`) and the rebalance inputs (Asignación, `?aportacion=500`,
+`?desvio=2`) live in **URL search params**, written by the UI and read by the **loader**.
+
+A `<Form method="get">` **rewrites the whole query string** from its own fields, so any
+param already in the URL that is not a field of that form is dropped on submit. A GET
+form therefore re-emits every param it does not own as a hidden input — **all of them,
+read from the URL, never a hand-kept list** (`carriedParams`). The list version is not
+a smaller version of this: it works until someone adds a param elsewhere on the page and
+never thinks about that form, which is exactly how submitting the rebalance split started
+throwing the user back to the exposure tab. No context, no state lifting, and the view stays
 shareable. A route opts into the header's range selector with `handle = { range: true }`;
 `handle.title` sets the header title.
 

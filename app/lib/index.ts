@@ -8,5 +8,6 @@ export * from "./pagination";
 export * from "./portfolio";
 export * from "./range";
 export * from "./realized";
+export * from "./rebalance";
 export * from "./summary";
 export * from "./target";
