@@ -100,6 +100,11 @@ export const es = {
     },
   },
   allocation: {
+    views: {
+      label: "Vista",
+      exposicion: "Exposición",
+      rebalanceo: "Rebalanceo",
+    },
     intro:
       "Posición directa + peso dentro de tus ETFs (look-through). El tramo sólido de la barra es lo que compraste tú; el apagado viaja dentro de un fondo.",
     title: "Exposición real por valor",
@@ -142,6 +147,49 @@ export const es = {
       threshold: "Umbral configurado",
       empty: "Todavía no hay exposición resuelta que leer.",
     },
+  },
+  rebalance: {
+    title: "Rebalanceo por aportación",
+    intro:
+      "Dónde poner la próxima aportación para acercarte al objetivo sin vender nada. Vender realiza ganancia y tributa; aportar no, así que el reparto solo mueve dinero nuevo hacia lo que va por debajo de su peso.",
+    amount: "Próxima aportación",
+    amountPlaceholder: "500",
+    threshold: "Umbral de desvío (%)",
+    submit: "Calcular",
+    noTarget:
+      "Todavía no hay ningún objetivo vigente. Define tu plan de aportación en Objetivo y vuelve aquí.",
+    prompt: "Escribe cuánto vas a aportar y verás el reparto sugerido.",
+    hypothesis:
+      "Es una sugerencia, no una orden: no se guarda nada ni se ejecuta ninguna compra.",
+    columns: {
+      instrument: "Instrumento",
+      amount: "Aportar",
+      current: "Valor actual",
+      drift: "Desvío",
+    },
+    targetSuffix: (weight: string): string => `${weight} objetivo`,
+    driftArrow: (before: string, after: string): string =>
+      `${before} → ${after}`,
+    total: "Total repartido",
+    overThreshold: (drift: string, threshold: string): string =>
+      `Tu cartera acumula un ${drift} de desvío, por encima de tu umbral del ${threshold}.`,
+    underThreshold: (drift: string, threshold: string): string =>
+      `Tu cartera acumula un ${drift} de desvío, dentro de tu umbral del ${threshold}.`,
+    driftHint:
+      "El desvío es lo que se separa cada línea de su peso objetivo, y el total es la suma de todas. El umbral es informativo: el reparto siempre rellena lo que va por debajo.",
+    worsening: "Se aleja del objetivo aun recibiendo aportación",
+    worseningHint:
+      "Esta línea recibe aportación y aun así se aleja de su objetivo, porque otra posición del plan está sobreponderada y no se vende: el hueco que ocupa de más no se puede rellenar con dinero nuevo, solo diluir. Aportaciones mayores lo corrigen; venderla tributaría.",
+    unpriced: (names: string): string =>
+      `Sin precio utilizable, así que quedan fuera del reparto: ${names}. Un precio que falta no es un valor de cero — ejecuta pnpm prices:sync antes de fiarte del reparto.`,
+    offPlan: (count: number): string =>
+      count === 1
+        ? "1 posición en cartera, fuera del plan"
+        : `${count} posiciones en cartera, fuera del plan`,
+    offPlanNote:
+      "Tienes posición en esto y tu objetivo vigente no lo nombra. No recibe aportación: meter dinero nuevo ahí no es rebalancear, es cambiar de plan, y eso se hace en Objetivo.",
+    empty:
+      "Ninguna línea del objetivo se puede repartir todavía. Importa operaciones y sincroniza precios.",
   },
   holdings: {
     drop: "Arrastra aquí el CSV o Excel de posiciones del fondo",

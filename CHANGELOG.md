@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Rebalance by contribution: enter the next contribution on /asignacion and Quoin splits it across the active savings plan so the portfolio moves back towards its target weights **without selling anything** — no realised gain, so no tax. Each line's ideal is its target weight of the post-contribution portfolio, and the money is split in proportion to each line's shortfall; a line already at or above its ideal gets nothing. The split adds up to the contribution to the cent. A plan line that is held but unpriced is left out of the split and named, never passed in as zero, and a position the plan no longer names is reported rather than funded. The drift threshold is configurable on screen (`?desvio=2`) and is informative only — it changes what the panel says about the drift, never where the money goes. The suggestion is a hypothesis: nothing is persisted and no order is placed.
+
 ## [0.3.0] - 2026-08-20
 
 ### Added

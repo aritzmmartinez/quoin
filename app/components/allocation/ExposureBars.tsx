@@ -9,6 +9,8 @@ import {
   type ExposureRow,
 } from "~/lib";
 
+import { MeterBar } from "../ui/MeterBar";
+
 const GRID = "grid-cols-[minmax(120px,180px)_minmax(0,1fr)_74px]";
 
 export function ExposureBars({
@@ -102,32 +104,20 @@ function Row({
           </div>
         </div>
 
-        <div className="relative h-4 overflow-hidden rounded bg-surface-2">
-          <span
-            className="absolute inset-y-0 left-0 rounded-l"
-            style={{
-              width: `${direct}%`,
-              background: hot ? "var(--color-negative)" : "var(--color-text)",
-            }}
-          />
-          <span
-            className="absolute inset-y-0"
-            style={{
-              left: `${direct}%`,
-              width: `${via}%`,
-              background: hot ? "var(--color-negative)" : "var(--color-dn-3)",
+        <MeterBar
+          segments={[
+            {
+              width: direct,
+              color: hot ? "var(--color-negative)" : "var(--color-text)",
+            },
+            {
+              width: via,
+              color: hot ? "var(--color-negative)" : "var(--color-dn-3)",
               opacity: hot ? 0.45 : 1,
-            }}
-          />
-          <span
-            aria-hidden
-            className="absolute inset-y-0 w-px bg-muted"
-            style={{
-              left: `${(Number(threshold) / scaleMax) * 100}%`,
-              opacity: 0.6,
-            }}
-          />
-        </div>
+            },
+          ]}
+          marker={(Number(threshold) / scaleMax) * 100}
+        />
 
         <div className="text-right">
           <div
@@ -157,7 +147,9 @@ function Row({
                 {c.weightInParent === null
                   ? copy.direct
                   : copy.insideFund(
-                      formatPercent(c.weightInParent, 2, { floorNonZero: true }),
+                      formatPercent(c.weightInParent, 2, {
+                        floorNonZero: true,
+                      }),
                     )}
               </span>
               <span className="w-16 shrink-0 text-right tabular-nums">

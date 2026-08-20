@@ -6,11 +6,20 @@ import {
   PrismaLedgerRepository,
   PrismaPriceRepository,
   PrismaSecurityIdentityRepository,
+  PrismaTargetRepository,
 } from "~/adapters/persistence";
-import { Card, ExposureBars, PortfolioError, ReadingCard } from "~/components";
+import {
+  Card,
+  ExposureBars,
+  PortfolioError,
+  ReadingCard,
+  RebalancePanel,
+  ViewTabs,
+} from "~/components";
 import {
   BASE_CURRENCY,
   canonicaliseLeaves,
+  getActiveTarget,
   resolveWithHoldings,
   type WeightedLeaf,
 } from "~/core/domain";
@@ -21,9 +30,13 @@ import {
   summarizeExposures,
 } from "~/core/projections";
 import {
+  buildRebalancePlan,
   es,
   formatMoney,
   formatPercent,
+  parseAllocationView,
+  parseContribution,
+  parseDriftThreshold,
   parseThreshold,
   readingFor,
   tailOf,
@@ -40,17 +53,21 @@ export function meta(_: Route.MetaArgs) {
 export const handle = { title: es.nav.allocation };
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const threshold = parseThreshold(new URL(request.url).searchParams);
+  const params = new URL(request.url).searchParams;
+  const view = parseAllocationView(params);
+  const threshold = parseThreshold(params);
+  const contribution = parseContribution(params);
+  const driftThreshold = parseDriftThreshold(params);
 
-  const [events, instruments, prices, holdings, identities] = await Promise.all([
-    new PrismaLedgerRepository().list(),
-    new PrismaInstrumentRepository().list(),
-    new PrismaPriceRepository().latest(),
-    new PrismaHoldingsRepository().all(),
-    // A plain table read. Resolution happened at import time; nothing here
-    // touches the network.
-    new PrismaSecurityIdentityRepository().all(),
-  ]);
+  const [events, instruments, prices, holdings, identities, targets] =
+    await Promise.all([
+      new PrismaLedgerRepository().list(),
+      new PrismaInstrumentRepository().list(),
+      new PrismaPriceRepository().latest(),
+      new PrismaHoldingsRepository().all(),
+      new PrismaSecurityIdentityRepository().all(),
+      new PrismaTargetRepository().list(),
+    ]);
 
   const canonical = new Map<string, string>();
   for (const entry of identities.values()) {
@@ -83,17 +100,43 @@ export async function loader({ request }: Route.LoaderArgs) {
   const summary = summarizeExposures(exposures);
   const rows = toExposureRows(exposures, summary.total);
 
+  const target = getActiveTarget(targets, new Date());
+
   return {
     rows,
     tail: tailOf(exposures, summary.total),
     reading: readingFor(rows, summary.resolvedLeafCount, threshold),
     summary,
     threshold,
+    view,
+    driftThreshold,
+    hasTarget: target !== null,
+    plan:
+      view !== "rebalanceo" || target === null || contribution === null
+        ? null
+        : buildRebalancePlan(
+            target,
+            positions,
+            marketValues,
+            instruments,
+            contribution,
+            driftThreshold,
+          ),
   };
 }
 
 export default function Allocation({ loaderData }: Route.ComponentProps) {
-  const { rows, tail, reading, summary, threshold } = loaderData;
+  const {
+    rows,
+    tail,
+    reading,
+    summary,
+    threshold,
+    view,
+    driftThreshold,
+    plan,
+    hasTarget,
+  } = loaderData;
   const copy = es.allocation;
 
   const unresolvedShare =
@@ -101,8 +144,22 @@ export default function Allocation({ loaderData }: Route.ComponentProps) {
       ? "0"
       : String(Number(summary.unresolved) / Number(summary.total));
 
+  if (view === "rebalanceo") {
+    return (
+      <>
+        <ViewTabs value={view} />
+        <RebalancePanel
+          plan={plan}
+          hasTarget={hasTarget}
+          driftThreshold={driftThreshold}
+        />
+      </>
+    );
+  }
+
   return (
     <>
+      <ViewTabs value={view} />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
         <div className="flex flex-col gap-4">
           <ReadingCard reading={reading} threshold={threshold} />
