@@ -26,9 +26,9 @@ no heavy plugins):
 Convention: internal imports always use the `~/...` alias.
 
 ### core
-- `domain/`      value objects (Money as string + decimal.js), ledger event types, exposure leaves, `resolveIntrinsic` / `resolveWithHoldings` / `canonicaliseLeaves`
-- `ports/`       interfaces: `LedgerRepository`, `InstrumentRepository`, `MarketDataProvider`, `PriceRepository`, `HoldingsRepository`, `SecurityIdentityResolver`, `SecurityIdentityRepository` (planned: `FxProvider`, `TaxJurisdiction`)
-- `projections/` pure functions: `computePositions` (average cost), `computeTradeMeta`, `computeReturns`, `computeAllocation`, `computeExposures` (look-through) (planned: FIFO lots)
+- `domain/`      value objects (Money as string + decimal.js), ledger event types, exposure leaves, `resolveIntrinsic` / `resolveWithHoldings` / `canonicaliseLeaves`, `InflationIndex` + `Period` / `periodOf` / `deflate` and the `Revalue` function every projection takes to work in real terms, the portfolio target and `getActiveTarget`
+- `ports/`       interfaces: `LedgerRepository`, `InstrumentRepository`, `MarketDataProvider`, `PriceRepository`, `HoldingsRepository`, `SecurityIdentityResolver`, `SecurityIdentityRepository`, `InflationRepository`, `TargetRepository` (planned: `FxProvider`, `TaxJurisdiction`)
+- `projections/` pure functions: `walkAvco` and the two views over it (`computePositions`, `computeRealizedGains`), `computeTradeMeta`, `computeMarketValues`, `computeCostBasisTimeline`, `computeInvestedVsValueSeries`, `computePortfolioSummary` / `computeAllocation` / `computeTopPositions`, `computeReturns` and `computePortfolioReturns` over the shared `xirr` solver, `computeExposures` (look-through), `realBasis`, `deriveTargetWeights` (planned: FIFO lots)
 - `tax/`         TaxJurisdiction implementations (bizkaia, common, ...)
 
 ### adapters
@@ -36,6 +36,7 @@ Convention: internal imports always use the `~/...` alias.
 - `persistence/` Prisma 7 + SQLite (schema, generated client, ledger/instrument/price/holdings/identity repositories)
 - `marketdata/`  `YahooMarketDataProvider` behind the `MarketDataProvider` port; `quoteSymbol` per instrument (local DB only)
 - `identity/`    `OpenFigiIdentityResolver` behind the `SecurityIdentityResolver` port; maps an ISIN or a ticker to a share-class FIGI
+- `inflation/`   `ine/`, the consumer price index from INE's Tempus3 API (national and Bizkaia), parsed pure and separately from the fetch that feeds it
 - `fx/`          (planned) exchange rates for non-EUR quotes
 
 #### The holdings parser has no per-issuer branch
@@ -76,6 +77,58 @@ a minute, so five thousand constituents would take twenty minutes — but nearly
 them sit in the long tail, and a budget of a couple of hundred already covers every row
 a person can see.
 
+## Projections that needed a decision
+
+Four of them, written down here because the reasoning is not visible in the code and was
+otherwise only in a commit message.
+
+#### One AVCO walk, two projections
+
+`computePositions` (what is held now) and `computeRealizedGains` (what each sale produced)
+are two views over the same fold, `walkAvco`. They started as separate implementations of
+the same arithmetic, which is how the portfolio total and the per-sale breakdown begin to
+disagree; a test now asserts the sum of the sales matches the portfolio's realised total to
+the cent. **AVCO is the portfolio view only.** FIFO exists for the foral return and is a
+deliberately separate projection — the same sale has two correct answers depending on which
+question is being asked, and merging them would lose that.
+
+#### Real returns deflate flow by flow, never the total
+
+Every contribution entered with a different purchasing power, so each one is restated **at
+its own month inside the AVCO fold** and only then averaged. Deflating the finished total
+would apply one month's index to money that arrived across years, and it would flatter the
+result. The seam is one optional `Revalue` argument threaded through `walkAvco`,
+`computeCostBasisTimeline` and `computeInvestedVsValueSeries`, so a projection is nominal
+or real by what it is handed, not by a second implementation.
+
+The month of a trade is Madrid's, never UTC's, and the reference month is the last one INE
+has **published**, which lags by a few weeks. Both lines of the evolution chart are
+restated — invested at each contribution's date, value at each price mark's — because
+restating one and not the other turns plain inflation into a gap between them. A month with
+no published level is reported and disables real mode; it is never interpolated.
+
+#### The savings plan stores euros and derives weights
+
+A plan is written in euros per month ("300 into FTSE"), so euros are the fact and
+`deriveTargetWeights` is a view of them. Storing both invites the day they disagree — the
+same mistake as storing a leaf total beside its contributions. Versions are resolved by
+`activeFrom`, never by `createdAt`, and a version is never edited: changing the plan records
+the next one, so "what was I aiming at in March" stays answerable. A line may name an
+instrument never bought, which is why `PortfolioTargetLine.instrumentId` carries no foreign
+key.
+
+#### XIRR refuses rather than guesses
+
+One shared solver (`projections/xirr.ts`): Newton-Raphson, with bisection behind it because
+Newton alone wanders off on irregular flows and returns a confident number nobody can
+defend. It returns `null` — never a stand-in — for fewer than two flows, for flows that all
+carry the same sign (the rate is undefined), and for non-convergence; the UI states the
+absence. Portfolio TWR is **not** an average of the per-instrument figures: it links the
+sub-period returns between value points with each period's flow removed. Both figures stay
+nominal even under the real basis, because the flows are the euros that actually left the
+bank. A compounded return is unauditable as a scalar, so `explainPortfolioTwr` exposes the
+chain link by link and `pnpm twr:explain` ranks it.
+
 ## Persistence (Prisma 7 + SQLite)
 
 - **Prisma 7** uses a query compiler and **requires a driver adapter**: SQLite uses
@@ -89,9 +142,16 @@ a person can see.
   screen, never by ingestion, and omitted from `InstrumentWriteData` at the type level so a
   re-import cannot clobber them), `LedgerEntry` (immutable ledger), `PriceSnapshot`
   (append-only price history, `@@unique([instrumentId, asOf])`), `EtfHolding` (a fund's
-  published composition) and `SecurityIdentity` (the identity cache). Every
+  published composition), `InflationIndex` (monthly CPI levels), `PortfolioTarget` +
+  `PortfolioTargetLine` (the savings plan, one version per `activeFrom`, one line per
+  instrument per version) and `SecurityIdentity` (the identity cache). Every
   amount/quantity/price/weight is a `String` (decimal) -> operated on with decimal.js.
   `@@unique([source, externalId])` makes ingestion idempotent.
+- **`InflationIndex` rows carry their `base`, unlike `PriceSnapshot`.** A past price is a
+  fact that never changes; a past index level is republished against a new reference year
+  every few years. Append-only alone would keep the old levels beside the new ones and every
+  ratio spanning the boundary would be wrong, in the flattering direction — so `ipc:sync`
+  refuses on a base change until told to rebase the series wholesale.
 - `EtfHolding` is **replace-only, not append-only** like price history: a holdings file is a
   snapshot of what a fund holds today, not an event that happened, so appending would keep
   constituents that have left the index. The residual — cash, derivatives and rounding — is
@@ -121,6 +181,14 @@ pnpm run db:studio      # (optional) GUI to inspect the data
   `UNRESOLVED` leaf carrying its own value; pro-rating it across the leaves we do know would
   invent a concentration. The same rule applies inside a fund: one published with only its top
   ten resolves to eleven leaves, ten companies and a large unknown.
+- **Contributed is what left the bank, fees included** — one definition, shared by the cost
+  basis, the invested timeline and the XIRR cash flows. The foral rule puts inherent costs
+  inside the acquisition value, and excluding them flatters returns. TWR is the exception on
+  purpose: it works from price marks, and a fee is not a price. TWR is how the **asset** did,
+  MWR how **my money** did; under monthly contributions they diverge, and that is the point.
+- **Derived figures are never stored beside their inputs.** A leaf total, a target weight, a
+  base year: each is computed on read. Storing both invites the day they disagree, which is
+  exactly how the fee bug happened.
 - **Contributions are kept, not summed.** "NVIDIA 11.2%" is not actionable; "9.7% held
   directly, 1.5% inside the index funds" is, because only the first part is a decision.
 

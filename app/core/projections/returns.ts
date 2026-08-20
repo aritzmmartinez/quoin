@@ -1,6 +1,8 @@
 import Decimal from "decimal.js";
 
 import type { LedgerEvent, TradeEvent } from "../domain";
+import type { InvestedVsValuePoint } from "./invested-vs-value";
+import { xirr, type CashFlow } from "./xirr";
 
 export interface ReturnsSummary {
   twr: string | null;
@@ -10,54 +12,12 @@ export interface ReturnsSummary {
   avgBuyAmount: string;
 }
 
-interface CashFlow {
-  t: number;
-  amount: number;
-}
-
-const YEAR_MS = 365 * 24 * 60 * 60 * 1000;
-
 function isTrade(e: LedgerEvent): e is TradeEvent {
   return e.type === "BUY" || e.type === "SELL";
 }
 
 function baseAmount(value: string, fxToBase: string): Decimal {
   return new Decimal(value).mul(fxToBase);
-}
-
-function xirr(flows: readonly CashFlow[]): number | null {
-  if (flows.length < 2) return null;
-  const hasIn = flows.some((f) => f.amount > 0);
-  const hasOut = flows.some((f) => f.amount < 0);
-  if (!hasIn || !hasOut) return null;
-
-  const t0 = Math.min(...flows.map((f) => f.t));
-  const npv = (rate: number): number =>
-    flows.reduce(
-      (sum, f) => sum + f.amount / Math.pow(1 + rate, (f.t - t0) / YEAR_MS),
-      0,
-    );
-
-  let lo = -0.9999;
-  let hi = 10;
-  let fLo = npv(lo);
-  const fHi = npv(hi);
-  if (fLo === 0) return lo;
-  if (fHi === 0) return hi;
-  if (fLo * fHi > 0) return null;
-
-  for (let i = 0; i < 200; i++) {
-    const mid = (lo + hi) / 2;
-    const fMid = npv(mid);
-    if (Math.abs(fMid) < 1e-7) return mid;
-    if (fLo * fMid < 0) {
-      hi = mid;
-    } else {
-      lo = mid;
-      fLo = fMid;
-    }
-  }
-  return (lo + hi) / 2;
 }
 
 export function computeReturns(
@@ -148,4 +108,129 @@ export function computeReturns(
     buyCount,
     avgBuyAmount: avgBuyAmount.toString(),
   };
+}
+
+export interface PortfolioReturnsSummary {
+  twr: string | null;
+  mwr: string | null;
+}
+
+const EMPTY_PORTFOLIO_RETURNS: PortfolioReturnsSummary = {
+  twr: null,
+  mwr: null,
+};
+
+interface PortfolioFlow {
+  t: number;
+  gross: Decimal;
+  net: Decimal;
+}
+
+function portfolioFlows(events: readonly LedgerEvent[]): PortfolioFlow[] {
+  return events
+    .filter(isTrade)
+    .map((t) => {
+      const gross = baseAmount(t.grossAmount, t.fxToBase);
+      const fees = baseAmount(t.fees, t.fxToBase);
+      return t.type === "BUY"
+        ? { t: t.ts.getTime(), gross, net: gross.plus(fees).neg() }
+        : { t: t.ts.getTime(), gross: gross.neg(), net: gross.minus(fees) };
+    })
+    .sort((a, b) => a.t - b.t);
+}
+
+export function computePortfolioReturns(
+  events: readonly LedgerEvent[],
+  valueSeries: readonly InvestedVsValuePoint[],
+): PortfolioReturnsSummary {
+  const points = [...valueSeries].sort((a, b) => a.t - b.t);
+  const last = points[points.length - 1];
+  if (!last) return EMPTY_PORTFOLIO_RETURNS;
+
+  const flows = portfolioFlows(events);
+  if (flows.length === 0) return EMPTY_PORTFOLIO_RETURNS;
+
+  return {
+    twr: linkTwr(explainPortfolioTwr(events, points)),
+    mwr: portfolioMwr(flows, new Decimal(last.value), last.t),
+  };
+}
+
+export interface TwrSubPeriod {
+  from: number;
+  to: number;
+  startValue: string;
+  flow: string;
+  endValue: string;
+  ratio: string | null;
+}
+
+export function explainPortfolioTwr(
+  events: readonly LedgerEvent[],
+  valueSeries: readonly InvestedVsValuePoint[],
+): TwrSubPeriod[] {
+  const points = [...valueSeries].sort((a, b) => a.t - b.t);
+  const flows = portfolioFlows(events);
+  const rows: TwrSubPeriod[] = [];
+  let cursor = 0;
+
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const from = points[i]!;
+    const to = points[i + 1]!;
+
+    let flow = new Decimal(0);
+    while (cursor < flows.length && flows[cursor]!.t <= from.t) cursor += 1;
+    let ahead = cursor;
+    while (ahead < flows.length && flows[ahead]!.t <= to.t) {
+      flow = flow.plus(flows[ahead]!.gross);
+      ahead += 1;
+    }
+    cursor = ahead;
+
+    const start = new Decimal(from.value);
+    rows.push({
+      from: from.t,
+      to: to.t,
+      startValue: from.value,
+      flow: flow.toString(),
+      endValue: to.value,
+      ratio: start.lte(0)
+        ? null
+        : new Decimal(to.value).minus(flow).div(start).toString(),
+    });
+  }
+
+  return rows;
+}
+
+function linkTwr(rows: readonly TwrSubPeriod[]): string | null {
+  let factor = new Decimal(1);
+  let linked = false;
+
+  for (const row of rows) {
+    if (row.ratio === null) continue;
+    const ratio = new Decimal(row.ratio);
+    if (ratio.lte(0)) return null;
+    factor = factor.mul(ratio);
+    linked = true;
+  }
+
+  return linked ? factor.minus(1).toFixed(6) : null;
+}
+
+function portfolioMwr(
+  flows: readonly PortfolioFlow[],
+  terminalValue: Decimal,
+  terminalT: number,
+): string | null {
+  const cashFlows: CashFlow[] = flows.map((f) => ({
+    t: f.t,
+    amount: f.net.toNumber(),
+  }));
+  if (!terminalValue.isZero()) {
+    cashFlows.push({ t: terminalT, amount: terminalValue.toNumber() });
+  }
+
+  const rate = xirr(cashFlows);
+  return rate === null ? null : new Decimal(rate).toFixed(6);
 }

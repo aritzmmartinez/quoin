@@ -80,6 +80,14 @@ export const es = {
       realized: { label: "P&L realizado", sub: "Beneficio de ventas cerradas" },
       positions: { label: "Posiciones", sub: "Abiertas y valoradas" },
     },
+    returns: {
+      twr: { label: "TWR", sub: "ponderada por tiempo" },
+      mwr: { label: "MWR / TIR", sub: "ponderada por dinero" },
+      unavailable: "sin solución",
+      note: "El TWR mide cómo lo han hecho los activos; el MWR (TIR) mide cómo lo ha hecho tu dinero. Aportando poco a poco divergen a propósito: la mayor parte del capital lleva menos tiempo invertido, así que una subida antigua pesa entera en el TWR y casi nada en el MWR.",
+      nominal:
+        "Ambas se calculan siempre en euros nominales, aunque el resto de la pantalla esté en poder adquisitivo de hoy.",
+    },
     allocation: {
       title: "Asignación",
       link: "Ver detalle",
