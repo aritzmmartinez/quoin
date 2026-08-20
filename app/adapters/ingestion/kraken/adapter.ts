@@ -1,4 +1,8 @@
-import type { InstrumentRepository, LedgerRepository } from "~/core/ports";
+import type {
+  InstrumentRepository,
+  LedgerRepository,
+  PriceRepository,
+} from "~/core/ports";
 
 import {
   BatchBuilder,
@@ -6,22 +10,27 @@ import {
   type ImportSummary,
   type MappedBatch,
 } from "../ingest";
-import { groupByRefid, mapGroup } from "./map";
+import { groupByRefid, mapGroup, priceLookupFrom } from "./map";
 import { parseKrakenCsv } from "./row";
 
 export class KrakenCsvAdapter {
   constructor(
     private readonly instruments: InstrumentRepository,
     private readonly ledger: LedgerRepository,
+    private readonly prices: PriceRepository | null = null,
   ) {}
 
-  plan(csv: string): MappedBatch {
+  async plan(csv: string): Promise<MappedBatch> {
     const rows = parseKrakenCsv(csv);
     const groups = groupByRefid(rows);
+    const priceAt = priceLookupFrom(
+      this.prices ? await this.prices.historyFor("BTC") : [],
+    );
+
     const builder = new BatchBuilder();
     for (const group of groups.values()) {
       try {
-        builder.add(mapGroup(group));
+        builder.add(mapGroup(group, priceAt));
       } catch {
         builder.addError();
       }
@@ -30,6 +39,6 @@ export class KrakenCsvAdapter {
   }
 
   async import(csv: string): Promise<ImportSummary> {
-    return persistBatch(this.instruments, this.ledger, this.plan(csv));
+    return persistBatch(this.instruments, this.ledger, await this.plan(csv));
   }
 }

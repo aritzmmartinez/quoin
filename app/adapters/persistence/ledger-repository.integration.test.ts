@@ -79,4 +79,21 @@ describe("PrismaLedgerRepository (integration)", () => {
     const result = await ledgerRepo.append([event("a-1"), event("a-2")]);
     expect(result).toEqual({ inserted: 0, skipped: 2 });
   });
+
+  it("refuses a ledger type the domain does not model", async () => {
+    const { prisma } = await import("./index");
+
+    await expect(
+      prisma.ledgerEntry.create({
+        data: {
+          id: crypto.randomUUID(),
+          ts: new Date("2025-01-01"),
+          type: "FEE",
+          grossAmount: "2.50",
+          currency: "EUR",
+          source: "MANUAL",
+        },
+      }),
+    ).rejects.toThrow(/CHECK constraint failed/);
+  });
 });

@@ -29,7 +29,18 @@ model Instrument {
 model LedgerEntry {
   id     String   @id // uuid
   ts     DateTime // execution timestamp
-  type   String // BUY | SELL | DIVIDEND | FEE | DEPOSIT | WITHDRAWAL | INTEREST | TAX_WITHHOLDING | SPLIT
+  /// BUY | SELL | DIVIDEND | DEPOSIT | WITHDRAWAL | INTEREST — and nothing else.
+  ///
+  /// This list is exactly what `ledgerEventSchema` models, enforced by a CHECK
+  /// constraint because the two must not drift: `rowToEvent` throws on a type it
+  /// cannot read, so a row the database accepts but the domain refuses takes the
+  /// whole app down on the next read, not at the insert that caused it.
+  ///
+  /// FEE, TAX_WITHHOLDING and SPLIT used to be listed here and were never
+  /// modelled. No broker emits them either: Trade Republic reports fees as a
+  /// column on the trade and Kraken as `fee` on the ledger row, which is why
+  /// `fees` and `taxWithheld` are columns rather than event types.
+  type   String
   sleeve String? // CORE | TRADING | null (cash-level movements have no sleeve)
 
   instrumentId String?
@@ -79,6 +90,37 @@ model PriceSnapshot {
   @@index([asOf])
 }
 
+/// A consumer price index level for one month, used to restate past euros in
+/// today's purchasing power.
+///
+/// Append-only and idempotent by (series, period), like PriceSnapshot — with one
+/// difference that earns the extra `base` column: a past PRICE is a fact that
+/// never changes, while a past INDEX LEVEL does. Statistics offices rebase every
+/// few years and republish the whole series against the new reference year, so
+/// the same month arrives with a different number that means the same thing.
+///
+/// Storing the base is what lets `ipc:sync` notice. On a rebase it refuses the
+/// write and says how to replace the series, because the unique constraint alone
+/// would silently keep the old rows and accept the new ones next to them, and
+/// every ratio spanning the boundary would be wrong — in the direction that
+/// looks like a gain.
+model InflationIndex {
+  id     String @id @default(uuid())
+  series String // logical series: "ES" (national) | "BI" (Bizkaia)
+  period String // "YYYY-MM", the month the level refers to
+
+  // Money-like: ALWAYS a String (decimal) -> operated on with decimal.js.
+  indexValue String
+  base       String // reference year the level is 100 in, e.g. "2025"
+
+  source String @default("INE")
+
+  createdAt DateTime @default(now())
+
+  @@unique([series, period]) // idempotent sync: the same month won't duplicate
+  @@index([series])
+}
+
 // A fund's published composition.
 //
 // Unlike PriceSnapshot, this is REPLACE-only, not append-only: a holdings file is
@@ -105,6 +147,47 @@ model EtfHolding {
 
   @@unique([instrumentId, identity])
   @@index([instrumentId])
+}
+
+// The savings plan: what the monthly contribution is SUPPOSED to look like.
+//
+// Versioned by `activeFrom` and never edited in place, for the same reason the
+// ledger is immutable: "what was I aiming at in March" has to stay answerable
+// after the plan changes. A new plan is a new row, and the one in force on a
+// date is the latest `activeFrom` <= that date — resolved by `activeFrom`, the
+// business date, never by `createdAt`, exactly as prices resolve by `asOf`.
+model PortfolioTarget {
+  id         String   @id // uuid
+  name       String
+  activeFrom DateTime // the date this version takes over
+  note       String?
+  createdAt  DateTime @default(now()) // tie-break only: two versions from the same day
+
+  lines PortfolioTargetLine[]
+
+  @@index([activeFrom])
+}
+
+/// One instrument's slice of the monthly contribution.
+///
+/// The AMOUNT is what is planned; the weight is DERIVED from it at read time and
+/// never stored. The savings plan is written in euros per month ("300 into FTSE"),
+/// so the euros are the fact and the percentage is the projection of it — storing
+/// both invites the day they disagree, which is how the fee bug happened.
+model PortfolioTargetLine {
+  id       String          @id @default(uuid())
+  targetId String
+  target   PortfolioTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+  /// Deliberately NOT a relation to Instrument: a plan may name something never
+  /// bought yet, which has no Instrument row until the first trade is imported.
+  instrumentId String
+
+  // Money is ALWAYS a String (decimal) -> operated on with decimal.js.
+  monthlyAmount String
+
+  @@unique([targetId, instrumentId]) // one line per instrument; two would split its weight
+  @@index([targetId])
 }
 
 // Cache of raw identity -> canonical id, so a lookup is paid for once ever.

@@ -1,10 +1,6 @@
-import Decimal from "decimal.js";
-import {
-  Money,
-  type LedgerEvent,
-  type Sleeve,
-  type TradeEvent,
-} from "../domain";
+import { Money, type LedgerEvent, type Revalue, type Sleeve } from "../domain";
+
+import { walkAvco } from "./avco";
 
 export interface Position {
   instrumentId: string;
@@ -13,22 +9,6 @@ export interface Position {
   costBasis: string;
   averageCost: string;
   realizedPnL: string;
-}
-
-interface Accumulator {
-  instrumentId: string;
-  sleeve: Sleeve;
-  quantity: Decimal;
-  costBasis: Money;
-  realizedPnL: Money;
-}
-
-function isTrade(event: LedgerEvent): event is TradeEvent {
-  return event.type === "BUY" || event.type === "SELL";
-}
-
-function keyOf(instrumentId: string, sleeve: Sleeve): string {
-  return `${instrumentId}::${sleeve}`;
 }
 
 /**
@@ -42,66 +22,30 @@ function keyOf(instrumentId: string, sleeve: Sleeve): string {
  * (they belong to separate projections). Positions are keyed by instrument + sleeve
  * so the CORE and TRADING sleeves stay ring-fenced.
  *
+ * The AVCO arithmetic lives in `walkAvco`, shared with `computeRealizedGains` so the
+ * portfolio total and the per-sale breakdown cannot drift apart.
+ *
  * FIFO tax lots are a separate projection (required by tax rules) and intentionally
  * not computed here.
+ *
+ * With a `revalue`, the cost basis comes back in real terms: each purchase is
+ * deflated at its own date inside the walk, never the finished total.
  */
-export function computePositions(events: readonly LedgerEvent[]): Position[] {
-  const trades = events
-    .filter(isTrade)
-    .slice()
-    .sort((a, b) => a.ts.getTime() - b.ts.getTime());
-
-  const accumulators = new Map<string, Accumulator>();
-
-  for (const trade of trades) {
-    const key = keyOf(trade.instrumentId, trade.sleeve);
-    let acc = accumulators.get(key);
-    if (!acc) {
-      acc = {
-        instrumentId: trade.instrumentId,
-        sleeve: trade.sleeve,
-        quantity: new Decimal(0),
-        costBasis: Money.zero(),
-        realizedPnL: Money.zero(),
-      };
-      accumulators.set(key, acc);
-    }
-
-    const quantity = new Decimal(trade.quantity);
-    const gross = Money.fromString(trade.grossAmount).scaleBy(trade.fxToBase);
-    const fees = Money.fromString(trade.fees).scaleBy(trade.fxToBase);
-
-    if (trade.type === "BUY") {
-      acc.costBasis = acc.costBasis.add(gross).add(fees);
-      acc.quantity = acc.quantity.plus(quantity);
-    } else {
-      const averageCost = acc.quantity.isZero()
-        ? Money.zero()
-        : acc.costBasis.divideBy(acc.quantity);
-      const costRemoved = averageCost.scaleBy(quantity);
-      const proceeds = gross.subtract(fees);
-
-      acc.realizedPnL = acc.realizedPnL.add(proceeds).subtract(costRemoved);
-      acc.costBasis = acc.costBasis.subtract(costRemoved);
-      acc.quantity = acc.quantity.minus(quantity);
-
-      if (acc.quantity.isZero()) {
-        acc.costBasis = Money.zero();
-      }
-    }
-  }
-
-  return [...accumulators.values()].map((acc) => {
-    const averageCost = acc.quantity.isZero()
+export function computePositions(
+  events: readonly LedgerEvent[],
+  revalue?: Revalue,
+): Position[] {
+  return [...walkAvco(events, revalue).lots.values()].map((lot) => {
+    const averageCost = lot.quantity.isZero()
       ? Money.zero()
-      : acc.costBasis.divideBy(acc.quantity);
+      : lot.costBasis.divideBy(lot.quantity);
     return {
-      instrumentId: acc.instrumentId,
-      sleeve: acc.sleeve,
-      quantity: acc.quantity.toFixed(),
-      costBasis: acc.costBasis.toString(),
+      instrumentId: lot.instrumentId,
+      sleeve: lot.sleeve,
+      quantity: lot.quantity.toFixed(),
+      costBasis: lot.costBasis.toString(),
       averageCost: averageCost.toString(),
-      realizedPnL: acc.realizedPnL.toString(),
+      realizedPnL: lot.realizedPnL.toString(),
     };
   });
 }

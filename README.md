@@ -9,13 +9,16 @@ and support for the Bizkaia *foral* tax regime that off-the-shelf trackers ignor
 The goal isn't to trade: it's to **understand** a portfolio, and to double as a
 learning project.
 
-> **Status: v0.1.0, actively built.** The immutable ledger, core domain
-> (Money, event types, computePositions with average cost), CSV ingestion
+> **Status: v0.3.0, actively built.** The immutable ledger, core domain
+> (Money, event types, `computePositions` with average cost), CSV and `.xlsx` ingestion
 > (Trade Republic + Kraken), a Yahoo price provider with daily history, the app shell
-> and the summary / holdings / movements / asset-detail / instruments / allocation
-> screens are in place. Look-through works end to end: fund compositions are imported
-> from whatever CSV the issuer publishes, and holdings are matched across issuers by
-> canonical identity. The tax module is next — see the roadmap.
+> and the summary / holdings / movements / asset-detail / instruments / allocation /
+> realised / target screens are in place. Look-through works end to end: fund
+> compositions are imported from whatever the issuer publishes, and holdings are matched
+> across issuers by canonical identity. Returns are reported both time-weighted and
+> money-weighted, per instrument and for the portfolio, and can be read in today's
+> purchasing power against INE's consumer price index. The tax module is next — see the
+> roadmap.
 
 ![Quoin — pantalla de Asignación con look-through](docs/allocation_dark.png)
 
@@ -61,6 +64,8 @@ pnpm exposure:map                 # list how every instrument resolves for look-
 pnpm exposure:map <ISIN> <KIND> [LEAF]           # e.g. XS2183935274 COMMODITY XAU
 pnpm identity:resolve             # give holdings a canonical id so duplicates merge
 pnpm identity:resolve --report    # what merged, and what is still ambiguous
+pnpm ipc:sync                     # INE consumer price index (national + Bizkaia)
+pnpm target:set [<file>]          # show, or record a version of, the savings plan
 ```
 
 Fund compositions are imported from the **Instrumentos** screen: drop the issuer's
@@ -72,6 +77,13 @@ for it on purpose.
 Quote symbols and exposure classifications live only in your local database (never in
 the repo), so a public clone never discloses your holdings. Prefer EUR venues (`.DE`,
 `.AS`, `.MC`) to avoid FX for now.
+
+Two databases, on purpose. `data/quoin.sqlite` is the ledger — real trades, and the only
+thing here that cannot be regenerated. `data/dev.sqlite` is scratch: point `DATABASE_URL`
+at it, run `pnpm db:seed` for a synthetic portfolio, and develop against that. Commands
+that destroy data refuse to run against the ledger, and refuse just as firmly when they
+cannot tell which database they have been handed. Take a snapshot with `pnpm db:backup`
+before anything you have not done before.
 
 `exposure:map` exists because brokers do not report what a fund actually is: Trade
 Republic labels both equity ETFs and physical-gold ETCs as `FUND`, so an ETC arrives
@@ -99,6 +111,9 @@ pnpm run lint           # eslint (includes the layer boundaries)
 pnpm run build          # production build
 pnpm run db:generate    # regenerate the Prisma client after a schema change
 pnpm run db:studio      # Prisma Studio (GUI to inspect the data)
+pnpm run db:backup      # VACUUM INTO data/backups/, keeping the last 30
+pnpm run db:seed        # synthetic portfolio -> the scratch database
+pnpm twr:explain        # audit the portfolio TWR chain link by link, worst first
 pnpm test               # Vitest (pure domain / projection / mapper tests)
 pnpm run test:integration   # migrations against a temporary SQLite database
 ```
@@ -126,7 +141,12 @@ on with decimal.js; data and secrets are never committed.
 - [x] Generic holdings parser: one parser for every issuer, no per-provider rules
 - [x] Allocation screen: true look-through, direct vs via-fund attribution, concentration threshold
 - [x] Canonical identity via OpenFIGI, so a company held directly and inside a fund counts once
-- [ ] Read `.xlsx` holdings directly (most issuers publish Excel, not CSV)
+- [x] Read `.xlsx` holdings directly (most issuers publish Excel, not CSV)
+- [x] Ledger safety: scratch database, synthetic seed, verified `VACUUM INTO` backups
+- [x] Realised P&L broken down by sale (AVCO at the instant of each sale)
+- [x] Portfolio target: the savings plan, versioned by the date it took effect
+- [x] Real returns: a nominal/real switch backed by INE's monthly consumer price index
+- [x] Portfolio-level TWR and MWR, with an XIRR solver that refuses rather than guesses
 - [ ] Trading sleeve, watchlist and trade journal
 - [ ] Bizkaia foral tax module (FIFO lots)
 - [ ] DCF valuation module

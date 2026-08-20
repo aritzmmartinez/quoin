@@ -27,6 +27,24 @@ export const es = {
     y1: "1A",
     all: "Todo",
   },
+  basis: {
+    label: "Base de cálculo",
+    nominal: "Nominal",
+    real: "Real",
+    nominalHint: "Euros corrientes, sin ajustar por inflación",
+    realHint: "Euros ajustados por el IPC",
+    reference: (period: string): string => `en euros de ${period}`,
+    synced: (relative: string): string => `IPC actualizado ${relative}`,
+    neverSynced: "IPC sin fecha de actualización",
+    perFlow:
+      "Cada aportación se ajusta con el IPC de su propio mes, no el total de golpe.",
+    lag: "El valor de mercado es el de hoy: el IPC del mes en curso aún no está publicado, así que la referencia va unas semanas por detrás.",
+    noIndex:
+      "No hay datos de IPC guardados. Ejecuta pnpm ipc:sync para descargarlos del INE.",
+    gaps: (periods: string): string =>
+      `Faltan datos de IPC para ${periods}. No se ajusta nada: rellenar un hueco por interpolación inventaría un nivel de precios que nadie ha medido. Vuelve a ejecutar pnpm ipc:sync.`,
+    showingNominal: "Se muestran importes nominales.",
+  },
   pagination: {
     label: "Paginación",
     previous: "Página anterior",
@@ -61,6 +79,14 @@ export const es = {
       unrealized: { label: "P&L latente", sub: "Valor menos aportado" },
       realized: { label: "P&L realizado", sub: "Beneficio de ventas cerradas" },
       positions: { label: "Posiciones", sub: "Abiertas y valoradas" },
+    },
+    returns: {
+      twr: { label: "TWR", sub: "ponderada por tiempo" },
+      mwr: { label: "MWR / TIR", sub: "ponderada por dinero" },
+      unavailable: "sin solución",
+      note: "El TWR mide cómo lo han hecho los activos; el MWR (TIR) mide cómo lo ha hecho tu dinero. Aportando poco a poco divergen a propósito: la mayor parte del capital lleva menos tiempo invertido, así que una subida antigua pesa entera en el TWR y casi nada en el MWR.",
+      nominal:
+        "Ambas se calculan siempre en euros nominales, aunque el resto de la pantalla esté en poder adquisitivo de hoy.",
     },
     allocation: {
       title: "Asignación",
@@ -185,6 +211,48 @@ export const es = {
     closed: "Cerrada",
     empty: "Sin instrumentos. Importa tus operaciones con pnpm ingest.",
   },
+  target: {
+    title: "Objetivo",
+    intro:
+      "Tu plan de aportación mensual. Los importes son el dato; el peso se deriva de ellos. Un objetivo no se edita: cuando el plan cambia, guardas una versión nueva con su fecha de vigencia, para que siga sabiéndose qué objetivo estaba vigente en cada fecha.",
+    none: "Aún no hay ningún objetivo guardado. Crea la primera versión abajo o usa pnpm target:set.",
+    activeFrom: (date: string): string => `Vigente desde el ${date}`,
+    columns: {
+      instrument: "Instrumento",
+      amount: "Importe mensual",
+      weight: "Peso",
+    },
+    total: "Total mensual",
+    notHeld: "Sin posición todavía",
+    notImported: "Sin importar todavía",
+    history: {
+      title: "Versiones",
+      active: "Vigente",
+      summary: (lines: number, total: string): string =>
+        `${lines} ${lines === 1 ? "línea" : "líneas"} · ${total} al mes`,
+      delete: "Eliminar",
+      deleting: "…",
+      empty: "Sin versiones.",
+    },
+    form: {
+      title: "Nueva versión",
+      name: "Nombre",
+      namePlaceholder: "Plan de aportación",
+      activeFrom: "Vigente desde",
+      note: "Nota",
+      notePlaceholder: "Por qué cambia el plan",
+      lines: "Líneas",
+      linesHint:
+        "Una por línea: identificador del instrumento e importe mensual. Puedes incluir un instrumento que aún no tengas en cartera.",
+      linesPlaceholder: "IE00B3RBWM25 300\nIE00BKM4GZ66 75",
+      submit: "Guardar versión",
+      saving: "Guardando…",
+      invalid: "Datos no válidos.",
+      idMismatch: (pairs: string): string =>
+        `No se ha guardado nada. Estos identificadores no coinciden con los importados: ${pairs}. Una línea se une a su instrumento por identificador exacto, así que nunca resolverían.`,
+      saveFailed: "No se ha podido guardar la versión.",
+    },
+  },
   movements: {
     title: "Movimientos",
     summary: (count: number, net: string): string =>
@@ -253,6 +321,35 @@ export const es = {
       by: (column: string): string => `Ordenar por ${column}`,
       asc: "orden ascendente",
       desc: "orden descendente",
+    },
+  },
+  realized: {
+    title: "Realizado",
+    intro:
+      "Cada venta cerrada, con el coste que consumió en el momento de venderla. Las comisiones de compra ya van dentro del coste; las de venta se restan del bruto.",
+    avcoWarning:
+      "Cálculo AVCO (coste medio ponderado), el mismo criterio que la cartera. No coincide con el criterio fiscal FIFO: en la declaración cada venta se empareja con las compras más antiguas, así que el resultado por operación será otro.",
+    summary: (count: number, result: string): string =>
+      `${count} ${count === 1 ? "venta" : "ventas"} · ${result} de resultado`,
+    columns: {
+      date: "Fecha",
+      name: "Instrumento",
+      quantity: "Uds",
+      price: "Precio",
+      grossAmount: "Bruto",
+      fees: "Comisiones",
+      costBasis: "Coste",
+      realizedPnL: "Resultado",
+      returnPct: "%",
+      holdingDays: "Días",
+    },
+    days: (count: number): string => `${count} d`,
+    sales: (count: number): string =>
+      `${count} ${count === 1 ? "venta" : "ventas"}`,
+    total: "Total",
+    empty: {
+      title: "Sin ventas todavía",
+      body: "Cuando vendas algo, aquí aparecerá el resultado de cada operación.",
     },
   },
   instrument: {

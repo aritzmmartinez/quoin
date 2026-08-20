@@ -11,6 +11,8 @@ export default [
     route("cartera", "routes/portfolio.tsx"),
     route("asignacion", "routes/allocation.tsx"),
     route("movimientos", "routes/movements.tsx"),
+    route("realizado", "routes/realized.tsx"),
+    route("objetivo", "routes/target.tsx"),
     route("instrumentos", "routes/instruments.tsx"),
     route("instrument/:instrumentId", "routes/instrument.tsx"),
   ]),

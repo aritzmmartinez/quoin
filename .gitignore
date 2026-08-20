@@ -5,6 +5,9 @@
 /.react-router/
 /build/
 
+# Agent settings: the project file is committed, personal overrides are not
+/.claude/settings.local.json
+
 # Secrets and environment — NEVER committed
 .env
 .env.local

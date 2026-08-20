@@ -7,11 +7,13 @@ import {
 } from "~/adapters/persistence";
 import {
   AllocationCard,
+  BasisNotice,
   Card,
   PortfolioEmpty,
   PortfolioError,
   PortfolioValueChart,
   SummaryHero,
+  SummaryReturns,
   SummaryStats,
   TopPositionsCard,
   type AllocationRow,
@@ -22,6 +24,7 @@ import {
   computeInvestedVsValueSeries,
   computeMarketValues,
   computePortfolioInvestedVsValueSeries,
+  computePortfolioReturns,
   computePortfolioSummary,
   computePositions,
   computeTopPositions,
@@ -34,7 +37,12 @@ import {
   parseRange,
 } from "~/lib";
 
-import { BASE_CURRENCY, type InstrumentType } from "~/core/domain";
+import {
+  BASE_CURRENCY,
+  type InstrumentType,
+  type Revalue,
+} from "~/core/domain";
+import { resolveRealView } from "~/lib/real.server";
 
 const TOP_POSITIONS = 5;
 
@@ -45,7 +53,7 @@ export function meta(_: Route.MetaArgs) {
   ];
 }
 
-export const handle = { title: es.summary.title, range: true };
+export const handle = { title: es.summary.title, range: true, basis: true };
 
 export async function loader({ request }: Route.LoaderArgs) {
   const range = parseRange(new URL(request.url).searchParams);
@@ -57,7 +65,8 @@ export async function loader({ request }: Route.LoaderArgs) {
     priceRepository.latest(),
   ]);
 
-  const positions = computePositions(events);
+  const real = await resolveRealView(request, events);
+  const positions = computePositions(events, real.revalue);
   const marketValues = computeMarketValues(positions, prices, BASE_CURRENCY);
   const summary = computePortfolioSummary(positions, marketValues);
 
@@ -92,31 +101,49 @@ export async function loader({ request }: Route.LoaderArgs) {
   );
 
   const now = new Date();
-  const seriesByInstrument = heldIds.map((id, index) =>
-    computeInvestedVsValueSeries(
-      events,
-      id,
-      (histories[index] ?? [])
-        .filter((snapshot) => snapshot.currency === BASE_CURRENCY)
-        .map((snapshot) => ({ asOf: snapshot.asOf, price: snapshot.price })),
-      prices.get(id)?.currency === BASE_CURRENCY
-        ? (prices.get(id)?.price ?? null)
-        : null,
-      now,
-    ),
-  );
+  const buildSeries = (revalue?: Revalue) =>
+    computePortfolioInvestedVsValueSeries(
+      heldIds.map((id, index) =>
+        computeInvestedVsValueSeries(
+          events,
+          id,
+          (histories[index] ?? [])
+            .filter((snapshot) => snapshot.currency === BASE_CURRENCY)
+            .map((snapshot) => ({
+              asOf: snapshot.asOf,
+              price: snapshot.price,
+            })),
+          prices.get(id)?.currency === BASE_CURRENCY
+            ? (prices.get(id)?.price ?? null)
+            : null,
+          now,
+          revalue,
+        ),
+      ),
+    );
 
-  const series = filterByRange(
-    computePortfolioInvestedVsValueSeries(seriesByInstrument),
-    range,
-    now,
+  const portfolioSeries = buildSeries(real.revalue);
+  const series = filterByRange(portfolioSeries, range, now);
+
+  const returns = computePortfolioReturns(
+    events,
+    real.revalue ? buildSeries() : portfolioSeries,
   );
 
   return {
     summary,
+    returns,
     allocation,
     top,
     range,
+    real: {
+      basis: real.basis,
+      active: real.active,
+      reference: real.reference,
+      missing: real.missing,
+      hasIndex: real.hasIndex,
+      syncedAt: real.syncedAt,
+    },
     change: computeHeroChange(range, series, summary),
     series: series.map((point) => ({
       t: point.t,
@@ -127,7 +154,8 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export default function Summary({ loaderData }: Route.ComponentProps) {
-  const { summary, allocation, top, range, change, series } = loaderData;
+  const { summary, returns, allocation, top, range, change, series, real } =
+    loaderData;
   const hasPositions = summary.pricedCount > 0 || summary.unpricedCount > 0;
 
   if (!hasPositions) {
@@ -142,6 +170,8 @@ export default function Summary({ loaderData }: Route.ComponentProps) {
 
   return (
     <>
+      <BasisNotice {...real} />
+
       <SummaryHero
         totalValue={summary.totalValue}
         changeAbs={change.abs}
@@ -158,6 +188,12 @@ export default function Summary({ loaderData }: Route.ComponentProps) {
         unrealizedPnL={summary.unrealizedPnL}
         realizedPnL={summary.realizedPnL}
         positionCount={summary.pricedCount}
+      />
+
+      <SummaryReturns
+        twr={returns.twr}
+        mwr={returns.mwr}
+        realBasis={real.active}
       />
 
       <div

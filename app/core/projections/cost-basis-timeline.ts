@@ -1,6 +1,11 @@
 import Decimal from "decimal.js";
 
-import { Money, type LedgerEvent, type TradeEvent } from "../domain";
+import {
+  Money,
+  type LedgerEvent,
+  type Revalue,
+  type TradeEvent,
+} from "../domain";
 
 export interface CostBasisPoint {
   ts: string;
@@ -27,7 +32,10 @@ function isTrade(event: LedgerEvent): event is TradeEvent {
 export function computeCostBasisTimeline(
   events: readonly LedgerEvent[],
   instrumentId: string,
+  revalue?: Revalue,
 ): CostBasisPoint[] {
+  const restate: Revalue = revalue ?? ((money) => money);
+
   const trades = events
     .filter(isTrade)
     .filter((t) => t.instrumentId === instrumentId)
@@ -40,8 +48,14 @@ export function computeCostBasisTimeline(
 
   for (const trade of trades) {
     const tradeQty = new Decimal(trade.quantity);
-    const gross = Money.fromString(trade.grossAmount).scaleBy(trade.fxToBase);
-    const fees = Money.fromString(trade.fees).scaleBy(trade.fxToBase);
+    const gross = restate(
+      Money.fromString(trade.grossAmount).scaleBy(trade.fxToBase),
+      trade.ts,
+    );
+    const fees = restate(
+      Money.fromString(trade.fees).scaleBy(trade.fxToBase),
+      trade.ts,
+    );
     const tradePrice = tradeQty.isZero()
       ? Money.zero()
       : gross.divideBy(tradeQty);

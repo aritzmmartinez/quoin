@@ -1,5 +1,6 @@
 {
   "name": "quoin",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,11 +12,16 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
+    "db:backup": "tsx scripts/db-backup.ts",
+    "db:seed": "tsx scripts/db-guard.ts \"seed the demo database\" && prisma migrate deploy && tsx scripts/seed-demo.ts",
     "ingest": "tsx scripts/ingest.ts",
     "prices:sync": "tsx scripts/prices-sync.ts",
     "prices:map": "tsx scripts/prices-map.ts",
     "prices:backfill": "tsx scripts/prices-backfill.ts",
+    "ipc:sync": "tsx scripts/ipc-sync.ts",
     "exposure:map": "tsx scripts/exposure-map.ts",
+    "target:set": "tsx scripts/target-set.ts",
+    "twr:explain": "tsx scripts/twr-explain.ts",
     "identity:resolve": "tsx scripts/identity-resolve.ts",
     "postinstall": "prisma generate",
     "test": "vitest run",
