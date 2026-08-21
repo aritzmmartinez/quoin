@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import Decimal from "decimal.js";
+import { Link } from "react-router";
 import { z } from "zod";
 
 import type { Route } from "./+types/target";
@@ -157,6 +158,14 @@ export default function Target({ loaderData }: Route.ComponentProps) {
     <main className="mx-auto max-w-4xl px-4 py-8 md:px-6">
       <header className="mb-4">
         <p className="text-[13px] text-muted">{copy.intro}</p>
+        {active && (
+          <Link
+            to="/proyeccion"
+            className="mt-2 inline-block text-[12.5px] text-muted underline decoration-dotted underline-offset-2 transition-colors hover:text-text"
+          >
+            {es.projection.fromTarget}
+          </Link>
+        )}
       </header>
 
       <Card className="mb-6">

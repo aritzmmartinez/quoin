@@ -39,6 +39,7 @@ export * from "./summary/SummaryStats";
 export * from "./summary/SummaryReturns";
 export * from "./summary/AllocationCard";
 export * from "./summary/TopPositionsCard";
+export * from "./projection/ProjectionPanel";
 export * from "./target/TargetLines";
 export * from "./target/TargetVersions";
 export * from "./target/TargetForm";

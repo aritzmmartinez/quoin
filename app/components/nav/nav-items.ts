@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   PieChart,
   Target,
+  TrendingUp,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
@@ -23,5 +24,6 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { label: es.nav.allocation, icon: PieChart, to: "/asignacion" },
   { label: es.nav.movements, icon: ArrowLeftRight, to: "/movimientos" },
   { label: es.target.title, icon: Target, to: "/objetivo" },
+  { label: es.projection.title, icon: TrendingUp, to: "/proyeccion" },
   { label: es.nav.instruments, icon: Boxes, to: "/instrumentos" },
 ];

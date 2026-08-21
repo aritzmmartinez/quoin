@@ -301,6 +301,104 @@ export const es = {
       saveFailed: "No se ha podido guardar la versión.",
     },
   },
+  projection: {
+    title: "Proyección",
+    intro:
+      "Si sigues aportando según tu plan vigente, dónde podría acabar la cartera. No es una previsión: es un remuestreo de los meses que tus propios instrumentos ya han vivido. Por eso responde con un rango y no con una cifra — una única línea fingiría conocer el futuro.",
+    noTarget:
+      "No hay ningún objetivo vigente que proyectar. Define tu plan de aportación en Objetivo y vuelve aquí.",
+    fromTarget: "simula tu plan actual →",
+    noHistory:
+      "Ninguna línea de tu plan tiene histórico de precios, así que no hay nada que remuestrear. Mapea sus símbolos con pnpm prices:map y descarga el histórico con pnpm prices:backfill.",
+    noWindow:
+      "Las líneas de tu plan no comparten ni un solo mes de histórico, así que no hay ventana común que remuestrear. Amplía el histórico más corto con pnpm prices:backfill.",
+    thinWindow: {
+      title: "Sin cifras todavía: la ventana es demasiado corta",
+      body: (months: number, minimum: number, instrument: string): string =>
+        `Tus líneas comparten ${months} ${months === 1 ? "mes" : "meses"} de histórico y hacen falta ${minimum}. La ventana la recorta ${instrument}, que es la que menos historial tiene.`,
+      why: (months: number, years: number): string =>
+        `No es un aviso que puedas saltarte: remuestrear ${months} meses de un tramo de mercado concreto y componerlos ${years * 12} meses hacia delante no proyecta tu cartera, extrapola ese tramo. Un número así se lee como una previsión por mucho que lleve una nota debajo, y decidir cuánto aportas sobre él sería decidirlo sobre esos ${months} meses.`,
+      fix: (instrument: string): string =>
+        `Ejecuta pnpm prices:backfill sobre ${instrument} (por defecto trae 5 años) y vuelve. En cuanto la ventana llegue al mínimo, la pantalla da cifras.`,
+    },
+    form: {
+      horizon: "Horizonte (años)",
+      contribution: "Aportación mensual",
+      goal: "Objetivo (opcional)",
+      goalPlaceholder: "1.000.000",
+      submit: "Proyectar",
+    },
+    bands: {
+      title: (years: number): string =>
+        years === 1 ? "Dentro de 1 año" : `Dentro de ${years} años`,
+      p10: "Escenario malo",
+      p50: "Escenario central",
+      p90: "Escenario bueno",
+      p10Hint:
+        "Percentil 10: una de cada diez simulaciones acaba por debajo de esta cifra.",
+      p50Hint:
+        "Percentil 50: la mitad de las simulaciones acaba por encima y la mitad por debajo. Es la mediana, no un promedio.",
+      p90Hint:
+        "Percentil 90: solo una de cada diez simulaciones acaba por encima de esta cifra.",
+      real: (amount: string): string => `${amount} en euros de hoy`,
+      noReal:
+        "Sin datos de IPC no se puede expresar en euros de hoy. Ejecuta pnpm ipc:sync.",
+    },
+    contributed: (amount: string): string =>
+      `De ahí, ${amount} sale de tu bolsillo: lo que ya tienes simulado más todas las aportaciones del horizonte.`,
+    method: {
+      title: "Cómo se ha calculado",
+      window: (months: number, instrument: string): string =>
+        `Se remuestrean ${months} meses de histórico, la ventana que comparten todas las líneas del plan. La recorta ${instrument}, que es la que menos historial tiene: rellenar los meses que le faltan sería inventarlos.`,
+      drift: (annual: string, years: number): string =>
+        `Esa ventana compone un ${annual} anual, y es la deriva que el remuestreo extrapola ${years} ${years === 1 ? "año" : "años"} hacia delante. Si te parece alta para un plazo largo, lo es: mira ese número antes que el titular.`,
+      simulations: (count: number, seed: number): string =>
+        `${count} simulaciones, semilla ${seed}: los mismos datos dan siempre el mismo resultado.`,
+      inflation: (annual: string): string =>
+        `El importe en euros de hoy descuenta un ${annual} anual, la media histórica del IPC. No hay IPC futuro, así que se asume que la inflación también se parece a su pasado.`,
+      fixedWeights:
+        "Los pesos del plan se mantienen fijos durante todo el horizonte y las aportaciones entran a principio de mes.",
+      twoPots: (offPlan: string): string =>
+        `La parte de fuera del plan que llega a la ventana (${offPlan}) se simula aparte, con sus propios rendimientos y sin recibir aportaciones — prestarle la varianza del plan a otra cosa sería inventarse su riesgo. Ambos botes avanzan sobre el mismo mes sorteado, así que un mal mes lo es para toda la cartera a la vez.`,
+      allOffPlanExcluded:
+        "El bote de fuera del plan queda vacío, y no porque no tengas nada fuera del plan: es que nada de lo que tienes ahí llega a la ventana, así que todo ello queda sin simular — lo tienes detallado arriba, con su importe.",
+      noOffPlan:
+        "Todo lo que tienes en cartera lo nombra el plan, así que no hay nada que simular aparte.",
+    },
+    excluded: (names: string, coverage: string): string =>
+      `Sin histórico de precios, así que quedan fuera de la simulación: ${names}. Los pesos restantes se reparten el 100%, de modo que lo proyectado es el ${coverage} de tu plan, no el plan entero. Ejecuta pnpm prices:backfill antes de fiarte del rango.`,
+    unsimulated: (names: string, amount: string): string =>
+      `${amount} en posiciones fuera del plan con menos histórico que la ventana: ${names}. No entran en las cifras de arriba ni se suman al final. Congelarlas veinte años a un 0% sería una afirmación tan falsa como prestarles el rendimiento del plan; que el plan fije la ventana es lo que evita que una compra reciente la encoja para todo lo demás.`,
+    unpriced: (count: number): string =>
+      count === 1
+        ? "1 posición sin precio utilizable queda fuera del valor de partida. Un precio que falta no es un valor de cero."
+        : `${count} posiciones sin precio utilizable quedan fuera del valor de partida. Un precio que falta no es un valor de cero.`,
+    goal: {
+      title: (amount: string): string => `Para llegar a ${amount}`,
+      contribution: (amount: string, years: number): string =>
+        `Aportando ${amount} al mes, el escenario central alcanza el objetivo en ${years === 1 ? "1 año" : `${years} años`}.`,
+      contributionUnreachable:
+        "No hay aportación mensual que lleve el escenario central hasta ahí en este horizonte. Alarga el plazo o baja el objetivo.",
+      horizon: (amount: string, horizon: string): string =>
+        `Con ${amount} al mes, el escenario central llega al objetivo en ${horizon}.`,
+      horizonNow: "Ya lo has alcanzado: tu cartera vale más que el objetivo.",
+      horizonUnreachable:
+        "Con esa aportación el escenario central no llega al objetivo ni en un siglo.",
+      caveat:
+        "Ambas respuestas apuntan a la mediana. Que el escenario central llegue no significa que vayas a llegar: la mitad de las simulaciones acaban por debajo.",
+    },
+    horizonLabel: (months: number): string => {
+      const years = Math.floor(months / 12);
+      const rest = months % 12;
+      const y = years === 1 ? "1 año" : `${years} años`;
+      const m = rest === 1 ? "1 mes" : `${rest} meses`;
+      if (years === 0) return m;
+      if (rest === 0) return y;
+      return `${y} y ${m}`;
+    },
+    hypothesis:
+      "Es una simulación, no una promesa: no se guarda nada y ningún rendimiento pasado obliga al futuro.",
+  },
   movements: {
     title: "Movimientos",
     summary: (count: number, net: string): string =>

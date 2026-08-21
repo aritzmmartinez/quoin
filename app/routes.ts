@@ -13,6 +13,7 @@ export default [
     route("movimientos", "routes/movements.tsx"),
     route("realizado", "routes/realized.tsx"),
     route("objetivo", "routes/target.tsx"),
+    route("proyeccion", "routes/projection.tsx"),
     route("instrumentos", "routes/instruments.tsx"),
     route("instrument/:instrumentId", "routes/instrument.tsx"),
   ]),

@@ -6,6 +6,7 @@ export * from "./instruments";
 export * from "./movements";
 export * from "./pagination";
 export * from "./portfolio";
+export * from "./projection";
 export * from "./range";
 export * from "./realized";
 export * from "./rebalance";

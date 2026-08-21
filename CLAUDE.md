@@ -328,6 +328,33 @@ manual aliasing was abandoned — 726 confirmations is not a system.
   clamping each term at zero can only raise the sum. The total deficit is therefore
   always ≥ the contribution. A contribution big enough to fill every deficit is one
   that lands every line exactly on its ideal with nothing left over.
+- **`computeProjection` simulates two pots and they never merge.** The planned pot
+  takes the contributions at target weights; everything else held compounds at its own
+  weights and is never funded. Applying the plan's return distribution to money sitting
+  in something the plan does not name is the same error as pro-rating an `UNRESOLVED`
+  leaf. Both pots advance on **the same drawn month index** — drawing separately would
+  assume the two halves of the portfolio are independent and understate a bad month.
+- **The plan fixes the bootstrap window; off-plan positions only qualify for it.** A
+  held position either covers every month of that window or is reported with its value
+  in `unsimulatedValue` and left out. Otherwise a purchase made last month would shrink
+  the window the whole projection rests on. Set-aside value is **not** added flat to the
+  percentiles either: freezing a real asset at 0% for twenty years is as false a claim
+  as lending it the plan's returns.
+- **Below `MIN_WINDOW_MONTHS` (60) the screen prints no number at all.** Same rule as a
+  CPI hole disabling real mode. `projectionWindow` is exported precisely so the refusal
+  can name the limiting instrument without simulating anything. Above the threshold,
+  `impliedAnnualReturn` — the annualised drift of the sampled window — stays on screen:
+  sixty months can still sit entirely inside one rally, and that number is what makes it
+  visible. Do not "helpfully" downgrade the refusal to a warning.
+- **Lowering `MIN_WINDOW_MONTHS` to see the other branch is a one-way trip if you forget.**
+  No other test routes through the constant — each builds its own window — so a leftover
+  `= 12` passes the entire suite while the refusal quietly stops refusing. A test pins the
+  value at 60 for exactly that reason. If it fails, the question is whether the policy
+  changed on purpose, never whether the assertion is in the way.
+- **The projection loop is the one place floats are allowed.** It reports a guess, not a
+  fact, and a Monte Carlo median quoted to the cent claims a precision the method lacks.
+  `Money` still guards the boundaries. This is not licence to relax the money rules
+  anywhere that reports what actually happened.
 - **`computePortfolioReturns` is nominal even when the basis switch says real.** Its flows
   are the euros that left the bank, so deflating the value series without them would quote
   a real return against nominal money. The Resumen loader builds a second, un-deflated
