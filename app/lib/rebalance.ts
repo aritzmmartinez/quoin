@@ -7,11 +7,12 @@ import {
 } from "~/core/domain";
 import {
   computeRebalance,
-  tradeMetaKey,
   type MarketValue,
   type Position,
   type RebalanceLine,
 } from "~/core/projections";
+
+import { heldValuesByInstrument } from "./portfolio";
 
 export const DEFAULT_DRIFT_THRESHOLD = "0.02";
 export const CONTRIBUTION_PARAM = "aportacion";
@@ -22,8 +23,11 @@ const FORM_OWNED: readonly string[] = [
   DRIFT_THRESHOLD_PARAM,
 ];
 
-export function carriedParams(params: URLSearchParams): [string, string][] {
-  return [...params].filter(([key]) => !FORM_OWNED.includes(key));
+export function carriedParams(
+  params: URLSearchParams,
+  owned: readonly string[] = FORM_OWNED,
+): [string, string][] {
+  return [...params].filter(([key]) => !owned.includes(key));
 }
 
 export function parseDriftThreshold(params: URLSearchParams): string {
@@ -83,11 +87,6 @@ export interface RebalancePlan {
   offPlan: OffPlanRow[];
 }
 
-interface Held {
-  value: Decimal;
-  unpriced: boolean;
-}
-
 export function buildRebalancePlan(
   target: PortfolioTarget,
   positions: readonly Position[],
@@ -99,20 +98,7 @@ export function buildRebalancePlan(
   const byId = new Map(instruments.map((i) => [i.id, i]));
   const nameOf = (id: string): string => byId.get(id)?.name ?? id;
 
-  const held = new Map<string, Held>();
-  for (const position of positions) {
-    if (!new Decimal(position.quantity).gt(0)) continue;
-    const market = marketValues.get(
-      tradeMetaKey(position.instrumentId, position.sleeve),
-    );
-    const entry = held.get(position.instrumentId) ?? {
-      value: new Decimal(0),
-      unpriced: false,
-    };
-    if (market?.marketValue == null) entry.unpriced = true;
-    else entry.value = entry.value.plus(market.marketValue);
-    held.set(position.instrumentId, entry);
-  }
+  const held = heldValuesByInstrument(positions, marketValues);
 
   const weights = deriveTargetWeights(target);
   const planned = new Set(weights.map((w) => w.instrumentId));
