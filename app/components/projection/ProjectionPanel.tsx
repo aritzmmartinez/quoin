@@ -349,6 +349,7 @@ function Method({ view }: { view: ProjectionView }) {
           )}
         </li>
         <li>{copy.simulations(result.simulations, result.seed)}</li>
+        <li>{copy.tailNoise(result.simulations, result.windowMonths)}</li>
         {view.annualInflation !== null && (
           <li>{copy.inflation(formatPercent(view.annualInflation, 2))}</li>
         )}

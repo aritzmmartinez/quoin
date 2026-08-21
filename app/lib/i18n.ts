@@ -348,7 +348,7 @@ export const es = {
       p50Hint:
         "Percentil 50: la mitad de las simulaciones acaba por encima y la mitad por debajo. Es la mediana, no un promedio.",
       p90Hint:
-        "Percentil 90: solo una de cada diez simulaciones acaba por encima de esta cifra.",
+        "Percentil 90: solo una de cada diez simulaciones acaba por encima de esta cifra. Es la que se estima con menos caminos, así que es la que más se mueve al cambiar de semilla.",
       real: (amount: string): string => `${amount} en euros de hoy`,
       noReal:
         "Sin datos de IPC no se puede expresar en euros de hoy. Ejecuta pnpm ipc:sync.",
@@ -363,6 +363,8 @@ export const es = {
         `Esa ventana compone un ${annual} anual, y es la deriva que el remuestreo extrapola ${years} ${years === 1 ? "año" : "años"} hacia delante. Si te parece alta para un plazo largo, lo es: mira ese número antes que el titular.`,
       simulations: (count: number, seed: number): string =>
         `${count} simulaciones, semilla ${seed}: los mismos datos dan siempre el mismo resultado.`,
+      tailNoise: (simulations: number, months: number): string =>
+        `De las tres cifras, la del escenario bueno es la menos firme: cambiando solo la semilla se mueve unas cuatro veces más que las otras dos. No es la ventana quien la limita — las tres se estrechan al mismo ritmo al subir las simulaciones —, es que una cola se estima con muchos menos caminos que la mediana. Se arregla con más simulaciones, solo que hace falta más de un orden de magnitud sobre las ${simulations} de aquí, y eso encarecería cada respuesta a un objetivo. Sería reproducibilidad, no acierto: lo que limitan ${months} meses de muestra es la exactitud de las tres cifras a la vez, no la firmeza de esta.`,
       inflation: (annual: string): string =>
         `El importe en euros de hoy descuenta un ${annual} anual, la media histórica del IPC. No hay IPC futuro, así que se asume que la inflación también se parece a su pasado.`,
       fixedWeights:

@@ -80,7 +80,7 @@ describe("toMonthlyReturns", () => {
 
 describe("DEFAULT_SIMULATIONS", () => {
   it("is pinned, so it moves only when pnpm projection:converge says it should", () => {
-    expect(DEFAULT_SIMULATIONS).toBe(3000);
+    expect(DEFAULT_SIMULATIONS).toBe(10000);
   });
 });
 

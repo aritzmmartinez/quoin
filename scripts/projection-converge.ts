@@ -17,7 +17,7 @@ import { databasePath } from "./lib/db-target";
 const TARGET_SPREAD = 0.01;
 
 const DEFAULT_SIMS = [1000, 3000, 10000, 30000];
-const DEFAULT_SEEDS = 8;
+const DEFAULT_SEEDS = 24;
 const DEFAULT_HORIZON_MONTHS = 240;
 
 function flag(name: string): string | undefined {
@@ -47,22 +47,71 @@ const SIMS = (flag("sims") ?? DEFAULT_SIMS.join(",")).split(",").map((part) => {
 });
 
 interface Spread {
-  min: number;
-  max: number;
   median: number;
   spread: number;
 }
 
+const KEYS = ["p10", "p50", "p90"] as const;
+type Key = (typeof KEYS)[number];
+type Row = Record<Key, Spread>;
+
+const N_LIMITED_EXPONENT = -0.5;
+const EXPONENT_TOLERANCE = 0.2;
+const MIN_GRID = 3;
+const MIN_SEEDS_TO_JUDGE = 16;
+
+function exponentOf(
+  key: Key,
+  ordered: readonly [number, Row][],
+): number | null {
+  const points = ordered.filter(([, row]) => row[key].spread > 0);
+  if (points.length < MIN_GRID) return null;
+
+  const xs = points.map(([n]) => Math.log(n));
+  const ys = points.map(([, row]) => Math.log(row[key].spread));
+  const meanX = xs.reduce((sum, x) => sum + x, 0) / xs.length;
+  const meanY = ys.reduce((sum, y) => sum + y, 0) / ys.length;
+
+  let covariance = 0;
+  let variance = 0;
+  for (let i = 0; i < xs.length; i += 1) {
+    const dx = (xs[i] ?? 0) - meanX;
+    covariance += dx * ((ys[i] ?? 0) - meanY);
+    variance += dx * dx;
+  }
+  return variance === 0 ? null : covariance / variance;
+}
+
+function plateau(key: Key, ordered: readonly [number, Row][]): string {
+  const slope = exponentOf(key, ordered);
+  if (slope === null) return "";
+
+  const shape = ` — spread falls as N^${slope.toFixed(2)}`;
+  if (SEEDS < MIN_SEEDS_TO_JUDGE) return `${shape} (too few seeds to judge)`;
+  if (slope <= N_LIMITED_EXPONENT + EXPONENT_TOLERANCE) return shape;
+
+  return (
+    `${shape}, slower than the N^${N_LIMITED_EXPONENT.toFixed(2)} of an estimate that ` +
+    `only wants more draws, so this one is window-limited, not N-limited`
+  );
+}
+
 function spreadOf(values: readonly number[]): Spread {
   const sorted = [...values].sort((a, b) => a - b);
-  const min = sorted[0] ?? 0;
-  const max = sorted[sorted.length - 1] ?? 0;
   const mid = Math.floor(sorted.length / 2);
   const median =
     sorted.length % 2 === 1
       ? (sorted[mid] ?? 0)
       : ((sorted[mid - 1] ?? 0) + (sorted[mid] ?? 0)) / 2;
-  return { min, max, median, spread: median === 0 ? 0 : (max - min) / median };
+
+  if (values.length < 2 || median === 0) return { median, spread: 0 };
+
+  const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+  const variance =
+    values.reduce((sum, value) => sum + (value - mean) ** 2, 0) /
+    (values.length - 1);
+
+  return { median, spread: Math.sqrt(variance) / median };
 }
 
 function pct(value: number): string {
@@ -121,14 +170,15 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    `\n${SEEDS} seeds per row, from ${DEFAULT_SEED}. Spread is (max − min) / median ` +
-      `across those seeds.\n`,
+    `\n${SEEDS} seeds per row, from ${DEFAULT_SEED}. Spread is one standard deviation ` +
+      `across those seeds as a share of the median — a range would grow with the seed ` +
+      `count and say nothing.\n`,
   );
   console.log(
     "      N     ms/run       p10 median      p10 spread       p50 median      p50 spread       p90 median      p90 spread",
   );
 
-  const results = new Map<number, { p10: Spread; p50: Spread; p90: Spread }>();
+  const results = new Map<number, Row>();
 
   for (const simulations of SIMS) {
     const p10: number[] = [];
@@ -161,39 +211,37 @@ async function main(): Promise<void> {
     );
   }
 
-  const worst = (row: { p10: Spread; p50: Spread; p90: Spread }): number =>
-    Math.max(row.p10.spread, row.p50.spread, row.p90.spread);
-
   const ordered = [...results.entries()].sort(([a], [b]) => a - b);
-  const enough = ordered.find(([, row]) => worst(row) <= TARGET_SPREAD);
+  const largest = ordered[ordered.length - 1];
 
   console.log(
-    `\nTarget: every percentile within ${(TARGET_SPREAD * 100).toFixed(1)} % across seeds.`,
+    `\nTarget: ${(TARGET_SPREAD * 100).toFixed(1)} % across seeds, judged per percentile — ` +
+      `a single worst-of-three verdict hides which one is the problem.\n`,
   );
+
+  for (const key of KEYS) {
+    const clears = ordered.find(([, row]) => row[key].spread <= TARGET_SPREAD);
+    const best = largest === undefined ? 0 : largest[1][key].spread;
+    const verdict =
+      clears === undefined
+        ? `no tested N clears it, best ${pct(best).trim()} at ${largest?.[0]}`
+        : `clears at ${clears[0]}`;
+    console.log(`  ${key}  ${verdict}${plateau(key, ordered)}`);
+  }
 
   const current = results.get(DEFAULT_SIMULATIONS);
   if (current !== undefined) {
     console.log(
-      `Today's default (${DEFAULT_SIMULATIONS}) moves at worst ` +
-        `${(worst(current) * 100).toFixed(3)} % between seeds` +
-        `${worst(current) <= TARGET_SPREAD ? " — inside the target." : " — outside the target."}`,
+      `\nToday's default (${DEFAULT_SIMULATIONS}): ` +
+        KEYS.map((key) => `${key} ${pct(current[key].spread).trim()}`).join(
+          "  |  ",
+        ),
     );
   }
-
-  const largest = ordered[ordered.length - 1];
-  if (enough === undefined) {
-    console.log(
-      `No tested N holds the target: the largest tested (${largest?.[0]}) still moves ` +
-        `${((largest === undefined ? 0 : worst(largest[1])) * 100).toFixed(3)} %. ` +
-        `Extend the grid with --sims= before picking a default.`,
-    );
-  } else {
-    console.log(
-      `Smallest tested N inside the target: ${enough[0]}. That is the number to pin as ` +
-        `DEFAULT_SIMULATIONS — and the ms/run column is what it costs, multiplied by ~60 ` +
-        `on any screen that also solves a goal.`,
-    );
-  }
+  console.log(
+    `Cost of raising it is the ms/run column, multiplied by ~60 on any screen that also ` +
+      `solves a goal.`,
+  );
 
   console.log(
     "\nConvergence is not accuracy. A tight spread says the figure no longer depends on " +

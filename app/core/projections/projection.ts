@@ -57,7 +57,7 @@ export interface ProjectionResult {
   seed: number;
 }
 
-export const DEFAULT_SIMULATIONS = 3000;
+export const DEFAULT_SIMULATIONS = 10000;
 export const DEFAULT_SEED = 0x51554f49;
 export const MAX_HORIZON_MONTHS = 1200;
 const MONTHS_PER_YEAR = 12;
