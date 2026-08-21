@@ -7,6 +7,7 @@ export * from "./ui/SleeveChip";
 export * from "./ui/StatTile";
 export * from "./ui/MeterBar";
 export * from "./ui/Hint";
+export * from "./ui/Checkbox";
 export * from "./ui/Pagination";
 export * from "./ui/RangeSelector";
 export * from "./ui/BasisToggle";

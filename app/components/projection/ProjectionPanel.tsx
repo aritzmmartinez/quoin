@@ -1,9 +1,11 @@
 import Decimal from "decimal.js";
+import { Info } from "lucide-react";
 import { Form, useSearchParams } from "react-router";
 
 import {
   carriedParams,
   CONTRIBUTION_PARAM,
+  DETAIL_PARAM,
   es,
   formatMoney,
   formatPercent,
@@ -17,6 +19,7 @@ import {
 import type { ProjectionResult } from "~/core/projections";
 
 import { Card } from "../ui/Card";
+import { Checkbox } from "../ui/Checkbox";
 import { Hint } from "../ui/Hint";
 
 const FIELD =
@@ -26,6 +29,7 @@ const OWNED: readonly string[] = [
   HORIZON_PARAM,
   CONTRIBUTION_PARAM,
   GOAL_PARAM,
+  DETAIL_PARAM,
 ];
 
 export function ProjectionPanel({ view }: { view: ProjectionView }) {
@@ -90,6 +94,18 @@ export function ProjectionPanel({ view }: { view: ProjectionView }) {
               >
                 {copy.form.submit}
               </button>
+              <div className="flex items-center gap-1.5">
+                <Checkbox name={DETAIL_PARAM} defaultChecked={view.extended}>
+                  {copy.form.detail}
+                </Checkbox>
+                <Hint
+                  label={copy.form.detailHint}
+                  name={copy.form.detail}
+                  className="shrink-0 text-muted"
+                >
+                  <Info size={12} strokeWidth={1.75} aria-hidden />
+                </Hint>
+              </div>
             </Form>
 
             {view.problem === "thin-window" ? (
@@ -146,6 +162,17 @@ function Bands({ view }: { view: ProjectionView }) {
       real: result.p10Real,
       strong: false,
     },
+    ...(view.extended
+      ? [
+          {
+            label: copy.bands.p25,
+            hint: copy.bands.p25Hint,
+            value: result.p25,
+            real: result.p25Real,
+            strong: false,
+          },
+        ]
+      : []),
     {
       label: copy.bands.p50,
       hint: copy.bands.p50Hint,
@@ -153,6 +180,17 @@ function Bands({ view }: { view: ProjectionView }) {
       real: result.p50Real,
       strong: true,
     },
+    ...(view.extended
+      ? [
+          {
+            label: copy.bands.p75,
+            hint: copy.bands.p75Hint,
+            value: result.p75,
+            real: result.p75Real,
+            strong: false,
+          },
+        ]
+      : []),
     {
       label: copy.bands.p90,
       hint: copy.bands.p90Hint,
@@ -168,7 +206,11 @@ function Bands({ view }: { view: ProjectionView }) {
         {copy.bands.title(view.horizonYears)}
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div
+        className={`grid gap-3 sm:grid-cols-3 ${
+          view.extended ? "lg:grid-cols-5" : ""
+        }`}
+      >
         {bands.map((band) => (
           <div
             key={band.label}

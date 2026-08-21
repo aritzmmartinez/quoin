@@ -54,6 +54,8 @@ pnpm identity:resolve [--limit N] [--all] [--retry-ambiguous] [--report]
 pnpm ipc:sync [--force-rebase]        # INE consumer price index, national + Bizkaia
 pnpm target:set                       # show the savings-plan target in force today
 pnpm target:set <file> [--from=YYYY-MM-DD] [--name=…] [--note=…]   # record a version
+pnpm projection:converge              # seed-to-seed spread of p10/p50/p90 at several N
+pnpm projection:converge [--sims=1000,3000] [--seeds=8] [--horizon=240] [--contribution=…]
 pnpm twr:explain [--top=N]            # print the portfolio TWR chain, worst link first
 pnpm twr:explain --around=YYYY-MM-DD  # open one link: holdings and implied prices at both ends
 ```
@@ -340,6 +342,22 @@ manual aliasing was abandoned — 726 confirmations is not a system.
   the window the whole projection rests on. Set-aside value is **not** added flat to the
   percentiles either: freezing a real asset at 0% for twenty years is as false a claim
   as lending it the plan's returns.
+- **`DEFAULT_SIMULATIONS` is measured, not chosen.** `pnpm projection:converge` runs the
+  same input the screen builds — both go through `loadProjectionContext`, so a script
+  rebuilding it by hand would tune a default for a different case — at several N and
+  several seeds, and reports `(max − min) / median` per percentile. The bar is 1%: the
+  screen prints euros to the cent, and a figure that swings 5% on a seed nobody chose is
+  not one anybody can act on. Cost rises linearly in N and **linearly times ~60** on any
+  screen that also solves a goal, because each bisection step re-runs the whole
+  simulation. A test pins the constant for the same reason one pins `MIN_WINDOW_MONTHS`.
+  Convergence is not accuracy: a tight spread says the number no longer depends on the
+  draw, never that resampling a short window describes the next twenty years.
+- **The tails converge later than the median**, so all three percentiles are reported
+  separately and the median looking settled is not evidence that p10/p90 are.
+- **p25/p75 are two more reads of an already-sorted array**, so `computeProjection` always
+  returns them and `?detalle=1` only decides whether the screen draws them. They are
+  inserted between the three scenarios, never in place of them: the default panel is
+  exactly what it was before the toggle existed.
 - **Below `MIN_WINDOW_MONTHS` (60) the screen prints no number at all.** Same rule as a
   CPI hole disabling real mode. `projectionWindow` is exported precisely so the refusal
   can name the limiting instrument without simulating anything. Above the threshold,
@@ -497,8 +515,9 @@ Append is idempotent: dedup by `source` + `externalId`.
 ## URL as state
 
 Sort order (Cartera), chart range (Resumen), page (Movimientos), concentration threshold
-(Asignación, `?umbral=20`) and the rebalance inputs (Asignación, `?aportacion=500`,
-`?desvio=2`) live in **URL search params**, written by the UI and read by the **loader**.
+(Asignación, `?umbral=20`), the rebalance inputs (Asignación, `?aportacion=500`,
+`?desvio=2`) and the projection's extended percentiles (Proyección, `?detalle=1`) live in
+**URL search params**, written by the UI and read by the **loader**.
 
 A `<Form method="get">` **rewrites the whole query string** from its own fields, so any
 param already in the URL that is not a field of that form is dropped on submit. A GET

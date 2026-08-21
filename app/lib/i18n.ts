@@ -327,15 +327,24 @@ export const es = {
       goal: "Objetivo (opcional)",
       goalPlaceholder: "1.000.000",
       submit: "Proyectar",
+      detail: "Ver más detalle",
+      detailHint:
+        "Añade los cuartiles (percentiles 25 y 75) entre los tres escenarios. No vuelve a simular: son dos lecturas más de la misma distribución ya calculada.",
     },
     bands: {
       title: (years: number): string =>
         years === 1 ? "Dentro de 1 año" : `Dentro de ${years} años`,
       p10: "Escenario malo",
+      p25: "Cuartil bajo",
       p50: "Escenario central",
+      p75: "Cuartil alto",
       p90: "Escenario bueno",
       p10Hint:
         "Percentil 10: una de cada diez simulaciones acaba por debajo de esta cifra.",
+      p25Hint:
+        "Percentil 25: una de cada cuatro simulaciones acaba por debajo de esta cifra. Entre el escenario malo y el central está la mitad del riesgo que no se ve con tres cifras.",
+      p75Hint:
+        "Percentil 75: solo una de cada cuatro simulaciones acaba por encima de esta cifra.",
       p50Hint:
         "Percentil 50: la mitad de las simulaciones acaba por encima y la mitad por debajo. Es la mediana, no un promedio.",
       p90Hint:

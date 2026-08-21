@@ -11,6 +11,7 @@ import {
   MAX_HORIZON_YEARS,
   MIN_WINDOW_MONTHS,
   offPlanState,
+  parseExtended,
   parseGoal,
   parseHorizonYears,
 } from "./projection";
@@ -55,6 +56,15 @@ const params = (query: string) => new URLSearchParams(query);
 describe("MIN_WINDOW_MONTHS", () => {
   it("is pinned at 60, so lowering it for debugging cannot survive a commit", () => {
     expect(MIN_WINDOW_MONTHS).toBe(60);
+  });
+});
+
+describe("parseExtended", () => {
+  it("keeps the default panel at three scenarios unless the checkbox asks", () => {
+    expect(parseExtended(params(""))).toBe(false);
+    expect(parseExtended(params("detalle=0"))).toBe(false);
+    expect(parseExtended(params("detalle=si"))).toBe(false);
+    expect(parseExtended(params("detalle=1"))).toBe(true);
   });
 });
 

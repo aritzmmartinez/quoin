@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   computeProjection,
+  DEFAULT_SIMULATIONS,
   mulberry32,
   projectionWindow,
   startingValue,
@@ -77,6 +78,12 @@ describe("toMonthlyReturns", () => {
   });
 });
 
+describe("DEFAULT_SIMULATIONS", () => {
+  it("is pinned, so it moves only when pnpm projection:converge says it should", () => {
+    expect(DEFAULT_SIMULATIONS).toBe(3000);
+  });
+});
+
 describe("computeProjection", () => {
   const lines = [
     line("A", "0.6", returns("2015-01", 120, 7)),
@@ -117,8 +124,23 @@ describe("computeProjection", () => {
       simulations: 500,
     });
 
-    expect(new Decimal(result.p10).lte(result.p50)).toBe(true);
-    expect(new Decimal(result.p50).lte(result.p90)).toBe(true);
+    expect(new Decimal(result.p10).lte(result.p25)).toBe(true);
+    expect(new Decimal(result.p25).lte(result.p50)).toBe(true);
+    expect(new Decimal(result.p50).lte(result.p75)).toBe(true);
+    expect(new Decimal(result.p75).lte(result.p90)).toBe(true);
+  });
+
+  it("splits the draws where a quartile splits them, not near it", () => {
+    const flat = returns("2015-01", 120).map((r) => ({ ...r, change: 0 }));
+    const result = computeProjection({
+      horizonMonths: 12,
+      monthlyContribution: "100",
+      lines: [line("A", "1", flat)],
+      simulations: 400,
+    });
+
+    expect(result.p25).toBe("1200");
+    expect(result.p75).toBe("1200");
   });
 
   it("truncates the window to the shortest history and names it", () => {
@@ -218,6 +240,12 @@ describe("computeProjection", () => {
     const factor = new Decimal("1.002").pow(24);
     expect(new Decimal(result.p50Real ?? "0").toFixed(2)).toBe(
       new Decimal(result.p50).div(factor).toFixed(2),
+    );
+    expect(new Decimal(result.p25Real ?? "0").toFixed(2)).toBe(
+      new Decimal(result.p25).div(factor).toFixed(2),
+    );
+    expect(new Decimal(result.p75Real ?? "0").toFixed(2)).toBe(
+      new Decimal(result.p75).div(factor).toFixed(2),
     );
   });
 

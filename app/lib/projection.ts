@@ -15,6 +15,7 @@ import {
 
 export const HORIZON_PARAM = "anos";
 export const GOAL_PARAM = "objetivo";
+export const DETAIL_PARAM = "detalle";
 
 export const DEFAULT_HORIZON_YEARS = 10;
 export const MAX_HORIZON_YEARS = 40;
@@ -32,6 +33,10 @@ export function parseHorizonYears(params: URLSearchParams): number {
   if (years < 1) return 1;
   if (years > MAX_HORIZON_YEARS) return MAX_HORIZON_YEARS;
   return years;
+}
+
+export function parseExtended(params: URLSearchParams): boolean {
+  return params.get(DETAIL_PARAM) === "1";
 }
 
 export function parseGoal(params: URLSearchParams): string | null {
@@ -64,6 +69,7 @@ export interface ProjectionView {
   horizonYears: number;
   contribution: string;
   goal: string | null;
+  extended: boolean;
   result: ProjectionResult | null;
   problem: "no-target" | "no-history" | "no-window" | "thin-window" | null;
   windowMonths: number;

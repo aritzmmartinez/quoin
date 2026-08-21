@@ -1,42 +1,23 @@
-import Decimal from "decimal.js";
-
 import type { Route } from "./+types/projection";
 
-import {
-  PrismaInflationRepository,
-  PrismaInstrumentRepository,
-  PrismaLedgerRepository,
-  PrismaPriceRepository,
-  PrismaTargetRepository,
-} from "~/adapters/persistence";
 import { Card, PortfolioError, ProjectionPanel } from "~/components";
 import {
-  averageMonthlyInflation,
-  BASE_CURRENCY,
-  getActiveTarget,
-  monthlyTotal,
-} from "~/core/domain";
-import {
-  computeMarketValues,
-  computePortfolioSummary,
-  computePositions,
   computeProjection,
   projectionWindow,
   solveContribution,
   solveHorizon,
 } from "~/core/projections";
 import {
-  buildProjectionSource,
   es,
-  heldValuesByInstrument,
   MIN_WINDOW_MONTHS,
   parseContribution,
+  parseExtended,
   parseGoal,
   parseHorizonYears,
   type NamedValue,
   type ProjectionView,
 } from "~/lib";
-import { DEFAULT_INFLATION_SERIES } from "~/lib/real.server";
+import { loadProjectionContext } from "~/lib/projection.server";
 
 export function meta(_: Route.MetaArgs) {
   return [
@@ -52,27 +33,14 @@ export async function loader({ request }: Route.LoaderArgs) {
   const horizonYears = parseHorizonYears(params);
   const horizonMonths = horizonYears * 12;
   const goal = parseGoal(params);
+  const extended = parseExtended(params);
 
-  const priceRepository = new PrismaPriceRepository();
-  const [events, instruments, prices, targets, inflationPoints] =
-    await Promise.all([
-      new PrismaLedgerRepository().list(),
-      new PrismaInstrumentRepository().list(),
-      priceRepository.latest(),
-      new PrismaTargetRepository().list(),
-      new PrismaInflationRepository().list(DEFAULT_INFLATION_SERIES),
-    ]);
-
-  const target = getActiveTarget(targets, new Date());
-  const monthlyInflation = averageMonthlyInflation(inflationPoints);
-  const annualInflation =
-    monthlyInflation === null
-      ? null
-      : new Decimal(monthlyInflation).plus(1).pow(12).minus(1).toFixed(6);
+  const { annualInflation, plan } = await loadProjectionContext();
 
   const empty = {
     horizonYears,
     goal,
+    extended,
     result: null,
     windowMonths: 0,
     limitingName: "",
@@ -84,7 +52,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     goalAnswer: null,
   };
 
-  if (target === null) {
+  if (plan === null) {
     return {
       ...empty,
       contribution: parseContribution(params) ?? "0.00",
@@ -92,57 +60,15 @@ export async function loader({ request }: Route.LoaderArgs) {
     } satisfies ProjectionView;
   }
 
-  const contribution = parseContribution(params) ?? monthlyTotal(target);
-
-  const positions = computePositions(events);
-  const marketValues = computeMarketValues(positions, prices, BASE_CURRENCY);
-  const summary = computePortfolioSummary(positions, marketValues);
-  const held = heldValuesByInstrument(positions, marketValues);
-
-  const instrumentsById = new Map(
-    instruments.map((instrument) => [instrument.id, instrument]),
-  );
-  const nameOf = (id: string): string => instrumentsById.get(id)?.name ?? id;
-
-  const plannedIds = new Set(target.lines.map((line) => line.instrumentId));
-
-  let plannedValue = new Decimal(0);
-  const offPlanValues = new Map<string, string>();
-  for (const [instrumentId, entry] of held) {
-    if (plannedIds.has(instrumentId))
-      plannedValue = plannedValue.plus(entry.value);
-    else if (entry.value.gt(0)) {
-      offPlanValues.set(instrumentId, entry.value.toFixed(2));
-    }
-  }
-
-  const historyIds = [...new Set([...plannedIds, ...offPlanValues.keys()])];
-  const histories = await Promise.all(
-    historyIds.map((id) => priceRepository.historyFor(id)),
-  );
-
-  const now = new Date();
-  const source = buildProjectionSource(
-    target,
-    new Map(
-      historyIds.map((id, index) => [
-        id,
-        (histories[index] ?? [])
-          .filter((snapshot) => snapshot.currency === BASE_CURRENCY)
-          .map((snapshot) => ({ asOf: snapshot.asOf, price: snapshot.price })),
-      ]),
-    ),
-    instrumentsById,
-    offPlanValues,
-    now,
-  );
+  const { source, input, nameOf } = plan;
+  const contribution = parseContribution(params) ?? plan.defaultContribution;
 
   const shared = {
     ...empty,
     contribution,
     excluded: source.excluded,
     coverage: source.coverage,
-    unpricedCount: summary.unpricedCount,
+    unpricedCount: plan.unpricedCount,
   };
 
   if (source.lines.length === 0) {
@@ -172,13 +98,6 @@ export async function loader({ request }: Route.LoaderArgs) {
     } satisfies ProjectionView;
   }
 
-  const input = {
-    lines: source.lines,
-    heldLines: source.heldLines,
-    plannedValue: plannedValue.toFixed(2),
-    monthlyInflation,
-  };
-
   const result = computeProjection({
     ...input,
     horizonMonths,
@@ -189,7 +108,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     (id) => ({
       instrumentId: id,
       name: nameOf(id),
-      value: offPlanValues.get(id) ?? "0",
+      value: plan.offPlanValues.get(id) ?? "0",
     }),
   );
 

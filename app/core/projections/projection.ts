@@ -37,10 +37,14 @@ export interface ProjectionInput {
 
 export interface ProjectionResult {
   p10: string;
+  p25: string;
   p50: string;
+  p75: string;
   p90: string;
   p10Real: string | null;
+  p25Real: string | null;
   p50Real: string | null;
+  p75Real: string | null;
   p90Real: string | null;
   contributed: string;
   offPlanValue: string;
@@ -322,17 +326,25 @@ export function computeProjection(input: ProjectionInput): ProjectionResult {
   );
 
   const p10 = toMoney(percentile(finals, 0.1));
+  const p25 = toMoney(percentile(finals, 0.25));
   const p50 = toMoney(percentile(finals, 0.5));
+  const p75 = toMoney(percentile(finals, 0.75));
   const p90 = toMoney(percentile(finals, 0.9));
   const factor = deflator(input.monthlyInflation, horizonMonths);
+  const real = (value: Money): string | null =>
+    factor === null ? null : value.divideBy(factor).toString();
 
   return {
     p10: p10.toString(),
+    p25: p25.toString(),
     p50: p50.toString(),
+    p75: p75.toString(),
     p90: p90.toString(),
-    p10Real: factor === null ? null : p10.divideBy(factor).toString(),
-    p50Real: factor === null ? null : p50.divideBy(factor).toString(),
-    p90Real: factor === null ? null : p90.divideBy(factor).toString(),
+    p10Real: real(p10),
+    p25Real: real(p25),
+    p50Real: real(p50),
+    p75Real: real(p75),
+    p90Real: real(p90),
     contributed: planned
       .add(offPlan.value)
       .add(contribution.scaleBy(horizonMonths))
