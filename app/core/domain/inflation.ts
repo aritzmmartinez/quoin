@@ -83,3 +83,51 @@ export function deflate(
   if (!fromLevel || !toLevel || fromLevel.isZero()) return null;
   return amount.scaleBy(toLevel).divideBy(fromLevel);
 }
+
+const MIN_MONTHS_FOR_AVERAGE = 12;
+
+function monthsBetween(from: Period, to: Period): number {
+  const [fromYear, fromMonth] = from.split("-").map(Number);
+  const [toYear, toMonth] = to.split("-").map(Number);
+  if (
+    fromYear === undefined ||
+    fromMonth === undefined ||
+    toYear === undefined ||
+    toMonth === undefined ||
+    !Number.isInteger(fromYear) ||
+    !Number.isInteger(fromMonth) ||
+    !Number.isInteger(toYear) ||
+    !Number.isInteger(toMonth)
+  ) {
+    throw new Error(`Not a period pair: "${from}" to "${to}"`);
+  }
+  return (toYear - fromYear) * 12 + (toMonth - fromMonth);
+}
+
+export function averageMonthlyInflation(
+  points: readonly IndexPoint[],
+): string | null {
+  if (points.length < 2) return null;
+
+  const bases = [...new Set(points.map((point) => point.base))].sort();
+  if (bases.length > 1) {
+    throw new Error(
+      `Cannot average across bases (${bases.join(", ")}): levels from ` +
+        `different reference years do not share a ratio.`,
+    );
+  }
+
+  const sorted = [...points].sort((a, b) => a.period.localeCompare(b.period));
+  const first = sorted[0];
+  const last = sorted[sorted.length - 1];
+  if (first === undefined || last === undefined) return null;
+
+  const months = monthsBetween(first.period, last.period);
+  if (months < MIN_MONTHS_FOR_AVERAGE) return null;
+
+  const from = new Decimal(first.indexValue);
+  const to = new Decimal(last.indexValue);
+  if (!from.gt(0) || !to.gt(0)) return null;
+
+  return to.div(from).pow(new Decimal(1).div(months)).minus(1).toString();
+}

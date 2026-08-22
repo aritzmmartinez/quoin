@@ -54,6 +54,8 @@ pnpm identity:resolve [--limit N] [--all] [--retry-ambiguous] [--report]
 pnpm ipc:sync [--force-rebase]        # INE consumer price index, national + Bizkaia
 pnpm target:set                       # show the savings-plan target in force today
 pnpm target:set <file> [--from=YYYY-MM-DD] [--name=…] [--note=…]   # record a version
+pnpm projection:converge              # seed-to-seed spread of p10/p50/p90 at several N
+pnpm projection:converge [--sims=1000,3000] [--seeds=8] [--horizon=240] [--contribution=…]
 pnpm twr:explain [--top=N]            # print the portfolio TWR chain, worst link first
 pnpm twr:explain --around=YYYY-MM-DD  # open one link: holdings and implied prices at both ends
 ```
@@ -328,6 +330,74 @@ manual aliasing was abandoned — 726 confirmations is not a system.
   clamping each term at zero can only raise the sum. The total deficit is therefore
   always ≥ the contribution. A contribution big enough to fill every deficit is one
   that lands every line exactly on its ideal with nothing left over.
+- **`computeProjection` simulates two pots and they never merge.** The planned pot
+  takes the contributions at target weights; everything else held compounds at its own
+  weights and is never funded. Applying the plan's return distribution to money sitting
+  in something the plan does not name is the same error as pro-rating an `UNRESOLVED`
+  leaf. Both pots advance on **the same drawn month index** — drawing separately would
+  assume the two halves of the portfolio are independent and understate a bad month.
+- **The plan fixes the bootstrap window; off-plan positions only qualify for it.** A
+  held position either covers every month of that window or is reported with its value
+  in `unsimulatedValue` and left out. Otherwise a purchase made last month would shrink
+  the window the whole projection rests on. Set-aside value is **not** added flat to the
+  percentiles either: freezing a real asset at 0% for twenty years is as false a claim
+  as lending it the plan's returns.
+- **`DEFAULT_SIMULATIONS` is measured, not chosen.** `pnpm projection:converge` runs the
+  same input the screen builds — both go through `loadProjectionContext`, so a script
+  rebuilding it by hand would tune a default for a different case — at several N and
+  several seeds, and reports `(max − min) / median` **per percentile**. The bar is 1%: the
+  screen prints euros to the cent, and a figure that swings 5% on a seed nobody chose is
+  not one anybody can act on. A worst-of-three verdict was tried and removed — it hides
+  which percentile is the problem, which is the only useful thing the run has to say.
+  Cost rises linearly in N and **linearly times ~60** on any screen that also solves a
+  goal, because each bisection step re-runs the whole simulation. A test pins the constant
+  for the same reason one pins `MIN_WINDOW_MONTHS`.
+- **Spread across seeds is a standard deviation, never a range.** `max − min` grows with
+  the number of seeds by construction, so a range-based threshold measures how many seeds
+  were run as much as how settled the figure is, and two runs at different `--seeds` cannot
+  be compared. It also invents plateaus: on the range metric p90 looked as if it stopped
+  responding to N entirely, and it does not. This was measured wrong once — do not
+  reintroduce it because a range is easier to read.
+- **The tail is noisier at every N, and that is not the same as being unfixable by N.**
+  Measured over the plan held, 72-month window, 240-month horizon, 24 seeds: at `10000`
+  p10 is 0.97%, p50 1.05%, p90 3.78%. All three fall as `1/√N` — p90 included — so p90
+  reaches the others' 1% at roughly 140000 simulations, not never. A tail is estimated from
+  far fewer of the drawn paths than the median, which is a variance cost and is paid in N;
+  **the window has nothing to do with it**, and prescribing a backfill for it sends the
+  reader to fix the wrong thing. `10000` is the point where the ~60 simulations behind every
+  goal solve stop being worth another halving, and the screen states that the good scenario
+  is the least firm of the three instead of buying steadiness nobody asked for.
+- **The `1/√N` check is fitted over the whole grid and needs enough seeds to mean
+  anything.** It flags a percentile whose spread falls slower than `N^-0.5` — the signature
+  of a sample-limited estimate rather than a sample-count-limited one. Two traps, both hit
+  once: reading only the first and last row makes the verdict a coin toss, because each
+  spread is itself an estimate; and at 8 seeds the fitted exponent for p90 read `-0.26`
+  where 16, 24 and 48 seeds read `-0.43`, `-0.46`, `-0.52`. The script printed
+  *window-limited* on the strength of that noise. Hence `--seeds` defaults to 24 and the
+  verdict is withheld below 16. **On this plan nothing is window-limited.** Widening the
+  window (`pnpm prices:backfill` on the limiting instrument) is still the lever that
+  matters, but for **accuracy**, not for seed-to-seed steadiness. Do not conflate the two.
+- **The tails converge later than the median**, so all three percentiles are reported
+  separately and the median looking settled is not evidence that p10/p90 are.
+- **p25/p75 are two more reads of an already-sorted array**, so `computeProjection` always
+  returns them and `?detalle=1` only decides whether the screen draws them. They are
+  inserted between the three scenarios, never in place of them: the default panel is
+  exactly what it was before the toggle existed.
+- **Below `MIN_WINDOW_MONTHS` (60) the screen prints no number at all.** Same rule as a
+  CPI hole disabling real mode. `projectionWindow` is exported precisely so the refusal
+  can name the limiting instrument without simulating anything. Above the threshold,
+  `impliedAnnualReturn` — the annualised drift of the sampled window — stays on screen:
+  sixty months can still sit entirely inside one rally, and that number is what makes it
+  visible. Do not "helpfully" downgrade the refusal to a warning.
+- **Lowering `MIN_WINDOW_MONTHS` to see the other branch is a one-way trip if you forget.**
+  No other test routes through the constant — each builds its own window — so a leftover
+  `= 12` passes the entire suite while the refusal quietly stops refusing. A test pins the
+  value at 60 for exactly that reason. If it fails, the question is whether the policy
+  changed on purpose, never whether the assertion is in the way.
+- **The projection loop is the one place floats are allowed.** It reports a guess, not a
+  fact, and a Monte Carlo median quoted to the cent claims a precision the method lacks.
+  `Money` still guards the boundaries. This is not licence to relax the money rules
+  anywhere that reports what actually happened.
 - **`computePortfolioReturns` is nominal even when the basis switch says real.** Its flows
   are the euros that left the bank, so deflating the value series without them would quote
   a real return against nominal money. The Resumen loader builds a second, un-deflated
@@ -470,8 +540,9 @@ Append is idempotent: dedup by `source` + `externalId`.
 ## URL as state
 
 Sort order (Cartera), chart range (Resumen), page (Movimientos), concentration threshold
-(Asignación, `?umbral=20`) and the rebalance inputs (Asignación, `?aportacion=500`,
-`?desvio=2`) live in **URL search params**, written by the UI and read by the **loader**.
+(Asignación, `?umbral=20`), the rebalance inputs (Asignación, `?aportacion=500`,
+`?desvio=2`) and the projection's extended percentiles (Proyección, `?detalle=1`) live in
+**URL search params**, written by the UI and read by the **loader**.
 
 A `<Form method="get">` **rewrites the whole query string** from its own fields, so any
 param already in the URL that is not a field of that form is dropped on submit. A GET

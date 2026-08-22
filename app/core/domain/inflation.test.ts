@@ -1,7 +1,13 @@
 import Decimal from "decimal.js";
 import { describe, expect, it } from "vitest";
 
-import { deflate, InflationIndex, Money, periodOf } from "./index";
+import {
+  averageMonthlyInflation,
+  deflate,
+  InflationIndex,
+  Money,
+  periodOf,
+} from "./index";
 
 const point = (period: string, indexValue: string, base = "2025") => ({
   period,
@@ -108,5 +114,53 @@ describe("deflate", () => {
     expect(
       deflate(index, Money.fromString("100"), "2025-01", "2026-08"),
     ).toBeNull();
+  });
+});
+
+describe("averageMonthlyInflation", () => {
+  it("compounds back to the observed rise over the whole span", () => {
+    const rate = averageMonthlyInflation([
+      point("2015-01", "100"),
+      point("2020-01", "112"),
+      point("2025-01", "125"),
+    ]);
+
+    const compounded = new Decimal(1)
+      .plus(rate ?? "0")
+      .pow(120)
+      .times(100);
+    expect(compounded.toFixed(6)).toBe("125.000000");
+  });
+
+  it("measures the span, not the row count, so a gap cannot inflate it", () => {
+    const complete = [
+      point("2015-01", "100"),
+      point("2016-01", "104"),
+      point("2017-01", "110"),
+    ];
+    const gapped = [complete[0]!, complete[2]!];
+
+    expect(averageMonthlyInflation(gapped)).toBe(
+      averageMonthlyInflation(complete),
+    );
+  });
+
+  it("refuses a span too short to say anything", () => {
+    expect(
+      averageMonthlyInflation([
+        point("2025-01", "100"),
+        point("2025-06", "104"),
+      ]),
+    ).toBeNull();
+    expect(averageMonthlyInflation([point("2025-01", "100")])).toBeNull();
+  });
+
+  it("refuses to average across a rebased series", () => {
+    expect(() =>
+      averageMonthlyInflation([
+        point("2015-01", "100", "2015"),
+        point("2025-01", "125", "2025"),
+      ]),
+    ).toThrow(/different reference years/);
   });
 });
