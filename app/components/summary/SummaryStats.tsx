@@ -8,6 +8,7 @@ export interface SummaryStatsProps {
   unrealizedPnL: string;
   realizedPnL: string;
   positionCount: number;
+  opportunity?: { difference: string; symbol: string } | null;
 }
 
 export function SummaryStats({
@@ -15,6 +16,7 @@ export function SummaryStats({
   unrealizedPnL,
   realizedPnL,
   positionCount,
+  opportunity = null,
 }: SummaryStatsProps) {
   const s = es.summary.stats;
   return (
@@ -45,6 +47,15 @@ export function SummaryStats({
         sub={s.positions.sub}
         value={String(positionCount)}
       />
+      {opportunity && (
+        <StatTile
+          label={s.opportunity.label}
+          sub={s.opportunity.sub(opportunity.symbol)}
+          value={formatSignedMoney(opportunity.difference).text}
+          valueClass={signClass(opportunity.difference)}
+          to="/coste-oportunidad"
+        />
+      )}
     </div>
   );
 }
