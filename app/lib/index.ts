@@ -4,6 +4,7 @@ export * from "./format";
 export * from "./i18n";
 export * from "./instruments";
 export * from "./movements";
+export * from "./opportunity-cost";
 export * from "./pagination";
 export * from "./portfolio";
 export * from "./projection";

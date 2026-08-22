@@ -79,6 +79,10 @@ export const es = {
       unrealized: { label: "P&L latente", sub: "Valor menos aportado" },
       realized: { label: "P&L realizado", sub: "Beneficio de ventas cerradas" },
       positions: { label: "Posiciones", sub: "Abiertas y valoradas" },
+      opportunity: {
+        label: "vs índice",
+        sub: (symbol: string): string => `Frente a ${symbol}`,
+      },
     },
     returns: {
       twr: { label: "TWR", sub: "ponderada por tiempo" },
@@ -507,6 +511,58 @@ export const es = {
     empty: {
       title: "Sin ventas todavía",
       body: "Cuando vendas algo, aquí aparecerá el resultado de cada operación.",
+    },
+  },
+  opportunity: {
+    title: "Coste de oportunidad",
+    intro: (symbol: string): string =>
+      `Qué habría pasado si cada compra hubiera ido al índice (${symbol}) en vez del activo que elegiste: mismas fechas, mismos importes y las mismas comisiones a ambos lados. Lo que sobra o falta es selección de activos, no coste de operar.`,
+    taxWarning:
+      "El contrafactual nunca vende, así que tampoco tributa: las ganancias que sí generaron tus ventas reales pagan impuestos que aquí no se descuentan. La cifra es una referencia de qué tal fue la selección de activos, no una comparación fiscalmente perfecta.",
+    nominal:
+      "Todas las cifras son nominales, sin ajustar por inflación: la comparación es entre dos destinos del mismo dinero, y el IPC afecta igual a los dos.",
+    stats: {
+      real: { label: "Cartera real", sub: "Valor de hoy más lo ya vendido" },
+      benchmark: { label: "Contrafactual", sub: "Todo al índice, sin vender" },
+      difference: { label: "Diferencial", sub: "Real menos contrafactual" },
+      realMwr: { label: "MWR real", sub: "ponderada por dinero" },
+      benchmarkMwr: {
+        label: "MWR contrafactual",
+        sub: "mismo dinero, otro destino",
+      },
+      mwrDifference: {
+        label: "Diferencia de MWR",
+        sub: "Real menos contrafactual",
+      },
+      unavailable: "sin solución",
+    },
+    proceeds: (amount: string): string =>
+      `La cartera real incluye ${amount} de ventas ya cobradas: el contrafactual nunca vende, así que dejarlas fuera le regalaría cada euro que realizaste.`,
+    table: {
+      title: "Por posición",
+      note: "Cada línea compara lo que ese instrumento vale hoy (más lo que cobraste al venderlo) con lo que ese mismo dinero valdría en el índice. Las líneas suman el diferencial total.",
+      instrument: "Instrumento",
+      contributed: "Aportado",
+      real: "Real",
+      benchmark: "Contrafactual",
+      difference: "Diferencial",
+    },
+    truncated: (
+      symbol: string,
+      date: string,
+      count: number,
+      amount: string,
+    ): string =>
+      `El histórico de ${symbol} empieza el ${date}. ${count} ${count === 1 ? "compra anterior" : "compras anteriores"} (${amount}) no compran nada en el contrafactual —interpolar un precio que nadie publicó sería inventarlo—, pero siguen contando en la cartera real: el diferencial la favorece en esa medida. Amplía el histórico con pnpm prices:backfill.`,
+    unpriced: (names: string): string =>
+      `Sin precio utilizable: ${names}. Se excluyen de los dos lados, porque contar su coste sin su valor inventaría una pérdida.`,
+    unmapped: (symbol: string): string =>
+      `Ningún instrumento está mapeado a ${symbol}, así que no hay índice contra el que comparar. Ejecuta pnpm prices:map <ISIN> ${symbol}.`,
+    noHistory: (symbol: string): string =>
+      `${symbol} no tiene histórico de precios en euros. Ejecuta pnpm prices:backfill <ISIN> max para descargarlo.`,
+    empty: {
+      title: "Sin compras todavía",
+      body: "Importa tus movimientos para poder reproducirlos contra el índice.",
     },
   },
   instrument: {

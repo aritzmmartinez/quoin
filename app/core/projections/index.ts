@@ -13,3 +13,4 @@ export * from "./real";
 export * from "./rebalance";
 export * from "./projection";
 export * from "./projection-goal";
+export * from "./opportunity-cost";
