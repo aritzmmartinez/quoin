@@ -28,11 +28,13 @@ import {
   computePortfolioSummary,
   computePositions,
   computeTopPositions,
+  computeWeightedTer,
 } from "~/core/projections";
 import {
   computeHeroChange,
   es,
   filterByRange,
+  heldValuesByInstrument,
   instrumentTypeLabel,
   parseRange,
 } from "~/lib";
@@ -139,9 +141,23 @@ export async function loader({ request }: Route.LoaderArgs) {
     now,
   );
 
+  const ter = computeWeightedTer(
+    [...heldValuesByInstrument(positions, marketValues)].map(
+      ([instrumentId, held]) => ({
+        instrumentId,
+        value: held.value.toFixed(2),
+        ter: instrumentsById.get(instrumentId)?.ter ?? null,
+      }),
+    ),
+  );
+
   return {
     summary,
     returns,
+    ter:
+      ter.coveredValue === "0"
+        ? null
+        : { weightedTer: ter.weightedTer, annualCost: ter.annualCost },
     opportunity: opportunity.ok
       ? {
           difference: opportunity.result.difference,
@@ -173,6 +189,7 @@ export default function Summary({ loaderData }: Route.ComponentProps) {
     summary,
     returns,
     opportunity,
+    ter,
     allocation,
     top,
     range,
@@ -213,6 +230,7 @@ export default function Summary({ loaderData }: Route.ComponentProps) {
         realizedPnL={summary.realizedPnL}
         positionCount={summary.pricedCount}
         opportunity={opportunity}
+        ter={ter}
       />
 
       <SummaryReturns
