@@ -18,6 +18,7 @@ model Instrument {
   quoteSymbol String? // provider symbol for price quotes (e.g. "VWCE.DE"); set manually, never from ingestion
   exposureKind   String? // COMPANY | EQUITY_FUND | BOND_FUND | COMMODITY | CRYPTO; set manually, never from ingestion
   exposureLeafId String? // leaf identity for COMMODITY/CRYPTO (e.g. "XAU", "BTC"); defaults to the instrument id
+  ter            String? // annual total expense ratio as a decimal fraction ("0.0022" = 0.22%); set manually, never from ingestion
   createdAt  DateTime @default(now())
 
   entries  LedgerEntry[]

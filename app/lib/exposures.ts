@@ -141,6 +141,28 @@ export function readingFor(
   };
 }
 
+export const ALLOCATION_VIEWS = ["exposicion", "rebalanceo"] as const;
+export type AllocationView = (typeof ALLOCATION_VIEWS)[number];
+export const DEFAULT_ALLOCATION_VIEW: AllocationView = "exposicion";
+export const VIEW_PARAM = "vista";
+
+export function parseAllocationView(params: URLSearchParams): AllocationView {
+  const raw = params.get(VIEW_PARAM);
+  return raw !== null && (ALLOCATION_VIEWS as readonly string[]).includes(raw)
+    ? (raw as AllocationView)
+    : DEFAULT_ALLOCATION_VIEW;
+}
+
+export function viewHref(
+  params: URLSearchParams,
+  view: AllocationView,
+): string {
+  const next = new URLSearchParams(params);
+  if (view === DEFAULT_ALLOCATION_VIEW) next.delete(VIEW_PARAM);
+  else next.set(VIEW_PARAM, view);
+  return `?${next.toString()}`;
+}
+
 export const THRESHOLD_PARAM = "umbral";
 
 export function parseThreshold(params: URLSearchParams): string {

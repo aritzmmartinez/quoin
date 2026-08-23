@@ -1,6 +1,6 @@
 {
   "name": "quoin",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -22,6 +22,7 @@
     "exposure:map": "tsx scripts/exposure-map.ts",
     "target:set": "tsx scripts/target-set.ts",
     "twr:explain": "tsx scripts/twr-explain.ts",
+    "projection:converge": "tsx scripts/projection-converge.ts",
     "identity:resolve": "tsx scripts/identity-resolve.ts",
     "postinstall": "prisma generate",
     "test": "vitest run",

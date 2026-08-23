@@ -4,6 +4,9 @@ import type { LeafExposure } from "~/core/projections";
 
 import {
   CONCENTRATION_THRESHOLD,
+  DEFAULT_ALLOCATION_VIEW,
+  parseAllocationView,
+  viewHref,
   readingFor,
   PRESENTATION_THRESHOLD,
   isConcentrated,
@@ -151,5 +154,42 @@ describe("readingFor", () => {
   it("has nothing to say when there is no real leaf", () => {
     expect(readingFor([], 0)).toBeNull();
     expect(readingFor(rows(leaf("FUND", "9000", "UNRESOLVED")), 1)).toBeNull();
+  });
+});
+
+describe("parseAllocationView", () => {
+  const of = (query: string) => parseAllocationView(new URLSearchParams(query));
+
+  it("reads the view from the URL", () => {
+    expect(of("vista=rebalanceo")).toBe("rebalanceo");
+    expect(of("vista=exposicion")).toBe("exposicion");
+  });
+
+  it("falls back to the reading view for anything else", () => {
+    expect(of("")).toBe(DEFAULT_ALLOCATION_VIEW);
+    expect(of("vista=")).toBe(DEFAULT_ALLOCATION_VIEW);
+    expect(of("vista=Rebalanceo")).toBe(DEFAULT_ALLOCATION_VIEW);
+    expect(of("vista=../etc")).toBe(DEFAULT_ALLOCATION_VIEW);
+  });
+});
+
+describe("viewHref", () => {
+  const params = new URLSearchParams("umbral=20&aportacion=500.00&desvio=3");
+
+  it("keeps every other param, so a tab glance costs no state", () => {
+    const href = viewHref(params, "rebalanceo");
+    expect(new URLSearchParams(href).get("umbral")).toBe("20");
+    expect(new URLSearchParams(href).get("aportacion")).toBe("500.00");
+    expect(new URLSearchParams(href).get("desvio")).toBe("3");
+  });
+
+  it("omits the param for the default view instead of spelling it out", () => {
+    expect(viewHref(params, "exposicion")).not.toContain("vista");
+    expect(viewHref(params, "rebalanceo")).toContain("vista=rebalanceo");
+  });
+
+  it("drops a stale view when returning to the default", () => {
+    const away = new URLSearchParams(viewHref(params, "rebalanceo"));
+    expect(viewHref(away, "exposicion")).not.toContain("vista");
   });
 });

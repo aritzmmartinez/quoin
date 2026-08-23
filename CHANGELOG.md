@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-23
+
+### Added
+- Rebalance by contribution (/asignacion): split the next contribution across the active savings plan toward target weights without selling — no realised gain, no tax. The drift threshold shown is informative only; it never changes where the money goes.
+- Projection engine (/proyeccion): p10/p50/p90 by bootstrap of each plan instrument's historical monthly returns, deterministic via a seeded PRNG. Plan and off-plan money are simulated as two correlated pots on the same drawn month. Refuses to print a figure below 60 months of shared history. Nominal and real, optional quartiles (?detalle=1). Two inverse modes: how much to contribute, and how long to reach a goal.
+- pnpm projection:converge — measures, against the plan actually held, how many simulations the result needs to stop moving between seeds. Default raised from 3000 to 10000 based on a real run, not a guess.
+- Opportunity cost (/coste-oportunidad): every real purchase replayed into VWCE.DE at that day's close, so "would I have more money in the index" gets an answer. Difference in euros and in MWR, plus a per-position breakdown, both sides paying the same fees.
+- TER cost (/coste-ter, plus a tile on Resumen): what fund management fees cost per year, and what they add up to over the projection horizon. TER is entered by hand per instrument; an instrument without one is excluded and named rather than assumed free, so the projected cost is a floor, not an estimate.
+
 ## [0.3.0] - 2026-08-20
 
 ### Added
@@ -85,7 +94,8 @@ fund holdings must be supplied as CSV rather than the Excel most issuers publish
 Design rationale lives beside the code it explains, in `docs/ARCHITECTURE.md` and in the
 commit history — not here.
 
-[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.3.0...HEAD
-[0.3.0]: https://github.com/aritzmmartinez/quoin/compare/v0.3.0...HEAD
-[0.2.0]: https://github.com/aritzmmartinez/quoin/compare/v0.2.0
+[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/aritzmmartinez/quoin/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/aritzmmartinez/quoin/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/aritzmmartinez/quoin/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/aritzmmartinez/quoin/releases/tag/v0.1.0

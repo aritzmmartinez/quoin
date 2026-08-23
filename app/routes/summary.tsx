@@ -28,11 +28,13 @@ import {
   computePortfolioSummary,
   computePositions,
   computeTopPositions,
+  computeWeightedTer,
 } from "~/core/projections";
 import {
   computeHeroChange,
   es,
   filterByRange,
+  heldValuesByInstrument,
   instrumentTypeLabel,
   parseRange,
 } from "~/lib";
@@ -42,6 +44,7 @@ import {
   type InstrumentType,
   type Revalue,
 } from "~/core/domain";
+import { loadOpportunityCost } from "~/lib/opportunity-cost.server";
 import { resolveRealView } from "~/lib/real.server";
 
 const TOP_POSITIONS = 5;
@@ -130,9 +133,37 @@ export async function loader({ request }: Route.LoaderArgs) {
     real.revalue ? buildSeries() : portfolioSeries,
   );
 
+  const opportunity = await loadOpportunityCost(
+    events,
+    instruments,
+    prices,
+    undefined,
+    now,
+  );
+
+  const ter = computeWeightedTer(
+    [...heldValuesByInstrument(positions, marketValues)].map(
+      ([instrumentId, held]) => ({
+        instrumentId,
+        value: held.value.toFixed(2),
+        ter: instrumentsById.get(instrumentId)?.ter ?? null,
+      }),
+    ),
+  );
+
   return {
     summary,
     returns,
+    ter:
+      ter.coveredValue === "0"
+        ? null
+        : { weightedTer: ter.weightedTer, annualCost: ter.annualCost },
+    opportunity: opportunity.ok
+      ? {
+          difference: opportunity.result.difference,
+          symbol: opportunity.symbol,
+        }
+      : null,
     allocation,
     top,
     range,
@@ -154,8 +185,18 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export default function Summary({ loaderData }: Route.ComponentProps) {
-  const { summary, returns, allocation, top, range, change, series, real } =
-    loaderData;
+  const {
+    summary,
+    returns,
+    opportunity,
+    ter,
+    allocation,
+    top,
+    range,
+    change,
+    series,
+    real,
+  } = loaderData;
   const hasPositions = summary.pricedCount > 0 || summary.unpricedCount > 0;
 
   if (!hasPositions) {
@@ -188,6 +229,8 @@ export default function Summary({ loaderData }: Route.ComponentProps) {
         unrealizedPnL={summary.unrealizedPnL}
         realizedPnL={summary.realizedPnL}
         positionCount={summary.pricedCount}
+        opportunity={opportunity}
+        ter={ter}
       />
 
       <SummaryReturns

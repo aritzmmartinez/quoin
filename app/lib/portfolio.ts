@@ -6,19 +6,9 @@ import { tradeMetaKey } from "~/core/projections";
 
 import { instrumentTypeLabel } from "./i18n";
 
-/**
- * A single row of the portfolio table: a current position joined with its
- * instrument metadata, trade history and market-derived figures. Fully
- * serializable (strings / plain data only) so it crosses the loader -> component
- * boundary cleanly.
- *
- * Market fields are null when the instrument has no usable price (unmapped, or a
- * non-base-currency quote we don't convert yet).
- */
 export interface PortfolioRow {
-  /** Stable React key / join key: `instrumentId::sleeve`. */
   key: string;
-  instrumentId: string; // ISIN (symbol for crypto)
+  instrumentId: string;
   name: string;
   type: InstrumentType | null;
   sleeve: Sleeve;
@@ -30,9 +20,9 @@ export interface PortfolioRow {
   realizedPnL: string;
   marketValue: string | null;
   unrealizedPnL: string | null;
-  weight: string | null; // fraction 0..1
-  firstTradeAt: string | null; // ISO
-  lastTradeAt: string | null; // ISO
+  weight: string | null;
+  firstTradeAt: string | null;
+  lastTradeAt: string | null;
   tradeCount: number;
 }
 
@@ -55,7 +45,6 @@ export interface Sort {
   dir: SortDir;
 }
 
-/** Default direction per column: names read A→Z, magnitudes read big→small. */
 const DEFAULT_DIR: Record<SortKey, SortDir> = {
   name: "asc",
   type: "asc",
@@ -67,14 +56,12 @@ const DEFAULT_DIR: Record<SortKey, SortDir> = {
   weight: "desc",
 };
 
-/** Landing sort: heaviest holdings first (by portfolio weight). */
 export const DEFAULT_SORT: Sort = { key: "weight", dir: DEFAULT_DIR.weight };
 
 function isSortKey(value: string | null): value is SortKey {
   return value !== null && (SORT_KEYS as readonly string[]).includes(value);
 }
 
-/** Read a validated sort from URL search params, falling back to the default. */
 export function parseSort(params: URLSearchParams): Sort {
   const rawKey = params.get("sort");
   const rawDir = params.get("dir");
@@ -84,11 +71,6 @@ export function parseSort(params: URLSearchParams): Sort {
   return { key, dir };
 }
 
-/**
- * Given a clicked column and the current sort, return the next sort: toggle
- * direction when clicking the active column, otherwise switch to the new column
- * at its natural default direction.
- */
 export function nextSort(key: SortKey, current: Sort): Sort {
   if (key === current.key) {
     return { key, dir: current.dir === "asc" ? "desc" : "asc" };
@@ -96,11 +78,6 @@ export function nextSort(key: SortKey, current: Sort): Sort {
   return { key, dir: DEFAULT_DIR[key] };
 }
 
-/**
- * Join current positions with instrument metadata, trade history and market
- * values. Closed positions (quantity 0) are excluded: this is a *holdings* view,
- * not a historical ledger. Pure and deterministic.
- */
 export function toPortfolioRows(
   positions: readonly Position[],
   instruments: readonly Instrument[],
@@ -147,10 +124,11 @@ const NUMERIC_KEYS = new Set<SortKey>([
   "weight",
 ]);
 
-/** Compare two non-null row values for a key (numeric via Decimal, text via locale). */
 function compareValues(a: PortfolioRow, b: PortfolioRow, key: SortKey): number {
   if (NUMERIC_KEYS.has(key)) {
-    return new Decimal(a[key] as string).comparedTo(new Decimal(b[key] as string));
+    return new Decimal(a[key] as string).comparedTo(
+      new Decimal(b[key] as string),
+    );
   }
   if (key === "type") {
     return instrumentTypeLabel(a.type as InstrumentType).localeCompare(
@@ -162,11 +140,6 @@ function compareValues(a: PortfolioRow, b: PortfolioRow, key: SortKey): number {
   return a.name.localeCompare(b.name, "es", { sensitivity: "base" });
 }
 
-/**
- * Return a new array sorted by the given sort. Stable, non-mutating, and always
- * pushes rows with no value for that column (null) to the bottom regardless of
- * direction — so unpriced holdings never sit above priced ones.
- */
 export function sortPortfolioRows(
   rows: readonly PortfolioRow[],
   sort: Sort,
@@ -191,23 +164,52 @@ function sumOrNull(
   const priced = rows.filter((r) => r[field] !== null);
   if (priced.length === 0) return null;
   return priced
-    .reduce((sum, r) => sum.plus(new Decimal(r[field] as string)), new Decimal(0))
+    .reduce(
+      (sum, r) => sum.plus(new Decimal(r[field] as string)),
+      new Decimal(0),
+    )
     .toFixed(2);
 }
 
-/** Sum of invested amounts (cost basis) across rows, as a base-currency string. */
 export function totalInvested(rows: readonly PortfolioRow[]): string {
   return rows
     .reduce((sum, r) => sum.plus(new Decimal(r.costBasis)), new Decimal(0))
     .toFixed(2);
 }
 
-/** Sum of market value across priced rows, or null if none are priced. */
 export function totalMarketValue(rows: readonly PortfolioRow[]): string | null {
   return sumOrNull(rows, "marketValue");
 }
-
-/** Sum of unrealized P&L across priced rows, or null if none are priced. */
-export function totalUnrealizedPnL(rows: readonly PortfolioRow[]): string | null {
+export function totalUnrealizedPnL(
+  rows: readonly PortfolioRow[],
+): string | null {
   return sumOrNull(rows, "unrealizedPnL");
+}
+
+export interface HeldValue {
+  value: Decimal;
+  unpriced: boolean;
+}
+
+export function heldValuesByInstrument(
+  positions: readonly Position[],
+  marketValues: ReadonlyMap<string, MarketValue>,
+): Map<string, HeldValue> {
+  const held = new Map<string, HeldValue>();
+
+  for (const position of positions) {
+    if (!new Decimal(position.quantity).gt(0)) continue;
+    const market = marketValues.get(
+      tradeMetaKey(position.instrumentId, position.sleeve),
+    );
+    const entry = held.get(position.instrumentId) ?? {
+      value: new Decimal(0),
+      unpriced: false,
+    };
+    if (market?.marketValue == null) entry.unpriced = true;
+    else entry.value = entry.value.plus(market.marketValue);
+    held.set(position.instrumentId, entry);
+  }
+
+  return held;
 }

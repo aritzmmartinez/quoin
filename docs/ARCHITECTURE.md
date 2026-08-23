@@ -28,7 +28,7 @@ Convention: internal imports always use the `~/...` alias.
 ### core
 - `domain/`      value objects (Money as string + decimal.js), ledger event types, exposure leaves, `resolveIntrinsic` / `resolveWithHoldings` / `canonicaliseLeaves`, `InflationIndex` + `Period` / `periodOf` / `deflate` and the `Revalue` function every projection takes to work in real terms, the portfolio target and `getActiveTarget`
 - `ports/`       interfaces: `LedgerRepository`, `InstrumentRepository`, `MarketDataProvider`, `PriceRepository`, `HoldingsRepository`, `SecurityIdentityResolver`, `SecurityIdentityRepository`, `InflationRepository`, `TargetRepository` (planned: `FxProvider`, `TaxJurisdiction`)
-- `projections/` pure functions: `walkAvco` and the two views over it (`computePositions`, `computeRealizedGains`), `computeTradeMeta`, `computeMarketValues`, `computeCostBasisTimeline`, `computeInvestedVsValueSeries`, `computePortfolioSummary` / `computeAllocation` / `computeTopPositions`, `computeReturns` and `computePortfolioReturns` over the shared `xirr` solver, `computeExposures` (look-through), `realBasis`, `deriveTargetWeights` (planned: FIFO lots)
+- `projections/` pure functions: `walkAvco` and the two views over it (`computePositions`, `computeRealizedGains`), `computeTradeMeta`, `computeMarketValues`, `computeCostBasisTimeline`, `computeInvestedVsValueSeries`, `computePortfolioSummary` / `computeAllocation` / `computeTopPositions`, `computeReturns` and `computePortfolioReturns` over the shared `xirr` solver, `computeExposures` (look-through), `realBasis`, `deriveTargetWeights`, `computeRebalance`, `computeProjection` / `projectionWindow` / `solveContribution` / `solveHorizon` (planned: FIFO lots)
 - `tax/`         TaxJurisdiction implementations (bizkaia, common, ...)
 
 ### adapters
@@ -79,7 +79,7 @@ a person can see.
 
 ## Projections that needed a decision
 
-Four of them, written down here because the reasoning is not visible in the code and was
+Five of them, written down here because the reasoning is not visible in the code and was
 otherwise only in a commit message.
 
 #### One AVCO walk, two projections
@@ -129,6 +129,38 @@ nominal even under the real basis, because the flows are the euros that actually
 bank. A compounded return is unauditable as a scalar, so `explainPortfolioTwr` exposes the
 chain link by link and `pnpm twr:explain` ranks it.
 
+#### The projection simulates two pots, and refuses when the window is thin
+
+Where the plan could end up is a bootstrap: months are drawn with replacement from the
+window every planned line shares, and the result is reported as p10/p50/p90 because a
+single line would pretend to know the future. Two decisions carry it.
+
+**Money the plan names and money it does not are separate pots.** The planned one receives
+the contributions at target weights; everything else held compounds at its own weights and
+is never funded, because lending the plan's return distribution to a position the plan does
+not mention is the same error as pro-rating an `UNRESOLVED` leaf. Both pots advance on the
+**same drawn month index** — drawing separately would treat the two halves of the portfolio
+as independent and understate a bad month. A held position that does not cover the whole
+window is reported with its value and left out; adding it flat at 0% would be as false a
+claim as lending it the plan's returns, and letting it shorten the window would let last
+month's purchase shrink the sample everything rests on.
+
+**Below sixty shared months the screen prints no number at all.** Resampling one market
+regime and compounding it for decades extrapolates that regime, and a caveat under a large
+figure stops being read — the same rule that has a CPI hole disable real mode outright.
+`projectionWindow` is separate from the simulation precisely so the refusal can name the
+limiting instrument without simulating anything.
+
+The loop is the one place floats are allowed: it reports a guess, and a Monte Carlo median
+quoted to the cent claims a precision the method does not have. `Money` still guards the
+boundaries. How many paths to draw is **measured, not chosen** — `pnpm projection:converge`
+reports how far each percentile moves between seeds at several simulation counts, as a
+standard deviation rather than a range (a range grows with the seed count and makes two
+runs incomparable) and fitted over the whole grid rather than its end rows. The tail is
+about four times noisier than the median at any count, because it is estimated from far
+fewer of the drawn paths; it converges at the same `1/√N` all the same, and the screen says
+so rather than implying more history would settle it.
+
 ## Persistence (Prisma 7 + SQLite)
 
 - **Prisma 7** uses a query compiler and **requires a driver adapter**: SQLite uses
@@ -138,9 +170,9 @@ chain link by link and `pnpm twr:explain` ranks it.
   and the lint boundary keeps `core` from importing it.
 - The connection URL lives in **`prisma.config.ts`** (Prisma 7), not in the datasource block.
 - **Models**: `Instrument` (master, key = ISIN or symbol; `quoteSymbol` for price lookups and
-  `exposureKind`/`exposureLeafId` for look-through — all three set by CLI or the instruments
-  screen, never by ingestion, and omitted from `InstrumentWriteData` at the type level so a
-  re-import cannot clobber them), `LedgerEntry` (immutable ledger), `PriceSnapshot`
+  `exposureKind`/`exposureLeafId` for look-through, `ter` for the annual fee — all four set by
+  CLI or the instruments screen, never by ingestion, and omitted from `InstrumentWriteData` at
+  the type level so a re-import cannot clobber them), `LedgerEntry` (immutable ledger), `PriceSnapshot`
   (append-only price history, `@@unique([instrumentId, asOf])`), `EtfHolding` (a fund's
   published composition), `InflationIndex` (monthly CPI levels), `PortfolioTarget` +
   `PortfolioTargetLine` (the savings plan, one version per `activeFrom`, one line per

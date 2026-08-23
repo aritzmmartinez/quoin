@@ -79,6 +79,14 @@ export const es = {
       unrealized: { label: "P&L latente", sub: "Valor menos aportado" },
       realized: { label: "P&L realizado", sub: "Beneficio de ventas cerradas" },
       positions: { label: "Posiciones", sub: "Abiertas y valoradas" },
+      opportunity: {
+        label: "vs índice",
+        sub: (symbol: string): string => `Frente a ${symbol}`,
+      },
+      ter: {
+        label: "TER ponderado",
+        sub: (annual: string): string => `${annual} al año en gestión`,
+      },
     },
     returns: {
       twr: { label: "TWR", sub: "ponderada por tiempo" },
@@ -100,6 +108,11 @@ export const es = {
     },
   },
   allocation: {
+    views: {
+      label: "Vista",
+      exposicion: "Exposición",
+      rebalanceo: "Rebalanceo",
+    },
     intro:
       "Posición directa + peso dentro de tus ETFs (look-through). El tramo sólido de la barra es lo que compraste tú; el apagado viaja dentro de un fondo.",
     title: "Exposición real por valor",
@@ -142,6 +155,49 @@ export const es = {
       threshold: "Umbral configurado",
       empty: "Todavía no hay exposición resuelta que leer.",
     },
+  },
+  rebalance: {
+    title: "Rebalanceo por aportación",
+    intro:
+      "Dónde poner la próxima aportación para acercarte al objetivo sin vender nada. Vender realiza ganancia y tributa; aportar no, así que el reparto solo mueve dinero nuevo hacia lo que va por debajo de su peso.",
+    amount: "Próxima aportación",
+    amountPlaceholder: "500",
+    threshold: "Umbral de desvío (%)",
+    submit: "Calcular",
+    noTarget:
+      "Todavía no hay ningún objetivo vigente. Define tu plan de aportación en Objetivo y vuelve aquí.",
+    prompt: "Escribe cuánto vas a aportar y verás el reparto sugerido.",
+    hypothesis:
+      "Es una sugerencia, no una orden: no se guarda nada ni se ejecuta ninguna compra.",
+    columns: {
+      instrument: "Instrumento",
+      amount: "Aportar",
+      current: "Valor actual",
+      drift: "Desvío",
+    },
+    targetSuffix: (weight: string): string => `${weight} objetivo`,
+    driftArrow: (before: string, after: string): string =>
+      `${before} → ${after}`,
+    total: "Total repartido",
+    overThreshold: (drift: string, threshold: string): string =>
+      `Tu cartera acumula un ${drift} de desvío, por encima de tu umbral del ${threshold}.`,
+    underThreshold: (drift: string, threshold: string): string =>
+      `Tu cartera acumula un ${drift} de desvío, dentro de tu umbral del ${threshold}.`,
+    driftHint:
+      "El desvío es lo que se separa cada línea de su peso objetivo, y el total es la suma de todas. El umbral es informativo: el reparto siempre rellena lo que va por debajo.",
+    worsening: "Se aleja del objetivo aun recibiendo aportación",
+    worseningHint:
+      "Esta línea recibe aportación y aun así se aleja de su objetivo, porque otra posición del plan está sobreponderada y no se vende: el hueco que ocupa de más no se puede rellenar con dinero nuevo, solo diluir. Aportaciones mayores lo corrigen; venderla tributaría.",
+    unpriced: (names: string): string =>
+      `Sin precio utilizable, así que quedan fuera del reparto: ${names}. Un precio que falta no es un valor de cero — ejecuta pnpm prices:sync antes de fiarte del reparto.`,
+    offPlan: (count: number): string =>
+      count === 1
+        ? "1 posición en cartera, fuera del plan"
+        : `${count} posiciones en cartera, fuera del plan`,
+    offPlanNote:
+      "Tienes posición en esto y tu objetivo vigente no lo nombra. No recibe aportación: meter dinero nuevo ahí no es rebalancear, es cambiar de plan, y eso se hace en Objetivo.",
+    empty:
+      "Ninguna línea del objetivo se puede repartir todavía. Importa operaciones y sincroniza precios.",
   },
   holdings: {
     drop: "Arrastra aquí el CSV o Excel de posiciones del fondo",
@@ -199,11 +255,15 @@ export const es = {
       leaf: "Hoja",
       resolvesTo: "Resuelve a",
       composition: "Composición",
+      ter: "TER %",
       held: "Valor",
     },
     defaultOption: "(por defecto del tipo)",
     leafPlaceholder: "XAU, BTC…",
     leafRequired: "Esta clase necesita una hoja (p. ej. XAU).",
+    terPlaceholder: "0,22",
+    terInvalid:
+      "El TER va en porcentaje anual, entre 0 y 5. Un 0,22% se escribe 0,22.",
     invalid: "Datos no válidos.",
     save: "Guardar",
     saving: "…",
@@ -252,6 +312,115 @@ export const es = {
         `No se ha guardado nada. Estos identificadores no coinciden con los importados: ${pairs}. Una línea se une a su instrumento por identificador exacto, así que nunca resolverían.`,
       saveFailed: "No se ha podido guardar la versión.",
     },
+  },
+  projection: {
+    title: "Proyección",
+    intro:
+      "Si sigues aportando según tu plan vigente, dónde podría acabar la cartera. No es una previsión: es un remuestreo de los meses que tus propios instrumentos ya han vivido. Por eso responde con un rango y no con una cifra — una única línea fingiría conocer el futuro.",
+    noTarget:
+      "No hay ningún objetivo vigente que proyectar. Define tu plan de aportación en Objetivo y vuelve aquí.",
+    fromTarget: "simula tu plan actual →",
+    noHistory:
+      "Ninguna línea de tu plan tiene histórico de precios, así que no hay nada que remuestrear. Mapea sus símbolos con pnpm prices:map y descarga el histórico con pnpm prices:backfill.",
+    noWindow:
+      "Las líneas de tu plan no comparten ni un solo mes de histórico, así que no hay ventana común que remuestrear. Amplía el histórico más corto con pnpm prices:backfill.",
+    thinWindow: {
+      title: "Sin cifras todavía: la ventana es demasiado corta",
+      body: (months: number, minimum: number, instrument: string): string =>
+        `Tus líneas comparten ${months} ${months === 1 ? "mes" : "meses"} de histórico y hacen falta ${minimum}. La ventana la recorta ${instrument}, que es la que menos historial tiene.`,
+      why: (months: number, years: number): string =>
+        `No es un aviso que puedas saltarte: remuestrear ${months} meses de un tramo de mercado concreto y componerlos ${years * 12} meses hacia delante no proyecta tu cartera, extrapola ese tramo. Un número así se lee como una previsión por mucho que lleve una nota debajo, y decidir cuánto aportas sobre él sería decidirlo sobre esos ${months} meses.`,
+      fix: (instrument: string): string =>
+        `Ejecuta pnpm prices:backfill sobre ${instrument} (por defecto trae 5 años) y vuelve. En cuanto la ventana llegue al mínimo, la pantalla da cifras.`,
+    },
+    form: {
+      horizon: "Horizonte (años)",
+      contribution: "Aportación mensual",
+      goal: "Objetivo (opcional)",
+      goalPlaceholder: "1.000.000",
+      submit: "Proyectar",
+      detail: "Ver más detalle",
+      detailHint:
+        "Añade los cuartiles (percentiles 25 y 75) entre los tres escenarios. No vuelve a simular: son dos lecturas más de la misma distribución ya calculada.",
+    },
+    bands: {
+      title: (years: number): string =>
+        years === 1 ? "Dentro de 1 año" : `Dentro de ${years} años`,
+      p10: "Escenario malo",
+      p25: "Cuartil bajo",
+      p50: "Escenario central",
+      p75: "Cuartil alto",
+      p90: "Escenario bueno",
+      p10Hint:
+        "Percentil 10: una de cada diez simulaciones acaba por debajo de esta cifra.",
+      p25Hint:
+        "Percentil 25: una de cada cuatro simulaciones acaba por debajo de esta cifra. Entre el escenario malo y el central está la mitad del riesgo que no se ve con tres cifras.",
+      p75Hint:
+        "Percentil 75: solo una de cada cuatro simulaciones acaba por encima de esta cifra.",
+      p50Hint:
+        "Percentil 50: la mitad de las simulaciones acaba por encima y la mitad por debajo. Es la mediana, no un promedio.",
+      p90Hint:
+        "Percentil 90: solo una de cada diez simulaciones acaba por encima de esta cifra. Es la que se estima con menos caminos, así que es la que más se mueve al cambiar de semilla.",
+      real: (amount: string): string => `${amount} en euros de hoy`,
+      noReal:
+        "Sin datos de IPC no se puede expresar en euros de hoy. Ejecuta pnpm ipc:sync.",
+    },
+    contributed: (amount: string): string =>
+      `De ahí, ${amount} sale de tu bolsillo: lo que ya tienes simulado más todas las aportaciones del horizonte.`,
+    method: {
+      title: "Cómo se ha calculado",
+      window: (months: number, instrument: string): string =>
+        `Se remuestrean ${months} meses de histórico, la ventana que comparten todas las líneas del plan. La recorta ${instrument}, que es la que menos historial tiene: rellenar los meses que le faltan sería inventarlos.`,
+      drift: (annual: string, years: number): string =>
+        `Esa ventana compone un ${annual} anual, y es la deriva que el remuestreo extrapola ${years} ${years === 1 ? "año" : "años"} hacia delante. Si te parece alta para un plazo largo, lo es: mira ese número antes que el titular.`,
+      simulations: (count: number, seed: number): string =>
+        `${count} simulaciones, semilla ${seed}: los mismos datos dan siempre el mismo resultado.`,
+      tailNoise: (simulations: number, months: number): string =>
+        `De las tres cifras, la del escenario bueno es la menos firme: cambiando solo la semilla se mueve unas cuatro veces más que las otras dos. No es la ventana quien la limita — las tres se estrechan al mismo ritmo al subir las simulaciones —, es que una cola se estima con muchos menos caminos que la mediana. Se arregla con más simulaciones, solo que hace falta más de un orden de magnitud sobre las ${simulations} de aquí, y eso encarecería cada respuesta a un objetivo. Sería reproducibilidad, no acierto: lo que limitan ${months} meses de muestra es la exactitud de las tres cifras a la vez, no la firmeza de esta.`,
+      inflation: (annual: string): string =>
+        `El importe en euros de hoy descuenta un ${annual} anual, la media histórica del IPC. No hay IPC futuro, así que se asume que la inflación también se parece a su pasado.`,
+      fixedWeights:
+        "Los pesos del plan se mantienen fijos durante todo el horizonte y las aportaciones entran a principio de mes.",
+      twoPots: (offPlan: string): string =>
+        `La parte de fuera del plan que llega a la ventana (${offPlan}) se simula aparte, con sus propios rendimientos y sin recibir aportaciones — prestarle la varianza del plan a otra cosa sería inventarse su riesgo. Ambos botes avanzan sobre el mismo mes sorteado, así que un mal mes lo es para toda la cartera a la vez.`,
+      allOffPlanExcluded:
+        "El bote de fuera del plan queda vacío, y no porque no tengas nada fuera del plan: es que nada de lo que tienes ahí llega a la ventana, así que todo ello queda sin simular — lo tienes detallado arriba, con su importe.",
+      noOffPlan:
+        "Todo lo que tienes en cartera lo nombra el plan, así que no hay nada que simular aparte.",
+    },
+    excluded: (names: string, coverage: string): string =>
+      `Sin histórico de precios, así que quedan fuera de la simulación: ${names}. Los pesos restantes se reparten el 100%, de modo que lo proyectado es el ${coverage} de tu plan, no el plan entero. Ejecuta pnpm prices:backfill antes de fiarte del rango.`,
+    unsimulated: (names: string, amount: string): string =>
+      `${amount} en posiciones fuera del plan con menos histórico que la ventana: ${names}. No entran en las cifras de arriba ni se suman al final. Congelarlas veinte años a un 0% sería una afirmación tan falsa como prestarles el rendimiento del plan; que el plan fije la ventana es lo que evita que una compra reciente la encoja para todo lo demás.`,
+    unpriced: (count: number): string =>
+      count === 1
+        ? "1 posición sin precio utilizable queda fuera del valor de partida. Un precio que falta no es un valor de cero."
+        : `${count} posiciones sin precio utilizable quedan fuera del valor de partida. Un precio que falta no es un valor de cero.`,
+    goal: {
+      title: (amount: string): string => `Para llegar a ${amount}`,
+      contribution: (amount: string, years: number): string =>
+        `Aportando ${amount} al mes, el escenario central alcanza el objetivo en ${years === 1 ? "1 año" : `${years} años`}.`,
+      contributionUnreachable:
+        "No hay aportación mensual que lleve el escenario central hasta ahí en este horizonte. Alarga el plazo o baja el objetivo.",
+      horizon: (amount: string, horizon: string): string =>
+        `Con ${amount} al mes, el escenario central llega al objetivo en ${horizon}.`,
+      horizonNow: "Ya lo has alcanzado: tu cartera vale más que el objetivo.",
+      horizonUnreachable:
+        "Con esa aportación el escenario central no llega al objetivo ni en un siglo.",
+      caveat:
+        "Ambas respuestas apuntan a la mediana. Que el escenario central llegue no significa que vayas a llegar: la mitad de las simulaciones acaban por debajo.",
+    },
+    horizonLabel: (months: number): string => {
+      const years = Math.floor(months / 12);
+      const rest = months % 12;
+      const y = years === 1 ? "1 año" : `${years} años`;
+      const m = rest === 1 ? "1 mes" : `${rest} meses`;
+      if (years === 0) return m;
+      if (rest === 0) return y;
+      return `${y} y ${m}`;
+    },
+    hypothesis:
+      "Es una simulación, no una promesa: no se guarda nada y ningún rendimiento pasado obliga al futuro.",
   },
   movements: {
     title: "Movimientos",
@@ -351,6 +520,104 @@ export const es = {
       title: "Sin ventas todavía",
       body: "Cuando vendas algo, aquí aparecerá el resultado de cada operación.",
     },
+  },
+  opportunity: {
+    title: "Coste de oportunidad",
+    intro: (symbol: string): string =>
+      `Qué habría pasado si cada compra hubiera ido al índice (${symbol}) en vez del activo que elegiste: mismas fechas, mismos importes y las mismas comisiones a ambos lados. Lo que sobra o falta es selección de activos, no coste de operar.`,
+    taxWarning:
+      "El contrafactual nunca vende, así que tampoco tributa: las ganancias que sí generaron tus ventas reales pagan impuestos que aquí no se descuentan. La cifra es una referencia de qué tal fue la selección de activos, no una comparación fiscalmente perfecta.",
+    nominal:
+      "Todas las cifras son nominales, sin ajustar por inflación: la comparación es entre dos destinos del mismo dinero, y el IPC afecta igual a los dos.",
+    stats: {
+      real: { label: "Cartera real", sub: "Valor de hoy más lo ya vendido" },
+      benchmark: { label: "Contrafactual", sub: "Todo al índice, sin vender" },
+      difference: { label: "Diferencial", sub: "Real menos contrafactual" },
+      realMwr: { label: "MWR real", sub: "ponderada por dinero" },
+      benchmarkMwr: {
+        label: "MWR contrafactual",
+        sub: "mismo dinero, otro destino",
+      },
+      mwrDifference: {
+        label: "Diferencia de MWR",
+        sub: "Real menos contrafactual",
+      },
+      unavailable: "sin solución",
+    },
+    proceeds: (amount: string): string =>
+      `La cartera real incluye ${amount} de ventas ya cobradas: el contrafactual nunca vende, así que dejarlas fuera le regalaría cada euro que realizaste.`,
+    table: {
+      title: "Por posición",
+      note: "Cada línea compara lo que ese instrumento vale hoy (más lo que cobraste al venderlo) con lo que ese mismo dinero valdría en el índice. Las líneas suman el diferencial total.",
+      instrument: "Instrumento",
+      contributed: "Aportado",
+      real: "Real",
+      benchmark: "Contrafactual",
+      difference: "Diferencial",
+    },
+    truncated: (
+      symbol: string,
+      date: string,
+      count: number,
+      amount: string,
+    ): string =>
+      `El histórico de ${symbol} empieza el ${date}. ${count} ${count === 1 ? "compra anterior" : "compras anteriores"} (${amount}) no compran nada en el contrafactual —interpolar un precio que nadie publicó sería inventarlo—, pero siguen contando en la cartera real: el diferencial la favorece en esa medida. Amplía el histórico con pnpm prices:backfill.`,
+    unpriced: (names: string): string =>
+      `Sin precio utilizable: ${names}. Se excluyen de los dos lados, porque contar su coste sin su valor inventaría una pérdida.`,
+    unmapped: (symbol: string): string =>
+      `Ningún instrumento está mapeado a ${symbol}, así que no hay índice contra el que comparar. Ejecuta pnpm prices:map <ISIN> ${symbol}.`,
+    noHistory: (symbol: string): string =>
+      `${symbol} no tiene histórico de precios en euros. Ejecuta pnpm prices:backfill <ISIN> max para descargarlo.`,
+    empty: {
+      title: "Sin compras todavía",
+      body: "Importa tus movimientos para poder reproducirlos contra el índice.",
+    },
+  },
+  ter: {
+    title: "Coste del TER",
+    intro:
+      "Lo que te cuesta al año la gestión de tus fondos, y cuánto suma ese coste proyectado hacia delante. El TER lo escribes tú en la pantalla de instrumentos: no viene en ningún extracto, y un instrumento sin dato se queda fuera del ponderado en vez de contar como gratis.",
+    weighted: {
+      label: "TER ponderado",
+      sub: (coverage: string): string =>
+        `Sobre el ${coverage} de tu valor con TER conocido`,
+    },
+    annual: { label: "Coste anual", sub: "Al ritmo de hoy, un año" },
+    coverage: (covered: string, total: string): string =>
+      `${covered} de ${total} tienen TER en ficha.`,
+    unknown: (names: string): string =>
+      `Sin TER en ficha: ${names}. Quedan fuera del ponderado y cuentan como 0% en la proyección, así que el coste acumulado es un suelo, no una estimación. Anótalo en la pantalla de instrumentos.`,
+    none: {
+      title: "Ningún instrumento tiene TER",
+      body: "Anota el TER de tus fondos en la pantalla de instrumentos y esta pantalla empezará a decir algo.",
+    },
+    projected: {
+      title: (years: number): string =>
+        `Coste acumulado a ${years} ${years === 1 ? "año" : "años"}`,
+      note: "El precio de un fondo ya viene neto de su TER: así funciona un fondo. Así que aquí no se resta nada, se simula el gemelo que no cobrara comisión y se compara camino a camino, mes sorteado a mes sorteado. La diferencia es la comisión; no es ruido de muestreo.",
+      p10: { label: "Escenario malo", sub: "percentil 10" },
+      p50: { label: "Escenario central", sub: "mediana" },
+      p90: { label: "Escenario bueno", sub: "percentil 90" },
+      horizon: (years: number, contribution: string): string =>
+        `${years} ${years === 1 ? "año" : "años"} aportando ${contribution} al mes, sobre lo que ya tienes.`,
+    },
+    unavailable: {
+      "no-target":
+        "Sin objetivo vigente no hay plan que proyectar, así que el coste acumulado no se puede calcular. La cifra anual de arriba sí vale.",
+      "no-window":
+        "Los instrumentos del plan no comparten ni un mes de histórico, así que no hay nada que remuestrear.",
+      "thin-window": (months: number, name: string): string =>
+        `El histórico común es de ${months} meses y hacen falta 60. El que manda es ${name}: amplíalo con pnpm prices:backfill.`,
+    },
+    table: {
+      title: "Por posición",
+      instrument: "Instrumento",
+      value: "Valor",
+      ter: "TER",
+      annualCost: "Coste anual",
+      unknown: "Sin dato",
+    },
+    link: "Ver coste del TER",
   },
   instrument: {
     back: "Cartera",
