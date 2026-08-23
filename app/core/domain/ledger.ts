@@ -33,9 +33,6 @@ export const instrumentSchema = z.object({
   quoteSymbol: z.string().nullish(),
   exposureKind: exposureKindSchema.nullish(),
   exposureLeafId: z.string().nullish(),
-  // Lenient on purpose: the range lives at the write boundary (`terPercentSchema`),
-  // not here. A stored value the domain refused would throw on every read of the
-  // instrument list — the `LedgerEntry.type` trap, one layer up.
   ter: decimalString.nullish(),
 });
 export type Instrument = z.infer<typeof instrumentSchema>;
@@ -88,17 +85,6 @@ export type LedgerEventType = LedgerEvent["type"];
 
 export const MAX_TER_PERCENT = 5;
 
-/**
- * A TER as a human types it on the instruments screen: percent, es-ES comma
- * allowed ("0,22" -> "0.002200").
- *
- * Bounded at the *write* boundary rather than in `instrumentSchema`. A fund
- * charging over 5% a year does not exist in this portfolio, while "0,22" typed
- * where a fraction was expected is 22% a year — a typo that would not look wrong
- * on screen and would quietly multiply the projected cost by a hundred. Refusing
- * is the correct failure; a flag next to a number already inside the arithmetic
- * is not.
- */
 export const terPercentSchema = z
   .string()
   .trim()
