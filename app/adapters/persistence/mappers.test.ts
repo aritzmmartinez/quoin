@@ -69,6 +69,7 @@ const instrument: Instrument = {
   quoteSymbol: null,
   exposureKind: null,
   exposureLeafId: null,
+  ter: null,
 };
 
 describe("ledger mappers", () => {
@@ -103,6 +104,7 @@ describe("instrument mappers", () => {
       ...instrumentToWriteData(instrument),
       quoteSymbol: null,
       exposureKind: null,
+      ter: null,
       exposureLeafId: null,
     };
     expect(rowToInstrument(row)).toEqual(instrument);

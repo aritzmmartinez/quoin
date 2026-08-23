@@ -24,6 +24,10 @@ class FakeInstrumentRepository implements InstrumentRepository {
     const instrument = this.upserted.find((i) => i.id === id);
     if (instrument) instrument.quoteSymbol = symbol;
   }
+  async setTer(id: string, ter: string | null): Promise<void> {
+    const instrument = this.upserted.find((i) => i.id === id);
+    if (instrument) instrument.ter = ter;
+  }
   async setExposure(
     id: string,
     kind: ExposureKind | null,

@@ -137,11 +137,12 @@ export interface InstrumentRow {
   quoteSymbol: string | null;
   exposureKind: string | null;
   exposureLeafId: string | null;
+  ter: string | null;
 }
 
 export type InstrumentWriteData = Omit<
   InstrumentRow,
-  "quoteSymbol" | "exposureKind" | "exposureLeafId"
+  "quoteSymbol" | "exposureKind" | "exposureLeafId" | "ter"
 >;
 
 export function rowToInstrument(row: InstrumentRow): Instrument {
@@ -154,6 +155,7 @@ export function rowToInstrument(row: InstrumentRow): Instrument {
     quoteSymbol: row.quoteSymbol ?? null,
     exposureKind: row.exposureKind ?? null,
     exposureLeafId: row.exposureLeafId ?? null,
+    ter: row.ter ?? null,
   });
 }
 
