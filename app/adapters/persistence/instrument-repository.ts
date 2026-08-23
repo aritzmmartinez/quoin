@@ -36,6 +36,10 @@ export class PrismaInstrumentRepository implements InstrumentRepository {
     });
   }
 
+  async setTer(id: string, ter: string | null): Promise<void> {
+    await prisma.instrument.update({ where: { id }, data: { ter } });
+  }
+
   async setExposure(
     id: string,
     kind: ExposureKind | null,

@@ -16,12 +16,14 @@ export interface ProjectionSourceLine {
   instrumentId: string;
   targetWeight: string;
   monthlyReturns: readonly MonthlyReturn[];
+  ter?: string | null;
 }
 
 export interface ProjectionHeldLine {
   instrumentId: string;
   value: string;
   monthlyReturns: readonly MonthlyReturn[];
+  ter?: string | null;
 }
 
 export interface ProjectionInput {
@@ -33,6 +35,14 @@ export interface ProjectionInput {
   monthlyInflation?: string | null;
   simulations?: number;
   seed?: number;
+  terCost?: boolean;
+}
+
+export interface TerCostResult {
+  p10: string;
+  p50: string;
+  p90: string;
+  unknownInstrumentIds: string[];
 }
 
 export interface ProjectionResult {
@@ -55,6 +65,7 @@ export interface ProjectionResult {
   limitingInstrumentId: string;
   simulations: number;
   seed: number;
+  terCost: TerCostResult | null;
 }
 
 export const DEFAULT_SIMULATIONS = 10000;
@@ -204,8 +215,35 @@ function blend(
   );
 }
 
+interface FeeBearing {
+  instrumentId: string;
+  monthlyReturns: readonly MonthlyReturn[];
+  ter?: string | null;
+}
+
+function grossSeries(line: FeeBearing): readonly MonthlyReturn[] {
+  if (line.ter == null || line.ter === "") return line.monthlyReturns;
+
+  const ter = new Decimal(line.ter);
+  if (!ter.isFinite() || ter.isNegative()) {
+    throw new Error(`Not an annual fee for ${line.instrumentId}: ${line.ter}`);
+  }
+  if (ter.isZero()) return line.monthlyReturns;
+
+  const monthly = ter.plus(1).pow(new Decimal(1).div(MONTHS_PER_YEAR));
+  return line.monthlyReturns.map(({ period, change }) => ({
+    period,
+    change: monthly
+      .times(change + 1)
+      .minus(1)
+      .toNumber(),
+  }));
+}
+
 interface OffPlan {
   series: number[];
+  covering: ProjectionHeldLine[];
+  weights: number[];
   value: Money;
   unsimulatedValue: Money;
   unsimulatedInstrumentIds: string[];
@@ -249,6 +287,8 @@ function offPlanPot(
       covering.map((line) => line.monthlyReturns),
       weights,
     ),
+    covering,
+    weights,
     value,
     unsimulatedValue,
     unsimulatedInstrumentIds,
@@ -307,16 +347,35 @@ export function computeProjection(input: ProjectionInput): ProjectionResult {
     );
   }
 
+  const planWeights = weightsOf(lines);
   const planSeries = blend(
     periods,
     lines.map((line) => line.monthlyReturns),
-    weightsOf(lines),
+    planWeights,
   );
   const offPlan = offPlanPot(heldLines, periods);
 
-  const finals = simulate(
+  const feeLines: FeeBearing[] = [...lines, ...offPlan.covering];
+  const gross =
+    input.terCost === true && feeLines.some((line) => line.ter != null)
+      ? {
+          plan: blend(periods, lines.map(grossSeries), planWeights),
+          offPlan: blend(
+            periods,
+            offPlan.covering.map(grossSeries),
+            offPlan.weights,
+          ),
+          unknownInstrumentIds: feeLines
+            .filter((line) => line.ter == null || line.ter === "")
+            .map((line) => line.instrumentId)
+            .sort(),
+        }
+      : null;
+
+  const { finals, costs } = simulate(
     planSeries,
     offPlan.series,
+    gross,
     horizonMonths,
     planned.toNumber(),
     offPlan.value.toNumber(),
@@ -357,32 +416,53 @@ export function computeProjection(input: ProjectionInput): ProjectionResult {
     limitingInstrumentId,
     simulations,
     seed,
+    terCost:
+      costs === null || gross === null
+        ? null
+        : {
+            p10: toMoney(percentile(costs, 0.1)).toString(),
+            p50: toMoney(percentile(costs, 0.5)).toString(),
+            p90: toMoney(percentile(costs, 0.9)).toString(),
+            unknownInstrumentIds: gross.unknownInstrumentIds,
+          },
   };
 }
 
 function simulate(
   planSeries: readonly number[],
   offPlanSeries: readonly number[],
+  gross: { plan: readonly number[]; offPlan: readonly number[] } | null,
   horizonMonths: number,
   planned: number,
   offPlan: number,
   contribution: number,
   simulations: number,
   seed: number,
-): Float64Array {
+): { finals: Float64Array; costs: Float64Array | null } {
   const random = mulberry32(seed);
   const finals = new Float64Array(simulations);
+  const costs = gross === null ? null : new Float64Array(simulations);
   for (let s = 0; s < simulations; s += 1) {
     let inPlan = planned;
     let outOfPlan = offPlan;
+    let inPlanGross = planned;
+    let outOfPlanGross = offPlan;
     for (let m = 0; m < horizonMonths; m += 1) {
       const drawn = Math.floor(random() * planSeries.length);
       inPlan = (inPlan + contribution) * (1 + (planSeries[drawn] ?? 0));
       outOfPlan = outOfPlan * (1 + (offPlanSeries[drawn] ?? 0));
+      if (gross !== null) {
+        inPlanGross =
+          (inPlanGross + contribution) * (1 + (gross.plan[drawn] ?? 0));
+        outOfPlanGross = outOfPlanGross * (1 + (gross.offPlan[drawn] ?? 0));
+      }
     }
     finals[s] = inPlan + outOfPlan;
+    if (costs !== null) {
+      costs[s] = inPlanGross + outOfPlanGross - (inPlan + outOfPlan);
+    }
   }
-  return finals.sort();
+  return { finals: finals.sort(), costs: costs === null ? null : costs.sort() };
 }
 
 function impliedAnnualReturn(series: readonly number[]): string {

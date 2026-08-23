@@ -140,6 +140,7 @@ export function buildProjectionSource(
       instrumentId: allocation.instrumentId,
       targetWeight: allocation.weight,
       monthlyReturns,
+      ter: instruments.get(allocation.instrumentId)?.ter ?? null,
     });
   }
 
@@ -150,6 +151,7 @@ export function buildProjectionSource(
       instrumentId,
       value,
       monthlyReturns: toMonthlyReturns(histories.get(instrumentId) ?? [], asOf),
+      ter: instruments.get(instrumentId)?.ter ?? null,
     });
   }
 

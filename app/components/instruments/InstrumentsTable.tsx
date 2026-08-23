@@ -9,6 +9,7 @@ import {
   formatDate,
   formatMoney,
   formatPercent,
+  terToPercentInput,
   type InstrumentListItem,
 } from "~/lib";
 
@@ -16,7 +17,7 @@ import { HoldingsUpload } from "./HoldingsUpload";
 
 const KINDS = exposureKindSchema.options;
 const GRID =
-  "grid-cols-[minmax(0,1.4fr)_150px_150px_minmax(0,160px)_112px] items-center gap-3";
+  "grid-cols-[minmax(0,1.4fr)_150px_120px_150px_minmax(0,160px)_112px] items-center gap-3";
 
 export function InstrumentsTable({ items }: { items: InstrumentListItem[] }) {
   const copy = es.instruments;
@@ -38,6 +39,7 @@ export function InstrumentsTable({ items }: { items: InstrumentListItem[] }) {
           <span>{copy.columns.instrument}</span>
           <span>{copy.columns.exposure}</span>
           <span>{copy.columns.leaf}</span>
+          <span>{copy.columns.ter}</span>
           <span>{copy.columns.composition}</span>
           <span className="text-right">{copy.columns.held}</span>
         </div>
@@ -57,11 +59,14 @@ function InstrumentRow({ item }: { item: InstrumentListItem }) {
 
   const [kind, setKind] = useState<string>(item.exposureKind ?? "");
   const [leaf, setLeaf] = useState<string>(item.exposureLeafId ?? "");
+  const [ter, setTer] = useState<string>(terToPercentInput(item.ter));
   const [uploading, setUploading] = useState(false);
 
   const needsLeaf = KINDS_NEEDING_LEAF.some((k) => k === kind);
   const dirty =
-    kind !== (item.exposureKind ?? "") || leaf !== (item.exposureLeafId ?? "");
+    kind !== (item.exposureKind ?? "") ||
+    leaf !== (item.exposureLeafId ?? "") ||
+    ter !== terToPercentInput(item.ter);
   const busy = fetcher.state !== "idle";
   const saved = fetcher.data?.ok === true && !dirty;
   const error = fetcher.data?.ok === false ? fetcher.data.error : undefined;
@@ -101,16 +106,26 @@ function InstrumentRow({ item }: { item: InstrumentListItem }) {
             ))}
           </select>
 
+          <input
+            name="exposureLeafId"
+            value={leaf}
+            onChange={(e) => setLeaf(e.target.value)}
+            disabled={!needsLeaf}
+            required={needsLeaf}
+            aria-label={copy.columns.leaf}
+            placeholder={needsLeaf ? copy.leafPlaceholder : DASH}
+            className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-[12px] disabled:opacity-40"
+          />
+
           <div className="flex items-center gap-2">
             <input
-              name="exposureLeafId"
-              value={leaf}
-              onChange={(e) => setLeaf(e.target.value)}
-              disabled={!needsLeaf}
-              required={needsLeaf}
-              aria-label={copy.columns.leaf}
-              placeholder={needsLeaf ? copy.leafPlaceholder : DASH}
-              className="w-21.5 rounded-md border border-border bg-surface px-2 py-1.5 text-[12px] disabled:opacity-40"
+              name="ter"
+              value={ter}
+              onChange={(e) => setTer(e.target.value)}
+              inputMode="decimal"
+              aria-label={copy.columns.ter}
+              placeholder={copy.terPlaceholder}
+              className="w-16 rounded-md border border-border bg-surface px-2 py-1.5 text-right text-[12px] tabular-nums"
             />
             <button
               type="submit"

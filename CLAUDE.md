@@ -172,7 +172,7 @@ ledger while that rule is in force. Useful, but do not mistake it for a sandbox.
 
 ## Privacy and the no-clobber rule
 
-`Instrument.quoteSymbol`, `exposureKind` and `exposureLeafId` are set by CLI or the
+`Instrument.quoteSymbol`, `exposureKind`, `exposureLeafId` and `ter` are set by CLI or the
 instruments screen and live **only** in the local, gitignored SQLite database. Never commit
 symbols, ISINs, quantities, holdings or broker exports — this repo is public and that data
 would publish the author's portfolio. `*.csv` is gitignored.
@@ -182,9 +182,9 @@ whose compositions get imported *is* the portfolio. A parser test using the real
 and Amundi exports would disclose which funds are held, as surely as committing a
 `quoteSymbol` would. Copy the shape, invent the data.
 
-Ingestion must never write those three columns. This is enforced by the type, not by
+Ingestion must never write those four columns. This is enforced by the type, not by
 convention — `InstrumentWriteData` is `Omit<InstrumentRow, "quoteSymbol" | "exposureKind" |
-"exposureLeafId">`. Ingestion upserts **every** instrument on **every** import, so any
+"exposureLeafId" | "ter">`. Ingestion upserts **every** instrument on **every** import, so any
 column it can write is a column it will eventually overwrite. If you widen that type, a
 re-import silently destroys hand-set mappings.
 
@@ -463,6 +463,38 @@ manual aliasing was abandoned — 726 confirmations is not a system.
   timestamp cannot say which is the case. Do not collapse them into "updated".
 - `real.server.ts` is deliberately **not** exported from `app/lib/index.ts` — that barrel is
   what components import, and it would pull Prisma into the client bundle.
+
+## Fees (TER)
+
+- **`Instrument.ter` is entered as a percent and stored as a fraction.** `terPercentSchema`
+  does the conversion and bounds it at 0–5% a year. The bound is at the **write** boundary
+  only: `instrumentSchema` stays lenient, because a stored value the domain refused would
+  throw on every read of the instrument list — the `LedgerEntry.type` trap one layer up.
+  Nothing is written until it parses: "0,22" typed as a fraction is 22% a year, and a fee
+  wrong by a factor of a hundred looks entirely plausible on screen.
+- **An instrument with no TER is excluded and named, never counted as 0%.** Same rule as
+  `unpricedCount` and an `UNRESOLVED` leaf. In the weighted average it leaves the
+  denominator; in the projected cost it contributes nothing, which makes that figure a
+  **floor**, not an estimate. Dropping the line from the blend instead would redistribute
+  the weights and make the difference something other than fees.
+- **The projected cost is a counterfactual, not a drag.** A fund's price is already net of
+  its TER — that is how a fund works — so subtracting the fee inside `computeProjection`
+  would charge it twice and bias every scenario low. The fee is added **back**:
+  `(1 + ter)^(1/12)` a month, so twelve months compound to exactly one year of fee, the
+  same convention `impliedAnnualReturn` annualises with.
+- **The fee-free twin shares the drawn month and the loop, and the cost is per path.** Both
+  pots get a twin — off-plan money is in real funds paying real fees. Two runs on the same
+  seed would agree on the draws too, but subtracting p90 from p90 subtracts two *order
+  statistics*: the ninetieth-worst fee bill is not the fee bill of the ninetieth-worst path
+  unless the ranks line up, which is a coincidence, not a rule. `simulate` therefore
+  accumulates both and diffs before sorting.
+- **`terCost` is opt-in.** A goal solve re-runs the whole simulation about sixty times and
+  none of those runs has anything to say about fees, so `computeProjection` builds the twin
+  only when asked and only when some line actually carries a TER.
+- The weighted TER is by **current market value** — "what you pay today", not what the plan
+  would pay once it is met. `/coste-ter` reads `?anos` with the projection's own parser and
+  has no form of its own: it is a report derived from the ledger plus the manual fee, like
+  `/realizado` and `/coste-oportunidad`, so it has no sidebar entry either.
 
 ## Portfolio target (the savings plan)
 

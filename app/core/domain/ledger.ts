@@ -33,6 +33,7 @@ export const instrumentSchema = z.object({
   quoteSymbol: z.string().nullish(),
   exposureKind: exposureKindSchema.nullish(),
   exposureLeafId: z.string().nullish(),
+  ter: decimalString.nullish(),
 });
 export type Instrument = z.infer<typeof instrumentSchema>;
 
@@ -81,3 +82,21 @@ export const ledgerEventSchema = z.discriminatedUnion("type", [
 export type LedgerEvent = z.infer<typeof ledgerEventSchema>;
 
 export type LedgerEventType = LedgerEvent["type"];
+
+export const MAX_TER_PERCENT = 5;
+
+export const terPercentSchema = z
+  .string()
+  .trim()
+  .transform((value) => value.replace(",", "."))
+  .refine((value) => {
+    try {
+      const percent = new Decimal(value);
+      return (
+        percent.isFinite() && percent.gte(0) && percent.lte(MAX_TER_PERCENT)
+      );
+    } catch {
+      return false;
+    }
+  }, `A TER outside 0–${MAX_TER_PERCENT}% a year is a typo, not a fee.`)
+  .transform((value) => new Decimal(value).div(100).toFixed(6));

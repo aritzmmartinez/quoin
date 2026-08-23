@@ -83,6 +83,10 @@ export const es = {
         label: "vs índice",
         sub: (symbol: string): string => `Frente a ${symbol}`,
       },
+      ter: {
+        label: "TER ponderado",
+        sub: (annual: string): string => `${annual} al año en gestión`,
+      },
     },
     returns: {
       twr: { label: "TWR", sub: "ponderada por tiempo" },
@@ -251,11 +255,15 @@ export const es = {
       leaf: "Hoja",
       resolvesTo: "Resuelve a",
       composition: "Composición",
+      ter: "TER %",
       held: "Valor",
     },
     defaultOption: "(por defecto del tipo)",
     leafPlaceholder: "XAU, BTC…",
     leafRequired: "Esta clase necesita una hoja (p. ej. XAU).",
+    terPlaceholder: "0,22",
+    terInvalid:
+      "El TER va en porcentaje anual, entre 0 y 5. Un 0,22% se escribe 0,22.",
     invalid: "Datos no válidos.",
     save: "Guardar",
     saving: "…",
@@ -564,6 +572,52 @@ export const es = {
       title: "Sin compras todavía",
       body: "Importa tus movimientos para poder reproducirlos contra el índice.",
     },
+  },
+  ter: {
+    title: "Coste del TER",
+    intro:
+      "Lo que te cuesta al año la gestión de tus fondos, y cuánto suma ese coste proyectado hacia delante. El TER lo escribes tú en la pantalla de instrumentos: no viene en ningún extracto, y un instrumento sin dato se queda fuera del ponderado en vez de contar como gratis.",
+    weighted: {
+      label: "TER ponderado",
+      sub: (coverage: string): string =>
+        `Sobre el ${coverage} de tu valor con TER conocido`,
+    },
+    annual: { label: "Coste anual", sub: "Al ritmo de hoy, un año" },
+    coverage: (covered: string, total: string): string =>
+      `${covered} de ${total} tienen TER en ficha.`,
+    unknown: (names: string): string =>
+      `Sin TER en ficha: ${names}. Quedan fuera del ponderado y cuentan como 0% en la proyección, así que el coste acumulado es un suelo, no una estimación. Anótalo en la pantalla de instrumentos.`,
+    none: {
+      title: "Ningún instrumento tiene TER",
+      body: "Anota el TER de tus fondos en la pantalla de instrumentos y esta pantalla empezará a decir algo.",
+    },
+    projected: {
+      title: (years: number): string =>
+        `Coste acumulado a ${years} ${years === 1 ? "año" : "años"}`,
+      note: "El precio de un fondo ya viene neto de su TER: así funciona un fondo. Así que aquí no se resta nada, se simula el gemelo que no cobrara comisión y se compara camino a camino, mes sorteado a mes sorteado. La diferencia es la comisión; no es ruido de muestreo.",
+      p10: { label: "Escenario malo", sub: "percentil 10" },
+      p50: { label: "Escenario central", sub: "mediana" },
+      p90: { label: "Escenario bueno", sub: "percentil 90" },
+      horizon: (years: number, contribution: string): string =>
+        `${years} ${years === 1 ? "año" : "años"} aportando ${contribution} al mes, sobre lo que ya tienes.`,
+    },
+    unavailable: {
+      "no-target":
+        "Sin objetivo vigente no hay plan que proyectar, así que el coste acumulado no se puede calcular. La cifra anual de arriba sí vale.",
+      "no-window":
+        "Los instrumentos del plan no comparten ni un mes de histórico, así que no hay nada que remuestrear.",
+      "thin-window": (months: number, name: string): string =>
+        `El histórico común es de ${months} meses y hacen falta 60. El que manda es ${name}: amplíalo con pnpm prices:backfill.`,
+    },
+    table: {
+      title: "Por posición",
+      instrument: "Instrumento",
+      value: "Valor",
+      ter: "TER",
+      annualCost: "Coste anual",
+      unknown: "Sin dato",
+    },
+    link: "Ver coste del TER",
   },
   instrument: {
     back: "Cartera",

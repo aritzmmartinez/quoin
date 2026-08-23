@@ -14,3 +14,4 @@ export * from "./rebalance";
 export * from "./projection";
 export * from "./projection-goal";
 export * from "./opportunity-cost";
+export * from "./ter";

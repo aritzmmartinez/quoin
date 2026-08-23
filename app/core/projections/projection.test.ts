@@ -387,3 +387,141 @@ describe("startingValue", () => {
     ).toBe("1500");
   });
 });
+
+describe("computeProjection — TER cost", () => {
+  const window = returns("2018-01", 72);
+
+  const base = {
+    horizonMonths: 120,
+    monthlyContribution: "500.00",
+    plannedValue: "10000.00",
+    simulations: 400,
+  };
+
+  it("reports nothing unless it is asked", () => {
+    const result = computeProjection({
+      ...base,
+      lines: [{ ...line("A", "1", window), ter: "0.0022" }],
+    });
+
+    expect(result.terCost).toBeNull();
+  });
+
+  it("costs nothing when every fee is zero", () => {
+    const result = computeProjection({
+      ...base,
+      terCost: true,
+      lines: [{ ...line("A", "0.6", window), ter: "0" }],
+      heldLines: [
+        {
+          instrumentId: "B",
+          value: "4000.00",
+          monthlyReturns: window,
+          ter: "0.0000",
+        },
+      ],
+    });
+
+    expect(result.terCost).not.toBeNull();
+    expect(result.terCost?.p10).toBe("0");
+    expect(result.terCost?.p50).toBe("0");
+    expect(result.terCost?.p90).toBe("0");
+    expect(result.terCost?.unknownInstrumentIds).toEqual([]);
+  });
+
+  it("counts a line with no fee on file at zero and names it", () => {
+    const withFee = computeProjection({
+      ...base,
+      terCost: true,
+      lines: [
+        { ...line("A", "0.5", window), ter: "0.0020" },
+        { ...line("B", "0.5", returns("2018-01", 72, 2)), ter: "0.0020" },
+      ],
+    });
+    const halfMeasured = computeProjection({
+      ...base,
+      terCost: true,
+      lines: [
+        { ...line("A", "0.5", window), ter: "0.0020" },
+        { ...line("B", "0.5", returns("2018-01", 72, 2)) },
+      ],
+    });
+
+    expect(halfMeasured.terCost?.unknownInstrumentIds).toEqual(["B"]);
+    // A floor, not an estimate: the unmeasured half contributes nothing.
+    expect(Number(halfMeasured.terCost?.p50)).toBeGreaterThan(0);
+    expect(Number(halfMeasured.terCost?.p50)).toBeLessThan(
+      Number(withFee.terCost?.p50),
+    );
+  });
+
+  it("charges the off-plan pot too", () => {
+    const heldLine = {
+      instrumentId: "B",
+      value: "20000.00",
+      monthlyReturns: window,
+    };
+    const planOnly = computeProjection({
+      ...base,
+      terCost: true,
+      lines: [{ ...line("A", "1", window), ter: "0.0020" }],
+      heldLines: [heldLine],
+    });
+    const both = computeProjection({
+      ...base,
+      terCost: true,
+      lines: [{ ...line("A", "1", window), ter: "0.0020" }],
+      heldLines: [{ ...heldLine, ter: "0.0020" }],
+    });
+
+    expect(planOnly.terCost?.unknownInstrumentIds).toEqual(["B"]);
+    expect(Number(both.terCost?.p50)).toBeGreaterThan(
+      Number(planOnly.terCost?.p50),
+    );
+  });
+
+  it("leaves the projection itself untouched", () => {
+    const input = {
+      ...base,
+      lines: [{ ...line("A", "1", window), ter: "0.0035" }],
+    };
+
+    expect(computeProjection({ ...input, terCost: true }).p50).toBe(
+      computeProjection(input).p50,
+    );
+  });
+
+  it("is reproducible on the same seed", () => {
+    const input = {
+      ...base,
+      terCost: true,
+      lines: [{ ...line("A", "1", window), ter: "0.0022" }],
+    };
+
+    expect(computeProjection({ ...input, seed: 7 }).terCost).toEqual(
+      computeProjection({ ...input, seed: 7 }).terCost,
+    );
+    expect(computeProjection({ ...input, seed: 8 }).terCost?.p50).not.toBe(
+      computeProjection({ ...input, seed: 7 }).terCost?.p50,
+    );
+  });
+
+  it("compounds twelve monthly add-backs into exactly one year of fee", () => {
+    // No contribution, no draw dispersion: one flat month repeated is the only
+    // thing that can be drawn, so the twin's twelve-month lead is arithmetic.
+    const flat = Array.from({ length: 72 }, (_, i) => ({
+      period: `${2018 + Math.floor(i / 12)}-${String((i % 12) + 1).padStart(2, "0")}`,
+      change: 0,
+    }));
+    const result = computeProjection({
+      horizonMonths: 12,
+      monthlyContribution: "0",
+      plannedValue: "10000.00",
+      simulations: 1,
+      terCost: true,
+      lines: [{ ...line("A", "1", flat), ter: "0.0100" }],
+    });
+
+    expect(Number(result.terCost?.p50)).toBeCloseTo(100, 2);
+  });
+});

@@ -21,6 +21,7 @@ export interface InstrumentListItem {
   quoteSymbol: string | null;
   exposureKind: ExposureKind | null;
   exposureLeafId: string | null;
+  ter: string | null;
   resolvesTo: string;
   isExplicit: boolean;
   quantity: string;
@@ -77,6 +78,7 @@ export function toInstrumentListItems(
       quoteSymbol: instrument.quoteSymbol ?? null,
       exposureKind: instrument.exposureKind ?? null,
       exposureLeafId: instrument.exposureLeafId ?? null,
+      ter: instrument.ter ?? null,
       resolvesTo: leaf ? leafKey(leaf.leaf) : "—",
       isExplicit: Boolean(instrument.exposureKind),
       quantity: quantity.toFixed(),

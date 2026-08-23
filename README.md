@@ -9,11 +9,11 @@ and support for the Bizkaia *foral* tax regime that off-the-shelf trackers ignor
 The goal isn't to trade: it's to **understand** a portfolio, and to double as a
 learning project.
 
-> **Status: v0.3.0, actively built.** The immutable ledger, core domain
+> **Status: v0.4.0, actively built.** The immutable ledger, core domain
 > (Money, event types, `computePositions` with average cost), CSV and `.xlsx` ingestion
 > (Trade Republic + Kraken), a Yahoo price provider with daily history, the app shell
 > and the summary / holdings / movements / asset-detail / instruments / allocation /
-> realised / target / projection screens are in place. Look-through works end to end: fund
+> realised / target / projection / opportunity-cost / fee-cost screens are in place. Look-through works end to end: fund
 > compositions are imported from whatever the issuer publishes, and holdings are matched
 > across issuers by canonical identity. Returns are reported both time-weighted and
 > money-weighted, per instrument and for the portfolio, and can be read in today's
@@ -152,6 +152,8 @@ on with decimal.js; data and secrets are never committed.
 - [x] Portfolio-level TWR and MWR, with an XIRR solver that refuses rather than guesses
 - [x] Rebalance the next contribution towards the plan without selling anything
 - [x] Projection: bootstrap the plan into a range, with the simulation count measured rather than assumed
+- [x] Opportunity cost: every real purchase replayed into the index, in euros and in MWR
+- [x] Fee cost: the portfolio's weighted TER, and what it compounds to over the projection horizon
 - [ ] Trading sleeve, watchlist and trade journal
 - [ ] Bizkaia foral tax module (FIFO lots)
 - [ ] DCF valuation module
