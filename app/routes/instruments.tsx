@@ -18,6 +18,7 @@ import {
   BASE_CURRENCY,
   KINDS_NEEDING_LEAF,
   exposureKindSchema,
+  terPercentSchema,
 } from "~/core/domain";
 import { computeMarketValues, computePositions } from "~/core/projections";
 
@@ -56,6 +57,7 @@ const exposureForm = z.object({
   id: z.string().min(1),
   exposureKind: z.union([exposureKindSchema, z.literal("")]),
   exposureLeafId: z.string().trim().default(""),
+  ter: z.string().trim().default(""),
 });
 
 const holdingsForm = z.object({
@@ -83,11 +85,22 @@ export async function action({ request }: Route.ActionArgs) {
     return { ok: false as const, error: es.instruments.leafRequired };
   }
 
-  await new PrismaInstrumentRepository().setExposure(
+  let ter: string | null = null;
+  if (parsed.data.ter !== "") {
+    const fee = terPercentSchema.safeParse(parsed.data.ter);
+    if (!fee.success) {
+      return { ok: false as const, error: es.instruments.terInvalid };
+    }
+    ter = fee.data;
+  }
+
+  const repository = new PrismaInstrumentRepository();
+  await repository.setExposure(
     id,
     kind,
     exposureLeafId === "" ? null : exposureLeafId,
   );
+  await repository.setTer(id, ter);
   return { ok: true as const };
 }
 

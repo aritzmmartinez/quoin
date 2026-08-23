@@ -1,4 +1,4 @@
-import { es, formatMoney, formatSignedMoney } from "~/lib";
+import { es, formatMoney, formatPercent, formatSignedMoney } from "~/lib";
 
 import { signClass } from "../ui/signed";
 import { StatTile } from "../ui/StatTile";
@@ -9,6 +9,7 @@ export interface SummaryStatsProps {
   realizedPnL: string;
   positionCount: number;
   opportunity?: { difference: string; symbol: string } | null;
+  ter?: { weightedTer: string; annualCost: string } | null;
 }
 
 export function SummaryStats({
@@ -17,6 +18,7 @@ export function SummaryStats({
   realizedPnL,
   positionCount,
   opportunity = null,
+  ter = null,
 }: SummaryStatsProps) {
   const s = es.summary.stats;
   return (
@@ -54,6 +56,14 @@ export function SummaryStats({
           value={formatSignedMoney(opportunity.difference).text}
           valueClass={signClass(opportunity.difference)}
           to="/coste-oportunidad"
+        />
+      )}
+      {ter && (
+        <StatTile
+          label={s.ter.label}
+          sub={s.ter.sub(formatMoney(ter.annualCost))}
+          value={formatPercent(ter.weightedTer, 2)}
+          to="/coste-ter"
         />
       )}
     </div>

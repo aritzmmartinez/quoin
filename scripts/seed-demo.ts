@@ -35,6 +35,7 @@ interface DemoInstrument {
   quoteSymbol: string | null;
   exposureKind: string | null;
   exposureLeafId: string | null;
+  ter: string | null;
   seedPrice: number | null;
   drift: number;
   volatility: number;
@@ -50,6 +51,7 @@ const INSTRUMENTS: readonly DemoInstrument[] = [
     quoteSymbol: "DEMOW.DE",
     exposureKind: "EQUITY_FUND",
     exposureLeafId: null,
+    ter: "0.0022",
     seedPrice: 98.4,
     drift: 0.00042,
     volatility: 0.0079,
@@ -63,6 +65,7 @@ const INSTRUMENTS: readonly DemoInstrument[] = [
     quoteSymbol: "DEMOG.DE",
     exposureKind: "COMMODITY",
     exposureLeafId: "XAU",
+    ter: "0.0012",
     seedPrice: 51.2,
     drift: 0.00051,
     volatility: 0.0068,
@@ -76,6 +79,7 @@ const INSTRUMENTS: readonly DemoInstrument[] = [
     quoteSymbol: "DEMS.AS",
     exposureKind: "COMPANY",
     exposureLeafId: null,
+    ter: null,
     seedPrice: 412.5,
     drift: 0.00088,
     volatility: 0.0184,
@@ -89,6 +93,7 @@ const INSTRUMENTS: readonly DemoInstrument[] = [
     quoteSymbol: "BTC-EUR",
     exposureKind: "CRYPTO",
     exposureLeafId: "BTC",
+    ter: null,
     seedPrice: 58400,
     drift: 0.0011,
     volatility: 0.0291,
@@ -102,6 +107,7 @@ const INSTRUMENTS: readonly DemoInstrument[] = [
     quoteSymbol: "DEMOE.DE",
     exposureKind: "EQUITY_FUND",
     exposureLeafId: null,
+    ter: "0.0040",
     seedPrice: 33.7,
     drift: 0.00026,
     volatility: 0.0102,
@@ -115,6 +121,7 @@ const INSTRUMENTS: readonly DemoInstrument[] = [
     quoteSymbol: null,
     exposureKind: "BOND_FUND",
     exposureLeafId: null,
+    ter: null,
     seedPrice: null,
     drift: 0,
     volatility: 0,

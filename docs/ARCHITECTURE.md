@@ -170,9 +170,9 @@ so rather than implying more history would settle it.
   and the lint boundary keeps `core` from importing it.
 - The connection URL lives in **`prisma.config.ts`** (Prisma 7), not in the datasource block.
 - **Models**: `Instrument` (master, key = ISIN or symbol; `quoteSymbol` for price lookups and
-  `exposureKind`/`exposureLeafId` for look-through — all three set by CLI or the instruments
-  screen, never by ingestion, and omitted from `InstrumentWriteData` at the type level so a
-  re-import cannot clobber them), `LedgerEntry` (immutable ledger), `PriceSnapshot`
+  `exposureKind`/`exposureLeafId` for look-through, `ter` for the annual fee — all four set by
+  CLI or the instruments screen, never by ingestion, and omitted from `InstrumentWriteData` at
+  the type level so a re-import cannot clobber them), `LedgerEntry` (immutable ledger), `PriceSnapshot`
   (append-only price history, `@@unique([instrumentId, asOf])`), `EtfHolding` (a fund's
   published composition), `InflationIndex` (monthly CPI levels), `PortfolioTarget` +
   `PortfolioTargetLine` (the savings plan, one version per `activeFrom`, one line per

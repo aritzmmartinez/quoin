@@ -131,8 +131,6 @@ export async function loader({ request }: Route.LoaderArgs) {
     real.revalue ? buildSeries() : portfolioSeries,
   );
 
-  // Nominal on purpose, like the returns above: the counterfactual compares two
-  // destinations for the same euros, and the deflator would hit both alike.
   const opportunity = await loadOpportunityCost(
     events,
     instruments,
