@@ -12,6 +12,7 @@ import {
   Card,
   CurrencyPanel,
   ExposureBars,
+  OverlapPanel,
   PortfolioError,
   ReadingCard,
   RebalancePanel,
@@ -25,6 +26,7 @@ import {
   type WeightedLeaf,
 } from "~/core/domain";
 import {
+  computeAllFundOverlaps,
   computeCurrencyExposure,
   computeExposures,
   computeMarketValues,
@@ -37,9 +39,11 @@ import {
   es,
   formatMoney,
   formatPercent,
+  isCashLine,
   parseAllocationView,
   parseContribution,
   parseDriftThreshold,
+  parseOverlapMode,
   parseThreshold,
   readingFor,
   tailOf,
@@ -61,6 +65,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const threshold = parseThreshold(params);
   const contribution = parseContribution(params);
   const driftThreshold = parseDriftThreshold(params);
+  const overlapMode = parseOverlapMode(params);
 
   const [events, instruments, prices, holdings, identities, targets] =
     await Promise.all([
@@ -109,7 +114,25 @@ export async function loader({ request }: Route.LoaderArgs) {
     instruments.filter((i) => i.hedgedToBase).map((i) => i.id),
   );
 
+  const withHoldings = instruments.filter(
+    (instrument) => (holdings.get(instrument.id) ?? []).length > 0,
+  );
+  const overlapFunds = new Map<string, WeightedLeaf[]>(
+    withHoldings.map((instrument) => [
+      instrument.id,
+      resolutions.get(instrument.id) ?? [],
+    ]),
+  );
+
   return {
+    overlap:
+      view !== "solapamiento"
+        ? null
+        : {
+            mode: overlapMode,
+            funds: withHoldings.map(({ id, name }) => ({ id, name })),
+            pairs: computeAllFundOverlaps(overlapFunds, isCashLine),
+          },
     currency:
       view !== "divisa"
         ? null
@@ -155,6 +178,7 @@ export default function Allocation({ loaderData }: Route.ComponentProps) {
     hasTarget,
     currency,
     hedgedCount,
+    overlap,
   } = loaderData;
   const copy = es.allocation;
 
@@ -168,6 +192,19 @@ export default function Allocation({ loaderData }: Route.ComponentProps) {
       <>
         <ViewTabs value={view} />
         <CurrencyPanel exposure={currency} hedgedCount={hedgedCount} />
+      </>
+    );
+  }
+
+  if (view === "solapamiento" && overlap !== null) {
+    return (
+      <>
+        <ViewTabs value={view} />
+        <OverlapPanel
+          funds={overlap.funds}
+          pairs={overlap.pairs}
+          mode={overlap.mode}
+        />
       </>
     );
   }

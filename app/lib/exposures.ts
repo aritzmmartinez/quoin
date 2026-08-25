@@ -1,6 +1,7 @@
 import Decimal from "decimal.js";
 
 import { bloombergCurrency } from "~/adapters/identity/openfigi/currencies";
+import { looksLikeCashRow } from "~/adapters/ingestion/holdings/numbers";
 import { toExchangeCode, venueOf } from "~/adapters/identity/openfigi/venues";
 import type { CachedIdentity } from "~/core/ports";
 import type { Contribution, LeafExposure } from "~/core/projections";
@@ -181,16 +182,38 @@ export function currencyByLeaf(
   return byLeaf;
 }
 
-export const ALLOCATION_VIEWS = ["exposicion", "rebalanceo", "divisa"] as const;
+export function isCashLine(leafId: string, name: string): boolean {
+  const base = leafId.split(".")[0] ?? "";
+  return looksLikeCashRow(base, name);
+}
+
+export const ALLOCATION_VIEWS = [
+  "exposicion",
+  "rebalanceo",
+  "divisa",
+  "solapamiento",
+] as const;
 export type AllocationView = (typeof ALLOCATION_VIEWS)[number];
 export const DEFAULT_ALLOCATION_VIEW: AllocationView = "exposicion";
 export const VIEW_PARAM = "vista";
+
+export const OVERLAP_MODES = ["lista", "matriz"] as const;
+export type OverlapMode = (typeof OVERLAP_MODES)[number];
+export const DEFAULT_OVERLAP_MODE: OverlapMode = "lista";
+export const MODE_PARAM = "modo";
 
 export function parseAllocationView(params: URLSearchParams): AllocationView {
   const raw = params.get(VIEW_PARAM);
   return raw !== null && (ALLOCATION_VIEWS as readonly string[]).includes(raw)
     ? (raw as AllocationView)
     : DEFAULT_ALLOCATION_VIEW;
+}
+
+export function parseOverlapMode(params: URLSearchParams): OverlapMode {
+  const raw = params.get(MODE_PARAM);
+  return raw !== null && (OVERLAP_MODES as readonly string[]).includes(raw)
+    ? (raw as OverlapMode)
+    : DEFAULT_OVERLAP_MODE;
 }
 
 export function viewHref(
@@ -200,6 +223,14 @@ export function viewHref(
   const next = new URLSearchParams(params);
   if (view === DEFAULT_ALLOCATION_VIEW) next.delete(VIEW_PARAM);
   else next.set(VIEW_PARAM, view);
+  if (view !== "solapamiento") next.delete(MODE_PARAM);
+  return `?${next.toString()}`;
+}
+
+export function modeHref(params: URLSearchParams, mode: OverlapMode): string {
+  const next = new URLSearchParams(params);
+  if (mode === DEFAULT_OVERLAP_MODE) next.delete(MODE_PARAM);
+  else next.set(MODE_PARAM, mode);
   return `?${next.toString()}`;
 }
 
