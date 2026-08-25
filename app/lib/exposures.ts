@@ -1,5 +1,8 @@
 import Decimal from "decimal.js";
 
+import { bloombergCurrency } from "~/adapters/identity/openfigi/currencies";
+import { toExchangeCode, venueOf } from "~/adapters/identity/openfigi/venues";
+import type { CachedIdentity } from "~/core/ports";
 import type { Contribution, LeafExposure } from "~/core/projections";
 import { leafTotal, leafWeight } from "~/core/projections";
 
@@ -141,7 +144,44 @@ export function readingFor(
   };
 }
 
-export const ALLOCATION_VIEWS = ["exposicion", "rebalanceo"] as const;
+function currencyOf(entry: CachedIdentity): string | null {
+  if (entry.kind === "TICKER") {
+    const fromVenue = bloombergCurrency(toExchangeCode(venueOf(entry.value)));
+    if (fromVenue !== null) return fromVenue;
+  }
+  if (entry.resolution.status !== "resolved") return null;
+  return bloombergCurrency(entry.resolution.exchCode);
+}
+
+export function currencyByLeaf(
+  identities: ReadonlyMap<string, CachedIdentity>,
+): Map<string, string> {
+  const byLeaf = new Map<string, string>();
+  const conflicted = new Set<string>();
+
+  for (const entry of identities.values()) {
+    const leafId =
+      entry.resolution.status === "resolved"
+        ? entry.resolution.canonicalId
+        : entry.value;
+
+    const currency = currencyOf(entry);
+    if (currency === null) continue;
+
+    const key = `COMPANY:${leafId}`;
+    const known = byLeaf.get(key);
+    if (known === undefined) {
+      byLeaf.set(key, currency);
+    } else if (known !== currency) {
+      conflicted.add(key);
+    }
+  }
+
+  for (const key of conflicted) byLeaf.delete(key);
+  return byLeaf;
+}
+
+export const ALLOCATION_VIEWS = ["exposicion", "rebalanceo", "divisa"] as const;
 export type AllocationView = (typeof ALLOCATION_VIEWS)[number];
 export const DEFAULT_ALLOCATION_VIEW: AllocationView = "exposicion";
 export const VIEW_PARAM = "vista";
