@@ -113,6 +113,7 @@ export const es = {
       exposicion: "Exposición",
       rebalanceo: "Rebalanceo",
       divisa: "Divisa",
+      solapamiento: "Solapamiento",
     },
     intro:
       "Posición directa + peso dentro de tus ETFs (look-through). El tramo sólido de la barra es lo que compraste tú; el apagado viaja dentro de un fondo.",
@@ -178,6 +179,32 @@ export const es = {
         : `${count} instrumentos cubiertos a euro cuentan como euro, no como la divisa de su subyacente.`,
     empty:
       "Sin exposición por divisa que mostrar. Importa operaciones y sincroniza precios.",
+  },
+  overlap: {
+    title: "Solapamiento entre fondos",
+    intro:
+      "Cuánto de dos fondos es la misma empresa: por cada valor que ambos tienen, el menor de sus dos pesos, sumado. Dos fondos con nombres muy distintos pueden estar comprándote lo mismo.",
+    note: "El peso es el de cada empresa dentro de su propio fondo, no el de tu cartera: el solapamiento es una propiedad de los dos fondos entre sí, no de cuánto tengas invertido en cada uno.",
+    modes: {
+      label: "Modo de vista",
+      lista: "Lista",
+      matriz: "Matriz",
+    },
+    header: (funds: number, pairs: number): string =>
+      `${funds} fondos · ${pairs} ${pairs === 1 ? "par" : "pares"}`,
+    empty:
+      "Hacen falta al menos dos fondos con composición importada y posición abierta. Arrastra el CSV de holdings sobre la fila del fondo en Instrumentos; un fondo sin composición queda fuera del cálculo, no cuenta como 0%.",
+    includeSold: "Incluir fondos vendidos",
+    includeSoldHint:
+      "Fondos con composición importada pero sin posición abierta hoy — útil para ver cuánto se solaparía algo que vendiste antes de recomprarlo.",
+    shared: (count: number): string =>
+      count === 1 ? "1 empresa en común" : `${count} empresas en común`,
+    none: "Ninguna empresa en común: diversificación real entre estos dos.",
+    top: "Mayor aporte",
+    contributorPair: (a: string, b: string): string => `${a} · ${b}`,
+    matrixHeader: "Cada celda es el solapamiento de la fila con la columna.",
+    matrixLegend:
+      "Las columnas van numeradas en el mismo orden que las filas. La diagonal se omite: un fondo consigo mismo es siempre 100%.",
   },
   rebalance: {
     title: "Rebalanceo por aportación",

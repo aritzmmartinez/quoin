@@ -6,8 +6,14 @@ import type { LeafExposure } from "~/core/projections";
 import {
   CONCENTRATION_THRESHOLD,
   DEFAULT_ALLOCATION_VIEW,
+  DEFAULT_OVERLAP_MODE,
   currencyByLeaf,
+  includeSoldHref,
+  isCashLine,
+  modeHref,
   parseAllocationView,
+  parseIncludeSold,
+  parseOverlapMode,
   viewHref,
   readingFor,
   PRESENTATION_THRESHOLD,
@@ -194,6 +200,88 @@ describe("viewHref", () => {
   it("drops a stale view when returning to the default", () => {
     const away = new URLSearchParams(viewHref(params, "rebalanceo"));
     expect(viewHref(away, "exposicion")).not.toContain("vista");
+  });
+
+  it("leaves the overlap mode behind when leaving the overlap tab", () => {
+    const inOverlap = new URLSearchParams("vista=solapamiento&modo=matriz");
+    expect(viewHref(inOverlap, "divisa")).not.toContain("modo");
+    expect(viewHref(inOverlap, "solapamiento")).toContain("modo=matriz");
+  });
+
+  it("leaves the include-sold switch behind when leaving the overlap tab", () => {
+    const inOverlap = new URLSearchParams(
+      "vista=solapamiento&incluirVendidos=1",
+    );
+    expect(viewHref(inOverlap, "divisa")).not.toContain("incluirVendidos");
+    expect(viewHref(inOverlap, "solapamiento")).toContain("incluirVendidos=1");
+  });
+});
+
+describe("isCashLine", () => {
+  it("recognises a fund's cash buffer stored before the parser folded it", () => {
+    expect(isCashLine("JPY", "JPY CASH")).toBe(true);
+    expect(isCashLine("usd", "USD CASH")).toBe(true);
+  });
+
+  it("strips the venue the parser attached to the stored leaf id", () => {
+    expect(isCashLine("JPY.JT", "JPY CASH")).toBe(true);
+    expect(isCashLine("GBP.LN", "GBP CASH")).toBe(true);
+  });
+
+  it("leaves companies alone, currency-shaped tickers included", () => {
+    expect(isCashLine("NOK.LN", "NOKIA OYJ")).toBe(false);
+    expect(isCashLine("AAPL", "APPLE INC")).toBe(false);
+    expect(isCashLine("SAN.ES", "BANCO SANTANDER")).toBe(false);
+    expect(isCashLine("6857", "KEYENCE CORP")).toBe(false);
+  });
+});
+
+describe("parseOverlapMode", () => {
+  const of = (query: string) => parseOverlapMode(new URLSearchParams(query));
+
+  it("reads the mode from the URL and falls back to the list", () => {
+    expect(of("modo=matriz")).toBe("matriz");
+    expect(of("modo=lista")).toBe("lista");
+    expect(of("")).toBe(DEFAULT_OVERLAP_MODE);
+    expect(of("modo=Matriz")).toBe(DEFAULT_OVERLAP_MODE);
+  });
+});
+
+describe("modeHref", () => {
+  const params = new URLSearchParams("vista=solapamiento&umbral=20");
+
+  it("keeps the tab it belongs to and omits the default mode", () => {
+    expect(modeHref(params, "matriz")).toContain("vista=solapamiento");
+    expect(modeHref(params, "matriz")).toContain("modo=matriz");
+    expect(modeHref(params, "lista")).not.toContain("modo");
+  });
+});
+
+describe("parseIncludeSold", () => {
+  const of = (query: string) => parseIncludeSold(new URLSearchParams(query));
+
+  it("is off by default: sold funds stay out of the overlap unless asked for", () => {
+    expect(of("")).toBe(false);
+    expect(of("incluirVendidos=0")).toBe(false);
+    expect(of("incluirVendidos=si")).toBe(false);
+  });
+
+  it("turns on only for the exact flag", () => {
+    expect(of("incluirVendidos=1")).toBe(true);
+  });
+});
+
+describe("includeSoldHref", () => {
+  const params = new URLSearchParams("vista=solapamiento&umbral=20");
+
+  it("sets the flag on and omits it when off", () => {
+    expect(includeSoldHref(params, true)).toContain("incluirVendidos=1");
+    expect(includeSoldHref(params, false)).not.toContain("incluirVendidos");
+  });
+
+  it("keeps every other param", () => {
+    expect(includeSoldHref(params, true)).toContain("vista=solapamiento");
+    expect(includeSoldHref(params, true)).toContain("umbral=20");
   });
 });
 

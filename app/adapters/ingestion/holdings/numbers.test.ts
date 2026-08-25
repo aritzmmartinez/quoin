@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { looksLikeIsin, looksLikeTicker, parseLooseNumber } from "./numbers";
+import {
+  looksLikeCashRow,
+  looksLikeIsin,
+  looksLikeTicker,
+  parseLooseNumber,
+} from "./numbers";
 
 const n = (raw: string): string | null =>
   parseLooseNumber(raw)?.toString() ?? null;
@@ -19,7 +24,6 @@ describe("parseLooseNumber", () => {
   });
 
   it("keeps a sign separated from its digits by a space", () => {
-    // Observed verbatim in one issuer's export: "- 0,02%".
     expect(n("- 0,02%")).toBe("-0.02");
     expect(n("+ 1,5")).toBe("1.5");
   });
@@ -33,10 +37,6 @@ describe("parseLooseNumber", () => {
   });
 
   it("handles a separator doing both jobs in the same number", () => {
-    // "$ 322.235.420.00" is a real format: dots group the thousands AND mark the
-    // decimals. The last group settles it — grouping always leaves three digits,
-    // so a two-digit tail is a decimal. Reading it as pure grouping would inflate
-    // the value a hundredfold.
     expect(parseLooseNumber("$ 322.235.420.00")?.toFixed(2)).toBe(
       "322235420.00",
     );
@@ -96,5 +96,26 @@ describe("looksLikeTicker", () => {
     expect(looksLikeTicker("United States")).toBe(false);
     expect(looksLikeTicker("NVIDIA Corp")).toBe(false);
     expect(looksLikeTicker("")).toBe(false);
+  });
+});
+
+describe("looksLikeCashRow", () => {
+  it("catches a cash buffer however the issuer words it", () => {
+    expect(looksLikeCashRow("JPY", "JPY CASH")).toBe(true);
+    expect(looksLikeCashRow("USD", "USD CASH")).toBe(true);
+    expect(looksLikeCashRow("usd", "Cash USD")).toBe(true);
+    expect(looksLikeCashRow("USD", "EFECTIVO USD")).toBe(true); // no English
+    expect(looksLikeCashRow("CHF", "CHF CASH COLLATERAL")).toBe(true);
+  });
+
+  it("keeps a company whose ticker is also a currency code", () => {
+    expect(looksLikeCashRow("NOK", "NOKIA OYJ")).toBe(false);
+    expect(looksLikeCashRow("SEK", "SEKISUI HOUSE LTD")).toBe(false);
+  });
+
+  it("ignores anything that is not a currency code at all", () => {
+    expect(looksLikeCashRow("AAPL", "APPLE INC")).toBe(false);
+    expect(looksLikeCashRow("", "")).toBe(false);
+    expect(looksLikeCashRow("XYZ", "XYZ CASH")).toBe(false); // not ISO 4217
   });
 });

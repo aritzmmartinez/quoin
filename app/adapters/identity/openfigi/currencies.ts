@@ -59,6 +59,14 @@ const CURRENCY_BY_EXCHANGE: Record<string, string> = {
   PE: "PEN",
 };
 
+/**
+ * The ISO 4217 codes this table knows about, derived rather than restated so a
+ * currency added above cannot go missing here.
+ */
+export const KNOWN_CURRENCIES: ReadonlySet<string> = new Set(
+  Object.values(CURRENCY_BY_EXCHANGE),
+);
+
 /** ISO 4217 of a Bloomberg composite exchange code, or null if unlisted. */
 export function bloombergCurrency(exchCode: string | null): string | null {
   if (!exchCode) return null;
