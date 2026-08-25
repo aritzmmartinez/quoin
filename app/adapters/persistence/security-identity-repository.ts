@@ -11,6 +11,7 @@ interface Row {
   identity: string;
   identityKind: string;
   canonicalId: string | null;
+  exchCode: string | null;
   status: string;
   source: string;
   resolvedAt: Date;
@@ -18,7 +19,11 @@ interface Row {
 
 function toResolution(row: Row): IdentityResolution {
   if (row.status === "resolved" && row.canonicalId) {
-    return { status: "resolved", canonicalId: row.canonicalId };
+    return {
+      status: "resolved",
+      canonicalId: row.canonicalId,
+      exchCode: row.exchCode,
+    };
   }
   if (row.status === "ambiguous") return { status: "ambiguous", candidates: 0 };
   return { status: "not-found" };
@@ -56,6 +61,10 @@ export class PrismaSecurityIdentityRepository implements SecurityIdentityReposit
           canonicalId:
             entry.resolution.status === "resolved"
               ? entry.resolution.canonicalId
+              : null,
+          exchCode:
+            entry.resolution.status === "resolved"
+              ? entry.resolution.exchCode
               : null,
           status: entry.resolution.status,
           source: entry.source,

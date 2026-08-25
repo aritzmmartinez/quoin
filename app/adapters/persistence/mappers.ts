@@ -138,11 +138,12 @@ export interface InstrumentRow {
   exposureKind: string | null;
   exposureLeafId: string | null;
   ter: string | null;
+  hedgedToBase: boolean;
 }
 
 export type InstrumentWriteData = Omit<
   InstrumentRow,
-  "quoteSymbol" | "exposureKind" | "exposureLeafId" | "ter"
+  "quoteSymbol" | "exposureKind" | "exposureLeafId" | "ter" | "hedgedToBase"
 >;
 
 export function rowToInstrument(row: InstrumentRow): Instrument {
@@ -156,6 +157,7 @@ export function rowToInstrument(row: InstrumentRow): Instrument {
     exposureKind: row.exposureKind ?? null,
     exposureLeafId: row.exposureLeafId ?? null,
     ter: row.ter ?? null,
+    hedgedToBase: row.hedgedToBase,
   });
 }
 

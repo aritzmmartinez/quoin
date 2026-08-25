@@ -17,7 +17,7 @@ const trade: LedgerEvent = {
   id: "e1",
   ts: new Date("2025-01-01"),
   type: "BUY",
-  instrumentId: "IE00BK5BQT80",
+  instrumentId: "IE00TEST0010",
   sleeve: "CORE",
   quantity: "1.5",
   price: "100",
@@ -35,7 +35,7 @@ const dividend: LedgerEvent = {
   id: "e2",
   ts: new Date("2025-02-01"),
   type: "DIVIDEND",
-  instrumentId: "US0378331005",
+  instrumentId: "US00TEST0020",
   sleeve: "CORE",
   grossAmount: "12.34",
   taxWithheld: "2.34",
@@ -61,8 +61,8 @@ const cash: LedgerEvent = {
 };
 
 const instrument: Instrument = {
-  id: "IE00BK5BQT80",
-  name: "Vanguard FTSE All-World UCITS ETF",
+  id: "IE00TEST0010",
+  name: "Test World Equity UCITS ETF Acc",
   type: "ETF",
   currency: "EUR",
   assetClass: "FUND",
@@ -70,6 +70,7 @@ const instrument: Instrument = {
   exposureKind: null,
   exposureLeafId: null,
   ter: null,
+  hedgedToBase: false,
 };
 
 describe("ledger mappers", () => {
@@ -106,6 +107,7 @@ describe("instrument mappers", () => {
       exposureKind: null,
       ter: null,
       exposureLeafId: null,
+      hedgedToBase: false,
     };
     expect(rowToInstrument(row)).toEqual(instrument);
   });
@@ -116,10 +118,14 @@ describe("instrument mappers", () => {
       quoteSymbol: "VWCE.DE",
       exposureKind: "EQUITY_FUND",
       exposureLeafId: "X",
+      ter: "0.0022",
+      hedgedToBase: true,
     });
     expect(data).not.toHaveProperty("quoteSymbol");
     expect(data).not.toHaveProperty("exposureKind");
     expect(data).not.toHaveProperty("exposureLeafId");
+    expect(data).not.toHaveProperty("ter");
+    expect(data).not.toHaveProperty("hedgedToBase");
   });
 
   it("defaults a missing assetClass to null", () => {

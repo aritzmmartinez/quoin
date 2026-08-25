@@ -3,8 +3,8 @@
  *
  * Issuers disagree on what to publish: Amundi, HANetf and VanEck give an ISIN,
  * Vanguard and iShares give a venue-qualified ticker. They hold hundreds of the
- * same companies, so the same business arrives as `US67066G1040` from one file
- * and `NVDA.US` from another and stays two leaves.
+ * same companies, so the same business arrives as `US00TEST0005` from one file
+ * and `ACME.US` from another and stays two leaves.
  */
 export interface RawIdentity {
   value: string;
@@ -21,7 +21,11 @@ export interface RawIdentity {
  * guessing, because a wrong merge silently claims a holding that does not exist.
  */
 export type IdentityResolution =
-  | { status: "resolved"; canonicalId: string }
+  | {
+      status: "resolved";
+      canonicalId: string;
+      exchCode: string | null;
+    }
   | { status: "not-found" }
   | { status: "ambiguous"; candidates: number };
 

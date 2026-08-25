@@ -10,6 +10,7 @@ import {
 } from "~/adapters/persistence";
 import {
   Card,
+  CurrencyPanel,
   ExposureBars,
   PortfolioError,
   ReadingCard,
@@ -24,6 +25,7 @@ import {
   type WeightedLeaf,
 } from "~/core/domain";
 import {
+  computeCurrencyExposure,
   computeExposures,
   computeMarketValues,
   computePositions,
@@ -31,6 +33,7 @@ import {
 } from "~/core/projections";
 import {
   buildRebalancePlan,
+  currencyByLeaf,
   es,
   formatMoney,
   formatPercent,
@@ -102,7 +105,21 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const target = getActiveTarget(targets, new Date());
 
+  const hedged = new Set(
+    instruments.filter((i) => i.hedgedToBase).map((i) => i.id),
+  );
+
   return {
+    currency:
+      view !== "divisa"
+        ? null
+        : computeCurrencyExposure({
+            exposures,
+            currencyByLeaf: currencyByLeaf(identities),
+            hedgedInstruments: hedged,
+            base: BASE_CURRENCY,
+          }),
+    hedgedCount: hedged.size,
     rows,
     tail: tailOf(exposures, summary.total),
     reading: readingFor(rows, summary.resolvedLeafCount, threshold),
@@ -136,6 +153,8 @@ export default function Allocation({ loaderData }: Route.ComponentProps) {
     driftThreshold,
     plan,
     hasTarget,
+    currency,
+    hedgedCount,
   } = loaderData;
   const copy = es.allocation;
 
@@ -143,6 +162,15 @@ export default function Allocation({ loaderData }: Route.ComponentProps) {
     Number(summary.total) === 0
       ? "0"
       : String(Number(summary.unresolved) / Number(summary.total));
+
+  if (view === "divisa" && currency !== null) {
+    return (
+      <>
+        <ViewTabs value={view} />
+        <CurrencyPanel exposure={currency} hedgedCount={hedgedCount} />
+      </>
+    );
+  }
 
   if (view === "rebalanceo") {
     return (
@@ -187,9 +215,7 @@ export default function Allocation({ loaderData }: Route.ComponentProps) {
               )}
             </div>
             {Number(summary.unresolved) < 0 && (
-              // Honest, not broken: a fund carrying negative cash has holdings
-              // summing over 100%, so its residual is the shortfall.
-              <p className="mt-3 text-[11.5px] leading-[1.5] text-muted">
+              <p className="mt-3 text-[11.5px] leading-normal text-muted">
                 {copy.stats.negativeUnresolved}
               </p>
             )}

@@ -186,13 +186,13 @@ describe("deriveTargetWeights", () => {
 });
 
 describe("findIdMismatches", () => {
-  const known = ["IE00B3RBWM25", "BTC"];
+  const known = ["IE00TEST0011", "BTC"];
 
   it("flags an id that matches an imported one only in case", () => {
     expect(
-      findIdMismatches([line("ie00b3rbwm25", "300"), line("Btc", "75")], known),
+      findIdMismatches([line("ie00test0011", "300"), line("Btc", "75")], known),
     ).toEqual([
-      { given: "ie00b3rbwm25", likely: "IE00B3RBWM25" },
+      { given: "ie00test0011", likely: "IE00TEST0011" },
       { given: "Btc", likely: "BTC" },
     ]);
   });
@@ -202,26 +202,26 @@ describe("findIdMismatches", () => {
   });
 
   it("says nothing when the id matches exactly", () => {
-    expect(findIdMismatches([line("IE00B3RBWM25", "300")], known)).toEqual([]);
+    expect(findIdMismatches([line("IE00TEST0011", "300")], known)).toEqual([]);
   });
 
   it("says nothing when nothing has been imported at all", () => {
-    expect(findIdMismatches([line("ie00b3rbwm25", "300")], [])).toEqual([]);
+    expect(findIdMismatches([line("ie00test0011", "300")], [])).toEqual([]);
   });
 });
 
 describe("parseTargetLines", () => {
   it("reads one instrument and amount per line", () => {
     const text = `# savings plan
-IE00B3RBWM25 300
-IE00BKM4GZ66,75
+IE00TEST0011 300
+IE00TEST0012,75
 
 XS0000000001;40
 `;
 
     expect(parseTargetLines(text)).toEqual([
-      { instrumentId: "IE00B3RBWM25", monthlyAmount: "300" },
-      { instrumentId: "IE00BKM4GZ66", monthlyAmount: "75" },
+      { instrumentId: "IE00TEST0011", monthlyAmount: "300" },
+      { instrumentId: "IE00TEST0012", monthlyAmount: "75" },
       { instrumentId: "XS0000000001", monthlyAmount: "40" },
     ]);
   });

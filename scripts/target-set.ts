@@ -33,8 +33,8 @@ const USAGE = `Usage:
 The file is one line per instrument, "<instrumentId> <monthlyAmount>":
 
   # savings plan
-  IE00B3RBWM25  300
-  IE00BKM4GZ66   75
+  IE00TEST0001  300
+  IE00TEST0002   75
 
 Amounts are the fact; weights are derived from them. A version is never edited:
 changing the plan means recording another one with a later --from.`;

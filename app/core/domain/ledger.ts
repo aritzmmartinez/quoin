@@ -34,6 +34,7 @@ export const instrumentSchema = z.object({
   exposureKind: exposureKindSchema.nullish(),
   exposureLeafId: z.string().nullish(),
   ter: decimalString.nullish(),
+  hedgedToBase: z.boolean().optional(),
 });
 export type Instrument = z.infer<typeof instrumentSchema>;
 

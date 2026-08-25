@@ -40,6 +40,13 @@ export class PrismaInstrumentRepository implements InstrumentRepository {
     await prisma.instrument.update({ where: { id }, data: { ter } });
   }
 
+  async setHedgedToBase(id: string, hedged: boolean): Promise<void> {
+    await prisma.instrument.update({
+      where: { id },
+      data: { hedgedToBase: hedged },
+    });
+  }
+
   async setExposure(
     id: string,
     kind: ExposureKind | null,

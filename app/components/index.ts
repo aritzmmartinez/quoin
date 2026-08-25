@@ -1,3 +1,4 @@
+export * from "./allocation/CurrencyPanel";
 export * from "./allocation/ExposureBars";
 export * from "./allocation/ReadingCard";
 export * from "./allocation/RebalancePanel";
