@@ -112,6 +112,7 @@ export const es = {
       label: "Vista",
       exposicion: "Exposición",
       rebalanceo: "Rebalanceo",
+      divisa: "Divisa",
     },
     intro:
       "Posición directa + peso dentro de tus ETFs (look-through). El tramo sólido de la barra es lo que compraste tú; el apagado viaja dentro de un fondo.",
@@ -155,6 +156,28 @@ export const es = {
       threshold: "Umbral configurado",
       empty: "Todavía no hay exposición resuelta que leer.",
     },
+  },
+  currency: {
+    title: "Exposición por divisa",
+    intro:
+      "Comprar NVIDIA en Xetra pagando euros no te da exposición al euro: eso es el precio de Nueva York en dólares, convertido al instante. Lo que cuenta es la divisa del listing principal de cada valor, el tuyo directo y el que viaja dentro de tus fondos.",
+    stats: {
+      base: "En euros",
+      foreign: "Fuera del euro",
+      unresolved: "Sin determinar",
+    },
+    unresolvedLabel: "Sin determinar",
+    unresolvedTitle: "Por qué queda valor sin determinar",
+    unresolvedBody:
+      "No se reparte entre las divisas conocidas: hacerlo inventaría una exposición que no tienes. Aquí caen las hojas sin identidad canónica resuelta, las clases de acción listadas en más de un país (no hay una sola divisa que sea la respuesta) y la parte de tus fondos que el emisor no desglosa.",
+    unresolvedFix:
+      "Ejecuta pnpm identity:resolve --refresh para rellenar las identidades que aún no tienen mercado principal guardado.",
+    hedged: (count: number): string =>
+      count === 1
+        ? "1 instrumento cubierto a euro cuenta como euro, no como la divisa de su subyacente."
+        : `${count} instrumentos cubiertos a euro cuentan como euro, no como la divisa de su subyacente.`,
+    empty:
+      "Sin exposición por divisa que mostrar. Importa operaciones y sincroniza precios.",
   },
   rebalance: {
     title: "Rebalanceo por aportación",
@@ -256,8 +279,10 @@ export const es = {
       resolvesTo: "Resuelve a",
       composition: "Composición",
       ter: "TER %",
+      hedged: "Divisa",
       held: "Valor",
     },
+    hedgedShort: "Cubierta",
     defaultOption: "(por defecto del tipo)",
     leafPlaceholder: "XAU, BTC…",
     leafRequired: "Esta clase necesita una hoja (p. ej. XAU).",
@@ -304,7 +329,7 @@ export const es = {
       lines: "Líneas",
       linesHint:
         "Una por línea: identificador del instrumento e importe mensual. Puedes incluir un instrumento que aún no tengas en cartera.",
-      linesPlaceholder: "IE00B3RBWM25 300\nIE00BKM4GZ66 75",
+      linesPlaceholder: "IE00TEST0001 300\nIE00TEST0002 75",
       submit: "Guardar versión",
       saving: "Guardando…",
       invalid: "Datos no válidos.",

@@ -33,8 +33,8 @@ stored as an ETF and cannot be told apart from an equity fund. Ingestion never
 writes these columns, so a re-import will not clobber what you set here.
 
 Examples:
-  pnpm exposure:map XS2183935274 COMMODITY XAU
-  pnpm exposure:map IE00BGYWT403 BOND_FUND`;
+  pnpm exposure:map XS00TEST0003 COMMODITY XAU
+  pnpm exposure:map IE00TEST0004 BOND_FUND`;
 
 async function heldQuantity(instrumentId: string): Promise<Decimal> {
   const events = await new PrismaLedgerRepository().list();
@@ -48,17 +48,23 @@ async function describe(id: string): Promise<void> {
   if (!instrument) return;
 
   const [leaf] = resolveIntrinsic(instrument);
-  const source = instrument.exposureKind ? "explicit" : `default from type=${instrument.type}`;
+  const source = instrument.exposureKind
+    ? "explicit"
+    : `default from type=${instrument.type}`;
 
   console.log(`${instrument.id}  ${instrument.name}`);
-  console.log(`  exposureKind: ${instrument.exposureKind ?? "(none)"}  (${source})`);
+  console.log(
+    `  exposureKind: ${instrument.exposureKind ?? "(none)"}  (${source})`,
+  );
   console.log(`  resolves to:  ${leaf?.leaf.kind}:${leaf?.leaf.id}`);
 
   // The sanity check that prices:map lacks: on a closed position every derived
   // number is zero, so a wrong mapping looks identical to a right one.
   const qty = await heldQuantity(id);
   if (qty.isZero()) {
-    console.log("  ⚠ position is CLOSED — nothing here will show up on the allocation screen.");
+    console.log(
+      "  ⚠ position is CLOSED — nothing here will show up on the allocation screen.",
+    );
   }
 }
 
@@ -133,7 +139,10 @@ async function main(): Promise<void> {
 
 main()
   .catch((error: unknown) => {
-    console.error("\nMapping failed:", error instanceof Error ? error.message : error);
+    console.error(
+      "\nMapping failed:",
+      error instanceof Error ? error.message : error,
+    );
     exit(1);
   })
   .finally(() => prisma.$disconnect());

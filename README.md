@@ -63,7 +63,7 @@ pnpm prices:map <ISIN> <SYMBOL>   # map an instrument to a Yahoo symbol, e.g. VW
 pnpm prices:sync                  # fetch quotes for mapped instruments -> price snapshots
 pnpm prices:backfill [ISIN] [1y|2y|5y|10y|max]   # daily price history (default 5y)
 pnpm exposure:map                 # list how every instrument resolves for look-through
-pnpm exposure:map <ISIN> <KIND> [LEAF]           # e.g. XS2183935274 COMMODITY XAU
+pnpm exposure:map <ISIN> <KIND> [LEAF]           # e.g. XS00TEST0003 COMMODITY XAU
 pnpm identity:resolve             # give holdings a canonical id so duplicates merge
 pnpm identity:resolve --report    # what merged, and what is still ambiguous
 pnpm ipc:sync                     # INE consumer price index (national + Bizkaia)
@@ -94,7 +94,7 @@ automatically; ETCs and bond funds need one command each, once.
 
 `identity:resolve` exists because issuers disagree on what to publish. Some list an
 ISIN, others only a ticker, and they hold hundreds of the same companies — so the same
-business arrives as `US67066G1040` from one fund and `NVDA.US` from another and counts
+business arrives as `US00TEST0005` from one fund and `ACME.US` from another and counts
 twice. Both are mapped to a share-class FIGI via [OpenFIGI](https://www.openfigi.com/),
 which links one share class across countries. Set `OPENFIGI_API_KEY` in `.env` for a
 free and far higher rate limit; without one it still works, just slower. Anything that
