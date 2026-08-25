@@ -13,11 +13,12 @@ import {
   type InstrumentListItem,
 } from "~/lib";
 
+import { Checkbox } from "../ui/Checkbox";
 import { HoldingsUpload } from "./HoldingsUpload";
 
 const KINDS = exposureKindSchema.options;
 const GRID =
-  "grid-cols-[minmax(0,1.4fr)_150px_120px_150px_minmax(0,160px)_112px] items-center gap-3";
+  "grid-cols-[minmax(0,1.4fr)_150px_120px_78px_168px_minmax(0,160px)_112px] items-center gap-3";
 
 export function InstrumentsTable({ items }: { items: InstrumentListItem[] }) {
   const copy = es.instruments;
@@ -32,7 +33,7 @@ export function InstrumentsTable({ items }: { items: InstrumentListItem[] }) {
 
   return (
     <div className="overflow-x-auto">
-      <div className="min-w-240">
+      <div className="min-w-280">
         <div
           className={`grid ${GRID} border-b border-border px-5 py-2 text-[11px] font-medium tracking-wide text-muted`}
         >
@@ -40,6 +41,7 @@ export function InstrumentsTable({ items }: { items: InstrumentListItem[] }) {
           <span>{copy.columns.exposure}</span>
           <span>{copy.columns.leaf}</span>
           <span>{copy.columns.ter}</span>
+          <span>{copy.columns.hedged}</span>
           <span>{copy.columns.composition}</span>
           <span className="text-right">{copy.columns.held}</span>
         </div>
@@ -60,13 +62,15 @@ function InstrumentRow({ item }: { item: InstrumentListItem }) {
   const [kind, setKind] = useState<string>(item.exposureKind ?? "");
   const [leaf, setLeaf] = useState<string>(item.exposureLeafId ?? "");
   const [ter, setTer] = useState<string>(terToPercentInput(item.ter));
+  const [hedged, setHedged] = useState<boolean>(item.hedgedToBase);
   const [uploading, setUploading] = useState(false);
 
   const needsLeaf = KINDS_NEEDING_LEAF.some((k) => k === kind);
   const dirty =
     kind !== (item.exposureKind ?? "") ||
     leaf !== (item.exposureLeafId ?? "") ||
-    ter !== terToPercentInput(item.ter);
+    ter !== terToPercentInput(item.ter) ||
+    hedged !== item.hedgedToBase;
   const busy = fetcher.state !== "idle";
   const saved = fetcher.data?.ok === true && !dirty;
   const error = fetcher.data?.ok === false ? fetcher.data.error : undefined;
@@ -117,16 +121,25 @@ function InstrumentRow({ item }: { item: InstrumentListItem }) {
             className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-[12px] disabled:opacity-40"
           />
 
+          <input
+            name="ter"
+            value={ter}
+            onChange={(e) => setTer(e.target.value)}
+            inputMode="decimal"
+            aria-label={copy.columns.ter}
+            placeholder={copy.terPlaceholder}
+            className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-right text-[12px] tabular-nums"
+          />
+
           <div className="flex items-center gap-2">
-            <input
-              name="ter"
-              value={ter}
-              onChange={(e) => setTer(e.target.value)}
-              inputMode="decimal"
-              aria-label={copy.columns.ter}
-              placeholder={copy.terPlaceholder}
-              className="w-16 rounded-md border border-border bg-surface px-2 py-1.5 text-right text-[12px] tabular-nums"
-            />
+            <Checkbox
+              name="hedgedToBase"
+              checked={hedged}
+              onChange={setHedged}
+              className="px-2 py-1.5"
+            >
+              {copy.hedgedShort}
+            </Checkbox>
             <button
               type="submit"
               disabled={!dirty || busy}
