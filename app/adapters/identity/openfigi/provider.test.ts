@@ -38,6 +38,7 @@ describe("OpenFigiIdentityResolver", () => {
     expect(resolved.get("NVDA.US")).toEqual({
       status: "resolved",
       canonicalId: "BBG001S5S399",
+      exchCode: null,
     });
   });
 

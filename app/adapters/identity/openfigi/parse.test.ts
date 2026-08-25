@@ -6,7 +6,9 @@ import {
   bareTicker,
   batch,
   canonicalFrom,
+  isinCountry,
   parseMappingResponse,
+  primaryExchCode,
   toMappingJobs,
   type MappingResult,
 } from "./parse";
@@ -38,8 +40,8 @@ describe("bareTicker", () => {
 
 describe("toMappingJobs", () => {
   it("asks by ISIN when the issuer published one", () => {
-    expect(toMappingJobs([isin("US67066G1040")])).toEqual([
-      { idType: "ID_ISIN", idValue: "US67066G1040" },
+    expect(toMappingJobs([isin("US00TEST0041")])).toEqual([
+      { idType: "ID_ISIN", idValue: "US00TEST0041" },
     ]);
   });
 
@@ -60,6 +62,7 @@ describe("canonicalFrom", () => {
     expect(canonicalFrom({ data: [match("BBG001S5S399")] })).toEqual({
       status: "resolved",
       canonicalId: "BBG001S5S399",
+      exchCode: null,
     });
   });
 
@@ -74,6 +77,7 @@ describe("canonicalFrom", () => {
     expect(canonicalFrom(result)).toEqual({
       status: "resolved",
       canonicalId: "BBG001S5S399",
+      exchCode: null,
     });
   });
 
@@ -119,6 +123,7 @@ describe("canonicalFrom", () => {
       {
         status: "resolved",
         canonicalId: "BBG001S5S399",
+        exchCode: null,
       },
     );
   });
@@ -127,7 +132,7 @@ describe("canonicalFrom", () => {
 describe("parseMappingResponse", () => {
   it("zips results back onto the identities positionally", () => {
     const identities = [
-      isin("US67066G1040"),
+      isin("US00TEST0041"),
       ticker("NVDA.US"),
       ticker("SAN.ES"),
     ];
@@ -138,7 +143,7 @@ describe("parseMappingResponse", () => {
     ];
 
     const resolved = parseMappingResponse(identities, results);
-    expect(resolved.get("US67066G1040")).toEqual(resolved.get("NVDA.US"));
+    expect(resolved.get("US00TEST0041")).toEqual(resolved.get("NVDA.US"));
     expect(resolved.get("SAN.ES")).toEqual({
       status: "ambiguous",
       candidates: 2,
@@ -183,17 +188,19 @@ describe("canonicalFrom — narrowing a ticker with the issuer's own name", () =
     ).toEqual({
       status: "resolved",
       canonicalId: "BBG_SAN",
+      exchCode: null,
     });
     expect(canonicalFrom({ data: [santander, sanofi] }, "Sanofi")).toEqual({
       status: "resolved",
       canonicalId: "BBG_SNY",
+      exchCode: null,
     });
   });
 
   it("ignores legal form, case and punctuation", () => {
     expect(
       canonicalFrom({ data: [santander, sanofi] }, "banco santander, s.a."),
-    ).toEqual({ status: "resolved", canonicalId: "BBG_SAN" });
+    ).toEqual({ status: "resolved", canonicalId: "BBG_SAN", exchCode: null });
   });
 
   it("stays ambiguous when the name matches nothing", () => {
@@ -217,7 +224,11 @@ describe("canonicalFrom — narrowing a ticker with the issuer's own name", () =
   it("needs no name when the candidates already agree", () => {
     expect(
       canonicalFrom({ data: [match("BBG001S5S399"), match("BBG001S5S399")] }),
-    ).toEqual({ status: "resolved", canonicalId: "BBG001S5S399" });
+    ).toEqual({
+      status: "resolved",
+      canonicalId: "BBG001S5S399",
+      exchCode: null,
+    });
   });
 
   it("stays ambiguous when no name was supplied", () => {
@@ -244,6 +255,7 @@ describe("canonicalFrom — narrowing by where the holding trades", () => {
     expect(canonicalFrom({ data: [tsmc, other] }, undefined, "TW")).toEqual({
       status: "resolved",
       canonicalId: "BBG_TSMC",
+      exchCode: "TT",
     });
   });
 
@@ -253,6 +265,7 @@ describe("canonicalFrom — narrowing by where the holding trades", () => {
     ).toEqual({
       status: "resolved",
       canonicalId: "BBG_TSMC",
+      exchCode: "TT",
     });
   });
 
@@ -262,6 +275,7 @@ describe("canonicalFrom — narrowing by where the holding trades", () => {
     ).toEqual({
       status: "resolved",
       canonicalId: "BBG_OTHER",
+      exchCode: "US",
     });
   });
 
@@ -271,6 +285,7 @@ describe("canonicalFrom — narrowing by where the holding trades", () => {
     expect(canonicalFrom({ data: [a, b] }, "Beta Corp", "US")).toEqual({
       status: "resolved",
       canonicalId: "BBG_B",
+      exchCode: "US",
     });
   });
 
@@ -296,7 +311,7 @@ describe("canonicalFrom — names truncated at different widths", () => {
         { data: [tsmc, other] },
         "Taiwan Semiconductor Manufacturing Co Ltd",
       ),
-    ).toEqual({ status: "resolved", canonicalId: "BBG_TSMC" });
+    ).toEqual({ status: "resolved", canonicalId: "BBG_TSMC", exchCode: null });
   });
 
   it("refuses when a prefix fits more than one candidate", () => {
@@ -307,6 +322,169 @@ describe("canonicalFrom — names truncated at different widths", () => {
     ).toEqual({
       status: "ambiguous",
       candidates: 2,
+    });
+  });
+});
+
+describe("isinCountry", () => {
+  it("reads the country an ISIN is registered in", () => {
+    expect(isinCountry("US00TEST0041")).toBe("US");
+    expect(isinCountry("IE00TEST0042")).toBe("IE");
+  });
+
+  it("has nothing to say about a ticker", () => {
+    expect(isinCountry("NVDA.US")).toBeNull();
+    expect(isinCountry("6526")).toBeNull();
+    expect(isinCountry("")).toBeNull();
+  });
+});
+
+describe("primaryExchCode — where a share class does business", () => {
+  const composite = (
+    figi: string,
+    exchCode: string,
+    shareClassFIGI = "BBG_SC",
+  ) => ({ figi, compositeFIGI: figi, shareClassFIGI, exchCode });
+
+  const venue = (
+    figi: string,
+    compositeFIGI: string,
+    exchCode: string,
+    shareClassFIGI = "BBG_SC",
+  ) => ({ figi, compositeFIGI, shareClassFIGI, exchCode });
+
+  it("takes the only composite when there is only one", () => {
+    const rows = [
+      composite("BBG_C", "US"),
+      venue("BBG_V1", "BBG_C", "UN"),
+      venue("BBG_V2", "BBG_C", "UW"),
+    ];
+    expect(primaryExchCode(rows, "BBG_SC")).toBe("US");
+  });
+
+  it("confirms the registered country against the composites, for a cross-listed name", () => {
+    const nvidia = [
+      composite("BBG_US", "US"),
+      composite("BBG_DE", "GR"),
+      composite("BBG_MX", "MM"),
+      composite("BBG_CH", "SW"),
+      composite("BBG_MTF", "EO"),
+      venue("BBG_V", "BBG_US", "UW"),
+    ];
+    expect(primaryExchCode(nvidia, "BBG_SC", "US")).toBe("US");
+  });
+
+  it("refuses when nothing confirms the registered country", () => {
+    const accenture = [
+      composite("BBG_DE", "GR"),
+      composite("BBG_US", "US"),
+      composite("BBG_MX", "MM"),
+      composite("BBG_MTF", "EO"),
+    ];
+    expect(primaryExchCode(accenture, "BBG_SC", "IE")).toBeNull();
+  });
+
+  it("confirms against a venue row when the country's composite is absent", () => {
+    const asml = [
+      composite("BBG_DE", "GR"),
+      composite("BBG_US", "US"),
+      composite("BBG_MTF", "EO"),
+      venue("BBG_AMS", "BBG_NEVER_RETURNED", "NA"),
+    ];
+    expect(primaryExchCode(asml, "BBG_SC", "NL")).toBe("NA");
+  });
+
+  it("refuses a cross-listed name with no country to confirm against", () => {
+    const rows = [composite("BBG_US", "US"), composite("BBG_DE", "GR")];
+    expect(primaryExchCode(rows, "BBG_SC")).toBeNull();
+    expect(primaryExchCode(rows, "BBG_SC", null)).toBeNull();
+    expect(primaryExchCode(rows, "BBG_SC", "ZZ")).toBeNull();
+  });
+
+  it("ignores the composites of other share classes in the same answer", () => {
+    const rows = [
+      composite("BBG_A", "TT", "BBG_SC_A"),
+      composite("BBG_B", "US", "BBG_SC_B"),
+      composite("BBG_C", "GR", "BBG_SC_B"),
+    ];
+    expect(primaryExchCode(rows, "BBG_SC_A")).toBe("TT");
+  });
+
+  it("falls back to unanimity when no row marks itself composite", () => {
+    const a = { shareClassFIGI: "BBG_SC", exchCode: "TT" };
+    const b = { shareClassFIGI: "BBG_SC", exchCode: "TT" };
+    expect(primaryExchCode([a, b], "BBG_SC")).toBe("TT");
+
+    const c = { shareClassFIGI: "BBG_SC", exchCode: "US" };
+    expect(primaryExchCode([a, c], "BBG_SC")).toBeNull();
+  });
+
+  it("has nothing to say when no listing carries an exchange code", () => {
+    expect(
+      primaryExchCode([{ shareClassFIGI: "BBG_SC" }], "BBG_SC"),
+    ).toBeNull();
+    expect(
+      primaryExchCode([{ shareClassFIGI: "BBG_SC", exchCode: "" }], "BBG_SC"),
+    ).toBeNull();
+  });
+});
+
+describe("canonicalFrom — the currency of business it carries", () => {
+  it("confirms an ISIN's country without letting it decide the canonical id", () => {
+    const rows = [
+      {
+        figi: "BBG_US",
+        compositeFIGI: "BBG_US",
+        shareClassFIGI: "BBG_SC",
+        exchCode: "US",
+      },
+      {
+        figi: "BBG_DE",
+        compositeFIGI: "BBG_DE",
+        shareClassFIGI: "BBG_SC",
+        exchCode: "GR",
+      },
+    ];
+
+    const [resolution] = [
+      ...parseMappingResponse(
+        [isin("US00TEST0041")],
+        [{ data: rows }],
+      ).values(),
+    ];
+    expect(resolution).toEqual({
+      status: "resolved",
+      canonicalId: "BBG_SC",
+      exchCode: "US",
+    });
+  });
+
+  it("refuses the currency when the ISIN's country is not among the listings", () => {
+    const rows = [
+      {
+        figi: "BBG_US",
+        compositeFIGI: "BBG_US",
+        shareClassFIGI: "BBG_SC",
+        exchCode: "US",
+      },
+      {
+        figi: "BBG_DE",
+        compositeFIGI: "BBG_DE",
+        shareClassFIGI: "BBG_SC",
+        exchCode: "GR",
+      },
+    ];
+
+    const [resolution] = [
+      ...parseMappingResponse(
+        [isin("IE00TEST0042")],
+        [{ data: rows }],
+      ).values(),
+    ];
+    expect(resolution).toEqual({
+      status: "resolved",
+      canonicalId: "BBG_SC",
+      exchCode: null,
     });
   });
 });

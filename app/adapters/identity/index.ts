@@ -1,3 +1,4 @@
+export * from "./openfigi/currencies";
 export * from "./openfigi/names";
 export * from "./openfigi/parse";
 export * from "./openfigi/provider";

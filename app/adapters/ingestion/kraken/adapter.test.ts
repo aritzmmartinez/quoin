@@ -30,6 +30,10 @@ class FakeInstrumentRepository implements InstrumentRepository {
     const instrument = this.upserted.find((i) => i.id === id);
     if (instrument) instrument.ter = ter;
   }
+  async setHedgedToBase(id: string, hedged: boolean): Promise<void> {
+    const instrument = this.upserted.find((i) => i.id === id);
+    if (instrument) instrument.hedgedToBase = hedged;
+  }
   async setExposure(
     id: string,
     kind: ExposureKind | null,

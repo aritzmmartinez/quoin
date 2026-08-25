@@ -49,8 +49,8 @@ pnpm prices:sync                  # quote every mapped instrument
 pnpm prices:map <ISIN> <SYMBOL>   # set / show / --clear a Yahoo symbol
 pnpm prices:backfill [ISIN] [1y|2y|5y|10y|max]   # daily history, default 5y
 pnpm exposure:map                 # list how every instrument resolves
-pnpm exposure:map <ISIN> <KIND> [LEAF]           # e.g. XS2183935274 COMMODITY XAU
-pnpm identity:resolve [--limit N] [--all] [--retry-ambiguous] [--report]
+pnpm exposure:map <ISIN> <KIND> [LEAF]           # e.g. XS00TEST0003 COMMODITY XAU
+pnpm identity:resolve [--limit N] [--all] [--retry-ambiguous] [--refresh] [--report]
 pnpm ipc:sync [--force-rebase]        # INE consumer price index, national + Bizkaia
 pnpm target:set                       # show the savings-plan target in force today
 pnpm target:set <file> [--from=YYYY-MM-DD] [--name=…] [--note=…]   # record a version
@@ -193,7 +193,7 @@ re-import silently destroys hand-set mappings.
 An ISIN trades on many venues. Always map the **EUR-denominated venue line**, never the
 ISIN itself, and always sanity-check the price magnitude.
 
-- **Never map an ISIN as a `quoteSymbol`** (e.g. `XS2183935274.SG`). Yahoo resolves the
+- **Never map an ISIN as a `quoteSymbol`** (e.g. `XS00TEST0003.SG`). Yahoo resolves the
   ISIN to a quote, but has no historical series under that key — `timestamps` and `closes`
   come back `null` and `backfill` returns 0 candles. Use the venue ticker.
 - **Verify the price magnitude, not just the currency.** Several symbols quote in EUR and
@@ -290,6 +290,56 @@ manual aliasing was abandoned — 726 confirmations is not a system.
   **descending weight order** — unauthenticated the endpoint allows 10 jobs per request and
   25 requests a minute, so five thousand leaves is twenty minutes; ordering by weight means
   a couple of hundred lookups already cover every row that is drawn.
+
+## Currency exposure
+
+- **OpenFIGI's `/mapping` response has no `currency` field.** `currency` is a request
+  *filter* only. The response carries `figi`, `securityType`, `marketSector`, `exchCode`,
+  `securityType2`, `ticker`, `name`, `shareClassFIGI`, `compositeFIGI`,
+  `securityDescription`. Checked against the official docs; do not go looking for it again.
+- **OpenFIGI does not say which listing is primary, and no rule over that payload can.**
+  Measured, not assumed: NVIDIA's ISIN returns 247 rows and **sixteen** self-composite ones
+  (US, GR, MM, SW, CI, CB plus multi-currency MTF lines `NVDAEUR`, `NVDAGBP`, `NVDAJPY`…),
+  all `Common Stock`, one `shareClassFIGI`, one `name`. Accenture returns nine. Nothing
+  separates them — not `securityType`, not `securityType2`, not the ticker (NVIDIA's
+  shortest is `NVD`, Frankfurt). Every large cap looks like this. A first version refused
+  on "more than one country" and refused **5100 of 5153** resolved identities.
+- **So the country comes from outside and OpenFIGI only confirms it — three branches, in
+  order.** (1) The venue the issuer published (`NVDA.US`): a fact of the holdings file, no
+  provider, no quota, no re-resolution, and **4086 of 5153** identities are venue-qualified
+  tickers. (2) A bare ISIN proposes its registered country and is taken only if a row of
+  that share class actually carries that country's code. (3) Anything else is unresolved.
+- **The ISIN prefix never decides alone — that is what makes branch 2 safe.** Accenture is
+  `IE00B4BNMY34`, and not one of its 120 rows carries an Irish code, so the prefix proposes
+  IE, nothing confirms it, and the answer is unresolved — never EUR. Verified live: NVIDIA
+  → USD, Nestlé → CHF, ASML → EUR, Accenture → unresolved.
+- **Confirm against every row, not only self-composite ones.** ASML has twelve
+  self-composite rows and none is Amsterdam, while its Amsterdam listing is present as a
+  venue row under a composite FIGI the payload never returns. Requiring a self-composite
+  row reports a Dutch blue chip as unresolved.
+- **`SecurityIdentity.exchCode` stores the code; the currency is derived at read.** Same
+  rule as the plan storing euros and deriving the weight. A wrong entry in the translation
+  table is then a one-line fix, not a re-resolution of five thousand identities.
+- **The cache never re-asks a resolved identity**, so a column added later stays null
+  forever without `identity:resolve --refresh`.
+- **`bloombergCurrency` is deliberately not `BLOOMBERG_EXCHANGE` inverted.** That table's
+  own comment says a wrong or missing entry costs nothing, and that is true only because it
+  narrows an already-ambiguous set. Here a wrong entry is a wrong currency on screen with
+  nothing to catch it. Bloomberg's codes are not ISO's and two pairs read as typos: `IT` is
+  Israel (Italy is `IM`), `ID` is Ireland (Indonesia is `IJ`). Both are pinned by tests.
+- **Hedging is a property of the vehicle and is not in any market data.** A "Physical Gold
+  USD (EUR Hedged)" ETC and an unhedged one quote on the same venue in the same currency;
+  only the prospectus differs. `Instrument.hedgedToBase` is set by hand and excluded from
+  `InstrumentWriteData`, exactly like `ter` — widen that type and a re-import destroys it.
+- **The fold is over contributions, never over leaves.** One company held directly and
+  through a hedged fund is one leaf and two different currency exposures; folding at the
+  leaf would have to pick one and be wrong for the other. This is the payoff of
+  contributions being kept rather than summed.
+- **No FX, and none is needed.** Every amount arriving is already EUR by the valuation
+  invariant. This labels and sums; it never converts. `app/adapters/fx` is still a
+  placeholder, and the IPC pipeline is a price index, not a rate source.
+- A leaf with no known currency lands in its own bucket at full value and is never
+  pro-rated — same rule as `UNRESOLVED`, `unpricedCount` and a missing CPI month.
 
 ## Projections
 

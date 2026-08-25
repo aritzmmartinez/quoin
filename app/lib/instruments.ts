@@ -22,6 +22,7 @@ export interface InstrumentListItem {
   exposureKind: ExposureKind | null;
   exposureLeafId: string | null;
   ter: string | null;
+  hedgedToBase: boolean;
   resolvesTo: string;
   isExplicit: boolean;
   quantity: string;
@@ -79,6 +80,7 @@ export function toInstrumentListItems(
       exposureKind: instrument.exposureKind ?? null,
       exposureLeafId: instrument.exposureLeafId ?? null,
       ter: instrument.ter ?? null,
+      hedgedToBase: instrument.hedgedToBase ?? false,
       resolvesTo: leaf ? leafKey(leaf.leaf) : "—",
       isExplicit: Boolean(instrument.exposureKind),
       quantity: quantity.toFixed(),

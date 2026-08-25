@@ -5,12 +5,16 @@ export function Checkbox({
   name,
   value = "1",
   defaultChecked = false,
+  checked,
+  onChange,
   children,
   className = "",
 }: {
   name: string;
   value?: string;
   defaultChecked?: boolean;
+  checked?: boolean;
+  onChange?: (checked: boolean) => void;
   children: ReactNode;
   className?: string;
 }) {
@@ -22,7 +26,12 @@ export function Checkbox({
         type="checkbox"
         name={name}
         value={value}
-        defaultChecked={defaultChecked}
+        {...(checked === undefined
+          ? { defaultChecked }
+          : {
+              checked,
+              onChange: (event) => onChange?.(event.target.checked),
+            })}
         className="sr-only"
       />
       <span
