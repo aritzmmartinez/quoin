@@ -1,5 +1,7 @@
 import Decimal from "decimal.js";
 
+import { KNOWN_CURRENCIES } from "~/adapters/identity/openfigi/currencies";
+
 /**
  * Issuer CSVs write numbers every way a spreadsheet can. Observed in the wild,
  * across six issuers:
@@ -16,21 +18,11 @@ import Decimal from "decimal.js";
  * column misread by a factor of a thousand cannot sum to 100.
  */
 
-/** Anything that groups digits but carries no meaning. */
 const NOISE = /[\s\u00a0\u2019'%$€£]/g;
 
-/**
- * Disambiguate a number that uses one separator character several times.
- *
- * A grouping separator always leaves exactly three digits behind it, so the
- * length of the last group settles it: "322.235.420" is an integer, while
- * "322.235.420.00" is that integer with two decimals — a real format, dots for
- * both jobs in the same number.
- */
 function resolveRepeated(text: string, sep: string, lastIndex: number): string {
   const all = new RegExp(`\\${sep}`, "g");
   if (text.indexOf(sep) === lastIndex) {
-    // A single separator is a decimal point.
     return text.replace(sep, ".");
   }
   const lastGroup = text.slice(lastIndex + 1);
@@ -40,7 +32,6 @@ function resolveRepeated(text: string, sep: string, lastIndex: number): string {
 
 export function parseLooseNumber(raw: string): Decimal | null {
   let text = raw.trim().replace(/^"|"$/g, "");
-  // "- 0,02" -> "-0,02". The sign belongs to the number, not to the whitespace.
   text = text.replace(/^([-+])\s+/, "$1");
   text = text.replace(NOISE, "");
   if (text === "" || !/\d/.test(text)) return null;
@@ -49,7 +40,6 @@ export function parseLooseNumber(raw: string): Decimal | null {
   const lastDot = text.lastIndexOf(".");
 
   if (lastComma !== -1 && lastDot !== -1) {
-    // Both present: the rightmost one is the decimal separator, the other groups.
     text =
       lastComma > lastDot
         ? text.replace(/\./g, "").replace(",", ".")
@@ -68,7 +58,6 @@ export function parseLooseNumber(raw: string): Decimal | null {
   }
 }
 
-/** True when the text looks like a label rather than a measurement. */
 export function looksNumeric(raw: string): boolean {
   return parseLooseNumber(raw) !== null;
 }
@@ -79,16 +68,18 @@ export function looksLikeIsin(raw: string): boolean {
   return ISIN.test(raw.trim().toUpperCase());
 }
 
-/**
- * A ticker is short and has no spaces. Numeric tickers are allowed on purpose:
- * Tokyo lists Keyence as 6857, and excluding them threw out a third of a global
- * fund's rows — enough to make the real Ticker column fail detection and hand
- * the job to a two-letter Region column instead.
- */
 const TICKER = /^[A-Z0-9][A-Z0-9._ -]{0,9}$/;
 
 export function looksLikeTicker(raw: string): boolean {
   const text = raw.trim().toUpperCase();
-  // An internal space is allowed: Nordic share classes are written "HEXA B".
   return text !== "" && TICKER.test(text);
+}
+
+export function looksLikeCashRow(identity: string, name: string): boolean {
+  const code = identity.trim().toUpperCase();
+  if (!KNOWN_CURRENCIES.has(code)) return false;
+  return name
+    .toUpperCase()
+    .split(/[^A-Z0-9]+/)
+    .includes(code);
 }
