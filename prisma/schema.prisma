@@ -19,6 +19,11 @@ model Instrument {
   exposureKind   String? // COMPANY | EQUITY_FUND | BOND_FUND | COMMODITY | CRYPTO; set manually, never from ingestion
   exposureLeafId String? // leaf identity for COMMODITY/CRYPTO (e.g. "XAU", "BTC"); defaults to the instrument id
   ter            String? // annual total expense ratio as a decimal fraction ("0.0022" = 0.22%); set manually, never from ingestion
+  /// Whether the vehicle hedges its currency exposure back to EUR. Set manually,
+  /// never from ingestion — no listing reveals it: a "Physical Gold USD (EUR
+  /// Hedged)" ETC and an unhedged one quote on the same venue in the same
+  /// currency and differ only in the prospectus.
+  hedgedToBase Boolean @default(false)
   createdAt  DateTime @default(now())
 
   entries  LedgerEntry[]
@@ -203,6 +208,19 @@ model SecurityIdentity {
 
   /** Null when the provider found nothing, or found more than one candidate. */
   canonicalId String?
+  /**
+   * Bloomberg composite exchange code of the primary listing ("US", "GR", "TT"),
+   * which is where the currency of business is derived from at read time.
+   *
+   * The CODE is stored and the currency derived, not the other way round: this
+   * is the fact OpenFIGI returned, and a correction to the code-to-currency
+   * table must not cost a full re-resolution of five thousand identities.
+   *
+   * Null on a share class whose listings span more than one country, and on
+   * every row cached before this column existed — the cache never re-asks a
+   * resolved identity, so those need `identity:resolve --refresh`.
+   */
+  exchCode String?
   /** resolved | not-found | ambiguous — kept so a miss can be explained. */
   status String
   source String

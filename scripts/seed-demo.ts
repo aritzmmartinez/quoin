@@ -36,6 +36,7 @@ interface DemoInstrument {
   exposureKind: string | null;
   exposureLeafId: string | null;
   ter: string | null;
+  hedgedToBase?: boolean;
   seedPrice: number | null;
   drift: number;
   volatility: number;
@@ -66,6 +67,7 @@ const INSTRUMENTS: readonly DemoInstrument[] = [
     exposureKind: "COMMODITY",
     exposureLeafId: "XAU",
     ter: "0.0012",
+    hedgedToBase: true,
     seedPrice: 51.2,
     drift: 0.00051,
     volatility: 0.0068,
@@ -546,6 +548,7 @@ async function main(): Promise<void> {
         identity: "US00DEMO0101",
         identityKind: "ISIN",
         canonicalId: "DEMOFIGI000001",
+        exchCode: "US",
         status: "resolved",
         source: "DEMO",
       },
@@ -553,6 +556,7 @@ async function main(): Promise<void> {
         identity: "DEMOP.DE",
         identityKind: "TICKER",
         canonicalId: "DEMOFIGI000002",
+        exchCode: null,
         status: "resolved",
         source: "DEMO",
       },
