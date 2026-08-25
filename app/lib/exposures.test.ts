@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 
+import type { CachedIdentity } from "~/core/ports";
 import type { LeafExposure } from "~/core/projections";
 
 import {
   CONCENTRATION_THRESHOLD,
   DEFAULT_ALLOCATION_VIEW,
+  currencyByLeaf,
   parseAllocationView,
   viewHref,
   readingFor,
@@ -162,6 +164,7 @@ describe("parseAllocationView", () => {
 
   it("reads the view from the URL", () => {
     expect(of("vista=rebalanceo")).toBe("rebalanceo");
+    expect(of("vista=divisa")).toBe("divisa");
     expect(of("vista=exposicion")).toBe("exposicion");
   });
 
@@ -191,5 +194,82 @@ describe("viewHref", () => {
   it("drops a stale view when returning to the default", () => {
     const away = new URLSearchParams(viewHref(params, "rebalanceo"));
     expect(viewHref(away, "exposicion")).not.toContain("vista");
+  });
+});
+
+describe("currencyByLeaf", () => {
+  const cached = (
+    value: string,
+    kind: "ISIN" | "TICKER",
+    canonicalId: string | null,
+    exchCode: string | null = null,
+  ): CachedIdentity => ({
+    value,
+    kind,
+    source: "openfigi",
+    resolvedAt: new Date("2026-01-01"),
+    resolution:
+      canonicalId === null
+        ? { status: "not-found" }
+        : { status: "resolved", canonicalId, exchCode },
+  });
+
+  const from = (entries: CachedIdentity[]) =>
+    currencyByLeaf(new Map(entries.map((e) => [e.value, e])));
+
+  it("takes the venue the issuer published, with no provider involved", () => {
+    const map = from([cached("NVDA.US", "TICKER", "BBG_NVDA")]);
+    expect(map.get("COMPANY:BBG_NVDA")).toBe("USD");
+  });
+
+  it("answers for a ticker the provider never placed", () => {
+    const map = from([cached("IBE.ES", "TICKER", null)]);
+    expect(map.get("COMPANY:IBE.ES")).toBe("EUR");
+  });
+
+  it("keys the currency by the leaf the projection will use", () => {
+    const map = from([cached("US67066G1040", "ISIN", "BBG_NVDA", "US")]);
+    expect(map.get("COMPANY:BBG_NVDA")).toBe("USD");
+    expect(map.has("COMPANY:US67066G1040")).toBe(false);
+  });
+
+  it("merges two identities that reach the same company", () => {
+    const map = from([
+      cached("US67066G1040", "ISIN", "BBG_NVDA", "US"),
+      cached("NVDA.US", "TICKER", "BBG_NVDA"),
+    ]);
+    expect(map.get("COMPANY:BBG_NVDA")).toBe("USD");
+  });
+
+  it("refuses a leaf whose identities disagree on the currency", () => {
+    const map = from([
+      cached("NVDA.US", "TICKER", "BBG_SAME"),
+      cached("NVDA.MX", "TICKER", "BBG_SAME"),
+    ]);
+    expect(map.has("COMPANY:BBG_SAME")).toBe(false);
+  });
+
+  it("says nothing about an ISIN the provider could not place", () => {
+    const map = from([cached("IE00B4BNMY34", "ISIN", null)]);
+    expect(map.size).toBe(0);
+  });
+
+  it("says nothing when an ISIN's listing has no exchange code cached yet", () => {
+    const map = from([cached("IE00B4BNMY34", "ISIN", "BBG_ACN", null)]);
+    expect(map.size).toBe(0);
+  });
+
+  it("ignores a code it cannot translate without losing the ones it can", () => {
+    const map = from([
+      cached("A00000000001", "ISIN", "BBG_A", "ZZ"),
+      cached("B00000000002", "ISIN", "BBG_B", "TT"),
+    ]);
+    expect(map.has("COMPANY:BBG_A")).toBe(false);
+    expect(map.get("COMPANY:BBG_B")).toBe("TWD");
+  });
+
+  it("falls back to the confirmed listing for a ticker with no usable venue", () => {
+    const map = from([cached("NVDA", "TICKER", "BBG_NVDA", "US")]);
+    expect(map.get("COMPANY:BBG_NVDA")).toBe("USD");
   });
 });

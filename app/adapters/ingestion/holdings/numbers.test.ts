@@ -1,12 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  looksLikeIsin,
-  looksLikeTicker,
-  parseLooseNumber,
-} from "./numbers";
+import { looksLikeIsin, looksLikeTicker, parseLooseNumber } from "./numbers";
 
-const n = (raw: string): string | null => parseLooseNumber(raw)?.toString() ?? null;
+const n = (raw: string): string | null =>
+  parseLooseNumber(raw)?.toString() ?? null;
 
 describe("parseLooseNumber", () => {
   it("reads a dot decimal with a percent sign", () => {
@@ -40,7 +37,9 @@ describe("parseLooseNumber", () => {
     // decimals. The last group settles it — grouping always leaves three digits,
     // so a two-digit tail is a decimal. Reading it as pure grouping would inflate
     // the value a hundredfold.
-    expect(parseLooseNumber("$ 322.235.420.00")?.toFixed(2)).toBe("322235420.00");
+    expect(parseLooseNumber("$ 322.235.420.00")?.toFixed(2)).toBe(
+      "322235420.00",
+    );
   });
 
   it("treats the rightmost separator as the decimal point", () => {
@@ -71,15 +70,15 @@ describe("parseLooseNumber", () => {
 
 describe("looksLikeIsin", () => {
   it("accepts a well-formed ISIN", () => {
-    expect(looksLikeIsin("IE00BK5BQT80")).toBe(true);
-    expect(looksLikeIsin("US67066G1040")).toBe(true);
-    expect(looksLikeIsin("XS2183935274")).toBe(true);
+    expect(looksLikeIsin("IE00TEST0001")).toBe(true);
+    expect(looksLikeIsin("US00TEST0002")).toBe(true);
+    expect(looksLikeIsin("XS00TEST0003")).toBe(true);
   });
 
   it("rejects near misses", () => {
     expect(looksLikeIsin("NVDA")).toBe(false);
-    expect(looksLikeIsin("IE00BK5BQT8")).toBe(false); // too short
-    expect(looksLikeIsin("1E00BK5BQT80")).toBe(false); // digits for the country
+    expect(looksLikeIsin("IE00TEST000")).toBe(false); // too short
+    expect(looksLikeIsin("1E00TEST0001")).toBe(false); // digits for the country
     expect(looksLikeIsin("--")).toBe(false);
   });
 });
