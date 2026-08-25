@@ -191,9 +191,12 @@ export const es = {
       matriz: "Matriz",
     },
     header: (funds: number, pairs: number): string =>
-      `${funds} fondos con composición importada · ${pairs} ${pairs === 1 ? "par" : "pares"}`,
+      `${funds} fondos · ${pairs} ${pairs === 1 ? "par" : "pares"}`,
     empty:
-      "Hacen falta al menos dos fondos con composición importada. Arrastra el CSV de holdings sobre la fila del fondo en Instrumentos; un fondo sin composición queda fuera del cálculo, no cuenta como 0%.",
+      "Hacen falta al menos dos fondos con composición importada y posición abierta. Arrastra el CSV de holdings sobre la fila del fondo en Instrumentos; un fondo sin composición queda fuera del cálculo, no cuenta como 0%.",
+    includeSold: "Incluir fondos vendidos",
+    includeSoldHint:
+      "Fondos con composición importada pero sin posición abierta hoy — útil para ver cuánto se solaparía algo que vendiste antes de recomprarlo.",
     shared: (count: number): string =>
       count === 1 ? "1 empresa en común" : `${count} empresas en común`,
     none: "Ninguna empresa en común: diversificación real entre estos dos.",

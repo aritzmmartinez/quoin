@@ -1,7 +1,13 @@
 import { Link, useSearchParams } from "react-router";
 
 import type { FundOverlapPair } from "~/core/projections";
-import { OVERLAP_MODES, es, modeHref, type OverlapMode } from "~/lib";
+import {
+  OVERLAP_MODES,
+  es,
+  includeSoldHref,
+  modeHref,
+  type OverlapMode,
+} from "~/lib";
 
 import { Card } from "../ui/Card";
 import { OverlapList } from "./OverlapList";
@@ -16,10 +22,12 @@ export function OverlapPanel({
   funds,
   pairs,
   mode,
+  includeSold,
 }: {
   funds: readonly OverlapFund[];
   pairs: readonly FundOverlapPair[];
   mode: OverlapMode;
+  includeSold: boolean;
 }) {
   const copy = es.overlap;
 
@@ -30,6 +38,9 @@ export function OverlapPanel({
         <p className="py-8 text-center text-[13px] leading-normal text-muted">
           {copy.empty}
         </p>
+        <div className="mt-2 flex justify-center">
+          <IncludeSoldToggle value={includeSold} />
+        </div>
       </Card>
     );
   }
@@ -46,7 +57,10 @@ export function OverlapPanel({
         <p className="mb-3 text-[12.5px] leading-normal text-muted">
           {copy.intro}
         </p>
-        <ModeTabs value={mode} />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <ModeTabs value={mode} />
+          <IncludeSoldToggle value={includeSold} />
+        </div>
       </Card>
 
       {mode === "matriz" ? (
@@ -57,6 +71,26 @@ export function OverlapPanel({
 
       <p className="text-[11.5px] leading-normal text-muted">{copy.note}</p>
     </div>
+  );
+}
+
+function IncludeSoldToggle({ value }: { value: boolean }) {
+  const [params] = useSearchParams();
+  const copy = es.overlap;
+
+  return (
+    <Link
+      to={includeSoldHref(params, !value)}
+      aria-current={value ? "page" : undefined}
+      title={copy.includeSoldHint}
+      className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[12px] font-medium transition-colors ${
+        value
+          ? "border-border bg-surface-2 text-text"
+          : "border-border text-muted hover:text-text"
+      }`}
+    >
+      {copy.includeSold}
+    </Link>
   );
 }
 

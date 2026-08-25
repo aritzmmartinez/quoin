@@ -39,10 +39,12 @@ import {
   es,
   formatMoney,
   formatPercent,
+  heldValuesByInstrument,
   isCashLine,
   parseAllocationView,
   parseContribution,
   parseDriftThreshold,
+  parseIncludeSold,
   parseOverlapMode,
   parseThreshold,
   readingFor,
@@ -66,6 +68,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const contribution = parseContribution(params);
   const driftThreshold = parseDriftThreshold(params);
   const overlapMode = parseOverlapMode(params);
+  const includeSold = parseIncludeSold(params);
 
   const [events, instruments, prices, holdings, identities, targets] =
     await Promise.all([
@@ -117,8 +120,15 @@ export async function loader({ request }: Route.LoaderArgs) {
   const withHoldings = instruments.filter(
     (instrument) => (holdings.get(instrument.id) ?? []).length > 0,
   );
+  const heldIds = includeSold
+    ? null
+    : new Set(heldValuesByInstrument(positions, marketValues).keys());
+  const overlapInstruments =
+    heldIds === null
+      ? withHoldings
+      : withHoldings.filter((instrument) => heldIds.has(instrument.id));
   const overlapFunds = new Map<string, WeightedLeaf[]>(
-    withHoldings.map((instrument) => [
+    overlapInstruments.map((instrument) => [
       instrument.id,
       resolutions.get(instrument.id) ?? [],
     ]),
@@ -130,7 +140,8 @@ export async function loader({ request }: Route.LoaderArgs) {
         ? null
         : {
             mode: overlapMode,
-            funds: withHoldings.map(({ id, name }) => ({ id, name })),
+            includeSold,
+            funds: overlapInstruments.map(({ id, name }) => ({ id, name })),
             pairs: computeAllFundOverlaps(overlapFunds, isCashLine),
           },
     currency:
@@ -204,6 +215,7 @@ export default function Allocation({ loaderData }: Route.ComponentProps) {
           funds={overlap.funds}
           pairs={overlap.pairs}
           mode={overlap.mode}
+          includeSold={overlap.includeSold}
         />
       </>
     );

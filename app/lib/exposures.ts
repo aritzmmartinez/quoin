@@ -202,6 +202,8 @@ export type OverlapMode = (typeof OVERLAP_MODES)[number];
 export const DEFAULT_OVERLAP_MODE: OverlapMode = "lista";
 export const MODE_PARAM = "modo";
 
+export const INCLUDE_SOLD_PARAM = "incluirVendidos";
+
 export function parseAllocationView(params: URLSearchParams): AllocationView {
   const raw = params.get(VIEW_PARAM);
   return raw !== null && (ALLOCATION_VIEWS as readonly string[]).includes(raw)
@@ -216,6 +218,20 @@ export function parseOverlapMode(params: URLSearchParams): OverlapMode {
     : DEFAULT_OVERLAP_MODE;
 }
 
+export function parseIncludeSold(params: URLSearchParams): boolean {
+  return params.get(INCLUDE_SOLD_PARAM) === "1";
+}
+
+export function includeSoldHref(
+  params: URLSearchParams,
+  includeSold: boolean,
+): string {
+  const next = new URLSearchParams(params);
+  if (includeSold) next.set(INCLUDE_SOLD_PARAM, "1");
+  else next.delete(INCLUDE_SOLD_PARAM);
+  return `?${next.toString()}`;
+}
+
 export function viewHref(
   params: URLSearchParams,
   view: AllocationView,
@@ -223,7 +239,10 @@ export function viewHref(
   const next = new URLSearchParams(params);
   if (view === DEFAULT_ALLOCATION_VIEW) next.delete(VIEW_PARAM);
   else next.set(VIEW_PARAM, view);
-  if (view !== "solapamiento") next.delete(MODE_PARAM);
+  if (view !== "solapamiento") {
+    next.delete(MODE_PARAM);
+    next.delete(INCLUDE_SOLD_PARAM);
+  }
   return `?${next.toString()}`;
 }
 
