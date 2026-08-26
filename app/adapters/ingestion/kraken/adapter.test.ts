@@ -118,11 +118,11 @@ describe("KrakenCsvAdapter", () => {
     const summary = await adapter.import(CSV);
 
     expect(summary.total).toBe(5);
-    expect(summary.imported).toBe(3);
+    expect(summary.imported).toBe(4);
     expect(summary.discarded).toEqual({ "non-btc": 2 });
     expect(summary.instruments).toBe(1);
     expect(instruments.upserted[0]!.id).toBe("BTC");
-    expect(ledger.appended).toHaveLength(3);
+    expect(ledger.appended).toHaveLength(4);
   });
 
   it("gives the imported reward the market value it had that day", async () => {
@@ -133,6 +133,20 @@ describe("KrakenCsvAdapter", () => {
     if (reward?.type === "BUY") {
       expect(reward.price).toBe("80000");
       expect(reward.grossAmount).toBe("0.4568");
+    }
+  });
+
+  it("also records the reward as income at the same market value", async () => {
+    await adapter.import(CSV);
+
+    const income = ledger.appended.find(
+      (e) => e.note === "kraken-reward-income",
+    );
+    expect(income?.type).toBe("DIVIDEND");
+    if (income?.type === "DIVIDEND") {
+      expect(income.instrumentId).toBe("BTC");
+      expect(income.grossAmount).toBe("0.4568");
+      expect(income.externalId).toBe("RW1:income");
     }
   });
 

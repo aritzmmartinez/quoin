@@ -9,7 +9,7 @@ and support for the Bizkaia *foral* tax regime that off-the-shelf trackers ignor
 The goal isn't to trade: it's to **understand** a portfolio, and to double as a
 learning project.
 
-> **Status: v0.4.0, actively built.** The immutable ledger, core domain
+> **Status: v0.5.0, actively built.** The immutable ledger, core domain
 > (Money, event types, `computePositions` with average cost), CSV and `.xlsx` ingestion
 > (Trade Republic + Kraken), a Yahoo price provider with daily history, the app shell
 > and the summary / holdings / movements / asset-detail / instruments / allocation /
@@ -20,7 +20,10 @@ learning project.
 > purchasing power against INE's consumer price index. The savings plan drives both a
 > no-sell rebalance of the next contribution and a bootstrap projection of where the
 > portfolio could end up, reported as a range and refused outright when the price history
-> is too short to resample. The tax module is next — see the roadmap.
+> is too short to resample. Realised gains are also computed under the Bizkaia *foral*
+> regime — FIFO by lot, a two-month wash-sale exclusion and four-year loss carryforward —
+> as a projection kept separate from the portfolio's average-cost view. The trading sleeve
+> is next — see the roadmap.
 
 ![Quoin — pantalla de Asignación con look-through](docs/allocation_dark.png)
 
@@ -28,7 +31,9 @@ learning project.
 
 Existing trackers do charts and dividends well, but none of them:
 
-- model a **jurisdiction-pluggable tax engine** (Bizkaia foral rules as a first implementation);
+- model the **Bizkaia *foral* IRPF rules** — FIFO by lot, the short-term repurchase
+  exclusion, four-year loss carryforward — as a capital-gains projection kept separate
+  from the portfolio's average-cost view;
 - compute **true look-through exposure** — your real single-name weight counting holdings
   inside each ETF, not just direct positions;
 - stay **local-first and self-hosted** with zero recurring cost, so the data you own
@@ -116,6 +121,7 @@ pnpm run db:studio      # Prisma Studio (GUI to inspect the data)
 pnpm run db:backup      # VACUUM INTO data/backups/, keeping the last 30
 pnpm run db:seed        # synthetic portfolio -> the scratch database
 pnpm twr:explain        # audit the portfolio TWR chain link by link, worst first
+pnpm tax:explain        # replay the Bizkaia foral FIFO year by year against the real ledger
 pnpm projection:converge    # how much the projected range moves between seeds, per simulation count
 pnpm test               # Vitest (pure domain / projection / mapper tests)
 pnpm run test:integration   # migrations against a temporary SQLite database
@@ -154,8 +160,8 @@ on with decimal.js; data and secrets are never committed.
 - [x] Projection: bootstrap the plan into a range, with the simulation count measured rather than assumed
 - [x] Opportunity cost: every real purchase replayed into the index, in euros and in MWR
 - [x] Fee cost: the portfolio's weighted TER, and what it compounds to over the projection horizon
+- [x] Bizkaia foral tax module (FIFO lots)
 - [ ] Trading sleeve, watchlist and trade journal
-- [ ] Bizkaia foral tax module (FIFO lots)
 - [ ] DCF valuation module
 
 ## License

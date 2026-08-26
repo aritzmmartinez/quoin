@@ -546,6 +546,11 @@ export const es = {
   },
   realized: {
     title: "Realizado",
+    views: {
+      label: "Vista",
+      ventas: "Ventas",
+      fiscal: "Fiscal (Bizkaia)",
+    },
     intro:
       "Cada venta cerrada, con el coste que consumió en el momento de venderla. Las comisiones de compra ya van dentro del coste; las de venta se restan del bruto.",
     avcoWarning:
@@ -571,6 +576,59 @@ export const es = {
     empty: {
       title: "Sin ventas todavía",
       body: "Cuando vendas algo, aquí aparecerá el resultado de cada operación.",
+    },
+    fiscal: {
+      intro:
+        "Mismas ventas, criterio FIFO en vez de AVCO — el que exige la declaración foral de Bizkaia, no el de la pestaña de Ventas. Cálculo puro: computeTaxLots y computeNetWithCarryforward, sin cifras nuevas.",
+      yearLabel: "Año fiscal",
+      noYears: "No hay ventas registradas todavía en ningún año.",
+      summary: {
+        netBase: "Base liquidable del ahorro",
+        quota: "Cuota resultante",
+        scale: (source: string): string => `Escala aplicada: ${source}`,
+        noScale:
+          "Sin escala fiscal cargada para este año — no se puede calcular la cuota.",
+      },
+      net: {
+        before: "Neto propio antes de exclusión por wash-sale",
+        after: "Neto propio después de exclusión por wash-sale",
+        counts: (allowed: number, disallowed: number): string =>
+          `${allowed} ${allowed === 1 ? "venta permitida" : "ventas permitidas"}` +
+          (disallowed > 0
+            ? `, ${disallowed} ${disallowed === 1 ? "descartada por wash-sale" : "descartadas por wash-sale"}`
+            : ""),
+      },
+      salesTitle: "Ventas del año, orden FIFO",
+      columns: {
+        date: "Fecha",
+        name: "Instrumento",
+        quantity: "Uds",
+        grossAmount: "Bruto",
+        fees: "Comisiones",
+        costBasis: "Coste",
+        realizedPnL: "Resultado",
+      },
+      disallowedBadge: "Wash-sale",
+      expand: "Ver lotes",
+      collapse: "Ocultar lotes",
+      lotsTitle: "Lotes FIFO consumidos",
+      lotsColumns: {
+        acquiredAt: "Adquirido",
+        quantity: "Uds",
+        unitCost: "Coste unitario",
+      },
+      empty: {
+        title: "Sin ventas en este año",
+        body: "Elige otro año fiscal en el desplegable.",
+      },
+      carryforwardTitle: "Arrastre de pérdidas, últimos 4 años",
+      carryforwardColumns: {
+        year: "Año",
+        ownNet: "Neto propio",
+        consumedFromCarryforward: "Consumido del arrastre",
+        finalNet: "Neto final",
+        pendingLossRemaining: "Pérdida pendiente",
+      },
     },
   },
   opportunity: {

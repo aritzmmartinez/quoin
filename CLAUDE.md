@@ -39,6 +39,8 @@ pnpm lint                         # eslint
 pnpm test                         # vitest, unit
 pnpm test:watch
 pnpm test:integration             # migrate deploy against a temp sqlite db
+pnpm verify                       # lint + typecheck + build + test (the four unit-level checks)
+pnpm verify:full                  # verify + test:integration — the full CI gate, run before a tag
 pnpm db:generate                  # prisma generate
 pnpm db:migrate                   # prisma migrate dev
 pnpm db:studio
@@ -344,8 +346,8 @@ manual aliasing was abandoned — 726 confirmations is not a system.
 ## Projections
 
 - `computePositions` uses **AVCO** (weighted average cost) for the portfolio view.
-  **FIFO** exists only for foral tax (`computeTaxLots`, future) and is a **separate**
-  projection. Do not merge them.
+  **FIFO** exists only for foral tax (`computeTaxLots`, over the `walkFifo` fold in
+  `core/tax/`) and is a **separate** projection. Do not merge them.
 - **Contributed ("aportado") = what left the bank, fees included.** One definition, shared
   by `computePositions.costBasis`, `computeCostBasisTimeline`, `computeReturns.totalInvested`
   and the XIRR cash flows. Rationale: the foral rule puts inherent costs inside the
@@ -575,6 +577,31 @@ manual aliasing was abandoned — 726 confirmations is not a system.
 
 Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never régimen común.
 
+- **Never cite an NF 13/2013 article number without a verifiable source for it.** Two
+  were fabricated during initial development (`Art. 47.2` for the wash-sale rule, `Art.
+  71` for carryforward — both plausible chapter-adjacent numbers, both wrong; correct are
+  Art. 43 and Art. 66). A guessed-but-plausible citation is worse than none: it invites
+  trust nobody checked. If the article cannot be confirmed against the actual text, write
+  the comment without a number ("regla de recompra a corto plazo, Bizkaia — ver nota de
+  Aritz") rather than inventing one that reads as authoritative.
+- **The wash-sale rule is a deliberate simplification: it EXCLUDES the loss from the
+  year's deductible net and FLAGS it, it does not model the deferral.** Art. 43 defers a
+  loss on securities repurchased within two months until the repurchased position is
+  finally transmitted; Quoin drops it from the year and shows the exclusion on screen so
+  whoever files sees it. Do not "fix" it into a deferral without checking that is what
+  Aritz wants — the exclusion is the design, not a bug. The trades that make up the sold
+  lot are excluded from the repurchase search, or every quick loss trips on its own buy.
+- **Nothing FIFO is persisted.** `computeTaxLots` and `computeNetWithCarryforward`
+  recompute from the ledger on every read — no lot table, no carryforward countdown.
+  Restricting the carryforward walk to `[targetYear − 4, targetYear]` is what enforces
+  the four-year expiry; do not add a stored balance.
+- **`TAX_SCALES` is keyed by `(territory, year)`.** A year not on file returns `null` from
+  `getTaxScale` and the screen states the absence — never fall back to the nearest year's
+  brackets. A rate is data; a superseded scale is a wrong number that looks right.
+- **The fiscal year is Madrid's calendar** (`fiscalYearOf` via `Intl`, `timeZone:
+  "Europe/Madrid"`), same trap as `periodOf` — the last hours of 31 December are already
+  the next year locally.
+
 ## Kraken rewards
 
 - **A reward is an acquisition with no counter-leg**, so its value comes from the price
@@ -590,6 +617,11 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
   87% of refid groups are discarded as `non-btc` — SOL and ETH `earn`, plus `welcomebonus`
   in five assets. `pnpm ingest` prints the count under one label, so the breakdown by asset
   is not visible from the summary.
+- **A reward's income leg is a `DIVIDEND` event, not a dedicated type.** The shape already
+  fits — instrument plus gross amount, no quantity needed — and a new type would touch the
+  SQLite `LedgerEntry` CHECK migration for no functional gain. `mapGroup` emits it alongside
+  the BUY, same market value, distinct `externalId` (`refid:income`) so both survive dedup.
+  Distinguish it from a real fund dividend by `note: "kraken-reward-income"`, not by type.
 
 ## Ledger entry types
 
@@ -654,13 +686,18 @@ OS, and without it the panel comes back light while the options inherit white te
 
 Vitest. Everything pure is tested: `Money`, domain, projections, parsers, mappers, and
 ingestion against injected fake repositories. `test:integration` runs `prisma migrate
-deploy` against a temporary SQLite database.
+deploy` against a temporary SQLite database — kept out of the default (unit) run because
+it needs the generated Prisma client and shells out to `prisma`, and its `beforeAll` gets
+a 120s `hookTimeout` because a cold pnpm + Prisma engine start blows past vitest's 10s
+default (it silently did, on Windows, before that was set).
 
 A regression only counts as fixed when a test covers it. The fee-treatment bug survived
 for months because **no test used `fees ≠ 0`**.
 
-CI (GitHub Actions) runs lint + typecheck + build + test on every push and PR. All four
-must pass.
+CI (GitHub Actions) runs lint + typecheck + build + test + test:integration on every push
+and PR — the same five `pnpm verify:full` runs locally. All five must pass. `pnpm verify`
+is the first four alone (no integration); `verify:full` is the gate to run before tagging
+a release.
 
 ## Workflow
 
