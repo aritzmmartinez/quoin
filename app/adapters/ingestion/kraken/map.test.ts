@@ -35,13 +35,15 @@ describe("Kraken mapGroup", () => {
         fee: "0",
       }),
     ]);
-    expect(result.kind).toBe("domain");
-    if (result.kind === "domain" && result.event.type === "BUY") {
-      expect(result.instrument?.id).toBe("BTC");
-      expect(result.event.quantity).toBe("0.003");
-      expect(result.event.grossAmount).toBe("150");
-      expect(result.event.price).toBe("50000");
-      expect(result.event.sleeve).toBe("CORE");
+    expect(result).toHaveLength(1);
+    const [item] = result;
+    expect(item!.kind).toBe("domain");
+    if (item!.kind === "domain" && item!.event.type === "BUY") {
+      expect(item!.instrument?.id).toBe("BTC");
+      expect(item!.event.quantity).toBe("0.003");
+      expect(item!.event.grossAmount).toBe("150");
+      expect(item!.event.price).toBe("50000");
+      expect(item!.event.sleeve).toBe("CORE");
     }
   });
 
@@ -64,10 +66,9 @@ describe("Kraken mapGroup", () => {
         fee: "0",
       }),
     ]);
+    const [item] = result;
     expect(
-      result.kind === "domain" &&
-        result.event.type === "BUY" &&
-        result.event.fees,
+      item!.kind === "domain" && item!.event.type === "BUY" && item!.event.fees,
     ).toBe("7.92");
   });
 
@@ -75,7 +76,8 @@ describe("Kraken mapGroup", () => {
     const result = mapGroup([
       row({ refid: "D1", type: "deposit", asset: "EUR", amount: "500" }),
     ]);
-    expect(result.kind === "domain" && result.event.type).toBe("DEPOSIT");
+    const [item] = result;
+    expect(item!.kind === "domain" && item!.event.type).toBe("DEPOSIT");
   });
 
   const rewardRow = (over: Partial<KrakenRow> = {}) =>
@@ -92,38 +94,62 @@ describe("Kraken mapGroup", () => {
   it("values a BTC reward at the market price when it was received", () => {
     const result = mapGroup([rewardRow()], () => "80000");
 
-    expect(result.kind).toBe("domain");
-    if (result.kind === "domain" && result.event.type === "BUY") {
-      expect(result.event.quantity).toBe("0.0000057");
-      expect(result.event.price).toBe("80000");
-      expect(result.event.grossAmount).toBe("0.456");
-      expect(result.event.fees).toBe("0");
+    expect(result).toHaveLength(2);
+    const [buy, income] = result;
+    expect(buy!.kind).toBe("domain");
+    if (buy!.kind === "domain" && buy!.event.type === "BUY") {
+      expect(buy!.event.quantity).toBe("0.0000057");
+      expect(buy!.event.price).toBe("80000");
+      expect(buy!.event.grossAmount).toBe("0.456");
+      expect(buy!.event.fees).toBe("0");
+    }
+    expect(income!.kind).toBe("domain");
+    if (income!.kind === "domain" && income!.event.type === "DIVIDEND") {
+      expect(income!.event.instrumentId).toBe("BTC");
+      expect(income!.event.grossAmount).toBe("0.456");
+      expect(income!.event.externalId).toBe("RW1:income");
     }
   });
 
+  it("gives the BUY and the income row distinct externalIds so both survive dedup", () => {
+    const [buy, income] = mapGroup([rewardRow()], () => "80000");
+
+    expect(buy!.kind === "domain" && buy!.event.externalId).toBe("RW1");
+    expect(income!.kind === "domain" && income!.event.externalId).toBe(
+      "RW1:income",
+    );
+  });
+
   it("keeps a sub-cent reward's value instead of rounding it away", () => {
-    const result = mapGroup(
+    const [buy, income] = mapGroup(
       [rewardRow({ amount: "0.00000001" })],
       () => "80000",
     );
 
     expect(
-      result.kind === "domain" &&
-        result.event.type === "BUY" &&
-        result.event.grossAmount,
+      buy!.kind === "domain" &&
+        buy!.event.type === "BUY" &&
+        buy!.event.grossAmount,
     ).toBe("0.0008");
+    expect(income!.kind === "domain" && income!.event.grossAmount).toBe(
+      "0.0008",
+    );
   });
 
   it("discards a reward it cannot price rather than recording a zero cost", () => {
     const result = mapGroup([rewardRow()], () => null);
 
-    expect(result).toEqual({ kind: "discard", reason: "reward-unpriced" });
+    expect(result).toEqual([{ kind: "discard", reason: "reward-unpriced" }]);
   });
 
   it("prices an earn the same way as a reward", () => {
     const result = mapGroup([rewardRow({ type: "earn" })], () => "80000");
 
-    expect(result.kind === "domain" && result.event.type).toBe("BUY");
+    expect(result).toHaveLength(2);
+    expect(result[0]!.kind === "domain" && result[0]!.event.type).toBe("BUY");
+    expect(result[1]!.kind === "domain" && result[1]!.event.type).toBe(
+      "DIVIDEND",
+    );
   });
 
   it("discards non-BTC crypto rewards", () => {
@@ -136,7 +162,7 @@ describe("Kraken mapGroup", () => {
         amount: "0.5",
       }),
     ]);
-    expect(sol).toEqual({ kind: "discard", reason: "non-btc" });
+    expect(sol).toEqual([{ kind: "discard", reason: "non-btc" }]);
   });
 
   it("discards crypto-to-crypto swaps as non-BTC", () => {
@@ -156,7 +182,7 @@ describe("Kraken mapGroup", () => {
         amount: "0.02",
       }),
     ]);
-    expect(swap).toEqual({ kind: "discard", reason: "non-btc" });
+    expect(swap).toEqual([{ kind: "discard", reason: "non-btc" }]);
   });
 });
 
