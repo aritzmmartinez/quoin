@@ -27,9 +27,9 @@ Convention: internal imports always use the `~/...` alias.
 
 ### core
 - `domain/`      value objects (Money as string + decimal.js), ledger event types, exposure leaves, `resolveIntrinsic` / `resolveWithHoldings` / `canonicaliseLeaves`, `InflationIndex` + `Period` / `periodOf` / `deflate` and the `Revalue` function every projection takes to work in real terms, the portfolio target and `getActiveTarget`
-- `ports/`       interfaces: `LedgerRepository`, `InstrumentRepository`, `MarketDataProvider`, `PriceRepository`, `HoldingsRepository`, `SecurityIdentityResolver`, `SecurityIdentityRepository`, `InflationRepository`, `TargetRepository` (planned: `FxProvider`, `TaxJurisdiction`)
-- `projections/` pure functions: `walkAvco` and the two views over it (`computePositions`, `computeRealizedGains`), `computeTradeMeta`, `computeMarketValues`, `computeCostBasisTimeline`, `computeInvestedVsValueSeries`, `computePortfolioSummary` / `computeAllocation` / `computeTopPositions`, `computeReturns` and `computePortfolioReturns` over the shared `xirr` solver, `computeExposures` (look-through), `realBasis`, `deriveTargetWeights`, `computeRebalance`, `computeProjection` / `projectionWindow` / `solveContribution` / `solveHorizon` (planned: FIFO lots)
-- `tax/`         TaxJurisdiction implementations (bizkaia, common, ...)
+- `ports/`       interfaces: `LedgerRepository`, `InstrumentRepository`, `MarketDataProvider`, `PriceRepository`, `HoldingsRepository`, `SecurityIdentityResolver`, `SecurityIdentityRepository`, `InflationRepository`, `TargetRepository` (planned: `FxProvider`)
+- `projections/` pure functions: `walkAvco` and the two views over it (`computePositions`, `computeRealizedGains`), `computeTradeMeta`, `computeMarketValues`, `computeCostBasisTimeline`, `computeInvestedVsValueSeries`, `computePortfolioSummary` / `computeAllocation` / `computeTopPositions`, `computeReturns` and `computePortfolioReturns` over the shared `xirr` solver, `computeExposures` (look-through), `computeCurrencyExposure`, `computeFundOverlap` / `computeAllFundOverlaps`, `realBasis`, `deriveTargetWeights`, `computeRebalance`, `computeProjection` / `projectionWindow` / `solveContribution` / `solveHorizon`
+- `tax/`         the Bizkaia *foral* capital-gains projection, separate from `projections/` because it answers a different question about the same ledger: `walkFifo` (the shared FIFO fold), `computeTaxLots` (one fiscal year), `findWashSaleTrigger`, `computeNetWithCarryforward`, and `config.ts` (`TAX_SCALES`, `WASH_SALE_WINDOW_MONTHS`, `LOSS_CARRYFORWARD_YEARS`). `Territory` is `"bizkaia"` only — Spanish IRPF, not a multi-country abstraction.
 
 ### adapters
 - `ingestion/`   `TradeRepublicCsvAdapter` + `KrakenCsvAdapter` (CSV -> events; filter card spending / non-BTC crypto; dedup by transaction id) and `holdings/`, one issuer-agnostic parser for fund compositions
@@ -79,7 +79,7 @@ a person can see.
 
 ## Projections that needed a decision
 
-Five of them, written down here because the reasoning is not visible in the code and was
+Eight of them, written down here because the reasoning is not visible in the code and was
 otherwise only in a commit message.
 
 #### One AVCO walk, two projections
@@ -90,7 +90,8 @@ the same arithmetic, which is how the portfolio total and the per-sale breakdown
 disagree; a test now asserts the sum of the sales matches the portfolio's realised total to
 the cent. **AVCO is the portfolio view only.** FIFO exists for the foral return and is a
 deliberately separate projection — the same sale has two correct answers depending on which
-question is being asked, and merging them would lose that.
+question is being asked, and merging them would lose that. (The FIFO half is its own
+subsection below.)
 
 #### Real returns deflate flow by flow, never the total
 
@@ -160,6 +161,83 @@ runs incomparable) and fitted over the whole grid rather than its end rows. The 
 about four times noisier than the median at any count, because it is estimated from far
 fewer of the drawn paths; it converges at the same `1/√N` all the same, and the screen says
 so rather than implying more history would settle it.
+
+#### Currency exposure: the country comes from outside, OpenFIGI only confirms it
+
+Which currencies the portfolio does business in is a question about the securities held,
+not about where each trade settled — buying NVIDIA on Xetra in euros is dollar exposure.
+The provider does not answer it directly: OpenFIGI's `/mapping` response carries no
+`currency` field (`currency` is a request filter only), and it publishes no primary-listing
+flag — every large cap is composite-listed in a dozen countries, so a first version that
+refused on "more than one country" refused 99% of an already-resolved set.
+
+So the country is **supplied from outside and OpenFIGI only confirms it**, in three
+branches, in order: (1) the venue the issuer published in the holdings file (`NVDA.US`) —
+a fact, no provider, and four fifths of holdings are venue-qualified; (2) a bare ISIN
+proposes its registered country, taken **only if** a row of that share class actually
+carries that country's code — the prefix never decides alone, which is what keeps Accenture
+(`IE...`, no Irish listing) from being reported as EUR; (3) anything else is unresolved and
+reported at full value in its own bucket, never pro-rated. `SecurityIdentity.exchCode`
+stores the confirmed code and the currency is **derived at read** through a Bloomberg→ISO
+table (`bloombergCurrency`), so a wrong entry is a one-line fix, not a re-resolution of
+thousands of identities. That table is held to a higher bar than the ISO→Bloomberg one it
+looks like the inverse of: a wrong entry there is a wrong currency on screen with nothing
+to catch it, where the other only narrows an already-ambiguous set.
+
+The fold is over **contributions, never over leaves**: one company held directly and
+through a hedged fund is one leaf and two different currency exposures, so folding at the
+leaf would have to pick one. Hedging is a property of the vehicle and is in no market data
+— `Instrument.hedgedToBase` is set by hand and excluded from `InstrumentWriteData`, like
+`ter`. There is no FX and none is needed: every amount is already EUR by the valuation
+invariant, so this labels and sums, it never converts.
+
+#### Fund overlap: `Σ min(weight)`, and the residual never crosses
+
+How much of two funds is the same company is the industry measure,
+`Σ min(weight_A, weight_B)` over the companies both hold. The weight is the holding's
+weight **inside its own fund** (the composition that sums to ~1), never its weight in the
+portfolio — overlap is a property of the two funds, and how much is invested in each does
+not change how alike they are. There is no division anywhere, so an empty intersection is
+an exact `0`, never `NaN`.
+
+A fund with no composition imported is left out and counted in the header, never given a
+false 0%, and an `UNRESOLVED` leaf (a fund's own undecomposed residual) never crosses:
+pro-rating it would invent a shared bet that is not there. A fund's cash buffer is
+dropped from the **listed contributors** — two funds holding yen is a settlement artefact,
+not a shared position — but kept in the **overlap figure itself**, which stays
+arithmetically the sum of the minimums. The screen is scoped to open positions: a closed
+fund is not part of today's concentration.
+
+#### The foral return is FIFO, and it is a separate projection
+
+The Bizkaia foral return pairs a disposal with the **oldest lots first**, where the
+portfolio view uses AVCO. `walkFifo` is the counterpart to `walkAvco` — one fold, per
+`(instrument, sleeve)` queue, that both `computeTaxLots` (one fiscal year) and
+`computeNetWithCarryforward` (the target year and the four before it) are views over. The
+fiscal year is Madrid's calendar, the same timezone rule as `periodOf`. Nothing FIFO is
+persisted: every figure is recomputed from the ledger on read, so it can never drift from
+the events, and the AVCO realised view is untouched beside it.
+
+Two rules carry the domain. **The wash-sale exclusion is a deliberate simplification.**
+Art. 43 NF 13/2013 *defers* a loss on securities repurchased within two months until the
+repurchased position is finally sold; Quoin does not model the deferral — it *excludes*
+the loss from that year's deductible net and **flags it on screen**, so whoever files the
+return sees it rather than having it silently moved. The trades that make up the sold lot
+are excluded from the repurchase search, or almost every quick loss would trip the rule on
+its own acquisition. **Carryforward is recomputed, not tracked.** `computeNetWithCarryforward`
+walks `targetYear − 4 .. targetYear` from scratch, consuming pending losses oldest-first;
+restricting the window to four years is what enforces expiry without storing a countdown.
+
+**The bracket scale is keyed by year.** `TAX_SCALES` holds the savings-base brackets per
+`(territory, year)` with the norm that set them as a `source` string; `getTaxScale` returns
+`null` for a year not on file and the screen states the absence rather than applying a
+stale scale. Same rule as the plan storing euros and deriving the weight: a rate is data,
+and a superseded scale is a wrong number that looks right.
+
+Never cite an NF 13/2013 article number that has not been checked against the actual text.
+Two were fabricated during development (`Art. 47.2`, `Art. 71` — both plausible, both
+wrong; the real ones are Art. 43 and Art. 66). A guessed-but-plausible citation invites a
+trust nobody earned.
 
 ## Persistence (Prisma 7 + SQLite)
 

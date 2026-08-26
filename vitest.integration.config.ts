@@ -14,5 +14,9 @@ export default defineConfig({
       "app/**/*.integration.test.ts",
       "scripts/**/*.integration.test.ts",
     ],
+    // `beforeAll` shells out to `prisma migrate deploy`; a cold pnpm + Prisma
+    // engine start is well over the 10s default, especially on Windows / CI.
+    hookTimeout: 120_000,
+    testTimeout: 30_000,
   },
 });
