@@ -590,6 +590,11 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
   87% of refid groups are discarded as `non-btc` — SOL and ETH `earn`, plus `welcomebonus`
   in five assets. `pnpm ingest` prints the count under one label, so the breakdown by asset
   is not visible from the summary.
+- **A reward's income leg is a `DIVIDEND` event, not a dedicated type.** The shape already
+  fits — instrument plus gross amount, no quantity needed — and a new type would touch the
+  SQLite `LedgerEntry` CHECK migration for no functional gain. `mapGroup` emits it alongside
+  the BUY, same market value, distinct `externalId` (`refid:income`) so both survive dedup.
+  Distinguish it from a real fund dividend by `note: "kraken-reward-income"`, not by type.
 
 ## Ledger entry types
 
