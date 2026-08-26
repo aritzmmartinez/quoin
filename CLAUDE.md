@@ -39,6 +39,8 @@ pnpm lint                         # eslint
 pnpm test                         # vitest, unit
 pnpm test:watch
 pnpm test:integration             # migrate deploy against a temp sqlite db
+pnpm verify                       # lint + typecheck + build + test (the four unit-level checks)
+pnpm verify:full                  # verify + test:integration — the full CI gate, run before a tag
 pnpm db:generate                  # prisma generate
 pnpm db:migrate                   # prisma migrate dev
 pnpm db:studio
@@ -49,8 +51,8 @@ pnpm prices:sync                  # quote every mapped instrument
 pnpm prices:map <ISIN> <SYMBOL>   # set / show / --clear a Yahoo symbol
 pnpm prices:backfill [ISIN] [1y|2y|5y|10y|max]   # daily history, default 5y
 pnpm exposure:map                 # list how every instrument resolves
-pnpm exposure:map <ISIN> <KIND> [LEAF]           # e.g. XS2183935274 COMMODITY XAU
-pnpm identity:resolve [--limit N] [--all] [--retry-ambiguous] [--report]
+pnpm exposure:map <ISIN> <KIND> [LEAF]           # e.g. XS00TEST0003 COMMODITY XAU
+pnpm identity:resolve [--limit N] [--all] [--retry-ambiguous] [--refresh] [--report]
 pnpm ipc:sync [--force-rebase]        # INE consumer price index, national + Bizkaia
 pnpm target:set                       # show the savings-plan target in force today
 pnpm target:set <file> [--from=YYYY-MM-DD] [--name=…] [--note=…]   # record a version
@@ -193,7 +195,7 @@ re-import silently destroys hand-set mappings.
 An ISIN trades on many venues. Always map the **EUR-denominated venue line**, never the
 ISIN itself, and always sanity-check the price magnitude.
 
-- **Never map an ISIN as a `quoteSymbol`** (e.g. `XS2183935274.SG`). Yahoo resolves the
+- **Never map an ISIN as a `quoteSymbol`** (e.g. `XS00TEST0003.SG`). Yahoo resolves the
   ISIN to a quote, but has no historical series under that key — `timestamps` and `closes`
   come back `null` and `backfill` returns 0 candles. Use the venue ticker.
 - **Verify the price magnitude, not just the currency.** Several symbols quote in EUR and
@@ -291,11 +293,61 @@ manual aliasing was abandoned — 726 confirmations is not a system.
   25 requests a minute, so five thousand leaves is twenty minutes; ordering by weight means
   a couple of hundred lookups already cover every row that is drawn.
 
+## Currency exposure
+
+- **OpenFIGI's `/mapping` response has no `currency` field.** `currency` is a request
+  *filter* only. The response carries `figi`, `securityType`, `marketSector`, `exchCode`,
+  `securityType2`, `ticker`, `name`, `shareClassFIGI`, `compositeFIGI`,
+  `securityDescription`. Checked against the official docs; do not go looking for it again.
+- **OpenFIGI does not say which listing is primary, and no rule over that payload can.**
+  Measured, not assumed: NVIDIA's ISIN returns 247 rows and **sixteen** self-composite ones
+  (US, GR, MM, SW, CI, CB plus multi-currency MTF lines `NVDAEUR`, `NVDAGBP`, `NVDAJPY`…),
+  all `Common Stock`, one `shareClassFIGI`, one `name`. Accenture returns nine. Nothing
+  separates them — not `securityType`, not `securityType2`, not the ticker (NVIDIA's
+  shortest is `NVD`, Frankfurt). Every large cap looks like this. A first version refused
+  on "more than one country" and refused **5100 of 5153** resolved identities.
+- **So the country comes from outside and OpenFIGI only confirms it — three branches, in
+  order.** (1) The venue the issuer published (`NVDA.US`): a fact of the holdings file, no
+  provider, no quota, no re-resolution, and **4086 of 5153** identities are venue-qualified
+  tickers. (2) A bare ISIN proposes its registered country and is taken only if a row of
+  that share class actually carries that country's code. (3) Anything else is unresolved.
+- **The ISIN prefix never decides alone — that is what makes branch 2 safe.** Accenture is
+  `IE00B4BNMY34`, and not one of its 120 rows carries an Irish code, so the prefix proposes
+  IE, nothing confirms it, and the answer is unresolved — never EUR. Verified live: NVIDIA
+  → USD, Nestlé → CHF, ASML → EUR, Accenture → unresolved.
+- **Confirm against every row, not only self-composite ones.** ASML has twelve
+  self-composite rows and none is Amsterdam, while its Amsterdam listing is present as a
+  venue row under a composite FIGI the payload never returns. Requiring a self-composite
+  row reports a Dutch blue chip as unresolved.
+- **`SecurityIdentity.exchCode` stores the code; the currency is derived at read.** Same
+  rule as the plan storing euros and deriving the weight. A wrong entry in the translation
+  table is then a one-line fix, not a re-resolution of five thousand identities.
+- **The cache never re-asks a resolved identity**, so a column added later stays null
+  forever without `identity:resolve --refresh`.
+- **`bloombergCurrency` is deliberately not `BLOOMBERG_EXCHANGE` inverted.** That table's
+  own comment says a wrong or missing entry costs nothing, and that is true only because it
+  narrows an already-ambiguous set. Here a wrong entry is a wrong currency on screen with
+  nothing to catch it. Bloomberg's codes are not ISO's and two pairs read as typos: `IT` is
+  Israel (Italy is `IM`), `ID` is Ireland (Indonesia is `IJ`). Both are pinned by tests.
+- **Hedging is a property of the vehicle and is not in any market data.** A "Physical Gold
+  USD (EUR Hedged)" ETC and an unhedged one quote on the same venue in the same currency;
+  only the prospectus differs. `Instrument.hedgedToBase` is set by hand and excluded from
+  `InstrumentWriteData`, exactly like `ter` — widen that type and a re-import destroys it.
+- **The fold is over contributions, never over leaves.** One company held directly and
+  through a hedged fund is one leaf and two different currency exposures; folding at the
+  leaf would have to pick one and be wrong for the other. This is the payoff of
+  contributions being kept rather than summed.
+- **No FX, and none is needed.** Every amount arriving is already EUR by the valuation
+  invariant. This labels and sums; it never converts. `app/adapters/fx` is still a
+  placeholder, and the IPC pipeline is a price index, not a rate source.
+- A leaf with no known currency lands in its own bucket at full value and is never
+  pro-rated — same rule as `UNRESOLVED`, `unpricedCount` and a missing CPI month.
+
 ## Projections
 
 - `computePositions` uses **AVCO** (weighted average cost) for the portfolio view.
-  **FIFO** exists only for foral tax (`computeTaxLots`, future) and is a **separate**
-  projection. Do not merge them.
+  **FIFO** exists only for foral tax (`computeTaxLots`, over the `walkFifo` fold in
+  `core/tax/`) and is a **separate** projection. Do not merge them.
 - **Contributed ("aportado") = what left the bank, fees included.** One definition, shared
   by `computePositions.costBasis`, `computeCostBasisTimeline`, `computeReturns.totalInvested`
   and the XIRR cash flows. Rationale: the foral rule puts inherent costs inside the
@@ -525,6 +577,31 @@ manual aliasing was abandoned — 726 confirmations is not a system.
 
 Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never régimen común.
 
+- **Never cite an NF 13/2013 article number without a verifiable source for it.** Two
+  were fabricated during initial development (`Art. 47.2` for the wash-sale rule, `Art.
+  71` for carryforward — both plausible chapter-adjacent numbers, both wrong; correct are
+  Art. 43 and Art. 66). A guessed-but-plausible citation is worse than none: it invites
+  trust nobody checked. If the article cannot be confirmed against the actual text, write
+  the comment without a number ("regla de recompra a corto plazo, Bizkaia — ver nota de
+  Aritz") rather than inventing one that reads as authoritative.
+- **The wash-sale rule is a deliberate simplification: it EXCLUDES the loss from the
+  year's deductible net and FLAGS it, it does not model the deferral.** Art. 43 defers a
+  loss on securities repurchased within two months until the repurchased position is
+  finally transmitted; Quoin drops it from the year and shows the exclusion on screen so
+  whoever files sees it. Do not "fix" it into a deferral without checking that is what
+  Aritz wants — the exclusion is the design, not a bug. The trades that make up the sold
+  lot are excluded from the repurchase search, or every quick loss trips on its own buy.
+- **Nothing FIFO is persisted.** `computeTaxLots` and `computeNetWithCarryforward`
+  recompute from the ledger on every read — no lot table, no carryforward countdown.
+  Restricting the carryforward walk to `[targetYear − 4, targetYear]` is what enforces
+  the four-year expiry; do not add a stored balance.
+- **`TAX_SCALES` is keyed by `(territory, year)`.** A year not on file returns `null` from
+  `getTaxScale` and the screen states the absence — never fall back to the nearest year's
+  brackets. A rate is data; a superseded scale is a wrong number that looks right.
+- **The fiscal year is Madrid's calendar** (`fiscalYearOf` via `Intl`, `timeZone:
+  "Europe/Madrid"`), same trap as `periodOf` — the last hours of 31 December are already
+  the next year locally.
+
 ## Kraken rewards
 
 - **A reward is an acquisition with no counter-leg**, so its value comes from the price
@@ -540,6 +617,11 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
   87% of refid groups are discarded as `non-btc` — SOL and ETH `earn`, plus `welcomebonus`
   in five assets. `pnpm ingest` prints the count under one label, so the breakdown by asset
   is not visible from the summary.
+- **A reward's income leg is a `DIVIDEND` event, not a dedicated type.** The shape already
+  fits — instrument plus gross amount, no quantity needed — and a new type would touch the
+  SQLite `LedgerEntry` CHECK migration for no functional gain. `mapGroup` emits it alongside
+  the BUY, same market value, distinct `externalId` (`refid:income`) so both survive dedup.
+  Distinguish it from a real fund dividend by `note: "kraken-reward-income"`, not by type.
 
 ## Ledger entry types
 
@@ -604,13 +686,18 @@ OS, and without it the panel comes back light while the options inherit white te
 
 Vitest. Everything pure is tested: `Money`, domain, projections, parsers, mappers, and
 ingestion against injected fake repositories. `test:integration` runs `prisma migrate
-deploy` against a temporary SQLite database.
+deploy` against a temporary SQLite database — kept out of the default (unit) run because
+it needs the generated Prisma client and shells out to `prisma`, and its `beforeAll` gets
+a 120s `hookTimeout` because a cold pnpm + Prisma engine start blows past vitest's 10s
+default (it silently did, on Windows, before that was set).
 
 A regression only counts as fixed when a test covers it. The fee-treatment bug survived
 for months because **no test used `fees ≠ 0`**.
 
-CI (GitHub Actions) runs lint + typecheck + build + test on every push and PR. All four
-must pass.
+CI (GitHub Actions) runs lint + typecheck + build + test + test:integration on every push
+and PR — the same five `pnpm verify:full` runs locally. All five must pass. `pnpm verify`
+is the first four alone (no integration); `verify:full` is the gate to run before tagging
+a release.
 
 ## Workflow
 

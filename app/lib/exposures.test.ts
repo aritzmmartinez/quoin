@@ -1,11 +1,19 @@
 import { describe, expect, it } from "vitest";
 
+import type { CachedIdentity } from "~/core/ports";
 import type { LeafExposure } from "~/core/projections";
 
 import {
   CONCENTRATION_THRESHOLD,
   DEFAULT_ALLOCATION_VIEW,
+  DEFAULT_OVERLAP_MODE,
+  currencyByLeaf,
+  includeSoldHref,
+  isCashLine,
+  modeHref,
   parseAllocationView,
+  parseIncludeSold,
+  parseOverlapMode,
   viewHref,
   readingFor,
   PRESENTATION_THRESHOLD,
@@ -162,6 +170,7 @@ describe("parseAllocationView", () => {
 
   it("reads the view from the URL", () => {
     expect(of("vista=rebalanceo")).toBe("rebalanceo");
+    expect(of("vista=divisa")).toBe("divisa");
     expect(of("vista=exposicion")).toBe("exposicion");
   });
 
@@ -191,5 +200,164 @@ describe("viewHref", () => {
   it("drops a stale view when returning to the default", () => {
     const away = new URLSearchParams(viewHref(params, "rebalanceo"));
     expect(viewHref(away, "exposicion")).not.toContain("vista");
+  });
+
+  it("leaves the overlap mode behind when leaving the overlap tab", () => {
+    const inOverlap = new URLSearchParams("vista=solapamiento&modo=matriz");
+    expect(viewHref(inOverlap, "divisa")).not.toContain("modo");
+    expect(viewHref(inOverlap, "solapamiento")).toContain("modo=matriz");
+  });
+
+  it("leaves the include-sold switch behind when leaving the overlap tab", () => {
+    const inOverlap = new URLSearchParams(
+      "vista=solapamiento&incluirVendidos=1",
+    );
+    expect(viewHref(inOverlap, "divisa")).not.toContain("incluirVendidos");
+    expect(viewHref(inOverlap, "solapamiento")).toContain("incluirVendidos=1");
+  });
+});
+
+describe("isCashLine", () => {
+  it("recognises a fund's cash buffer stored before the parser folded it", () => {
+    expect(isCashLine("JPY", "JPY CASH")).toBe(true);
+    expect(isCashLine("usd", "USD CASH")).toBe(true);
+  });
+
+  it("strips the venue the parser attached to the stored leaf id", () => {
+    expect(isCashLine("JPY.JT", "JPY CASH")).toBe(true);
+    expect(isCashLine("GBP.LN", "GBP CASH")).toBe(true);
+  });
+
+  it("leaves companies alone, currency-shaped tickers included", () => {
+    expect(isCashLine("NOK.LN", "NOKIA OYJ")).toBe(false);
+    expect(isCashLine("AAPL", "APPLE INC")).toBe(false);
+    expect(isCashLine("SAN.ES", "BANCO SANTANDER")).toBe(false);
+    expect(isCashLine("6857", "KEYENCE CORP")).toBe(false);
+  });
+});
+
+describe("parseOverlapMode", () => {
+  const of = (query: string) => parseOverlapMode(new URLSearchParams(query));
+
+  it("reads the mode from the URL and falls back to the list", () => {
+    expect(of("modo=matriz")).toBe("matriz");
+    expect(of("modo=lista")).toBe("lista");
+    expect(of("")).toBe(DEFAULT_OVERLAP_MODE);
+    expect(of("modo=Matriz")).toBe(DEFAULT_OVERLAP_MODE);
+  });
+});
+
+describe("modeHref", () => {
+  const params = new URLSearchParams("vista=solapamiento&umbral=20");
+
+  it("keeps the tab it belongs to and omits the default mode", () => {
+    expect(modeHref(params, "matriz")).toContain("vista=solapamiento");
+    expect(modeHref(params, "matriz")).toContain("modo=matriz");
+    expect(modeHref(params, "lista")).not.toContain("modo");
+  });
+});
+
+describe("parseIncludeSold", () => {
+  const of = (query: string) => parseIncludeSold(new URLSearchParams(query));
+
+  it("is off by default: sold funds stay out of the overlap unless asked for", () => {
+    expect(of("")).toBe(false);
+    expect(of("incluirVendidos=0")).toBe(false);
+    expect(of("incluirVendidos=si")).toBe(false);
+  });
+
+  it("turns on only for the exact flag", () => {
+    expect(of("incluirVendidos=1")).toBe(true);
+  });
+});
+
+describe("includeSoldHref", () => {
+  const params = new URLSearchParams("vista=solapamiento&umbral=20");
+
+  it("sets the flag on and omits it when off", () => {
+    expect(includeSoldHref(params, true)).toContain("incluirVendidos=1");
+    expect(includeSoldHref(params, false)).not.toContain("incluirVendidos");
+  });
+
+  it("keeps every other param", () => {
+    expect(includeSoldHref(params, true)).toContain("vista=solapamiento");
+    expect(includeSoldHref(params, true)).toContain("umbral=20");
+  });
+});
+
+describe("currencyByLeaf", () => {
+  const cached = (
+    value: string,
+    kind: "ISIN" | "TICKER",
+    canonicalId: string | null,
+    exchCode: string | null = null,
+  ): CachedIdentity => ({
+    value,
+    kind,
+    source: "openfigi",
+    resolvedAt: new Date("2026-01-01"),
+    resolution:
+      canonicalId === null
+        ? { status: "not-found" }
+        : { status: "resolved", canonicalId, exchCode },
+  });
+
+  const from = (entries: CachedIdentity[]) =>
+    currencyByLeaf(new Map(entries.map((e) => [e.value, e])));
+
+  it("takes the venue the issuer published, with no provider involved", () => {
+    const map = from([cached("NVDA.US", "TICKER", "BBG_NVDA")]);
+    expect(map.get("COMPANY:BBG_NVDA")).toBe("USD");
+  });
+
+  it("answers for a ticker the provider never placed", () => {
+    const map = from([cached("IBE.ES", "TICKER", null)]);
+    expect(map.get("COMPANY:IBE.ES")).toBe("EUR");
+  });
+
+  it("keys the currency by the leaf the projection will use", () => {
+    const map = from([cached("US67066G1040", "ISIN", "BBG_NVDA", "US")]);
+    expect(map.get("COMPANY:BBG_NVDA")).toBe("USD");
+    expect(map.has("COMPANY:US67066G1040")).toBe(false);
+  });
+
+  it("merges two identities that reach the same company", () => {
+    const map = from([
+      cached("US67066G1040", "ISIN", "BBG_NVDA", "US"),
+      cached("NVDA.US", "TICKER", "BBG_NVDA"),
+    ]);
+    expect(map.get("COMPANY:BBG_NVDA")).toBe("USD");
+  });
+
+  it("refuses a leaf whose identities disagree on the currency", () => {
+    const map = from([
+      cached("NVDA.US", "TICKER", "BBG_SAME"),
+      cached("NVDA.MX", "TICKER", "BBG_SAME"),
+    ]);
+    expect(map.has("COMPANY:BBG_SAME")).toBe(false);
+  });
+
+  it("says nothing about an ISIN the provider could not place", () => {
+    const map = from([cached("IE00B4BNMY34", "ISIN", null)]);
+    expect(map.size).toBe(0);
+  });
+
+  it("says nothing when an ISIN's listing has no exchange code cached yet", () => {
+    const map = from([cached("IE00B4BNMY34", "ISIN", "BBG_ACN", null)]);
+    expect(map.size).toBe(0);
+  });
+
+  it("ignores a code it cannot translate without losing the ones it can", () => {
+    const map = from([
+      cached("A00000000001", "ISIN", "BBG_A", "ZZ"),
+      cached("B00000000002", "ISIN", "BBG_B", "TT"),
+    ]);
+    expect(map.has("COMPANY:BBG_A")).toBe(false);
+    expect(map.get("COMPANY:BBG_B")).toBe("TWD");
+  });
+
+  it("falls back to the confirmed listing for a ticker with no usable venue", () => {
+    const map = from([cached("NVDA", "TICKER", "BBG_NVDA", "US")]);
+    expect(map.get("COMPANY:BBG_NVDA")).toBe("USD");
   });
 });

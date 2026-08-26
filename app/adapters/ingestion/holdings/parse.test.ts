@@ -32,6 +32,18 @@ const SPANISH_STYLE = `Número,Nombre de la posición,Ticker,ISIN,Acciones,Valor
 3,Otros/efectivo, -- , -- , -- ,$ 112.075.00,"0,01%"
 `;
 
+const POSITIVE_CASH_STYLE = `Ticker,Name,Asset Class,Weight (%),Location
+"AAAA","ALPHA CORP","Equity","59.70","United States"
+"NOK","NOKIA OYJ","Equity","40.00","Finland"
+"JPY","JPY CASH","Cash","0.30","Japan"
+`;
+
+const SPANISH_CASH_STYLE = `Ticker,Nombre,Clase de activo,Peso (%),Pais
+"AAAA","ALPHA CORP","Renta variable","59.70","Estados Unidos"
+"BBBB","BETA SA","Renta variable","40.00","Espana"
+"USD","EFECTIVO USD","Efectivo","0.30","Estados Unidos"
+`;
+
 describe("parseHoldingsCsv — issuer agnosticism", () => {
   it("reads a ticker-only file and does not mistake Region for the identity", () => {
     const result = parseHoldingsCsv(TICKER_STYLE);
@@ -87,6 +99,32 @@ describe("parseHoldingsCsv — the residual", () => {
     expect(result.foldedRows).toBe(1);
   });
 
+  it("folds a cash buffer that is positive, which is the ordinary case", () => {
+    const result = parseHoldingsCsv(POSITIVE_CASH_STYLE);
+
+    expect(result.holdings.map((h) => h.name)).not.toContain("JPY CASH");
+    expect(result.foldedRows).toBe(1);
+    expect(result.covered).toBe("0.997");
+    expect(result.residual).toBe("0.003");
+  });
+
+  it("keeps a company whose ticker happens to be a currency code", () => {
+    const result = parseHoldingsCsv(POSITIVE_CASH_STYLE);
+
+    expect(result.holdings.map((h) => h.identity)).toContain("NOK");
+    expect(result.holdings.find((h) => h.identity === "NOK")?.weight).toBe(
+      "0.4",
+    );
+  });
+
+  it("folds cash written in a language the parser knows nothing about", () => {
+    const result = parseHoldingsCsv(SPANISH_CASH_STYLE);
+
+    expect(result.holdings.map((h) => h.name)).not.toContain("EFECTIVO USD");
+    expect(result.holdings).toHaveLength(2);
+    expect(result.residual).toBe("0.003");
+  });
+
   it("goes negative when a fund carries negative cash, rather than clamping", () => {
     const result = parseHoldingsCsv(PREAMBLE_STYLE);
     expect(result.covered).toBe("1.0058");
@@ -112,6 +150,8 @@ describe("parseHoldingsCsv — the residual", () => {
       COMMA_STYLE,
       PREAMBLE_STYLE,
       SPANISH_STYLE,
+      POSITIVE_CASH_STYLE,
+      SPANISH_CASH_STYLE,
     ]) {
       const { covered, residual } = parseHoldingsCsv(csv);
       expect(Number(covered) + Number(residual)).toBeCloseTo(1, 10);
@@ -320,7 +360,8 @@ US5949181045;Microsoft Corp;91,57%
   });
 
   it("reads a tab-delimited file", () => {
-    const csv = "ISIN\tName\tWeight\nUS67066G1040\tNVIDIA Corp\t40%\nUS0378331005\tApple Inc\t60%\n";
+    const csv =
+      "ISIN\tName\tWeight\nUS67066G1040\tNVIDIA Corp\t40%\nUS0378331005\tApple Inc\t60%\n";
     expect(parseHoldingsCsv(csv).holdings).toHaveLength(2);
   });
 
@@ -371,7 +412,8 @@ US5949181045,Microsoft Corp,25.00%
   });
 
   it("reads Windows line endings", () => {
-    const csv = "ISIN,Name,Weight\r\nUS67066G1040,NVIDIA Corp,40%\r\nUS0378331005,Apple Inc,60%\r\n";
+    const csv =
+      "ISIN,Name,Weight\r\nUS67066G1040,NVIDIA Corp,40%\r\nUS0378331005,Apple Inc,60%\r\n";
     expect(parseHoldingsCsv(csv).holdings).toHaveLength(2);
   });
 

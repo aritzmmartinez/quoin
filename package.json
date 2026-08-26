@@ -1,6 +1,6 @@
 {
   "name": "quoin",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -22,12 +22,15 @@
     "exposure:map": "tsx scripts/exposure-map.ts",
     "target:set": "tsx scripts/target-set.ts",
     "twr:explain": "tsx scripts/twr-explain.ts",
+    "tax:explain": "tsx scripts/tax-explain.ts",
     "projection:converge": "tsx scripts/projection-converge.ts",
     "identity:resolve": "tsx scripts/identity-resolve.ts",
     "postinstall": "prisma generate",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:integration": "vitest run --config vitest.integration.config.ts"
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "verify": "pnpm run lint && pnpm run typecheck && pnpm run build && pnpm run test",
+    "verify:full": "pnpm run verify && pnpm run test:integration"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.8.0",

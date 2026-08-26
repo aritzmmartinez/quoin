@@ -3,6 +3,7 @@ import Decimal from "decimal.js";
 import {
   Money,
   cashEventSchema,
+  dividendEventSchema,
   tradeEventSchema,
   type Instrument,
 } from "~/core/domain";
@@ -80,17 +81,17 @@ export function groupByRefid(rows: KrakenRow[]): Map<string, KrakenRow[]> {
 export function mapGroup(
   rows: KrakenRow[],
   priceAt: PriceAt = () => null,
-): MappedItem {
+): MappedItem[] {
   const refid = rows[0]!.refid;
   const spend = rows.find((r) => r.type === "spend");
   const receive = rows.find((r) => r.type === "receive");
 
   if (spend && receive) {
     if (isBtc(receive) && isFiat(spend))
-      return trade(refid, "BUY", spend, receive);
+      return [trade(refid, "BUY", spend, receive)];
     if (isBtc(spend) && isFiat(receive))
-      return trade(refid, "SELL", receive, spend);
-    return { kind: "discard", reason: "non-btc" };
+      return [trade(refid, "SELL", receive, spend)];
+    return [{ kind: "discard", reason: "non-btc" }];
   }
 
   if (rows.length === 1) {
@@ -98,23 +99,23 @@ export function mapGroup(
     switch (row.type) {
       case "deposit":
         return isFiat(row)
-          ? cash(refid, row, "DEPOSIT")
-          : { kind: "discard", reason: "non-btc" };
+          ? [cash(refid, row, "DEPOSIT")]
+          : [{ kind: "discard", reason: "non-btc" }];
       case "withdrawal":
         return isFiat(row)
-          ? cash(refid, row, "WITHDRAWAL")
-          : { kind: "discard", reason: "non-btc" };
+          ? [cash(refid, row, "WITHDRAWAL")]
+          : [{ kind: "discard", reason: "non-btc" }];
       case "reward":
       case "earn":
         return isBtc(row)
           ? reward(refid, row, priceAt)
-          : { kind: "discard", reason: "non-btc" };
+          : [{ kind: "discard", reason: "non-btc" }];
       default:
-        return { kind: "discard", reason: "unsupported" };
+        return [{ kind: "discard", reason: "unsupported" }];
     }
   }
 
-  return { kind: "discard", reason: "unsupported" };
+  return [{ kind: "discard", reason: "unsupported" }];
 }
 
 function trade(
@@ -148,15 +149,25 @@ function trade(
   };
 }
 
-function reward(refid: string, row: KrakenRow, priceAt: PriceAt): MappedItem {
+/**
+ * A reward is an acquisition with no counter-leg, so it needs two ledger
+ * rows sharing one market value: a BUY that becomes the FIFO/AVCO lot's
+ * acquisition cost, and a DIVIDEND recording the same value as income
+ * ("rendimiento de capital mobiliario" on receipt, Bizkaia foral IRPF).
+ * One event doing both jobs is what hid the income in the original bug —
+ * see CLAUDE.md "Kraken rewards". The two rows share `refid` as a prefix
+ * but need distinct `externalId`s to both survive the (source, externalId)
+ * dedup key.
+ */
+function reward(refid: string, row: KrakenRow, priceAt: PriceAt): MappedItem[] {
   const ts = parseTime(row.time);
   const price = priceAt("BTC", ts);
-  if (price === null) return { kind: "discard", reason: "reward-unpriced" };
+  if (price === null) return [{ kind: "discard", reason: "reward-unpriced" }];
 
   const quantity = abs(row.amount);
   const grossAmount = Money.fromString(price).scaleBy(quantity).toString();
 
-  return {
+  const acquisition: MappedItem = {
     kind: "domain",
     instrument: BTC,
     event: tradeEventSchema.parse({
@@ -177,6 +188,28 @@ function reward(refid: string, row: KrakenRow, priceAt: PriceAt): MappedItem {
       note: "kraken-reward",
     }),
   };
+
+  const income: MappedItem = {
+    kind: "domain",
+    instrument: null,
+    event: dividendEventSchema.parse({
+      id: crypto.randomUUID(),
+      ts,
+      type: "DIVIDEND",
+      instrumentId: "BTC",
+      sleeve: "CORE",
+      grossAmount,
+      taxWithheld: "0",
+      currency: "EUR",
+      fxToBase: "1",
+      account: "kraken",
+      source: "KRAKEN_CSV",
+      externalId: `${refid}:income`,
+      note: "kraken-reward-income",
+    }),
+  };
+
+  return [acquisition, income];
 }
 
 function cash(

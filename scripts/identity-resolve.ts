@@ -23,6 +23,10 @@ const USAGE = `Usage:
   --all              no limit; without an API key this is about two minutes
                      per thousand identities
   --retry-ambiguous  ask again for the ones previously refused
+  --refresh          ask again for EVERY identity, resolved ones included.
+                     The cache never re-asks something it has already placed,
+                     so this is what fills in a column added afterwards — the
+                     primary listing behind the currency view. Pair with --all.
   --report           show what merged, and change nothing
 
   Set OPENFIGI_API_KEY in .env for a free, much higher rate limit.`;
@@ -129,14 +133,19 @@ async function main(): Promise<void> {
   const cache = new PrismaSecurityIdentityRepository();
   const ranked = await identitiesByWeight();
   const retry = args.includes("--retry-ambiguous");
+  const refresh = args.includes("--refresh");
   const pending = retry
     ? await cache.ambiguous(ranked)
-    : await cache.unresolved(ranked);
+    : refresh
+      ? ranked
+      : await cache.unresolved(ranked);
 
   console.log(
     retry
       ? `${pending.length} previously ambiguous to ask again.`
-      : `${ranked.length} identities, ${ranked.length - pending.length} already cached, ${pending.length} to look up.`,
+      : refresh
+        ? `${pending.length} identities to ask again, cached ones included.`
+        : `${ranked.length} identities, ${ranked.length - pending.length} already cached, ${pending.length} to look up.`,
   );
   if (pending.length === 0) return;
 

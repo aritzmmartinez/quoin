@@ -112,6 +112,8 @@ export const es = {
       label: "Vista",
       exposicion: "Exposición",
       rebalanceo: "Rebalanceo",
+      divisa: "Divisa",
+      solapamiento: "Solapamiento",
     },
     intro:
       "Posición directa + peso dentro de tus ETFs (look-through). El tramo sólido de la barra es lo que compraste tú; el apagado viaja dentro de un fondo.",
@@ -155,6 +157,54 @@ export const es = {
       threshold: "Umbral configurado",
       empty: "Todavía no hay exposición resuelta que leer.",
     },
+  },
+  currency: {
+    title: "Exposición por divisa",
+    intro:
+      "Comprar NVIDIA en Xetra pagando euros no te da exposición al euro: eso es el precio de Nueva York en dólares, convertido al instante. Lo que cuenta es la divisa del listing principal de cada valor, el tuyo directo y el que viaja dentro de tus fondos.",
+    stats: {
+      base: "En euros",
+      foreign: "Fuera del euro",
+      unresolved: "Sin determinar",
+    },
+    unresolvedLabel: "Sin determinar",
+    unresolvedTitle: "Por qué queda valor sin determinar",
+    unresolvedBody:
+      "No se reparte entre las divisas conocidas: hacerlo inventaría una exposición que no tienes. Aquí caen las hojas sin identidad canónica resuelta, las clases de acción listadas en más de un país (no hay una sola divisa que sea la respuesta) y la parte de tus fondos que el emisor no desglosa.",
+    unresolvedFix:
+      "Ejecuta pnpm identity:resolve --refresh para rellenar las identidades que aún no tienen mercado principal guardado.",
+    hedged: (count: number): string =>
+      count === 1
+        ? "1 instrumento cubierto a euro cuenta como euro, no como la divisa de su subyacente."
+        : `${count} instrumentos cubiertos a euro cuentan como euro, no como la divisa de su subyacente.`,
+    empty:
+      "Sin exposición por divisa que mostrar. Importa operaciones y sincroniza precios.",
+  },
+  overlap: {
+    title: "Solapamiento entre fondos",
+    intro:
+      "Cuánto de dos fondos es la misma empresa: por cada valor que ambos tienen, el menor de sus dos pesos, sumado. Dos fondos con nombres muy distintos pueden estar comprándote lo mismo.",
+    note: "El peso es el de cada empresa dentro de su propio fondo, no el de tu cartera: el solapamiento es una propiedad de los dos fondos entre sí, no de cuánto tengas invertido en cada uno.",
+    modes: {
+      label: "Modo de vista",
+      lista: "Lista",
+      matriz: "Matriz",
+    },
+    header: (funds: number, pairs: number): string =>
+      `${funds} fondos · ${pairs} ${pairs === 1 ? "par" : "pares"}`,
+    empty:
+      "Hacen falta al menos dos fondos con composición importada y posición abierta. Arrastra el CSV de holdings sobre la fila del fondo en Instrumentos; un fondo sin composición queda fuera del cálculo, no cuenta como 0%.",
+    includeSold: "Incluir fondos vendidos",
+    includeSoldHint:
+      "Fondos con composición importada pero sin posición abierta hoy — útil para ver cuánto se solaparía algo que vendiste antes de recomprarlo.",
+    shared: (count: number): string =>
+      count === 1 ? "1 empresa en común" : `${count} empresas en común`,
+    none: "Ninguna empresa en común: diversificación real entre estos dos.",
+    top: "Mayor aporte",
+    contributorPair: (a: string, b: string): string => `${a} · ${b}`,
+    matrixHeader: "Cada celda es el solapamiento de la fila con la columna.",
+    matrixLegend:
+      "Las columnas van numeradas en el mismo orden que las filas. La diagonal se omite: un fondo consigo mismo es siempre 100%.",
   },
   rebalance: {
     title: "Rebalanceo por aportación",
@@ -256,8 +306,10 @@ export const es = {
       resolvesTo: "Resuelve a",
       composition: "Composición",
       ter: "TER %",
+      hedged: "Divisa",
       held: "Valor",
     },
+    hedgedShort: "Cubierta",
     defaultOption: "(por defecto del tipo)",
     leafPlaceholder: "XAU, BTC…",
     leafRequired: "Esta clase necesita una hoja (p. ej. XAU).",
@@ -304,7 +356,7 @@ export const es = {
       lines: "Líneas",
       linesHint:
         "Una por línea: identificador del instrumento e importe mensual. Puedes incluir un instrumento que aún no tengas en cartera.",
-      linesPlaceholder: "IE00B3RBWM25 300\nIE00BKM4GZ66 75",
+      linesPlaceholder: "IE00TEST0001 300\nIE00TEST0002 75",
       submit: "Guardar versión",
       saving: "Guardando…",
       invalid: "Datos no válidos.",
@@ -494,6 +546,11 @@ export const es = {
   },
   realized: {
     title: "Realizado",
+    views: {
+      label: "Vista",
+      ventas: "Ventas",
+      fiscal: "Fiscal (Bizkaia)",
+    },
     intro:
       "Cada venta cerrada, con el coste que consumió en el momento de venderla. Las comisiones de compra ya van dentro del coste; las de venta se restan del bruto.",
     avcoWarning:
@@ -519,6 +576,59 @@ export const es = {
     empty: {
       title: "Sin ventas todavía",
       body: "Cuando vendas algo, aquí aparecerá el resultado de cada operación.",
+    },
+    fiscal: {
+      intro:
+        "Mismas ventas, criterio FIFO en vez de AVCO — el que exige la declaración foral de Bizkaia, no el de la pestaña de Ventas. Cálculo puro: computeTaxLots y computeNetWithCarryforward, sin cifras nuevas.",
+      yearLabel: "Año fiscal",
+      noYears: "No hay ventas registradas todavía en ningún año.",
+      summary: {
+        netBase: "Base liquidable del ahorro",
+        quota: "Cuota resultante",
+        scale: (source: string): string => `Escala aplicada: ${source}`,
+        noScale:
+          "Sin escala fiscal cargada para este año — no se puede calcular la cuota.",
+      },
+      net: {
+        before: "Neto propio antes de exclusión por wash-sale",
+        after: "Neto propio después de exclusión por wash-sale",
+        counts: (allowed: number, disallowed: number): string =>
+          `${allowed} ${allowed === 1 ? "venta permitida" : "ventas permitidas"}` +
+          (disallowed > 0
+            ? `, ${disallowed} ${disallowed === 1 ? "descartada por wash-sale" : "descartadas por wash-sale"}`
+            : ""),
+      },
+      salesTitle: "Ventas del año, orden FIFO",
+      columns: {
+        date: "Fecha",
+        name: "Instrumento",
+        quantity: "Uds",
+        grossAmount: "Bruto",
+        fees: "Comisiones",
+        costBasis: "Coste",
+        realizedPnL: "Resultado",
+      },
+      disallowedBadge: "Wash-sale",
+      expand: "Ver lotes",
+      collapse: "Ocultar lotes",
+      lotsTitle: "Lotes FIFO consumidos",
+      lotsColumns: {
+        acquiredAt: "Adquirido",
+        quantity: "Uds",
+        unitCost: "Coste unitario",
+      },
+      empty: {
+        title: "Sin ventas en este año",
+        body: "Elige otro año fiscal en el desplegable.",
+      },
+      carryforwardTitle: "Arrastre de pérdidas, últimos 4 años",
+      carryforwardColumns: {
+        year: "Año",
+        ownNet: "Neto propio",
+        consumedFromCarryforward: "Consumido del arrastre",
+        finalNet: "Neto final",
+        pendingLossRemaining: "Pérdida pendiente",
+      },
     },
   },
   opportunity: {

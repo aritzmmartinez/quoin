@@ -186,6 +186,32 @@ export function realizedTotals(rows: readonly RealizedRow[]): RealizedTotals {
   };
 }
 
+export const REALIZED_VIEWS = ["ventas", "fiscal"] as const;
+export type RealizedView = (typeof REALIZED_VIEWS)[number];
+export const DEFAULT_REALIZED_VIEW: RealizedView = "ventas";
+export const REALIZED_VIEW_PARAM = "vista";
+
+export function parseRealizedView(params: URLSearchParams): RealizedView {
+  const raw = params.get(REALIZED_VIEW_PARAM);
+  return raw !== null && (REALIZED_VIEWS as readonly string[]).includes(raw)
+    ? (raw as RealizedView)
+    : DEFAULT_REALIZED_VIEW;
+}
+
+export function realizedViewHref(
+  params: URLSearchParams,
+  view: RealizedView,
+): string {
+  const next = new URLSearchParams(params);
+  if (view === DEFAULT_REALIZED_VIEW) {
+    next.delete(REALIZED_VIEW_PARAM);
+    next.delete("year");
+  } else {
+    next.set(REALIZED_VIEW_PARAM, view);
+  }
+  return `?${next.toString()}`;
+}
+
 export interface RealizedYear {
   year: number;
   rows: RealizedRow[];

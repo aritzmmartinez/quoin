@@ -7,6 +7,8 @@ export * from "./cost-basis-timeline";
 export * from "./xirr";
 export * from "./returns";
 export * from "./exposures";
+export * from "./currency-exposure";
+export * from "./fund-overlap";
 export * from "./invested-vs-value";
 export * from "./portfolio";
 export * from "./real";

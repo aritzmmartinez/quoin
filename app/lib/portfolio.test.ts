@@ -17,12 +17,24 @@ import {
 } from "./portfolio";
 
 const instruments: Instrument[] = [
-  { id: "IE00BK5BQT80", name: "Vanguard FTSE All-World", type: "ETF", currency: "EUR" },
-  { id: "NL0010273215", name: "ASML Holding", type: "STOCK", currency: "EUR" },
+  {
+    id: "IE00TEST0031",
+    name: "Test World Equity",
+    type: "ETF",
+    currency: "EUR",
+  },
+  {
+    id: "NL00TEST0032",
+    name: "Test Semiconductors NV",
+    type: "STOCK",
+    currency: "EUR",
+  },
   { id: "BTC", name: "Bitcoin", type: "CRYPTO", currency: "EUR" },
 ];
 
-function position(overrides: Partial<Position> & Pick<Position, "instrumentId">): Position {
+function position(
+  overrides: Partial<Position> & Pick<Position, "instrumentId">,
+): Position {
   return {
     sleeve: "CORE",
     quantity: "10",
@@ -35,8 +47,12 @@ function position(overrides: Partial<Position> & Pick<Position, "instrumentId">)
 
 const meta = new Map<string, TradeMeta>([
   [
-    tradeMetaKey("IE00BK5BQT80", "CORE"),
-    { firstTradeAt: new Date("2026-01-01"), lastTradeAt: new Date("2026-06-01"), tradeCount: 3 },
+    tradeMetaKey("IE00TEST0031", "CORE"),
+    {
+      firstTradeAt: new Date("2026-01-01"),
+      lastTradeAt: new Date("2026-06-01"),
+      tradeCount: 3,
+    },
   ],
 ]);
 
@@ -46,19 +62,19 @@ describe("toPortfolioRows", () => {
   it("joins position, instrument, trade meta and market values", () => {
     const market = new Map<string, MarketValue>([
       [
-        tradeMetaKey("IE00BK5BQT80", "CORE"),
+        tradeMetaKey("IE00TEST0031", "CORE"),
         { marketValue: "1200", unrealizedPnL: "200", weight: "1.000000" },
       ],
     ]);
     const rows = toPortfolioRows(
-      [position({ instrumentId: "IE00BK5BQT80" })],
+      [position({ instrumentId: "IE00TEST0031" })],
       instruments,
       meta,
       market,
     );
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
-      name: "Vanguard FTSE All-World",
+      name: "Test World Equity",
       type: "ETF",
       currency: "EUR",
       tradeCount: 3,
@@ -71,7 +87,7 @@ describe("toPortfolioRows", () => {
 
   it("leaves market fields null when the position is unpriced", () => {
     const rows = toPortfolioRows(
-      [position({ instrumentId: "IE00BK5BQT80" })],
+      [position({ instrumentId: "IE00TEST0031" })],
       instruments,
       meta,
       noMarket,
@@ -83,14 +99,18 @@ describe("toPortfolioRows", () => {
   it("excludes closed positions (quantity 0)", () => {
     const rows = toPortfolioRows(
       [
-        position({ instrumentId: "IE00BK5BQT80" }),
-        position({ instrumentId: "NL0010273215", quantity: "0", costBasis: "0" }),
+        position({ instrumentId: "IE00TEST0031" }),
+        position({
+          instrumentId: "NL00TEST0032",
+          quantity: "0",
+          costBasis: "0",
+        }),
       ],
       instruments,
       meta,
       noMarket,
     );
-    expect(rows.map((r) => r.instrumentId)).toEqual(["IE00BK5BQT80"]);
+    expect(rows.map((r) => r.instrumentId)).toEqual(["IE00TEST0031"]);
   });
 
   it("falls back gracefully when the instrument is unknown", () => {
@@ -107,15 +127,29 @@ describe("toPortfolioRows", () => {
 });
 
 const market = new Map<string, MarketValue>([
-  [tradeMetaKey("IE00BK5BQT80", "CORE"), { marketValue: "6000", unrealizedPnL: "1000", weight: "0.400000" }],
-  [tradeMetaKey("BTC", "CORE"), { marketValue: "9000", unrealizedPnL: "1000", weight: "0.600000" }],
-  // NL0010273215 intentionally unpriced
+  [
+    tradeMetaKey("IE00TEST0031", "CORE"),
+    { marketValue: "6000", unrealizedPnL: "1000", weight: "0.400000" },
+  ],
+  [
+    tradeMetaKey("BTC", "CORE"),
+    { marketValue: "9000", unrealizedPnL: "1000", weight: "0.600000" },
+  ],
+  // NL00TEST0032 intentionally unpriced
 ]);
 
 const rows: PortfolioRow[] = toPortfolioRows(
   [
-    position({ instrumentId: "IE00BK5BQT80", costBasis: "5000", quantity: "40" }),
-    position({ instrumentId: "NL0010273215", costBasis: "2000", quantity: "3" }),
+    position({
+      instrumentId: "IE00TEST0031",
+      costBasis: "5000",
+      quantity: "40",
+    }),
+    position({
+      instrumentId: "NL00TEST0032",
+      costBasis: "2000",
+      quantity: "3",
+    }),
     position({ instrumentId: "BTC", costBasis: "8000", quantity: "0.5" }),
   ],
   instruments,
@@ -128,27 +162,31 @@ describe("sortPortfolioRows", () => {
     const sorted = sortPortfolioRows(rows, { key: "costBasis", dir: "desc" });
     expect(sorted.map((r) => r.instrumentId)).toEqual([
       "BTC",
-      "IE00BK5BQT80",
-      "NL0010273215",
+      "IE00TEST0031",
+      "NL00TEST0032",
     ]);
   });
 
   it("sorts by name ascending using locale order", () => {
     const sorted = sortPortfolioRows(rows, { key: "name", dir: "asc" });
     expect(sorted.map((r) => r.name)).toEqual([
-      "ASML Holding",
       "Bitcoin",
-      "Vanguard FTSE All-World",
+      "Test Semiconductors NV",
+      "Test World Equity",
     ]);
   });
 
   it("pushes unpriced rows to the bottom regardless of direction", () => {
     const desc = sortPortfolioRows(rows, { key: "weight", dir: "desc" });
-    expect(desc.map((r) => r.instrumentId)).toEqual(["BTC", "IE00BK5BQT80", "NL0010273215"]);
+    expect(desc.map((r) => r.instrumentId)).toEqual([
+      "BTC",
+      "IE00TEST0031",
+      "NL00TEST0032",
+    ]);
     const asc = sortPortfolioRows(rows, { key: "weight", dir: "asc" });
     // the unpriced ASML stays last even ascending
-    expect(asc.at(-1)?.instrumentId).toBe("NL0010273215");
-    expect(asc[0]?.instrumentId).toBe("IE00BK5BQT80");
+    expect(asc.at(-1)?.instrumentId).toBe("NL00TEST0032");
+    expect(asc[0]?.instrumentId).toBe("IE00TEST0031");
   });
 
   it("does not mutate the input", () => {
@@ -165,7 +203,9 @@ describe("parseSort", () => {
   });
 
   it("rejects an invalid sort key", () => {
-    expect(parseSort(new URLSearchParams("sort=hacktheplanet"))).toEqual(DEFAULT_SORT);
+    expect(parseSort(new URLSearchParams("sort=hacktheplanet"))).toEqual(
+      DEFAULT_SORT,
+    );
   });
 
   it("reads a valid key and direction", () => {
@@ -176,13 +216,18 @@ describe("parseSort", () => {
   });
 
   it("defaults direction to the column's natural direction", () => {
-    expect(parseSort(new URLSearchParams("sort=name"))).toEqual({ key: "name", dir: "asc" });
+    expect(parseSort(new URLSearchParams("sort=name"))).toEqual({
+      key: "name",
+      dir: "asc",
+    });
   });
 });
 
 describe("nextSort", () => {
   it("toggles direction on the active column", () => {
-    expect(nextSort("marketValue", { key: "marketValue", dir: "desc" })).toEqual({
+    expect(
+      nextSort("marketValue", { key: "marketValue", dir: "desc" }),
+    ).toEqual({
       key: "marketValue",
       dir: "asc",
     });
@@ -211,7 +256,7 @@ describe("totals", () => {
 
   it("returns null totals when nothing is priced", () => {
     const unpriced = toPortfolioRows(
-      [position({ instrumentId: "IE00BK5BQT80" })],
+      [position({ instrumentId: "IE00TEST0031" })],
       instruments,
       meta,
       noMarket,

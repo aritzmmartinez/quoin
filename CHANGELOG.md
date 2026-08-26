@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-26
+
+### Added
+- Bizkaia foral tax module (/realizado?vista=fiscal): capital gains for the savings base, computed the way the foral return actually pairs a sale — FIFO by lot, not the AVCO the portfolio view uses. The same disposal has two correct answers depending on the question, so computeTaxLots is a second projection over the same ledger, never a replacement: it walks the events lot by lot per fiscal year (Madrid calendar), and nothing FIFO is stored. A loss on securities repurchased within two months is flagged and excluded from that year's deductible net — a deliberate simplification, the exclusion is shown on screen rather than silently deferred the way the real rule defers it. Unused losses carry forward four years, consumed oldest-first, recomputed from the ledger on every view. The 2026 savings-base bracket scale is applied to the resulting net to show the quota.
+- pnpm tax:explain — replays the foral FIFO year by year against the real ledger, printing every lot each sale consumes, so the tax figure can be checked against the broker's own history rather than trusted.
+- Fund overlap (/asignacion?vista=solapamiento): how much of any two funds is the same company, as Σ min(weight_A, weight_B) over the constituents both hold — the industry formula, applied to the funds actually owned rather than to a market-wide comparator. List and matrix views, switched with ?modo=matriz. The weight is the holding's weight inside its own fund, so the figure is a property of the two funds and does not move with how much is invested in each. A fund with no composition imported is left out and counted in the header, never given a false 0%, and a fund's undecomposed residual never crosses. A fund's cash buffer is excluded from the listed contributors — two funds holding yen is a settlement artefact, not a shared bet on a company — but not from the overlap figure, which stays arithmetically true.
+- Currency exposure (/asignacion?vista=divisa): which currencies the portfolio does business in, through ETFs and cross-listings rather than by where each trade settles. Buying NVIDIA on Xetra in euros is dollar exposure, and a fund domiciled and quoted in EUR is not EUR exposure unless it hedges.
+- Instruments screen: a per-instrument "hedged to EUR" flag, for the case no market data can reveal — a "Physical Gold USD (EUR Hedged)" ETC quotes on the same venue in the same currency as an unhedged one and differs only in the prospectus. Set by hand, like the TER; ingestion never writes it.
+- pnpm identity:resolve --refresh — re-asks every identity including the ones already resolved. The cache never re-asks what it has placed, so this is what fills a column added after the fact.
+
+### Changed
+- Identity resolution now keeps the listing's exchange code from the same OpenFIGI response it already made. No extra requests: the field was being read to disambiguate and then discarded. The code is stored and the currency derived at read time, so correcting the translation table costs nothing.
+- The currency of a holding is read first from the venue its issuer published (NVDA.US), which needs no provider at all and answers for four fifths of holdings. A bare ISIN falls back to its registered country, taken only when a real listing there confirms it — OpenFIGI publishes no primary-listing flag, and every large cap is composite-listed in a dozen countries.
+
+### Fixed
+- Holdings import: a fund's cash buffer became a company leaf instead of folding into the residual. The parser intended to fold it and only ever did so by accident, through the negative-weight test — the one fixture covering it carried negative cash, so the case that actually matters, an ordinary positive buffer with a usable ticker ("JPY", "JPY CASH"), went straight through as a constituent. Both the currency code and that code appearing as a whole word of the name are now required, so Nokia (ticker NOK, and NOK is the Norwegian krone) stays a holding. Existing funds keep their cash leaves until re-imported: EtfHolding is replace-only.
+- Kraken staking rewards recorded the market value on receipt only as the acquisition cost of the lot, never as income. v0.4.0 fixed the cost side (a zero there inflated every later realised gain); the income side stayed invisible. A reward now also emits a DIVIDEND event for the same value — the "rendimiento de capital mobiliario" the foral return expects — sharing the refid but with a distinct externalId so both survive the dedup key. A reward with no price for that day is still discarded, never zeroed.
+
 ## [0.4.0] - 2026-08-23
 
 ### Added
@@ -94,7 +112,8 @@ fund holdings must be supplied as CSV rather than the Excel most issuers publish
 Design rationale lives beside the code it explains, in `docs/ARCHITECTURE.md` and in the
 commit history — not here.
 
-[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/aritzmmartinez/quoin/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/aritzmmartinez/quoin/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/aritzmmartinez/quoin/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/aritzmmartinez/quoin/compare/v0.1.0...v0.2.0

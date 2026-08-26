@@ -6,13 +6,24 @@ import {
   PrismaInstrumentRepository,
   PrismaLedgerRepository,
 } from "~/adapters/persistence";
-import { BasisNotice, Card, PortfolioError, RealizedTable } from "~/components";
+import {
+  BasisNotice,
+  Card,
+  PortfolioError,
+  RealizedTable,
+  RealizedViewTabs,
+  TaxYearPanel,
+} from "~/components";
 import { computeRealizedGains } from "~/core/projections";
 import {
+  buildTaxYearView,
   es,
   formatSignedMoney,
   groupRealizedByYear,
+  listTaxYears,
   parseRealizedSort,
+  parseRealizedView,
+  parseTaxYear,
   realizedTotals,
   toRealizedRows,
 } from "~/lib";
@@ -28,7 +39,9 @@ export function meta(_: Route.MetaArgs) {
 export const handle = { title: es.realized.title, basis: true };
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const sort = parseRealizedSort(new URL(request.url).searchParams);
+  const params = new URL(request.url).searchParams;
+  const view = parseRealizedView(params);
+  const sort = parseRealizedSort(params);
 
   const [events, instruments] = await Promise.all([
     new PrismaLedgerRepository().list(),
@@ -41,7 +54,11 @@ export async function loader({ request }: Route.LoaderArgs) {
     instruments,
   );
 
+  const taxYears = listTaxYears(events);
+  const taxYear = parseTaxYear(params, taxYears);
+
   return {
+    view,
     years: groupRealizedByYear(rows, sort),
     totals: realizedTotals(rows),
     sort,
@@ -53,16 +70,38 @@ export async function loader({ request }: Route.LoaderArgs) {
       hasIndex: real.hasIndex,
       syncedAt: real.syncedAt,
     },
+    fiscal: {
+      years: taxYears,
+      year: taxYear,
+      view:
+        view !== "fiscal" || taxYear === null
+          ? null
+          : buildTaxYearView(events, instruments, taxYear),
+    },
   };
 }
 
 export default function Realized({ loaderData }: Route.ComponentProps) {
-  const { years, totals, sort, real } = loaderData;
+  const { view, years, totals, sort, real, fiscal } = loaderData;
   const navigation = useNavigation();
   const busy = navigation.state === "loading";
 
+  if (view === "fiscal") {
+    return (
+      <>
+        <RealizedViewTabs value={view} />
+        <TaxYearPanel
+          years={fiscal.years}
+          year={fiscal.year}
+          view={fiscal.view}
+        />
+      </>
+    );
+  }
+
   return (
     <>
+      <RealizedViewTabs value={view} />
       <header className="mb-4">
         {totals.count > 0 && (
           <span className="text-[13px] text-muted">

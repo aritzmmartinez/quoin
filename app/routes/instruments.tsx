@@ -58,6 +58,7 @@ const exposureForm = z.object({
   exposureKind: z.union([exposureKindSchema, z.literal("")]),
   exposureLeafId: z.string().trim().default(""),
   ter: z.string().trim().default(""),
+  hedgedToBase: z.string().optional(),
 });
 
 const holdingsForm = z.object({
@@ -101,6 +102,7 @@ export async function action({ request }: Route.ActionArgs) {
     exposureLeafId === "" ? null : exposureLeafId,
   );
   await repository.setTer(id, ter);
+  await repository.setHedgedToBase(id, parsed.data.hedgedToBase === "1");
   return { ok: true as const };
 }
 
