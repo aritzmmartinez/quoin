@@ -5,9 +5,9 @@ import { Money } from "../domain";
 /** Spanish IRPF territories only (foral and común) — not a multi-country abstraction. */
 export type Territory = "bizkaia";
 
-/** Art. 47.2 NF 13/2013 de Bizkaia — recompra de valores homogéneos. */
+/** Art. 43 NF 13/2013 de Bizkaia — pérdidas patrimoniales no computables (recompra de valores homogéneos). */
 export const WASH_SALE_WINDOW_MONTHS = 2;
-/** Art. 71 NF 13/2013 de Bizkaia — compensación de saldos negativos. */
+/** Art. 66 NF 13/2013 de Bizkaia — integración y compensación de rentas en la base imponible del ahorro (límite de cuatro años). */
 export const LOSS_CARRYFORWARD_YEARS = 4;
 
 export interface TaxBracket {

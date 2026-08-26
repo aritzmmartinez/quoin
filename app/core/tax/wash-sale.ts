@@ -15,9 +15,10 @@ function addMonths(date: Date, months: number): Date {
 }
 
 /**
- * Deliberate simplification of Art. 47.2 NF 13/2013 (recompra de valores
- * homogéneos): the real rule DEFERS the loss until the repurchased position
- * is definitively transmitted with no further repurchase in window. Quoin
+ * Deliberate simplification of Art. 43 NF 13/2013 (pérdidas patrimoniales no
+ * computables — recompra de valores homogéneos): the real rule DEFERS the loss
+ * until the repurchased position is definitively transmitted with no further
+ * repurchase in window. Quoin
  * does not model that deferral — it only EXCLUDES the loss from the year's
  * deductible net. The exclusion is flagged, never silently dropped, so it
  * stays visible to whoever files the return.

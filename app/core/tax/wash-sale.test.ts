@@ -102,7 +102,7 @@ describe("findWashSaleTrigger", () => {
   it("realistic scenario: a partial loss sale rebought a week later stays disallowed", () => {
     // 2024: buy 20 shares of an ETF. 2025-11: sell 8 at a loss to harvest it
     // for the year, then rebuy 8 the following week — a textbook attempt at
-    // the exact thing Art. 47.2 exists to catch.
+    // the exact thing Art. 43 exists to catch.
     const buy1 = trade("BUY", "ETF", "20", "2000", { ts: "2024-06-01" });
     const sell = trade("SELL", "ETF", "8", "640", { ts: "2025-11-10" }); // loss: 800 cost vs 640 proceeds
     const rebuy = trade("BUY", "ETF", "8", "656", { ts: "2025-11-17" });

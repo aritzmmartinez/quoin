@@ -575,6 +575,14 @@ manual aliasing was abandoned — 726 confirmations is not a system.
 
 Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never régimen común.
 
+- **Never cite an NF 13/2013 article number without a verifiable source for it.** Two
+  were fabricated during initial development (`Art. 47.2` for the wash-sale rule, `Art.
+  71` for carryforward — both plausible chapter-adjacent numbers, both wrong; correct are
+  Art. 43 and Art. 66). A guessed-but-plausible citation is worse than none: it invites
+  trust nobody checked. If the article cannot be confirmed against the actual text, write
+  the comment without a number ("regla de recompra a corto plazo, Bizkaia — ver nota de
+  Aritz") rather than inventing one that reads as authoritative.
+
 ## Kraken rewards
 
 - **A reward is an acquisition with no counter-leg**, so its value comes from the price
