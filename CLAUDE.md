@@ -524,6 +524,16 @@ manual aliasing was abandoned — 726 confirmations is not a system.
   throw on every read of the instrument list — the `LedgerEntry.type` trap one layer up.
   Nothing is written until it parses: "0,22" typed as a fraction is 22% a year, and a fee
   wrong by a factor of a hundred looks entirely plausible on screen.
+- **The instrument row's "dirty" check parses, it does not string-compare.** `terInputMatches`
+  runs the current input through `terPercentSchema` and compares the resulting fraction to
+  the stored one — the same schema that decides the write decides whether the row still
+  differs. A string compare against `terToPercentInput(stored)` leaves the row dirty after a
+  correct save whenever the typed form is not byte-identical to the canonical one (`0.22`
+  vs `0,22`, a trailing zero, surrounding spaces), so the save silently never confirms. Do
+  **not** "fix" that with a post-save `useEffect` that rewrites the field. This is the
+  pattern to generalise the day a second inline-editable table exists — not before: as of
+  v0.5.1 `InstrumentsTable` is the only one, every other editable surface is create-only or
+  URL-as-state and compares nothing.
 - **An instrument with no TER is excluded and named, never counted as 0%.** Same rule as
   `unpricedCount` and an `UNRESOLVED` leaf. In the weighted average it leaves the
   denominator; in the projected cost it contributes nothing, which makes that figure a
