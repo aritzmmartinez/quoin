@@ -1,7 +1,12 @@
 import type { Instrument } from "~/core/domain";
 import type { OpportunityCostLine } from "~/core/projections";
 
-export const BENCHMARK_SYMBOL = "VWCE.DE";
+export const DEFAULT_BENCHMARK_SYMBOL = "VWCE.DE";
+
+export function resolveBenchmarkSymbol(configured: string | undefined): string {
+  const trimmed = configured?.trim();
+  return trimmed ? trimmed : DEFAULT_BENCHMARK_SYMBOL;
+}
 
 export interface OpportunityRow {
   instrumentId: string;
@@ -14,7 +19,7 @@ export interface OpportunityRow {
 
 export function findBenchmark(
   instruments: readonly Instrument[],
-  symbol: string = BENCHMARK_SYMBOL,
+  symbol: string = DEFAULT_BENCHMARK_SYMBOL,
 ): Instrument | null {
   return instruments.find((i) => i.quoteSymbol === symbol) ?? null;
 }
