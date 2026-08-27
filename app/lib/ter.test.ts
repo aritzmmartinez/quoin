@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { terPercentSchema, type Instrument } from "~/core/domain";
 
-import { terToPercentInput, toTerRows } from "./ter";
+import { terInputMatches, terToPercentInput, toTerRows } from "./ter";
 
 const instrument = (id: string, name: string): Instrument => ({
   id,
@@ -35,6 +35,28 @@ describe("terPercentSchema", () => {
     expect(terToPercentInput(terPercentSchema.parse("0,22"))).toBe("0,22");
     expect(terToPercentInput(null)).toBe("");
     expect(terToPercentInput("")).toBe("");
+  });
+});
+
+describe("terInputMatches", () => {
+  it("matches by parsed value, not by separator or trailing zeros", () => {
+    expect(terInputMatches("0,22", "0.002200")).toBe(true);
+    expect(terInputMatches("0.22", "0.002200")).toBe(true);
+    expect(terInputMatches("0,220", "0.002200")).toBe(true);
+    expect(terInputMatches("  0.22  ", "0.002200")).toBe(true);
+  });
+
+  it("treats an empty input as matching only an absent stored TER", () => {
+    expect(terInputMatches("", null)).toBe(true);
+    expect(terInputMatches("   ", null)).toBe(true);
+    expect(terInputMatches("", "0.002200")).toBe(false);
+    expect(terInputMatches("0,22", null)).toBe(false);
+  });
+
+  it("does not match a different value or an unparseable input", () => {
+    expect(terInputMatches("0,25", "0.002200")).toBe(false);
+    expect(terInputMatches("22", "0.002200")).toBe(false);
+    expect(terInputMatches("gratis", "0.002200")).toBe(false);
   });
 });
 
