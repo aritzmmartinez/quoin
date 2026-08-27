@@ -7,8 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-08-28
+
 ### Added
 - The running version is shown at the foot of the sidebar. Read from package.json in the _shell loader (server-side) and passed to the sidebar as a prop, so nothing pulls node:fs or the manifest into the client bundle.
+- BENCHMARK_SYMBOL env var: the opportunity-cost benchmark (/coste-oportunidad and the Resumen card) can now be changed from the default global all-world ETF. Must be an instrument already mapped and backfilled with EUR history.
+
+### Changed
+- Dependencies bumped to their latest minors/patches, runtime (Prisma 7.10, React 19.2.8, papaparse 5.7, lucide-react, isbot) and dev (eslint, tailwindcss 4.3, vitest, tsx, typescript-eslint, vite, @types/*). No API changes.
+
+### Fixed
+- Instruments screen: a TER row stayed marked as unsaved after a correct save whenever the typed form was not byte-identical to the canonical one (0.22 vs 0,22, a trailing zero, surrounding spaces). The dirty check now parses the input through the same schema that decides the write and compares fractions.
+- Fund overlap matrix (/asignacion?vista=solapamiento&modo=matriz): more spacing between the row number and the fund name.
+
+### Removed
+- MARKET_DATA_API_KEY from .env.example the Yahoo price provider takes no key and nothing read the variable.
 
 ## [0.5.0] - 2026-08-26
 
@@ -115,7 +128,8 @@ fund holdings must be supplied as CSV rather than the Excel most issuers publish
 Design rationale lives beside the code it explains, in `docs/ARCHITECTURE.md` and in the
 commit history — not here.
 
-[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/aritzmmartinez/quoin/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/aritzmmartinez/quoin/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/aritzmmartinez/quoin/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/aritzmmartinez/quoin/compare/v0.2.0...v0.3.0
