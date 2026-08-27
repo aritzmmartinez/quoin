@@ -57,7 +57,7 @@ export function OverlapMatrix({
                   className="max-w-0 truncate px-2 py-2 text-left font-medium"
                   title={row.name}
                 >
-                  <span className="tabular-nums text-muted">
+                  <span className="tabular-nums text-muted px-2">
                     {rowIndex + 1}
                   </span>{" "}
                   {row.name}
