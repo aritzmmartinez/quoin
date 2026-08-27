@@ -4,9 +4,10 @@ import type { Instrument } from "~/core/domain";
 import type { OpportunityCostLine } from "~/core/projections";
 
 import {
-  BENCHMARK_SYMBOL,
+  DEFAULT_BENCHMARK_SYMBOL,
   findBenchmark,
   namesOf,
+  resolveBenchmarkSymbol,
   toOpportunityRows,
 } from "./opportunity-cost";
 
@@ -36,7 +37,11 @@ const line = (
 describe("findBenchmark", () => {
   it("resolves the instrument by quote symbol, not by id", () => {
     const instruments = [
-      instrument("IE00B3RBWM25", "Vanguard All-World", BENCHMARK_SYMBOL),
+      instrument(
+        "IE00B3RBWM25",
+        "Vanguard All-World",
+        DEFAULT_BENCHMARK_SYMBOL,
+      ),
       instrument("VWCE.DE", "Ghost with the symbol as its id"),
     ];
 
@@ -45,6 +50,20 @@ describe("findBenchmark", () => {
 
   it("returns null when nobody mapped the symbol", () => {
     expect(findBenchmark([instrument("A", "Something")])).toBeNull();
+  });
+});
+
+describe("resolveBenchmarkSymbol", () => {
+  it("uses the configured symbol when the env var is set", () => {
+    expect(resolveBenchmarkSymbol("IWDA.AS")).toBe("IWDA.AS");
+    expect(resolveBenchmarkSymbol("  SWRD.MI  ")).toBe("SWRD.MI");
+  });
+
+  it("falls back to the default when unset, empty or whitespace", () => {
+    expect(resolveBenchmarkSymbol(undefined)).toBe(DEFAULT_BENCHMARK_SYMBOL);
+    expect(resolveBenchmarkSymbol("")).toBe(DEFAULT_BENCHMARK_SYMBOL);
+    expect(resolveBenchmarkSymbol("   ")).toBe(DEFAULT_BENCHMARK_SYMBOL);
+    expect(DEFAULT_BENCHMARK_SYMBOL).toBe("VWCE.DE");
   });
 });
 

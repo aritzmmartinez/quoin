@@ -10,7 +10,9 @@ import {
   type PriceLike,
 } from "~/core/projections";
 
-import { BENCHMARK_SYMBOL, findBenchmark } from "./opportunity-cost";
+import { findBenchmark, resolveBenchmarkSymbol } from "./opportunity-cost";
+
+const BENCHMARK_SYMBOL = resolveBenchmarkSymbol(process.env.BENCHMARK_SYMBOL);
 
 export type OpportunityView =
   | { ok: false; symbol: string; reason: "unmapped" | "no-history" }
