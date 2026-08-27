@@ -1,5 +1,6 @@
 import Decimal from "decimal.js";
 
+import { terPercentSchema } from "~/core/domain";
 import type { Instrument } from "~/core/domain";
 import type { TerLine } from "~/core/projections";
 
@@ -43,4 +44,14 @@ export function toTerRows(
 export function terToPercentInput(ter: string | null | undefined): string {
   if (ter == null || ter === "") return "";
   return new Decimal(ter).times(100).toString().replace(".", ",");
+}
+
+export function terInputMatches(
+  input: string,
+  stored: string | null | undefined,
+): boolean {
+  const trimmed = input.trim();
+  if (trimmed === "") return stored == null || stored === "";
+  const parsed = terPercentSchema.safeParse(trimmed);
+  return parsed.success && parsed.data === stored;
 }
