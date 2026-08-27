@@ -85,6 +85,10 @@ Quote symbols and exposure classifications live only in your local database (nev
 the repo), so a public clone never discloses your holdings. Prefer EUR venues (`.DE`,
 `.AS`, `.MC`) to avoid FX for now.
 
+The opportunity-cost screen replays every contribution into a benchmark ETF, `VWCE.DE`
+by default. Set `BENCHMARK_SYMBOL` in `.env` to use another — it must be an instrument
+you have mapped with `prices:map` and given EUR price history.
+
 Two databases, on purpose. `data/quoin.sqlite` is the ledger — real trades, and the only
 thing here that cannot be regenerated. `data/dev.sqlite` is scratch: point `DATABASE_URL`
 at it, run `pnpm db:seed` for a synthetic portfolio, and develop against that. Commands
