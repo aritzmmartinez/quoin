@@ -3,7 +3,7 @@ import { NAV_ITEMS } from "./nav-items";
 
 import { es } from "~/lib";
 
-export function AppSidebar() {
+export function AppSidebar({ version }: { version: string }) {
   return (
     <aside className="hidden shrink-0 md:sticky md:top-0 md:flex md:h-dvh md:w-52 md:flex-col md:self-start md:border-r md:border-border md:bg-surface">
       <div className="px-4 py-5">
@@ -16,6 +16,9 @@ export function AppSidebar() {
           <NavItemLink key={item.label} item={item} variant="sidebar" />
         ))}
       </nav>
+      <span className="mt-auto px-4 py-4 text-xs text-muted">
+        {es.nav.version(version)}
+      </span>
     </aside>
   );
 }

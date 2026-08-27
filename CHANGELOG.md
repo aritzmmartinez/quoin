@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- The running version is shown at the foot of the sidebar. Read from package.json in the _shell loader (server-side) and passed to the sidebar as a prop, so nothing pulls node:fs or the manifest into the client bundle.
+
 ## [0.5.0] - 2026-08-26
 
 ### Added
