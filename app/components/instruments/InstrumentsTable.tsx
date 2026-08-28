@@ -9,6 +9,7 @@ import {
   formatDate,
   formatMoney,
   formatPercent,
+  terInputMatches,
   terToPercentInput,
   type InstrumentListItem,
 } from "~/lib";
@@ -69,7 +70,7 @@ function InstrumentRow({ item }: { item: InstrumentListItem }) {
   const dirty =
     kind !== (item.exposureKind ?? "") ||
     leaf !== (item.exposureLeafId ?? "") ||
-    ter !== terToPercentInput(item.ter) ||
+    !terInputMatches(ter, item.ter) ||
     hedged !== item.hedgedToBase;
   const busy = fetcher.state !== "idle";
   const saved = fetcher.data?.ok === true && !dirty;

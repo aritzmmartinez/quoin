@@ -9,7 +9,7 @@ and support for the Bizkaia *foral* tax regime that off-the-shelf trackers ignor
 The goal isn't to trade: it's to **understand** a portfolio, and to double as a
 learning project.
 
-> **Status: v0.5.0, actively built.** The immutable ledger, core domain
+> **Status: v0.5.1, actively built.** The immutable ledger, core domain
 > (Money, event types, `computePositions` with average cost), CSV and `.xlsx` ingestion
 > (Trade Republic + Kraken), a Yahoo price provider with daily history, the app shell
 > and the summary / holdings / movements / asset-detail / instruments / allocation /
@@ -84,6 +84,10 @@ for it on purpose.
 Quote symbols and exposure classifications live only in your local database (never in
 the repo), so a public clone never discloses your holdings. Prefer EUR venues (`.DE`,
 `.AS`, `.MC`) to avoid FX for now.
+
+The opportunity-cost screen replays every contribution into a benchmark ETF, `VWCE.DE`
+by default. Set `BENCHMARK_SYMBOL` in `.env` to use another — it must be an instrument
+you have mapped with `prices:map` and given EUR price history.
 
 Two databases, on purpose. `data/quoin.sqlite` is the ledger — real trades, and the only
 thing here that cannot be regenerated. `data/dev.sqlite` is scratch: point `DATABASE_URL`

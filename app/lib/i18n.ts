@@ -16,6 +16,7 @@ export const es = {
     movements: "Movimientos",
     instruments: "Instrumentos",
     soon: "Pronto",
+    version: (v: string): string => `v${v}`,
   },
   theme: {
     toggle: "Cambiar tema",
