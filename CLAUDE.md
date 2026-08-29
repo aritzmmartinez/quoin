@@ -689,6 +689,38 @@ simply renders unstyled. Check `app/app.css` for the real tokens before inventin
 `dn-1..5` is a **greyscale ramp**, not a categorical palette. The design is monochrome and
 green/red are reserved as semantic signals — a category is not a warning.
 
+## Spacing
+
+The scale is Tailwind's own, restricted to **whole steps** — `1 2 3 4 6 8 16`. Half-steps
+(`py-2.5`, `gap-3.5`, `mt-0.5`) are for optical adjustment **inside** a control, a badge or
+a chart row; never for the layout of a table, a card or a section. Arbitrary values
+(`p-[13px]`) are not used for spacing at all.
+
+Two roles get a token in `@theme` instead, because a header row and its body rows must
+agree on both and nothing catches it when they drift:
+
+- `px-gutter` (`--spacing-gutter`, 20px) — horizontal inset of any band, row or panel
+  inside a card. One number, so a card header lines up with the column beneath it.
+- `py-row` (`--spacing-row`, 10px) — vertical padding of a data-table row and of the
+  header above it. 10px is not `py-2.5` under another name: it is a **decision** that these
+  tables are read daily on a desktop with dozens of rows on screen, so density beats air.
+  Right-aligned numeric columns are what carry scannability here, not row height.
+
+Drift in these two is not cosmetic — it is a misalignment bug that passes typecheck, lint
+and build, exactly like an unknown Tailwind class. It has happened twice: `TaxSaleItem`
+rows carried `px-5` while their header carried none, and `movementsGrid` lost its only
+flexible track when `instrument` was filtered out, leaving every track a fixed px so the
+whole table hugged the left edge. `movements/columns.test.ts` pins the second shape — one
+track per rendered column, exactly one flexible.
+
+**A shared `ui/Table` was considered and deliberately not built** (v0.5.2). Nine tables,
+too dissimilar to fold: two are real `<table>` elements and seven are `div[role=row]` +
+`<ul>`; some sort, some are clickable rows, one is inline-editable. Collapsing them behind
+one component before the shapes converge would be the abstraction built for generality
+rather than for a second real case. What they actually shared was spacing, and that is what
+the tokens above fix. Revisit when a tenth table wants something the ninth already has —
+not before, and not as a tidy-up.
+
 Also declare `color-scheme` when adding native controls: a `<select>` popup is drawn by the
 OS, and without it the panel comes back light while the options inherit white text.
 
