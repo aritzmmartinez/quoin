@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-08-31
+
+### Added
+- Two spacing tokens unifying row/header padding and card inset across the app.
+- Shared segmented control, replacing five duplicated implementations.
+- Shared component for table intro/caveat/footnote prose, replacing four copies of the boxed caveat.
+
+### Changed
+- Ten duplicated route-level ErrorBoundarys folded into one shared component. Migrated from useRouteError() to the Framework Mode prop pattern.
+
+### Fixed
+- Removed nested main in /instrumentos and /objetivo.
+- Explanatory text boxes now size to their content instead of a fixed width unrelated to the page.
+- Instrument-page movements table (/instrument/:id): fixed missing flexible grid track that pushed the table against the left edge.
+- Foral tax table (/realizado?vista=fiscal): fixed 20px header/row misalignment.
+- Unified row/header padding and column gap across all 9 tables.
+- Fixed the one table header still in small caps ( coste-oportunidad).
+- Removed duplicated grid template on /coste-ter.
+
 ## [0.5.1] - 2026-08-28
 
 ### Added
@@ -128,7 +147,8 @@ fund holdings must be supplied as CSV rather than the Excel most issuers publish
 Design rationale lives beside the code it explains, in `docs/ARCHITECTURE.md` and in the
 commit history — not here.
 
-[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/aritzmmartinez/quoin/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/aritzmmartinez/quoin/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/aritzmmartinez/quoin/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/aritzmmartinez/quoin/compare/v0.3.0...v0.4.0

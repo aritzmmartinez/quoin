@@ -532,7 +532,7 @@ manual aliasing was abandoned — 726 confirmations is not a system.
   vs `0,22`, a trailing zero, surrounding spaces), so the save silently never confirms. Do
   **not** "fix" that with a post-save `useEffect` that rewrites the field. This is the
   pattern to generalise the day a second inline-editable table exists — not before: as of
-  v0.5.1 `InstrumentsTable` is the only one, every other editable surface is create-only or
+  v0.5.2 `InstrumentsTable` is the only one, every other editable surface is create-only or
   URL-as-state and compares nothing.
 - **An instrument with no TER is excluded and named, never counted as 0%.** Same rule as
   `unpricedCount` and an `UNRESOLVED` leaf. In the weighted average it leaves the
@@ -678,6 +678,28 @@ throwing the user back to the exposure tab. No context, no state lifting, and th
 shareable. A route opts into the header's range selector with `handle = { range: true }`;
 `handle.title` sets the header title.
 
+## Route modules
+
+- **`_shell.tsx` owns the only `<main>`, and the only page padding.** A route renders a
+  fragment, not a landmark. A second `<main>` is invalid HTML and breaks landmark
+  navigation in a screen reader, and repeating `px-4 py-8 md:px-6` inside it double-insets
+  that screen against every other one — both passed typecheck, lint and build for months
+  on `/instrumentos` and `/objetivo`. `root.tsx` keeps its own `<main>` and is **not** the
+  same bug: its `ErrorBoundary` replaces the whole subtree below root, so it never
+  coexists with the shell's.
+- **A route does not write its own `ErrorBoundary`.** It re-exports the shared one:
+  `export { ErrorBoundary } from "~/components/ui/ErrorBoundary";` — imported from the
+  file, not through the `~/components` barrel, so ten route modules do not each pull sixty
+  exports through their own chunk. Write a bespoke one only when it says something the
+  generic card cannot; `instrument.tsx` is the only case (it distinguishes a 404 and
+  offers the way back).
+- **The error arrives as a prop, never from `useRouteError()`.** `{ error }:
+  Route.ErrorBoundaryProps` is the Framework Mode signature; the hook is Data Mode's and
+  works here only by compatibility. The shared component cannot use that type at all —
+  `params` and `loaderData` are generated per route, so a component with no route has no
+  `Route` namespace to import. It takes **no props**: it renders nothing from the error,
+  and an unused `error: unknown` would be decoration.
+
 ## Tailwind v4 — a nonexistent class is silent
 
 `bg-surface-1` and `text-warning` do not exist in this theme. Tailwind emits nothing for an
@@ -688,6 +710,38 @@ simply renders unstyled. Check `app/app.css` for the real tokens before inventin
 
 `dn-1..5` is a **greyscale ramp**, not a categorical palette. The design is monochrome and
 green/red are reserved as semantic signals — a category is not a warning.
+
+## Spacing
+
+The scale is Tailwind's own, restricted to **whole steps** — `1 2 3 4 6 8 16`. Half-steps
+(`py-2.5`, `gap-3.5`, `mt-0.5`) are for optical adjustment **inside** a control, a badge or
+a chart row; never for the layout of a table, a card or a section. Arbitrary values
+(`p-[13px]`) are not used for spacing at all.
+
+Two roles get a token in `@theme` instead, because a header row and its body rows must
+agree on both and nothing catches it when they drift:
+
+- `px-gutter` (`--spacing-gutter`, 20px) — horizontal inset of any band, row or panel
+  inside a card. One number, so a card header lines up with the column beneath it.
+- `py-row` (`--spacing-row`, 10px) — vertical padding of a data-table row and of the
+  header above it. 10px is not `py-2.5` under another name: it is a **decision** that these
+  tables are read daily on a desktop with dozens of rows on screen, so density beats air.
+  Right-aligned numeric columns are what carry scannability here, not row height.
+
+Drift in these two is not cosmetic — it is a misalignment bug that passes typecheck, lint
+and build, exactly like an unknown Tailwind class. It has happened twice: `TaxSaleItem`
+rows carried `px-5` while their header carried none, and `movementsGrid` lost its only
+flexible track when `instrument` was filtered out, leaving every track a fixed px so the
+whole table hugged the left edge. `movements/columns.test.ts` pins the second shape — one
+track per rendered column, exactly one flexible.
+
+**A shared `ui/Table` was considered and deliberately not built** (v0.5.2). Nine tables,
+too dissimilar to fold: two are real `<table>` elements and seven are `div[role=row]` +
+`<ul>`; some sort, some are clickable rows, one is inline-editable. Collapsing them behind
+one component before the shapes converge would be the abstraction built for generality
+rather than for a second real case. What they actually shared was spacing, and that is what
+the tokens above fix. Revisit when a tenth table wants something the ninth already has —
+not before, and not as a tidy-up.
 
 Also declare `color-scheme` when adding native controls: a `<select>` popup is drawn by the
 OS, and without it the panel comes back light while the options inherit white text.

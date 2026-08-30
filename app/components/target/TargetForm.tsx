@@ -12,7 +12,7 @@ export function TargetForm({ defaultLines = "" }: { defaultLines?: string }) {
   const error = fetcher.data?.ok === false ? fetcher.data.error : undefined;
 
   return (
-    <fetcher.Form method="post" className="grid gap-3 px-5 py-4">
+    <fetcher.Form method="post" className="grid gap-3 px-gutter py-4">
       <input type="hidden" name="intent" value="create" />
 
       <div className="grid gap-3 sm:grid-cols-2">

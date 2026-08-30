@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router";
 import { DASH, es, formatMoney, taxYearHref, type TaxYearView } from "~/lib";
 
 import { Card } from "../ui/Card";
+import { Explainer } from "../ui/Explainer";
 import { SignedMoney } from "../SignedMoney";
 import { TaxSaleItem } from "./TaxSaleItem";
 import { TAX_SALE_GRID, TAX_SALE_MIN_WIDTH } from "./tax-columns";
@@ -52,7 +53,7 @@ export function TaxYearPanel({
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="max-w-3xl text-[12px] text-muted">{copy.intro}</p>
+      <Explainer>{copy.intro}</Explainer>
 
       <div className="flex items-center gap-2">
         <label className="text-[12px] text-muted" htmlFor="tax-year">
@@ -89,24 +90,26 @@ export function TaxYearPanel({
             </p>
           </Card>
 
-          <Card className="p-6">
-            <div className="mb-1 flex flex-wrap items-baseline justify-between gap-3">
-              <h2 className="text-[14px] font-semibold">{copy.salesTitle}</h2>
-              <span className="text-[11.5px] text-muted">
-                {copy.net.counts(view.allowedCount, view.disallowedCount)}
-              </span>
-            </div>
-            <div className="mt-3 flex justify-between text-[12.5px] text-muted">
-              <span>{copy.net.before}</span>
-              <span className="tabular-nums">
-                <SignedMoney value={view.ownNetBeforeExclusion} />
-              </span>
-            </div>
-            <div className="flex justify-between text-[12.5px] font-medium">
-              <span>{copy.net.after}</span>
-              <span className="tabular-nums">
-                <SignedMoney value={view.allowedNet} />
-              </span>
+          <Card>
+            <div className="border-b border-border px-gutter py-4">
+              <div className="mb-1 flex flex-wrap items-baseline justify-between gap-3">
+                <h2 className="text-[14px] font-semibold">{copy.salesTitle}</h2>
+                <span className="text-[11.5px] text-muted">
+                  {copy.net.counts(view.allowedCount, view.disallowedCount)}
+                </span>
+              </div>
+              <div className="mt-3 flex justify-between text-[12.5px] text-muted">
+                <span>{copy.net.before}</span>
+                <span className="tabular-nums">
+                  <SignedMoney value={view.ownNetBeforeExclusion} />
+                </span>
+              </div>
+              <div className="flex justify-between text-[12.5px] font-medium">
+                <span>{copy.net.after}</span>
+                <span className="tabular-nums">
+                  <SignedMoney value={view.allowedNet} />
+                </span>
+              </div>
             </div>
 
             {view.sales.length === 0 ? (
@@ -119,11 +122,11 @@ export function TaxYearPanel({
                 </p>
               </div>
             ) : (
-              <div className="mt-4 overflow-x-auto">
+              <div className="overflow-x-auto">
                 <div className={TAX_SALE_MIN_WIDTH}>
                   <div
                     role="row"
-                    className={`grid ${TAX_SALE_GRID} items-center gap-2 border-b border-border py-2 text-[11px] font-medium tracking-wide text-muted`}
+                    className={`grid ${TAX_SALE_GRID} items-center gap-2 border-b border-border px-gutter py-row text-[11px] font-medium tracking-wide text-muted`}
                   >
                     <span>{copy.columns.date}</span>
                     <span>{copy.columns.name}</span>

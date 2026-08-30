@@ -8,6 +8,7 @@ import {
 import {
   Card,
   OpportunityTable,
+  Explainer,
   SignedMoney,
   StatTile,
   signClass,
@@ -67,14 +68,6 @@ export async function loader(_: Route.LoaderArgs) {
   };
 }
 
-function Notice({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="mt-2 max-w-3xl rounded-card border border-border bg-surface-2 px-3 py-2 text-[12px] text-muted">
-      {children}
-    </p>
-  );
-}
-
 export default function OpportunityCost({ loaderData }: Route.ComponentProps) {
   const o = es.opportunity;
 
@@ -98,8 +91,10 @@ export default function OpportunityCost({ loaderData }: Route.ComponentProps) {
   return (
     <>
       <header className="mb-4">
-        <p className="max-w-3xl text-[12px] text-muted">{o.intro(symbol)}</p>
-        <Notice>{o.taxWarning}</Notice>
+        <Explainer>{o.intro(symbol)}</Explainer>
+        <Explainer tone="notice" className="mt-2">
+          {o.taxWarning}
+        </Explainer>
       </header>
 
       {rows.length === 0 ? (
@@ -176,24 +171,28 @@ export default function OpportunityCost({ loaderData }: Route.ComponentProps) {
           </div>
 
           {truncated && (
-            <Notice>
+            <Explainer tone="notice" className="mt-2">
               {o.truncated(
                 symbol,
                 formatDate(truncated.earliestDay),
                 truncated.excludedFlowCount,
                 formatMoney(truncated.excludedAmount),
               )}
-            </Notice>
+            </Explainer>
           )}
           {unpriced.length > 0 && (
-            <Notice>{o.unpriced(unpriced.join(", "))}</Notice>
+            <Explainer tone="notice" className="mt-2">
+              {o.unpriced(unpriced.join(", "))}
+            </Explainer>
           )}
           {totals.realizedProceeds !== "0" && (
-            <Notice>{o.proceeds(formatMoney(totals.realizedProceeds))}</Notice>
+            <Explainer tone="notice" className="mt-2">
+              {o.proceeds(formatMoney(totals.realizedProceeds))}
+            </Explainer>
           )}
 
           <Card className="mt-4">
-            <div className="flex items-baseline justify-between gap-3 border-b border-border px-5 py-3">
+            <div className="flex items-baseline justify-between gap-3 border-b border-border px-gutter py-3">
               <h2 className="text-[14px] font-semibold">{o.table.title}</h2>
               <span className="text-[13px] tabular-nums">
                 <SignedMoney value={totals.difference} />
@@ -202,9 +201,9 @@ export default function OpportunityCost({ loaderData }: Route.ComponentProps) {
             <OpportunityTable rows={rows} />
           </Card>
 
-          <p className="mt-2 max-w-3xl text-[11px] leading-relaxed text-muted">
+          <Explainer tone="footnote" className="mt-2">
             {o.table.note} {o.nominal}
-          </p>
+          </Explainer>
         </>
       )}
     </>

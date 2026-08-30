@@ -6,7 +6,7 @@ import {
   type TargetRow,
 } from "~/lib";
 
-const GRID = "grid-cols-[minmax(0,1fr)_140px_90px] items-center gap-3";
+const GRID = "grid-cols-[minmax(0,1fr)_140px_90px] items-center gap-2";
 
 export function TargetLines({
   rows,
@@ -23,13 +23,13 @@ export function TargetLines({
 
   return (
     <div>
-      <div className="border-b border-border px-5 py-3">
+      <div className="border-b border-border px-gutter py-row">
         <p className="text-[13px]">{copy.activeFrom(formatDate(activeFrom))}</p>
         {note && <p className="mt-1 text-[12px] text-muted">{note}</p>}
       </div>
 
       <div
-        className={`grid ${GRID} border-b border-border px-5 py-2 text-[11px] font-medium tracking-wide text-muted`}
+        className={`grid ${GRID} border-b border-border px-gutter py-row text-[11px] font-medium tracking-wide text-muted`}
       >
         <span>{copy.columns.instrument}</span>
         <span className="text-right">{copy.columns.amount}</span>
@@ -40,7 +40,7 @@ export function TargetLines({
         {rows.map((row) => (
           <li
             key={row.instrumentId}
-            className={`grid ${GRID} border-b border-border px-5 py-2.5 text-[13px] last:border-b-0`}
+            className={`grid ${GRID} border-b border-border px-gutter py-row text-[13px] last:border-b-0`}
           >
             <div className="min-w-0">
               <div className="truncate">{row.name}</div>
@@ -64,7 +64,7 @@ export function TargetLines({
       </ul>
 
       <div
-        className={`grid ${GRID} border-t border-border px-5 py-2.5 text-[13px]`}
+        className={`grid ${GRID} border-t border-border px-gutter py-row text-[13px]`}
       >
         <span className="text-muted">{copy.total}</span>
         <span className="text-right tabular-nums">{formatMoney(total)}</span>

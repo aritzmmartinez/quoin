@@ -36,7 +36,7 @@ export function PortfolioRowItem({ row }: { row: PortfolioRow }) {
     <li className="border-b border-border last:border-b-0">
       <Link
         to={`/instrument/${encodeURIComponent(row.instrumentId)}`}
-        className={`grid ${GRID_TEMPLATE} items-center gap-2 px-5 py-3 transition-colors hover:bg-surface-2`}
+        className={`grid ${GRID_TEMPLATE} items-center gap-2 px-gutter py-row transition-colors hover:bg-surface-2`}
       >
         <span className="grid size-6 place-items-center text-muted">
           <ChevronRight />

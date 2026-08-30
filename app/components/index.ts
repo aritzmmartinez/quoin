@@ -12,6 +12,8 @@ export * from "./ui/StatTile";
 export * from "./ui/MeterBar";
 export * from "./ui/Hint";
 export * from "./ui/Checkbox";
+export * from "./ui/Segmented";
+export * from "./ui/Explainer";
 export * from "./ui/Pagination";
 export * from "./ui/RangeSelector";
 export * from "./ui/BasisToggle";

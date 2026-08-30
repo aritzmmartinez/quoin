@@ -19,14 +19,14 @@ import { HoldingsUpload } from "./HoldingsUpload";
 
 const KINDS = exposureKindSchema.options;
 const GRID =
-  "grid-cols-[minmax(0,1.4fr)_150px_120px_78px_168px_minmax(0,160px)_112px] items-center gap-3";
+  "grid-cols-[minmax(0,1.4fr)_150px_120px_78px_168px_minmax(0,160px)_112px] items-center gap-2";
 
 export function InstrumentsTable({ items }: { items: InstrumentListItem[] }) {
   const copy = es.instruments;
 
   if (items.length === 0) {
     return (
-      <p className="px-5 py-10 text-center text-[13px] text-muted">
+      <p className="px-gutter py-10 text-center text-[13px] text-muted">
         {copy.empty}
       </p>
     );
@@ -36,7 +36,7 @@ export function InstrumentsTable({ items }: { items: InstrumentListItem[] }) {
     <div className="overflow-x-auto">
       <div className="min-w-280">
         <div
-          className={`grid ${GRID} border-b border-border px-5 py-2 text-[11px] font-medium tracking-wide text-muted`}
+          className={`grid ${GRID} border-b border-border px-gutter py-row text-[11px] font-medium tracking-wide text-muted`}
         >
           <span>{copy.columns.instrument}</span>
           <span>{copy.columns.exposure}</span>
@@ -79,7 +79,7 @@ function InstrumentRow({ item }: { item: InstrumentListItem }) {
 
   return (
     <li className="border-b border-border last:border-b-0">
-      <div className={`grid ${GRID} px-5 py-2.5 text-[13px]`}>
+      <div className={`grid ${GRID} px-gutter py-row text-[13px]`}>
         <div className="min-w-0">
           <div className="truncate">{item.name}</div>
           <div className="font-mono text-[11px] text-muted">

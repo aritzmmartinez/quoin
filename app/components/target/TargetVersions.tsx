@@ -7,7 +7,7 @@ export function TargetVersions({ versions }: { versions: TargetVersionRow[] }) {
 
   if (versions.length === 0) {
     return (
-      <p className="px-5 py-8 text-center text-[13px] text-muted">
+      <p className="px-gutter py-8 text-center text-[13px] text-muted">
         {copy.empty}
       </p>
     );
@@ -28,7 +28,7 @@ function VersionRow({ version }: { version: TargetVersionRow }) {
   const busy = fetcher.state !== "idle";
 
   return (
-    <li className="flex items-center gap-3 border-b border-border px-5 py-2.5 text-[13px] last:border-b-0">
+    <li className="flex items-center gap-3 border-b border-border px-gutter py-row text-[13px] last:border-b-0">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="truncate">{version.name}</span>

@@ -9,6 +9,7 @@ import {
 import {
   BasisNotice,
   Card,
+  Explainer,
   RealizedTable,
   RealizedViewTabs,
   TaxYearPanel,
@@ -110,12 +111,10 @@ export default function Realized({ loaderData }: Route.ComponentProps) {
             )}
           </span>
         )}
-        <p className="mt-1 max-w-3xl text-[12px] text-muted">
-          {es.realized.intro}
-        </p>
-        <p className="mt-2 max-w-3xl rounded-card border border-border bg-surface-2 px-3 py-2 text-[12px] text-muted">
+        <Explainer className="mt-1">{es.realized.intro}</Explainer>
+        <Explainer tone="notice" className="mt-2">
           {es.realized.avcoWarning}
-        </p>
+        </Explainer>
       </header>
 
       <BasisNotice {...real} />
