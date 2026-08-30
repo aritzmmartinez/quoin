@@ -6,7 +6,7 @@ import {
   PrismaInstrumentRepository,
   PrismaLedgerRepository,
 } from "~/adapters/persistence";
-import { Card, MovementsTable, PortfolioError } from "~/components";
+import { Card, MovementsTable } from "~/components";
 import {
   es,
   formatMoney,
@@ -83,12 +83,4 @@ export default function Movements({ loaderData }: Route.ComponentProps) {
   );
 }
 
-export function ErrorBoundary() {
-  return (
-    <>
-      <Card>
-        <PortfolioError onRetry={() => window.location.reload()} />
-      </Card>
-    </>
-  );
-}
+export { ErrorBoundary } from "~/components/ui/ErrorBoundary";

@@ -13,7 +13,7 @@ import {
   PrismaLedgerRepository,
   PrismaPriceRepository,
 } from "~/adapters/persistence";
-import { Card, InstrumentsTable, PortfolioError } from "~/components";
+import { Card, InstrumentsTable } from "~/components";
 import {
   BASE_CURRENCY,
   KINDS_NEEDING_LEAF,
@@ -172,10 +172,4 @@ export default function Instruments({ loaderData }: Route.ComponentProps) {
   );
 }
 
-export function ErrorBoundary() {
-  return (
-    <Card>
-      <PortfolioError onRetry={() => window.location.reload()} />
-    </Card>
-  );
-}
+export { ErrorBoundary } from "~/components/ui/ErrorBoundary";

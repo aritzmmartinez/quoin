@@ -8,7 +8,6 @@ import {
 import {
   Card,
   OpportunityTable,
-  PortfolioError,
   SignedMoney,
   StatTile,
   signClass,
@@ -212,10 +211,4 @@ export default function OpportunityCost({ loaderData }: Route.ComponentProps) {
   );
 }
 
-export function ErrorBoundary() {
-  return (
-    <Card>
-      <PortfolioError onRetry={() => window.location.reload()} />
-    </Card>
-  );
-}
+export { ErrorBoundary } from "~/components/ui/ErrorBoundary";

@@ -9,7 +9,6 @@ import {
 import {
   BasisNotice,
   Card,
-  PortfolioError,
   RealizedTable,
   RealizedViewTabs,
   TaxYearPanel,
@@ -144,12 +143,4 @@ export default function Realized({ loaderData }: Route.ComponentProps) {
   );
 }
 
-export function ErrorBoundary() {
-  return (
-    <>
-      <Card>
-        <PortfolioError onRetry={() => window.location.reload()} />
-      </Card>
-    </>
-  );
-}
+export { ErrorBoundary } from "~/components/ui/ErrorBoundary";

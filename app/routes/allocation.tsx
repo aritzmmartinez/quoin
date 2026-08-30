@@ -13,7 +13,6 @@ import {
   CurrencyPanel,
   ExposureBars,
   OverlapPanel,
-  PortfolioError,
   ReadingCard,
   RebalancePanel,
   ViewTabs,
@@ -295,12 +294,4 @@ function Line({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function ErrorBoundary() {
-  return (
-    <>
-      <Card>
-        <PortfolioError onRetry={() => window.location.reload()} />
-      </Card>
-    </>
-  );
-}
+export { ErrorBoundary } from "~/components/ui/ErrorBoundary";

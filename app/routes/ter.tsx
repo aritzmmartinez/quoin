@@ -5,7 +5,7 @@ import {
   PrismaLedgerRepository,
   PrismaPriceRepository,
 } from "~/adapters/persistence";
-import { Card, PortfolioError, StatTile } from "~/components";
+import { Card, StatTile } from "~/components";
 import { BASE_CURRENCY } from "~/core/domain";
 import {
   computeMarketValues,
@@ -261,10 +261,4 @@ export default function Ter({ loaderData }: Route.ComponentProps) {
   );
 }
 
-export function ErrorBoundary() {
-  return (
-    <Card>
-      <PortfolioError onRetry={() => window.location.reload()} />
-    </Card>
-  );
-}
+export { ErrorBoundary } from "~/components/ui/ErrorBoundary";
