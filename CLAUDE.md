@@ -532,7 +532,7 @@ manual aliasing was abandoned — 726 confirmations is not a system.
   vs `0,22`, a trailing zero, surrounding spaces), so the save silently never confirms. Do
   **not** "fix" that with a post-save `useEffect` that rewrites the field. This is the
   pattern to generalise the day a second inline-editable table exists — not before: as of
-  v0.5.1 `InstrumentsTable` is the only one, every other editable surface is create-only or
+  v0.5.2 `InstrumentsTable` is the only one, every other editable surface is create-only or
   URL-as-state and compares nothing.
 - **An instrument with no TER is excluded and named, never counted as 0%.** Same rule as
   `unpricedCount` and an `UNRESOLVED` leaf. In the weighted average it leaves the
@@ -677,6 +677,28 @@ never thinks about that form, which is exactly how submitting the rebalance spli
 throwing the user back to the exposure tab. No context, no state lifting, and the view stays
 shareable. A route opts into the header's range selector with `handle = { range: true }`;
 `handle.title` sets the header title.
+
+## Route modules
+
+- **`_shell.tsx` owns the only `<main>`, and the only page padding.** A route renders a
+  fragment, not a landmark. A second `<main>` is invalid HTML and breaks landmark
+  navigation in a screen reader, and repeating `px-4 py-8 md:px-6` inside it double-insets
+  that screen against every other one — both passed typecheck, lint and build for months
+  on `/instrumentos` and `/objetivo`. `root.tsx` keeps its own `<main>` and is **not** the
+  same bug: its `ErrorBoundary` replaces the whole subtree below root, so it never
+  coexists with the shell's.
+- **A route does not write its own `ErrorBoundary`.** It re-exports the shared one:
+  `export { ErrorBoundary } from "~/components/ui/ErrorBoundary";` — imported from the
+  file, not through the `~/components` barrel, so ten route modules do not each pull sixty
+  exports through their own chunk. Write a bespoke one only when it says something the
+  generic card cannot; `instrument.tsx` is the only case (it distinguishes a 404 and
+  offers the way back).
+- **The error arrives as a prop, never from `useRouteError()`.** `{ error }:
+  Route.ErrorBoundaryProps` is the Framework Mode signature; the hook is Data Mode's and
+  works here only by compatibility. The shared component cannot use that type at all —
+  `params` and `loaderData` are generated per route, so a component with no route has no
+  `Route` namespace to import. It takes **no props**: it renders nothing from the error,
+  and an unused `error: unknown` would be decoration.
 
 ## Tailwind v4 — a nonexistent class is silent
 
