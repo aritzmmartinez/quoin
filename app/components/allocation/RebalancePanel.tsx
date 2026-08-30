@@ -130,7 +130,7 @@ function Split({ plan }: { plan: RebalancePlan }) {
       </ul>
 
       <div
-        className={`grid ${GRID} items-baseline border-t border-border py-2.5 text-[13px]`}
+        className={`grid ${GRID} items-baseline border-t border-border py-row text-[13px]`}
       >
         <span className="text-muted">{copy.total}</span>
         <span className="text-right font-medium tabular-nums">
@@ -155,7 +155,7 @@ function Row({ row, peak }: { row: RebalanceRow; peak: number }) {
 
   return (
     <li
-      className={`grid ${GRID} items-baseline border-b border-border py-2.5 text-[13px] last:border-b-0`}
+      className={`grid ${GRID} items-baseline border-b border-border py-row text-[13px] last:border-b-0`}
     >
       <div className="min-w-0">
         <div className="truncate">{row.name}</div>

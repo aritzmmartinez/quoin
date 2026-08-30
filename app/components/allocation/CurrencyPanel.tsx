@@ -65,7 +65,7 @@ export function CurrencyPanel({
           {exposure.buckets.map((bucket) => (
             <div
               key={bucket.currency ?? "unresolved"}
-              className={`grid ${GRID} items-center gap-3.5 border-b border-border py-2.5 last:border-b-0`}
+              className={`grid ${GRID} items-center gap-3.5 border-b border-border py-row last:border-b-0`}
             >
               <div
                 className={`truncate text-[13px] font-medium ${bucket.currency === null ? "text-muted" : "tabular-nums"}`}
