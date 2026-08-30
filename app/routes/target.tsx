@@ -11,13 +11,7 @@ import {
   PrismaLedgerRepository,
   PrismaTargetRepository,
 } from "~/adapters/persistence";
-import {
-  Card,
-  PortfolioError,
-  TargetForm,
-  TargetLines,
-  TargetVersions,
-} from "~/components";
+import { Card, TargetForm, TargetLines, TargetVersions } from "~/components";
 import {
   findIdMismatches,
   getActiveTarget,
@@ -196,10 +190,4 @@ export default function Target({ loaderData }: Route.ComponentProps) {
   );
 }
 
-export function ErrorBoundary() {
-  return (
-    <Card>
-      <PortfolioError onRetry={() => window.location.reload()} />
-    </Card>
-  );
-}
+export { ErrorBoundary } from "~/components/ui/ErrorBoundary";

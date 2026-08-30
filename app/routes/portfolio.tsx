@@ -5,7 +5,6 @@ import type { Route } from "./+types/portfolio";
 import {
   Card,
   PortfolioEmpty,
-  PortfolioError,
   PortfolioTable,
   SignedMoney,
 } from "~/components";
@@ -121,12 +120,4 @@ export default function Portfolio({ loaderData }: Route.ComponentProps) {
   );
 }
 
-export function ErrorBoundary() {
-  return (
-    <>
-      <Card>
-        <PortfolioError onRetry={() => window.location.reload()} />
-      </Card>
-    </>
-  );
-}
+export { ErrorBoundary } from "~/components/ui/ErrorBoundary";

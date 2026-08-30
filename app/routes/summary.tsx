@@ -10,7 +10,6 @@ import {
   BasisNotice,
   Card,
   PortfolioEmpty,
-  PortfolioError,
   PortfolioValueChart,
   SummaryHero,
   SummaryReturns,
@@ -250,12 +249,4 @@ export default function Summary({ loaderData }: Route.ComponentProps) {
   );
 }
 
-export function ErrorBoundary() {
-  return (
-    <>
-      <Card>
-        <PortfolioError onRetry={() => window.location.reload()} />
-      </Card>
-    </>
-  );
-}
+export { ErrorBoundary } from "~/components/ui/ErrorBoundary";

@@ -1,6 +1,6 @@
 import type { Route } from "./+types/projection";
 
-import { Card, PortfolioError, ProjectionPanel } from "~/components";
+import { ProjectionPanel } from "~/components";
 import {
   computeProjection,
   projectionWindow,
@@ -138,10 +138,4 @@ export default function Projection({ loaderData }: Route.ComponentProps) {
   return <ProjectionPanel view={loaderData} />;
 }
 
-export function ErrorBoundary() {
-  return (
-    <Card>
-      <PortfolioError onRetry={() => window.location.reload()} />
-    </Card>
-  );
-}
+export { ErrorBoundary } from "~/components/ui/ErrorBoundary";
