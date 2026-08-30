@@ -1,4 +1,4 @@
-import { isRouteErrorResponse, Link, useRouteError } from "react-router";
+import { isRouteErrorResponse, Link } from "react-router";
 
 import type { Route } from "./+types/instrument";
 
@@ -171,8 +171,7 @@ export default function Instrument({ loaderData }: Route.ComponentProps) {
   );
 }
 
-export function ErrorBoundary() {
-  const error = useRouteError();
+export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   const notFound = isRouteErrorResponse(error) && error.status === 404;
   const copy = notFound
     ? es.instrument.notFound

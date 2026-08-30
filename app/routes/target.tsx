@@ -11,13 +11,7 @@ import {
   PrismaLedgerRepository,
   PrismaTargetRepository,
 } from "~/adapters/persistence";
-import {
-  Card,
-  PortfolioError,
-  TargetForm,
-  TargetLines,
-  TargetVersions,
-} from "~/components";
+import { Card, TargetForm, TargetLines, TargetVersions } from "~/components";
 import {
   findIdMismatches,
   getActiveTarget,
@@ -155,7 +149,7 @@ export default function Target({ loaderData }: Route.ComponentProps) {
   const copy = es.target;
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-8 md:px-6">
+    <>
       <header className="mb-4">
         <p className="text-[13px] text-muted">{copy.intro}</p>
         {active && (
@@ -192,16 +186,8 @@ export default function Target({ loaderData }: Route.ComponentProps) {
       <Card>
         <TargetVersions versions={versions} />
       </Card>
-    </main>
+    </>
   );
 }
 
-export function ErrorBoundary() {
-  return (
-    <main className="mx-auto max-w-4xl px-4 py-8 md:px-6">
-      <Card>
-        <PortfolioError onRetry={() => window.location.reload()} />
-      </Card>
-    </main>
-  );
-}
+export { ErrorBoundary } from "~/components/ui/ErrorBoundary";
