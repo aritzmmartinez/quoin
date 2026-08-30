@@ -19,7 +19,7 @@ export function OpportunityTable({
       <div className={MIN_WIDTH}>
         <div
           role="row"
-          className={`grid ${GRID} items-center gap-2 border-b border-border px-5 py-3 text-[11px] text-muted uppercase`}
+          className={`grid ${GRID} items-center gap-2 border-b border-border px-gutter py-row text-[11px] font-medium tracking-wide text-muted`}
         >
           <span>{t.instrument}</span>
           <span className="text-right">{t.contributed}</span>
@@ -32,7 +32,7 @@ export function OpportunityTable({
           {rows.map((row) => (
             <li
               key={row.instrumentId}
-              className={`grid ${GRID} items-center gap-2 border-b border-border px-5 py-3 text-[13px] tabular-nums last:border-b-0 hover:bg-surface-2`}
+              className={`grid ${GRID} items-center gap-2 border-b border-border px-gutter py-row text-[13px] tabular-nums last:border-b-0 hover:bg-surface-2`}
             >
               <Link
                 to={`/instrument/${encodeURIComponent(row.instrumentId)}`}

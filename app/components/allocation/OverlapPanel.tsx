@@ -10,6 +10,8 @@ import {
 } from "~/lib";
 
 import { Card } from "../ui/Card";
+import { Explainer } from "../ui/Explainer";
+import { SegmentedLinks } from "../ui/Segmented";
 import { OverlapList } from "./OverlapList";
 import { OverlapMatrix } from "./OverlapMatrix";
 
@@ -69,7 +71,7 @@ export function OverlapPanel({
         <OverlapList funds={funds} pairs={pairs} />
       )}
 
-      <p className="text-[11.5px] leading-normal text-muted">{copy.note}</p>
+      <Explainer tone="footnote">{copy.note}</Explainer>
     </div>
   );
 }
@@ -99,24 +101,14 @@ function ModeTabs({ value }: { value: OverlapMode }) {
   const copy = es.overlap.modes;
 
   return (
-    <nav
-      aria-label={copy.label}
-      className="inline-flex rounded-lg border border-border p-0.5"
-    >
-      {OVERLAP_MODES.map((mode) => (
-        <Link
-          key={mode}
-          to={modeHref(params, mode)}
-          aria-current={value === mode ? "page" : undefined}
-          className={`rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors ${
-            value === mode
-              ? "bg-surface-2 text-text"
-              : "text-muted hover:text-text"
-          }`}
-        >
-          {copy[mode]}
-        </Link>
-      ))}
-    </nav>
+    <SegmentedLinks
+      label={copy.label}
+      value={value}
+      segments={OVERLAP_MODES.map((mode) => ({
+        key: mode,
+        label: copy[mode],
+        href: modeHref(params, mode),
+      }))}
+    />
   );
 }

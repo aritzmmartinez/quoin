@@ -24,7 +24,7 @@ export function TaxSaleItem({ sale }: { sale: TaxSaleRow }) {
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-label={open ? copy.collapse : copy.expand}
-        className={`grid ${TAX_SALE_GRID} w-full items-center gap-2 px-5 py-3 text-left text-[13px] tabular-nums transition-colors hover:bg-surface-2 ${
+        className={`grid ${TAX_SALE_GRID} w-full items-center gap-2 px-gutter py-row text-left text-[13px] tabular-nums transition-colors hover:bg-surface-2 ${
           sale.disallowed ? "border-l-2 border-negative bg-negative/4" : ""
         }`}
       >
@@ -62,7 +62,7 @@ export function TaxSaleItem({ sale }: { sale: TaxSaleRow }) {
       </button>
 
       {open && (
-        <div className="border-t border-border bg-surface-2 px-5 py-3">
+        <div className="border-t border-border bg-surface-2 px-gutter py-3">
           <div className="mb-2 text-[11px] uppercase tracking-[0.08em] text-muted">
             {copy.lotsTitle}
           </div>

@@ -49,7 +49,7 @@ export function RealizedTable({
       <div className={REALIZED_MIN_WIDTH}>
         <div
           role="row"
-          className={`grid ${REALIZED_GRID} items-center gap-2 border-b border-border px-5 py-3`}
+          className={`grid ${REALIZED_GRID} items-center gap-2 border-b border-border px-gutter py-row`}
         >
           {REALIZED_COLUMNS.map((col) => (
             <SortableHeader
@@ -101,7 +101,7 @@ function TotalsBand({
 }) {
   return (
     <div
-      className={`grid ${REALIZED_GRID} items-center gap-2 border-b border-border px-5 py-2 text-[12.5px] tabular-nums ${className}`}
+      className={`grid ${REALIZED_GRID} items-center gap-2 border-b border-border px-gutter py-row text-[12.5px] tabular-nums ${className}`}
     >
       <span className="font-semibold text-text">{label}</span>
       <span className="truncate">{es.realized.sales(totals.count)}</span>
@@ -126,7 +126,7 @@ function RealizedRowItem({ row }: { row: RealizedRow }) {
     <li className="border-b border-border last:border-b-0">
       <Link
         to={`/instrument/${encodeURIComponent(row.instrumentId)}`}
-        className={`grid ${REALIZED_GRID} items-center gap-2 px-5 py-3 text-[13px] tabular-nums transition-colors hover:bg-surface-2`}
+        className={`grid ${REALIZED_GRID} items-center gap-2 px-gutter py-row text-[13px] tabular-nums transition-colors hover:bg-surface-2`}
       >
         <span className="text-muted">{formatDate(row.t)}</span>
 

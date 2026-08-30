@@ -38,7 +38,7 @@ export function MovementsTable({
 
   if (rows.length === 0) {
     return (
-      <p className="px-5 pb-6 pt-2 text-[13px] text-muted">{copy.empty}</p>
+      <p className="px-gutter pb-6 pt-2 text-[13px] text-muted">{copy.empty}</p>
     );
   }
 
@@ -48,7 +48,7 @@ export function MovementsTable({
         <div className={movementsMinWidth(showInstrument)}>
           <div
             role="row"
-            className={`grid ${grid} gap-2 border-b border-border px-5 py-2 text-[11px] font-medium tracking-wide text-muted`}
+            className={`grid ${grid} gap-2 border-b border-border px-gutter py-row text-[11px] font-medium tracking-wide text-muted`}
           >
             {columns.map((col) => (
               <span
@@ -64,7 +64,7 @@ export function MovementsTable({
             {rows.map((row) => (
               <li
                 key={row.id}
-                className={`grid ${grid} gap-2 border-b border-border px-5 py-2.5 text-[13px] tabular-nums last:border-b-0`}
+                className={`grid ${grid} gap-2 border-b border-border px-gutter py-row text-[13px] tabular-nums last:border-b-0`}
               >
                 {columns.map((col) => (
                   <span

@@ -1,4 +1,4 @@
-import { isRouteErrorResponse, Link, useRouteError } from "react-router";
+import { isRouteErrorResponse, Link } from "react-router";
 
 import type { Route } from "./+types/instrument";
 
@@ -25,7 +25,6 @@ import {
   computeReturns,
 } from "~/core/projections";
 import { es, paginate, parsePage, toMovementRows } from "~/lib";
-
 
 export function meta(_: Route.MetaArgs) {
   return [{ title: "Detalle de activo · Quoin" }];
@@ -144,8 +143,14 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 }
 
 export default function Instrument({ loaderData }: Route.ComponentProps) {
-  const { instrument, kpis, priceChartData, ivvData, movements, movementsPage } =
-    loaderData;
+  const {
+    instrument,
+    kpis,
+    priceChartData,
+    ivvData,
+    movements,
+    movementsPage,
+  } = loaderData;
   return (
     <>
       <InstrumentHeader instrument={instrument} />
@@ -153,7 +158,7 @@ export default function Instrument({ loaderData }: Route.ComponentProps) {
       <PriceChartWithTrades data={priceChartData} />
       <InvestedVsValue data={ivvData} />
       <Card className="overflow-hidden">
-        <div className="px-5 pb-3 pt-4 text-[14px] font-semibold">
+        <div className="px-gutter pb-3 pt-4 text-[14px] font-semibold">
           {es.instrument.movements.title}
         </div>
         <MovementsTable
@@ -166,8 +171,7 @@ export default function Instrument({ loaderData }: Route.ComponentProps) {
   );
 }
 
-export function ErrorBoundary() {
-  const error = useRouteError();
+export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   const notFound = isRouteErrorResponse(error) && error.status === 404;
   const copy = notFound
     ? es.instrument.notFound

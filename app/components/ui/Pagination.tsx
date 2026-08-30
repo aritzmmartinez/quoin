@@ -12,7 +12,7 @@ export function Pagination({ info }: { info: PageInfo }) {
   return (
     <nav
       aria-label={copy.label}
-      className="flex items-center justify-between gap-3 border-t border-border px-5 py-3"
+      className="flex items-center justify-between gap-3 border-t border-border px-gutter py-3"
     >
       <span className="text-[12px] tabular-nums text-muted">
         {copy.range(info.from, info.to, info.total)}

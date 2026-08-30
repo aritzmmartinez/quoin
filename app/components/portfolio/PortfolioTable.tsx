@@ -39,7 +39,7 @@ export function PortfolioTable({
       <div className={TABLE_MIN_WIDTH}>
         <div
           role="row"
-          className={`grid ${GRID_TEMPLATE} items-center gap-2 border-b border-border px-5 py-3`}
+          className={`grid ${GRID_TEMPLATE} items-center gap-2 border-b border-border px-gutter py-row`}
         >
           <span />
           {COLUMNS.map((col) => (

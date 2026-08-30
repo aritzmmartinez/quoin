@@ -64,7 +64,7 @@ export function HoldingsUpload({
   }
 
   return (
-    <div className="border-t border-border bg-surface px-5 py-4">
+    <div className="border-t border-border bg-surface px-gutter py-4">
       {preview === null ? (
         <div
           onDragOver={(e) => {

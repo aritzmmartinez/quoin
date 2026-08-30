@@ -2,6 +2,8 @@ import { useRevalidator, useRouteLoaderData } from "react-router";
 
 import { BASIS_COOKIE, BASIS_KEYS, es, type Basis } from "~/lib";
 
+import { SegmentedButtons } from "./Segmented";
+
 const ONE_YEAR = 60 * 60 * 24 * 365;
 
 const LABELS: Record<Basis, string> = {
@@ -28,27 +30,15 @@ export function BasisToggle() {
   }
 
   return (
-    <div
-      role="group"
-      aria-label={es.basis.label}
-      className="inline-flex rounded-lg border border-border p-0.5"
-    >
-      {BASIS_KEYS.map((key) => (
-        <button
-          key={key}
-          type="button"
-          onClick={() => select(key)}
-          aria-pressed={value === key}
-          title={HINTS[key]}
-          className={`rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors ${
-            value === key
-              ? "bg-surface-2 text-text"
-              : "text-muted hover:text-text"
-          }`}
-        >
-          {LABELS[key]}
-        </button>
-      ))}
-    </div>
+    <SegmentedButtons
+      label={es.basis.label}
+      value={value}
+      onSelect={select}
+      segments={BASIS_KEYS.map((key) => ({
+        key,
+        label: LABELS[key],
+        hint: HINTS[key],
+      }))}
+    />
   );
 }
