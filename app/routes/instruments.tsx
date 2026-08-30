@@ -155,7 +155,7 @@ export default function Instruments({ loaderData }: Route.ComponentProps) {
   const { items, unmapped } = loaderData;
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 md:px-6">
+    <>
       <header className="mb-4">
         <p className="text-[13px] text-muted">{es.instruments.intro}</p>
         {unmapped > 0 && (
@@ -168,16 +168,14 @@ export default function Instruments({ loaderData }: Route.ComponentProps) {
       <Card className="overflow-hidden">
         <InstrumentsTable items={items} />
       </Card>
-    </main>
+    </>
   );
 }
 
 export function ErrorBoundary() {
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 md:px-6">
-      <Card>
-        <PortfolioError onRetry={() => window.location.reload()} />
-      </Card>
-    </main>
+    <Card>
+      <PortfolioError onRetry={() => window.location.reload()} />
+    </Card>
   );
 }
