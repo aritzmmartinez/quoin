@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Two spacing tokens in the Tailwind theme, px-gutter (20px) and py-row (10px), for the only two spacing roles every data table repeats: the horizontal inset of a band, row or panel inside a card, and the vertical padding of a table row and its header. A header and its rows disagreeing on either is a misalignment bug that passes typecheck, lint and build, so those two get a name and everything else stays on Tailwind's own scale, restricted to whole steps. 10px rows over 12px is a decision, not a rounding: these tables are read daily on desktop with dozens of rows on screen, and the right-aligned numeric columns are what carry scannability.
+
+- ui/Segmented: the rail-and-pill segmented control, as SegmentedLinks (URL-driven, aria-current) and SegmentedButtons (caller-driven, aria-pressed). Its markup and classes had been copied verbatim five times — the allocation and realized view tabs were the same file but for three identifiers. Kept as two components rather than one with a discriminant because links and buttons genuinely differ in semantics; only the appearance was ever shared. The "include sold funds" toggle stays a link and the "hedged"/"more detail" checkboxes stay form fields for the same reason: form state and URL state are different mechanics that happen to look alike.
+- ui/Explainer: the intro, caveat and footnote prose around the tables, in one component. The boxed caveat alone existed in four copies whose margins had already drifted.
+
+### Fixed
+- Explanatory text was capped at a fixed max-w-3xl (768px) unrelated to the page it sat on — wider than the table on /coste-ter and /coste-oportunidad, narrower than it on /realizado. Every block now sizes itself to its text at a readable measure (70ch), with no tone stretched to fill its container: a bordered caveat held at full width with its text ending halfway across reads as a layout bug, not as a banner. 768px of 12px text is over 120 characters a line.
+- Movements table on an instrument's page (/instrument/:id): the whole table was pushed against the left edge of its card with more than half the width left blank. Filtering out the instrument column left the narrow grid with every track a fixed px and no flexible one, so the leftover width was never allocated. `type` now absorbs it, the way `instrument` does on /movimientos. Its declared min-width was stale too (620px against a real 688px). Covered by a test that pins one track per rendered column and exactly one flexible track, in both variants.
+- Foral tax sales table (/realizado?vista=fiscal): the column headers sat 20px to the left of the row values they labelled, because the rows carried their own horizontal padding inside a card that already had its own and the header carried none. The card now follows the same shape as every other table in the app — a padded header band, then the table edge to edge — instead of holding the table inside a padded box. That also lets a disallowed sale's red left border and the row hover reach the card edge, as a flagged row should.
+- Table row padding, header padding and column gaps were three different values each across the nine tables (py-2/py-2.5/py-3, gap-2/gap-3). All nine now agree.
+- Opportunity-cost table header was the only one in small caps; it now matches the other eight.
+- /coste-ter had its grid template written out twice, once for the header and once for the rows — the shape that produces the misalignments above. Extracted to a single constant.
+
 ## [0.5.1] - 2026-08-28
 
 ### Added

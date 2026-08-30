@@ -5,7 +5,7 @@ import {
   PrismaLedgerRepository,
   PrismaPriceRepository,
 } from "~/adapters/persistence";
-import { Card, PortfolioError, StatTile } from "~/components";
+import { Card, Explainer, PortfolioError, StatTile } from "~/components";
 import { BASE_CURRENCY } from "~/core/domain";
 import {
   computeMarketValues,
@@ -104,13 +104,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   return { ...located, projected: result.terCost };
 }
 
-function Notice({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="mt-2 max-w-3xl rounded-card border border-border bg-surface-2 px-3 py-2 text-[12px] text-muted">
-      {children}
-    </p>
-  );
-}
+const GRID = "grid-cols-[minmax(0,2fr)_120px_100px_140px]";
 
 export default function Ter({ loaderData }: Route.ComponentProps) {
   const t = es.ter;
@@ -142,7 +136,7 @@ export default function Ter({ loaderData }: Route.ComponentProps) {
   return (
     <>
       <header className="mb-4">
-        <p className="max-w-3xl text-[12px] text-muted">{t.intro}</p>
+        <Explainer>{t.intro}</Explainer>
       </header>
 
       <div
@@ -167,10 +161,14 @@ export default function Ter({ loaderData }: Route.ComponentProps) {
           formatMoney(weighted.totalValue),
         )}
       </p>
-      {unknown.length > 0 && <Notice>{t.unknown(unknown.join(", "))}</Notice>}
+      {unknown.length > 0 && (
+        <Explainer tone="notice" className="mt-2">
+          {t.unknown(unknown.join(", "))}
+        </Explainer>
+      )}
 
       <Card className="mt-4">
-        <div className="border-b border-border px-5 py-3">
+        <div className="border-b border-border px-gutter py-3">
           <h2 className="text-[14px] font-semibold">
             {t.projected.title(horizonYears)}
           </h2>
@@ -179,7 +177,7 @@ export default function Ter({ loaderData }: Route.ComponentProps) {
           </p>
         </div>
 
-        <div className="px-5 py-4">
+        <div className="px-gutter py-4">
           {projected === null ? (
             <p className="text-[12px] text-muted">
               {unavailable === "thin-window"
@@ -215,17 +213,19 @@ export default function Ter({ loaderData }: Route.ComponentProps) {
         </div>
       </Card>
 
-      <p className="mt-2 max-w-3xl text-[11px] leading-relaxed text-muted">
+      <Explainer tone="footnote" className="mt-2">
         {t.projected.note}
-      </p>
+      </Explainer>
 
       <Card className="mt-4">
-        <div className="border-b border-border px-5 py-3">
+        <div className="border-b border-border px-gutter py-3">
           <h2 className="text-[14px] font-semibold">{t.table.title}</h2>
         </div>
         <div className="overflow-x-auto">
           <div className="min-w-140">
-            <div className="grid grid-cols-[minmax(0,2fr)_120px_100px_140px] gap-3 border-b border-border px-5 py-2 text-[11px] font-medium tracking-wide text-muted">
+            <div
+              className={`grid ${GRID} gap-2 border-b border-border px-gutter py-row text-[11px] font-medium tracking-wide text-muted`}
+            >
               <span>{t.table.instrument}</span>
               <span className="text-right">{t.table.value}</span>
               <span className="text-right">{t.table.ter}</span>
@@ -235,7 +235,7 @@ export default function Ter({ loaderData }: Route.ComponentProps) {
               {rows.map((row) => (
                 <li
                   key={row.instrumentId}
-                  className="grid grid-cols-[minmax(0,2fr)_120px_100px_140px] gap-3 border-b border-border px-5 py-2.5 text-[13px] last:border-b-0"
+                  className={`grid ${GRID} gap-2 border-b border-border px-gutter py-row text-[13px] last:border-b-0`}
                 >
                   <span className="truncate">{row.name}</span>
                   <span className="text-right tabular-nums">

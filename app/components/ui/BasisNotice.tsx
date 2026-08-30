@@ -1,5 +1,7 @@
 import { es, formatPeriod } from "~/lib";
 
+import { Explainer } from "./Explainer";
+
 export interface BasisNoticeProps {
   basis: "nominal" | "real";
   active: boolean;
@@ -22,8 +24,8 @@ export function BasisNotice({
       : `${es.basis.perFlow} ${es.basis.lag}`;
 
   return (
-    <p className="mb-4 max-w-3xl rounded-card border border-border bg-surface-2 px-3 py-2 text-[12px] text-muted">
+    <Explainer tone="notice" className="mb-4">
       {body}
-    </p>
+    </Explainer>
   );
 }
