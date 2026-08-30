@@ -80,7 +80,7 @@ function Row({
   return (
     <div className="border-b border-border last:border-b-0">
       <div
-        className={`grid ${GRID} items-center gap-3.5 py-2.5 ${expandable ? "cursor-pointer" : ""}`}
+        className={`grid ${GRID} items-center gap-3.5 py-row ${expandable ? "cursor-pointer" : ""}`}
         onClick={expandable ? () => setOpen((v) => !v) : undefined}
       >
         <div className="flex min-w-0 items-center gap-1">

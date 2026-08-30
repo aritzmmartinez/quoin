@@ -177,7 +177,7 @@ export default function Target({ loaderData }: Route.ComponentProps) {
             note={active.note}
           />
         ) : (
-          <p className="px-5 py-10 text-center text-[13px] text-muted">
+          <p className="px-gutter py-10 text-center text-[13px] text-muted">
             {copy.none}
           </p>
         )}
