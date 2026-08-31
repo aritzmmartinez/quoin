@@ -1,4 +1,4 @@
-import type { InstrumentType, Sleeve } from "~/core/domain";
+import type { ExposureKind, InstrumentType, Sleeve } from "~/core/domain";
 
 /**
  * Single source of truth for user-facing copy (Spanish only, for now).
@@ -790,6 +790,18 @@ export function sleeveLabel(sleeve: Sleeve): string {
 
 export function instrumentTypeLabel(type: InstrumentType): string {
   return TYPE_LABELS[type];
+}
+
+const EXPOSURE_KIND_LABELS: Record<ExposureKind, string> = {
+  COMPANY: "Acción",
+  EQUITY_FUND: "Fondo de renta variable",
+  BOND_FUND: "Fondo de bonos",
+  COMMODITY: "Materias primas",
+  CRYPTO: "Cripto",
+};
+
+export function exposureKindLabel(kind: string): string {
+  return EXPOSURE_KIND_LABELS[kind as ExposureKind] ?? "Sin clasificar";
 }
 
 export const DASH = "—";

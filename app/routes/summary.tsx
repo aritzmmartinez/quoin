@@ -32,17 +32,13 @@ import {
 import {
   computeHeroChange,
   es,
+  exposureKindLabel,
   filterByRange,
   heldValuesByInstrument,
-  instrumentTypeLabel,
   parseRange,
 } from "~/lib";
 
-import {
-  BASE_CURRENCY,
-  type InstrumentType,
-  type Revalue,
-} from "~/core/domain";
+import { BASE_CURRENCY, type Revalue } from "~/core/domain";
 import { loadOpportunityCost } from "~/lib/opportunity-cost.server";
 import { resolveRealView } from "~/lib/real.server";
 
@@ -73,7 +69,11 @@ export async function loader({ request }: Route.LoaderArgs) {
   const summary = computePortfolioSummary(positions, marketValues);
 
   const instrumentsById = new Map(instruments.map((i) => [i.id, i]));
-  const categories = new Map(instruments.map((i) => [i.id, i.type]));
+  const categories = new Map(
+    instruments.flatMap((i) =>
+      i.exposureKind ? [[i.id, i.exposureKind] as const] : [],
+    ),
+  );
 
   const allocation: AllocationRow[] = computeAllocation(
     positions,
@@ -81,7 +81,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     categories,
   ).map((slice) => ({
     ...slice,
-    label: instrumentTypeLabel(slice.category as InstrumentType),
+    label: exposureKindLabel(slice.category),
   }));
 
   const top: TopPositionRow[] = computeTopPositions(
