@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Resumen donut now classifies by exposureKind instead of Instrument.type. Trade Republic maps both FUND and SYNTHETIC to "ETF", so a physical-gold ETC was drawn as an index fund. Categories are now Acción, Fondo de renta variable, Fondo de bonos, Materias primas and Cripto. An instrument with no exposureKind set is reported as "Sin clasificar" instead of inheriting the broker's type, so the size of that slice is how much is still unmapped.
+
+### Fixed
+- Resumen allocation card: donut and legend are vertically centred in the card, which the grid stretches to match the taller Top posiciones beside it.
+
 ## [0.5.2] - 2026-08-31
 
 ### Added
