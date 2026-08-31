@@ -34,7 +34,7 @@ export function meta(_: Route.MetaArgs) {
   ];
 }
 
-export const handle = { title: es.opportunity.title };
+export const handle = { title: es.opportunity.title, parent: "/" };
 
 export async function loader(_: Route.LoaderArgs) {
   const [events, instruments, prices] = await Promise.all([
