@@ -35,7 +35,7 @@ export function meta(_: Route.MetaArgs) {
   ];
 }
 
-export const handle = { title: es.ter.title };
+export const handle = { title: es.ter.title, parent: "/" };
 
 type Unavailable = "no-target" | "no-history" | "no-window" | "thin-window";
 

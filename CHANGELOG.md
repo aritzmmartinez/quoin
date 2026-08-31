@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Back link on every subpage (/realizado, /coste-oportunidad, /coste-ter, /instrument/:id).
+
+### Changed
+- The sidebar keeps the parent section highlighted while on one of its subpages.
+- The instrument page's two hand-rolled back links folded into the shared one.
+
 ## [0.5.2] - 2026-08-31
 
 ### Added

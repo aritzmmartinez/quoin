@@ -731,7 +731,6 @@ export const es = {
     link: "Ver coste del TER",
   },
   instrument: {
-    back: "Cartera",
     viewFallback: "Activo",
     units: (n: string): string => `${n} uds`,
     value: "Valor",
