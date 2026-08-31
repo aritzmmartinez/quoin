@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Expanding a leaf named the company on every line instead of the fund it came through, which fund holds this. Each contribution is now named after its container, the leaf itself still takes the direct position's name.
+- The expander was unreachable without a mouse.
+
 ## [0.5.2] - 2026-08-31
 
 ### Added

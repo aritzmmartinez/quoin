@@ -77,11 +77,14 @@ export const es = {
         label: "Total aportado",
         sub: "Coste de las posiciones abiertas",
       },
-      unrealized: { label: "P&L latente", sub: "Valor menos aportado" },
-      realized: { label: "P&L realizado", sub: "Beneficio de ventas cerradas" },
+      unrealized: { label: "Resultado latente", sub: "Valor menos aportado" },
+      realized: {
+        label: "Resultado realizado",
+        sub: "Resultado de las ventas cerradas",
+      },
       positions: { label: "Posiciones", sub: "Abiertas y valoradas" },
       opportunity: {
-        label: "vs índice",
+        label: "Frente al índice",
         sub: (symbol: string): string => `Frente a ${symbol}`,
       },
       ter: {
@@ -93,7 +96,7 @@ export const es = {
       twr: { label: "TWR", sub: "ponderada por tiempo" },
       mwr: { label: "MWR / TIR", sub: "ponderada por dinero" },
       unavailable: "sin solución",
-      note: "El TWR mide cómo lo han hecho los activos; el MWR (TIR) mide cómo lo ha hecho tu dinero. Aportando poco a poco divergen a propósito: la mayor parte del capital lleva menos tiempo invertido, así que una subida antigua pesa entera en el TWR y casi nada en el MWR.",
+      note: "El TWR mide cómo lo han hecho los activos y el MWR (TIR) mide cómo lo ha hecho tu dinero. Aportando poco a poco divergen a propósito: la mayor parte del capital lleva menos tiempo invertido, así que una subida antigua pesa entera en el TWR y casi nada en el MWR.",
       nominal:
         "Ambas se calculan siempre en euros nominales, aunque el resto de la pantalla esté en poder adquisitivo de hoy.",
     },
@@ -103,7 +106,7 @@ export const es = {
       empty: "Sin datos de asignación.",
     },
     top: {
-      title: "Top posiciones",
+      title: "Mayores posiciones",
       link: "Ver cartera",
       empty: "Sin posiciones valoradas.",
     },
@@ -117,7 +120,7 @@ export const es = {
       solapamiento: "Solapamiento",
     },
     intro:
-      "Posición directa + peso dentro de tus ETFs (look-through). El tramo sólido de la barra es lo que compraste tú; el apagado viaja dentro de un fondo.",
+      "Tu posición directa más lo que llevas dentro de tus ETFs, mirando por transparencia lo que hay en cada fondo. El tramo sólido de la barra es lo que compraste tú. El apagado viaja dentro de un fondo.",
     title: "Exposición real por valor",
     thresholdMark: (weight: string): string => `\u250a umbral ${weight}`,
     stats: {
@@ -147,13 +150,13 @@ export const es = {
       lead: "Tu mayor concentración es ",
       isA: ": un ",
       breakdown: (direct: string, via: string): string =>
-        ` de la cartera \u2014 ${direct} en posición directa y ${via} a través de tus ETFs.`,
+        ` de la cartera: ${direct} en posición directa y ${via} a través de tus ETFs.`,
       allDirect: " de la cartera, toda en posición directa.",
       allVia: " de la cartera, toda a través de tus ETFs.",
       over: (threshold: string): string => `Supera tu umbral del ${threshold}.`,
       viaNote:
         "La parte que va dentro de un fondo indexado no se puede recortar sin salirte del índice.",
-      top3: "Top 3 exposiciones",
+      top3: "Tres mayores exposiciones",
       analysed: "Valores analizados",
       threshold: "Umbral configurado",
       empty: "Todavía no hay exposición resuelta que leer.",
@@ -162,7 +165,7 @@ export const es = {
   currency: {
     title: "Exposición por divisa",
     intro:
-      "Comprar NVIDIA en Xetra pagando euros no te da exposición al euro: eso es el precio de Nueva York en dólares, convertido al instante. Lo que cuenta es la divisa del listing principal de cada valor, el tuyo directo y el que viaja dentro de tus fondos.",
+      "Comprar NVIDIA en Xetra pagando euros no te da exposición al euro: eso es el precio de Nueva York en dólares, convertido al instante. Lo que cuenta es la divisa del mercado principal de cada valor, tanto el que tienes directo como el que viaja dentro de tus fondos.",
     stats: {
       base: "En euros",
       foreign: "Fuera del euro",
@@ -194,10 +197,10 @@ export const es = {
     header: (funds: number, pairs: number): string =>
       `${funds} fondos · ${pairs} ${pairs === 1 ? "par" : "pares"}`,
     empty:
-      "Hacen falta al menos dos fondos con composición importada y posición abierta. Arrastra el CSV de holdings sobre la fila del fondo en Instrumentos; un fondo sin composición queda fuera del cálculo, no cuenta como 0%.",
+      "Hacen falta al menos dos fondos con composición importada y posición abierta. Arrastra el CSV de posiciones sobre la fila del fondo en Instrumentos. Un fondo sin composición queda fuera del cálculo, no cuenta como 0 %.",
     includeSold: "Incluir fondos vendidos",
     includeSoldHint:
-      "Fondos con composición importada pero sin posición abierta hoy — útil para ver cuánto se solaparía algo que vendiste antes de recomprarlo.",
+      "Fondos con composición importada pero sin posición abierta hoy. Sirve para ver cuánto se solaparía algo que vendiste antes de recomprarlo.",
     shared: (count: number): string =>
       count === 1 ? "1 empresa en común" : `${count} empresas en común`,
     none: "Ninguna empresa en común: diversificación real entre estos dos.",
@@ -205,12 +208,12 @@ export const es = {
     contributorPair: (a: string, b: string): string => `${a} · ${b}`,
     matrixHeader: "Cada celda es el solapamiento de la fila con la columna.",
     matrixLegend:
-      "Las columnas van numeradas en el mismo orden que las filas. La diagonal se omite: un fondo consigo mismo es siempre 100%.",
+      "Las columnas van numeradas en el mismo orden que las filas. La diagonal se omite: un fondo consigo mismo es siempre 100 %.",
   },
   rebalance: {
     title: "Rebalanceo por aportación",
     intro:
-      "Dónde poner la próxima aportación para acercarte al objetivo sin vender nada. Vender realiza ganancia y tributa; aportar no, así que el reparto solo mueve dinero nuevo hacia lo que va por debajo de su peso.",
+      "Dónde poner la próxima aportación para acercarte al objetivo sin vender nada. Vender realiza ganancia y tributa, aportar no, así que el reparto solo mueve dinero nuevo hacia lo que va por debajo de su peso.",
     amount: "Próxima aportación",
     amountPlaceholder: "500",
     threshold: "Umbral de desvío (%)",
@@ -238,9 +241,9 @@ export const es = {
       "El desvío es lo que se separa cada línea de su peso objetivo, y el total es la suma de todas. El umbral es informativo: el reparto siempre rellena lo que va por debajo.",
     worsening: "Se aleja del objetivo aun recibiendo aportación",
     worseningHint:
-      "Esta línea recibe aportación y aun así se aleja de su objetivo, porque otra posición del plan está sobreponderada y no se vende: el hueco que ocupa de más no se puede rellenar con dinero nuevo, solo diluir. Aportaciones mayores lo corrigen; venderla tributaría.",
+      "Esta línea recibe aportación y aun así se aleja de su objetivo, porque otra posición del plan está sobreponderada y no se vende: el hueco que ocupa de más no se puede rellenar con dinero nuevo, solo diluir. Aportaciones mayores lo corrigen, y venderla tributaría.",
     unpriced: (names: string): string =>
-      `Sin precio utilizable, así que quedan fuera del reparto: ${names}. Un precio que falta no es un valor de cero — ejecuta pnpm prices:sync antes de fiarte del reparto.`,
+      `Sin precio utilizable, así que quedan fuera del reparto: ${names}. Un precio que falta no es un valor de cero. Ejecuta pnpm prices:sync antes de fiarte del reparto.`,
     offPlan: (count: number): string =>
       count === 1
         ? "1 posición en cartera, fuera del plan"
@@ -257,7 +260,7 @@ export const es = {
     unreadable: "No se ha podido leer el fichero.",
     saveFailed: "El fichero se ha leído bien, pero ha fallado al guardar.",
     qualifier: (column: string): string =>
-      `Un mismo ticker puede ser dos empresas en plazas distintas, así que se distinguen por «${column}».`,
+      `Un mismo código de cotización puede ser dos empresas en plazas distintas, así que se distinguen por «${column}».`,
     leaves: "posiciones detectadas",
     covered: "Cubierto",
     residual: "Residuo",
@@ -267,7 +270,7 @@ export const es = {
         ? "1 fila sin identidad va al residuo"
         : `${count} filas sin identidad van al residuo`,
     negativeResidual:
-      "El residuo es negativo porque el fondo lleva caja negativa: sus posiciones suman más del 100%. No es un error.",
+      "El residuo es negativo porque el fondo lleva caja negativa: sus posiciones suman más del 100 %. No es un error.",
     columns: {
       identity: "Identidad",
       name: "Nombre",
@@ -295,7 +298,7 @@ export const es = {
   instruments: {
     title: "Instrumentos",
     intro:
-      "Tu bróker no dice qué es realmente cada fondo: Trade Republic etiqueta como FUND tanto un ETF de renta variable como un ETC de oro físico. Las acciones y la cripto se resuelven solas por su tipo; los ETC y los fondos de bonos los clasificas aquí, una vez. Esta clasificación vive solo en tu base de datos local y la ingesta nunca la pisa.",
+      "Tu bróker no dice qué es realmente cada fondo: Trade Republic etiqueta como FUND tanto un ETF de renta variable como un ETC de oro físico. Las acciones y la cripto se resuelven solas por su tipo. Los ETC y los fondos de bonos los clasificas aquí, una sola vez. Esta clasificación vive solo en tu base de datos local y la ingesta nunca la pisa.",
     unmappedHint: (count: number): string =>
       count === 1
         ? "1 instrumento sigue con el valor por defecto y queda sin desglosar."
@@ -304,7 +307,7 @@ export const es = {
       instrument: "Instrumento",
       exposure: "Exposición",
       leaf: "Hoja",
-      resolvesTo: "Resuelve a",
+      resolvesTo: "Se resuelve como",
       composition: "Composición",
       ter: "TER %",
       hedged: "Divisa",
@@ -316,7 +319,7 @@ export const es = {
     leafRequired: "Esta clase necesita una hoja (p. ej. XAU).",
     terPlaceholder: "0,22",
     terInvalid:
-      "El TER va en porcentaje anual, entre 0 y 5. Un 0,22% se escribe 0,22.",
+      "El TER va en porcentaje anual, entre 0 y 5. Un 0,22 % se escribe 0,22.",
     invalid: "Datos no válidos.",
     save: "Guardar",
     saving: "…",
@@ -327,7 +330,7 @@ export const es = {
   target: {
     title: "Objetivo",
     intro:
-      "Tu plan de aportación mensual. Los importes son el dato; el peso se deriva de ellos. Un objetivo no se edita: cuando el plan cambia, guardas una versión nueva con su fecha de vigencia, para que siga sabiéndose qué objetivo estaba vigente en cada fecha.",
+      "Tu plan de aportación mensual. Los importes son el dato y el peso se deriva de ellos. Un objetivo no se edita: cuando el plan cambia, guardas una versión nueva con su fecha de vigencia, para que siga sabiéndose qué objetivo estaba vigente en cada fecha.",
     none: "Aún no hay ningún objetivo guardado. Crea la primera versión abajo o usa pnpm target:set.",
     activeFrom: (date: string): string => `Vigente desde el ${date}`,
     columns: {
@@ -337,7 +340,7 @@ export const es = {
     },
     total: "Total mensual",
     notHeld: "Sin posición todavía",
-    notImported: "Sin importar todavía",
+    notImported: "Aún sin importar",
     history: {
       title: "Versiones",
       active: "Vigente",
@@ -369,10 +372,10 @@ export const es = {
   projection: {
     title: "Proyección",
     intro:
-      "Si sigues aportando según tu plan vigente, dónde podría acabar la cartera. No es una previsión: es un remuestreo de los meses que tus propios instrumentos ya han vivido. Por eso responde con un rango y no con una cifra — una única línea fingiría conocer el futuro.",
+      "Si sigues aportando según tu plan vigente, dónde podría acabar la cartera. No es una previsión: es un remuestreo de los meses que tus propios instrumentos ya han vivido. Por eso responde con un rango y no con una cifra: una única línea fingiría conocer el futuro.",
     noTarget:
       "No hay ningún objetivo vigente que proyectar. Define tu plan de aportación en Objetivo y vuelve aquí.",
-    fromTarget: "simula tu plan actual →",
+    fromTarget: "Simula tu plan actual",
     noHistory:
       "Ninguna línea de tu plan tiene histórico de precios, así que no hay nada que remuestrear. Mapea sus símbolos con pnpm prices:map y descarga el histórico con pnpm prices:backfill.",
     noWindow:
@@ -429,22 +432,22 @@ export const es = {
       simulations: (count: number, seed: number): string =>
         `${count} simulaciones, semilla ${seed}: los mismos datos dan siempre el mismo resultado.`,
       tailNoise: (simulations: number, months: number): string =>
-        `De las tres cifras, la del escenario bueno es la menos firme: cambiando solo la semilla se mueve unas cuatro veces más que las otras dos. No es la ventana quien la limita — las tres se estrechan al mismo ritmo al subir las simulaciones —, es que una cola se estima con muchos menos caminos que la mediana. Se arregla con más simulaciones, solo que hace falta más de un orden de magnitud sobre las ${simulations} de aquí, y eso encarecería cada respuesta a un objetivo. Sería reproducibilidad, no acierto: lo que limitan ${months} meses de muestra es la exactitud de las tres cifras a la vez, no la firmeza de esta.`,
+        `De las tres cifras, la del escenario bueno es la menos firme: cambiando solo la semilla se mueve unas cuatro veces más que las otras dos. No es la ventana quien la limita, porque las tres se estrechan al mismo ritmo al subir las simulaciones. Lo que pasa es que una cola se estima con muchos menos caminos que la mediana. Se arregla con más simulaciones, solo que hace falta más de un orden de magnitud sobre las ${simulations} de aquí, y eso encarecería cada respuesta a un objetivo. Sería reproducibilidad, no acierto: lo que limitan ${months} meses de muestra es la exactitud de las tres cifras a la vez, no la firmeza de esta.`,
       inflation: (annual: string): string =>
         `El importe en euros de hoy descuenta un ${annual} anual, la media histórica del IPC. No hay IPC futuro, así que se asume que la inflación también se parece a su pasado.`,
       fixedWeights:
         "Los pesos del plan se mantienen fijos durante todo el horizonte y las aportaciones entran a principio de mes.",
       twoPots: (offPlan: string): string =>
-        `La parte de fuera del plan que llega a la ventana (${offPlan}) se simula aparte, con sus propios rendimientos y sin recibir aportaciones — prestarle la varianza del plan a otra cosa sería inventarse su riesgo. Ambos botes avanzan sobre el mismo mes sorteado, así que un mal mes lo es para toda la cartera a la vez.`,
+        `La parte de fuera del plan que llega a la ventana (${offPlan}) se simula aparte, con sus propios rendimientos y sin recibir aportaciones, porque prestarle la varianza del plan a otra cosa sería inventarse su riesgo. Ambos botes avanzan sobre el mismo mes sorteado, así que un mal mes lo es para toda la cartera a la vez.`,
       allOffPlanExcluded:
-        "El bote de fuera del plan queda vacío, y no porque no tengas nada fuera del plan: es que nada de lo que tienes ahí llega a la ventana, así que todo ello queda sin simular — lo tienes detallado arriba, con su importe.",
+        "El bote de fuera del plan queda vacío, y no porque no tengas nada fuera del plan: es que nada de lo que tienes ahí llega a la ventana, así que todo ello queda sin simular. Lo tienes detallado arriba, con su importe.",
       noOffPlan:
         "Todo lo que tienes en cartera lo nombra el plan, así que no hay nada que simular aparte.",
     },
     excluded: (names: string, coverage: string): string =>
-      `Sin histórico de precios, así que quedan fuera de la simulación: ${names}. Los pesos restantes se reparten el 100%, de modo que lo proyectado es el ${coverage} de tu plan, no el plan entero. Ejecuta pnpm prices:backfill antes de fiarte del rango.`,
+      `Sin histórico de precios, así que quedan fuera de la simulación: ${names}. Los pesos restantes se reparten el 100 %, de modo que lo proyectado es el ${coverage} de tu plan, no el plan entero. Ejecuta pnpm prices:backfill antes de fiarte del rango.`,
     unsimulated: (names: string, amount: string): string =>
-      `${amount} en posiciones fuera del plan con menos histórico que la ventana: ${names}. No entran en las cifras de arriba ni se suman al final. Congelarlas veinte años a un 0% sería una afirmación tan falsa como prestarles el rendimiento del plan; que el plan fije la ventana es lo que evita que una compra reciente la encoja para todo lo demás.`,
+      `${amount} en posiciones fuera del plan con menos histórico que la ventana: ${names}. No entran en las cifras de arriba ni se suman al final. Congelarlas veinte años a un 0 % sería una afirmación tan falsa como prestarles el rendimiento del plan. Que el plan fije la ventana es lo que evita que una compra reciente la encoja para todo lo demás.`,
     unpriced: (count: number): string =>
       count === 1
         ? "1 posición sin precio utilizable queda fuera del valor de partida. Un precio que falta no es un valor de cero."
@@ -499,7 +502,7 @@ export const es = {
     empty: "Sin movimientos.",
     emptyScreen: {
       title: "Sin movimientos todavía",
-      body: "Importa tus operaciones con la CLI (pnpm ingest) para ver aquí el ledger completo.",
+      body: "Importa tus operaciones con la CLI (pnpm ingest) para ver aquí el registro completo.",
     },
     amountHint:
       "El importe es el flujo de caja real: comisiones incluidas y retenciones descontadas.",
@@ -515,20 +518,20 @@ export const es = {
       averageCost: "Precio medio",
       costBasis: "Aportado",
       marketValue: "Valor",
-      unrealizedPnL: "P&L",
+      unrealizedPnL: "Resultado",
       weight: "Peso",
     },
     detail: {
       isin: "ISIN",
       currency: "Divisa",
       assetClass: "Clase de activo",
-      realizedPnL: "P&L realizado",
+      realizedPnL: "Resultado realizado",
       firstTrade: "Primera compra",
       lastTrade: "Última operación",
       tradeCount: "Nº de operaciones",
     },
     updatedAt: (relative: string): string => `Actualizado ${relative}`,
-    noPrices: "Sin precios — ejecuta pnpm prices:sync",
+    noPrices: "Sin precios. Ejecuta pnpm prices:sync",
     empty: {
       title: "Sin posiciones todavía",
       body: "Importa tus movimientos con la CLI (pnpm ingest) para empezar a seguir tu cartera.",
@@ -553,7 +556,7 @@ export const es = {
       fiscal: "Fiscal (Bizkaia)",
     },
     intro:
-      "Cada venta cerrada, con el coste que consumió en el momento de venderla. Las comisiones de compra ya van dentro del coste; las de venta se restan del bruto.",
+      "Cada venta cerrada, con el coste que consumió en el momento de venderla. Las comisiones de compra ya van dentro del coste y las de venta se restan del bruto.",
     avcoWarning:
       "Cálculo AVCO (coste medio ponderado), el mismo criterio que la cartera. No coincide con el criterio fiscal FIFO: en la declaración cada venta se empareja con las compras más antiguas, así que el resultado por operación será otro.",
     summary: (count: number, result: string): string =>
@@ -580,7 +583,7 @@ export const es = {
     },
     fiscal: {
       intro:
-        "Mismas ventas, criterio FIFO en vez de AVCO — el que exige la declaración foral de Bizkaia, no el de la pestaña de Ventas. Cálculo puro: computeTaxLots y computeNetWithCarryforward, sin cifras nuevas.",
+        "Mismas ventas, con criterio FIFO en vez de AVCO, que es el que exige la declaración foral de Bizkaia y no el de la pestaña de Ventas. Cálculo puro: computeTaxLots y computeNetWithCarryforward, sin cifras nuevas.",
       yearLabel: "Año fiscal",
       noYears: "No hay ventas registradas todavía en ningún año.",
       summary: {
@@ -588,15 +591,15 @@ export const es = {
         quota: "Cuota resultante",
         scale: (source: string): string => `Escala aplicada: ${source}`,
         noScale:
-          "Sin escala fiscal cargada para este año — no se puede calcular la cuota.",
+          "Sin escala fiscal cargada para este año. No se puede calcular la cuota.",
       },
       net: {
-        before: "Neto propio antes de exclusión por wash-sale",
-        after: "Neto propio después de exclusión por wash-sale",
+        before: "Neto propio antes de la exclusión por recompra",
+        after: "Neto propio después de la exclusión por recompra",
         counts: (allowed: number, disallowed: number): string =>
           `${allowed} ${allowed === 1 ? "venta permitida" : "ventas permitidas"}` +
           (disallowed > 0
-            ? `, ${disallowed} ${disallowed === 1 ? "descartada por wash-sale" : "descartadas por wash-sale"}`
+            ? `, ${disallowed} ${disallowed === 1 ? "descartada por recompra" : "descartadas por recompra"}`
             : ""),
       },
       salesTitle: "Ventas del año, orden FIFO",
@@ -609,7 +612,7 @@ export const es = {
         costBasis: "Coste",
         realizedPnL: "Resultado",
       },
-      disallowedBadge: "Wash-sale",
+      disallowedBadge: "Recompra",
       expand: "Ver lotes",
       collapse: "Ocultar lotes",
       lotsTitle: "Lotes FIFO consumidos",
@@ -672,7 +675,7 @@ export const es = {
       count: number,
       amount: string,
     ): string =>
-      `El histórico de ${symbol} empieza el ${date}. ${count} ${count === 1 ? "compra anterior" : "compras anteriores"} (${amount}) no compran nada en el contrafactual —interpolar un precio que nadie publicó sería inventarlo—, pero siguen contando en la cartera real: el diferencial la favorece en esa medida. Amplía el histórico con pnpm prices:backfill.`,
+      `El histórico de ${symbol} empieza el ${date}. ${count} ${count === 1 ? "compra anterior" : "compras anteriores"} (${amount}) no compran nada en el contrafactual, porque interpolar un precio que nadie publicó sería inventarlo, pero siguen contando en la cartera real: el diferencial la favorece en esa medida. Amplía el histórico con pnpm prices:backfill.`,
     unpriced: (names: string): string =>
       `Sin precio utilizable: ${names}. Se excluyen de los dos lados, porque contar su coste sin su valor inventaría una pérdida.`,
     unmapped: (symbol: string): string =>
@@ -697,7 +700,7 @@ export const es = {
     coverage: (covered: string, total: string): string =>
       `${covered} de ${total} tienen TER en ficha.`,
     unknown: (names: string): string =>
-      `Sin TER en ficha: ${names}. Quedan fuera del ponderado y cuentan como 0% en la proyección, así que el coste acumulado es un suelo, no una estimación. Anótalo en la pantalla de instrumentos.`,
+      `Sin TER en ficha: ${names}. Quedan fuera del ponderado y cuentan como 0 % en la proyección, así que el coste acumulado es un suelo, no una estimación. Anótalo en la pantalla de instrumentos.`,
     none: {
       title: "Ningún instrumento tiene TER",
       body: "Anota el TER de tus fondos en la pantalla de instrumentos y esta pantalla empezará a decir algo.",
@@ -705,7 +708,7 @@ export const es = {
     projected: {
       title: (years: number): string =>
         `Coste acumulado a ${years} ${years === 1 ? "año" : "años"}`,
-      note: "El precio de un fondo ya viene neto de su TER: así funciona un fondo. Así que aquí no se resta nada, se simula el gemelo que no cobrara comisión y se compara camino a camino, mes sorteado a mes sorteado. La diferencia es la comisión; no es ruido de muestreo.",
+      note: "El precio de un fondo ya viene neto de su TER: así funciona un fondo. Así que aquí no se resta nada, se simula el gemelo que no cobrara comisión y se compara camino a camino, mes sorteado a mes sorteado. La diferencia es la comisión, no ruido de muestreo.",
       p10: { label: "Escenario malo", sub: "percentil 10" },
       p50: { label: "Escenario central", sub: "mediana" },
       p90: { label: "Escenario bueno", sub: "percentil 90" },
@@ -735,7 +738,7 @@ export const es = {
     viewFallback: "Activo",
     units: (n: string): string => `${n} uds`,
     value: "Valor",
-    unrealizedPnL: "P&L no realizado",
+    unrealizedPnL: "Resultado latente",
     kpis: {
       twr: { label: "TWR", sub: "ponderada por tiempo" },
       mwr: { label: "MWR / TIR", sub: "ponderada por dinero" },
@@ -751,10 +754,10 @@ export const es = {
       sell: "Venta",
       empty: "Sin operaciones registradas.",
       noPrice:
-        "Sin histórico de precio todavía — se construye con cada pnpm prices:sync.",
+        "Sin histórico de precio todavía. Se construye con cada pnpm prices:sync.",
     },
     ivvChart: {
-      title: "Invertido vs. valor",
+      title: "Aportado frente a valor",
       invested: "Aportado",
       value: "Valor",
       building:

@@ -54,7 +54,7 @@ import {
 export function meta(_: Route.MetaArgs) {
   return [
     { title: "Asignación · Quoin" },
-    { name: "description", content: "Exposición real con look-through" },
+    { name: "description", content: "Exposición real por transparencia" },
   ];
 }
 
@@ -106,7 +106,12 @@ export async function loader({ request }: Route.LoaderArgs) {
     ]),
   );
 
-  const exposures = computeExposures(positions, marketValues, resolutions);
+  const exposures = computeExposures(
+    positions,
+    marketValues,
+    resolutions,
+    new Map(instruments.map((i) => [i.id, i.name])),
+  );
   const summary = summarizeExposures(exposures);
   const rows = toExposureRows(exposures, summary.total);
 

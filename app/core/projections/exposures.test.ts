@@ -140,11 +140,16 @@ describe("computeExposures", () => {
           ],
         ],
       ]),
+      new Map([
+        ["NVDA", "NVIDIA"],
+        ["FTSE", "Vanguard FTSE All-World"],
+      ]),
     );
 
     expect(exposures).toHaveLength(1);
     const nvidia = exposures[0]!;
     expect(leafTotal(nvidia)).toBe("1425.5");
+    expect(nvidia.name).toBe("NVIDIA");
     expect(nvidia.contributions).toEqual([
       {
         instrumentId: "NVDA",
@@ -154,7 +159,37 @@ describe("computeExposures", () => {
       },
       {
         instrumentId: "FTSE",
-        instrumentName: "NVIDIA",
+        instrumentName: "Vanguard FTSE All-World",
+        value: "175.50",
+        weightInParent: "0.045",
+      },
+    ]);
+  });
+
+  it("names a constituent's contribution after the fund, not the company", () => {
+    const [exposure] = computeExposures(
+      [position("FTSE")],
+      new Map([priced("FTSE", "3900.00")]),
+      new Map<string, WeightedLeaf[]>([
+        [
+          "FTSE",
+          [
+            {
+              leaf: { kind: "COMPANY", id: "US67066G1040" },
+              name: "NVIDIA Corp",
+              weight: "0.045",
+            },
+          ],
+        ],
+      ]),
+      new Map([["FTSE", "Vanguard FTSE All-World"]]),
+    );
+
+    expect(exposure?.name).toBe("NVIDIA Corp");
+    expect(exposure?.contributions).toEqual([
+      {
+        instrumentId: "FTSE",
+        instrumentName: "Vanguard FTSE All-World",
         value: "175.50",
         weightInParent: "0.045",
       },
