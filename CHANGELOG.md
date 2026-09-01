@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Resumen allocation card: donut and legend are vertically centred in the card, which the grid stretches to match the taller Top posiciones beside it.
+- Expanding a leaf named the company on every line instead of the fund it came through, which fund holds this. Each contribution is now named after its container, the leaf itself still takes the direct position's name.
+- The expander was unreachable without a mouse.
 
 ### Changed
 - The sidebar keeps the parent section highlighted while on one of its subpages.
