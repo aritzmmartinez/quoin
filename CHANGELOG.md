@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Tthe 15 % concentration threshold is now a slider, 5 % to 30 % in steps of 1.
 - Glossary modal reachable from the header on every page: 13 terms, each a one-line definition over a collapsed worked example.
 - Back link on every subpage (/realizado, /coste-oportunidad, /coste-ter, /instrument/:id).
 

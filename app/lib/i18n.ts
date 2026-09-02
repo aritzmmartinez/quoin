@@ -209,6 +209,7 @@ export const es = {
       "Tu posición directa más lo que llevas dentro de tus ETFs, mirando por transparencia lo que hay en cada fondo. El tramo sólido de la barra es lo que compraste tú. El apagado viaja dentro de un fondo.",
     title: "Exposición real por valor",
     thresholdMark: (weight: string): string => `\u250a umbral ${weight}`,
+    thresholdLabel: "Umbral de concentraci\u00f3n (%)",
     stats: {
       total: "Total resuelto",
       leaves: "Hojas resueltas",
