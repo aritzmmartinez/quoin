@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Shared modal folding the shell four modals.
 - Replaced four separate keys holding the word "Cerrar", four translations of one word the day a second locale lands.
+- Proyección: the "Cómo se ha calculado" card moved behind a link into its own modal, one card fewer on the page.
+- Coste del TER and Coste de oportunidad: the method footnotes under their tables moved behind a link into their own modals.
+- Shared notelink, the underlined link that opens a modal of explanatory text. All three sites that had one were identical but for where the link sits.
 - Resumen donut now classifies by exposureKind instead of Instrument.type. Trade Republic maps both FUND and SYNTHETIC to "ETF", so a physical-gold ETC was drawn as an index fund. Categories are now Acción, Fondo de renta variable, Fondo de bonos, Materias primas and Cripto. An instrument with no exposureKind set is reported as "Sin clasificar" instead of inheriting the broker's type, so the size of that slice is how much is still unmapped.
 - Back link on every subpage (/realizado, /coste-oportunidad, /coste-ter, /instrument/:id).
 

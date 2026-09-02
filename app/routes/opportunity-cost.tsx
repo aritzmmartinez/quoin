@@ -7,6 +7,7 @@ import {
 } from "~/adapters/persistence";
 import {
   Card,
+  NoteLink,
   OpportunityTable,
   Explainer,
   SignedMoney,
@@ -201,9 +202,15 @@ export default function OpportunityCost({ loaderData }: Route.ComponentProps) {
             <OpportunityTable rows={rows} />
           </Card>
 
-          <Explainer tone="footnote" className="mt-2">
-            {o.table.note} {o.nominal}
-          </Explainer>
+          <NoteLink
+            title={o.table.noteTitle}
+            className="mt-2 text-[11px] text-muted"
+          >
+            <div className="flex flex-col gap-2 py-4 text-[12px] leading-relaxed text-muted">
+              <p>{o.table.note}</p>
+              <p>{o.nominal}</p>
+            </div>
+          </NoteLink>
         </>
       )}
     </>

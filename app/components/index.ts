@@ -13,6 +13,7 @@ export * from "./ui/MeterBar";
 export * from "./ui/Hint";
 export * from "./ui/Modal";
 export * from "./ui/Glossary";
+export * from "./ui/NoteLink";
 export * from "./ui/Checkbox";
 export * from "./ui/Segmented";
 export * from "./ui/Explainer";

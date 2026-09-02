@@ -749,6 +749,7 @@ export const es = {
     table: {
       title: "Por posición",
       note: "Cada línea compara lo que ese instrumento vale hoy (más lo que cobraste al venderlo) con lo que ese mismo dinero valdría en el índice. Las líneas suman el diferencial total.",
+      noteTitle: "Cómo se lee esta tabla",
       instrument: "Instrumento",
       contributed: "Aportado",
       real: "Real",
@@ -795,6 +796,7 @@ export const es = {
       title: (years: number): string =>
         `Coste acumulado a ${years} ${years === 1 ? "año" : "años"}`,
       note: "El precio de un fondo ya viene neto de su TER: así funciona un fondo. Así que aquí no se resta nada, se simula el gemelo que no cobrara comisión y se compara camino a camino, mes sorteado a mes sorteado. La diferencia es la comisión, no ruido de muestreo.",
+      noteTitle: "Cómo se calcula este coste",
       p10: { label: "Escenario malo", sub: "percentil 10" },
       p50: { label: "Escenario central", sub: "mediana" },
       p90: { label: "Escenario bueno", sub: "percentil 90" },
