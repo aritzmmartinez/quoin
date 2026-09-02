@@ -1,13 +1,9 @@
 import type { ExposureKind, InstrumentType, Sleeve } from "~/core/domain";
 
-/**
- * Single source of truth for user-facing copy (Spanish only, for now).
- *
- * Deliberately centralized rather than scattered through JSX: adding a second
- * locale later becomes wrapping this object, not hunting literals across the tree.
- * Typed `as const` so keys are checked at compile time.
- */
 export const es = {
+  common: {
+    close: "Cerrar",
+  },
   nav: {
     brand: "Quoin",
     overview: "Resumen",
@@ -20,6 +16,96 @@ export const es = {
   },
   theme: {
     toggle: "Cambiar tema",
+  },
+  glossary: {
+    open: "Glosario de términos",
+    title: "Glosario",
+    terms: [
+      {
+        term: "Resultado latente y realizado",
+        short: "El resultado de tus inversiones, en euros.",
+        detail:
+          "El resultado latente es lo que ganarías si vendieras hoy lo que sigues teniendo: valor actual menos lo aportado. El realizado es el de lo que ya vendiste, cerrado. Se muestran por separado porque responden preguntas distintas: «cómo va lo que tengo» y «cuánto he ganado ya de verdad». «Aportado» incluye las comisiones, porque el coste de adquisición las incluye a efectos fiscales y excluirlas maquillaría la rentabilidad.",
+      },
+      {
+        term: "TER",
+        short:
+          "Lo que te cuesta al año la gestión de tus fondos, en porcentaje.",
+        detail:
+          "Un TER del 0,20 % sobre 10.000 € son 20 € al año, descontados directamente del valor del fondo. Nunca aparece como un cargo en tu extracto, porque el precio que cotiza el fondo ya sale neto de ese coste. Es la razón principal por la que dos fondos que replican el mismo índice pueden dar rentabilidades ligeramente distintas.",
+      },
+      {
+        term: "TWR",
+        short: "Mide cómo lo han hecho los activos, sin comisiones.",
+        detail:
+          "Es una marca de precio pura: cómo se habría comportado tu cartera si hubieras invertido todo de golpe al principio, sin importar cuándo metiste cada euro ni cuánto te costó cada operación. Por eso diverge del MWR, que sí tiene en cuenta ambas cosas.",
+      },
+      {
+        term: "MWR / TIR",
+        short: "Mide cómo lo ha hecho tu dinero, no el activo.",
+        detail:
+          "Pondera cada aportación por cuánto tiempo lleva invertida. Si metiste 1.000 € hace 3 años y otros 1.000 € el mes pasado, una subida de hace 2 años pesa mucho en el TWR, porque el activo llevaba tiempo subiendo, pero casi nada en tu MWR, porque la mayoría de tu dinero acaba de llegar. Aportando poco a poco divergen a propósito. No es un error, son preguntas distintas.",
+      },
+      {
+        term: "AVCO",
+        short:
+          "Coste medio ponderado: tu precio medio de compra, recalculado cada vez que compras más.",
+        detail:
+          "Si compras 10 acciones a 100 € y luego 10 más a 120 €, tu AVCO es 110 €. Al vender, Quoin usa ese coste medio para calcular la ganancia, y es el criterio de tu vista de cartera y de Realizado. No es el que exige la declaración.",
+      },
+      {
+        term: "FIFO",
+        short:
+          "«Primero en entrar, primero en salir», el criterio fiscal obligatorio.",
+        detail:
+          "A diferencia del AVCO, FIFO empareja cada venta con las compras más antiguas, no con un precio medio. Con el mismo ejemplo, 10 a 100 € y 10 a 120 €, si vendes 10, FIFO dice que vendiste las primeras, a 100 €, mientras que AVCO habría usado 110 €. Por eso el resultado de una venta puede diferir entre tu vista normal y la pestaña Fiscal. Son dos criterios legítimos para preguntas distintas.",
+      },
+      {
+        term: "Exposición real",
+        short: "Ver qué hay de verdad dentro de tus fondos, no solo su nombre.",
+        detail:
+          "«Tener un fondo indexado global» no dice mucho por sí solo. Lo que importa es qué empresas contiene y con qué peso. Mirando por transparencia, Quoin desglosa cada fondo en sus componentes reales y los suma a tus posiciones directas, para que veas tu exposición real a cada empresa y no solo al envoltorio.",
+      },
+      {
+        term: "Solapamiento",
+        short: "Cuánto se repiten las mismas empresas entre dos de tus fondos.",
+        detail:
+          "Dos fondos con nombres distintos pueden compartir gran parte de sus componentes. Un fondo mundial y uno de emergentes, por ejemplo, comparten TSMC o Samsung. Si el solapamiento es alto, tener dos fondos te da menos diversificación real de la que parece.",
+      },
+      {
+        term: "Umbral de concentración",
+        short:
+          "El porcentaje a partir del cual una posición se considera demasiado grande.",
+        detail:
+          "No hay un número universal, pero entre el 10 % y el 15 % es una referencia habitual de alarma para una sola posición. Quoin marca en rojo lo que supere el umbral que definas, para que decidas tú si es un riesgo asumido a propósito o algo a corregir.",
+      },
+      {
+        term: "Rebalanceo y desvío",
+        short:
+          "Cuánto se ha desviado tu cartera del reparto que te propusiste.",
+        detail:
+          "Si tu plan era un 70 % en renta variable y un 30 % en oro, y las subidas lo han dejado en 80 y 20, esa diferencia es el desvío. Rebalancear lo corrige, y Quoin lo hace sin vender: reparte tu próxima aportación hacia lo que se ha quedado corto, para no generar impuestos innecesarios.",
+      },
+      {
+        term: "Coste de oportunidad",
+        short:
+          "Qué habría pasado si, en vez de tus activos, hubieras comprado siempre el índice.",
+        detail:
+          "Quoin recrea tus mismas fechas e importes como si cada aportación hubiera ido a un índice de referencia. La diferencia te dice si elegir activos concretos ha compensado frente a simplemente indexar.",
+      },
+      {
+        term: "Divisa cubierta",
+        short: "Un fondo que neutraliza el efecto del tipo de cambio.",
+        detail:
+          "Un fondo de oro en dólares sin cobertura depende tanto del oro como del cambio entre el dólar y el euro. Uno con la divisa cubierta anula ese segundo efecto con derivados, así que tu resultado sigue de cerca al activo subyacente, a cambio de un coste extra normalmente ya incluido en su TER.",
+      },
+      {
+        term: "Nominal frente a real",
+        short: "Nominal son tus euros tal cual. Real, ajustados por inflación.",
+        detail:
+          "1.000 € ganados hoy no valen lo mismo que hace 3 años, porque los precios han subido de por medio. El modo Real descuenta el IPC de cada aportación según su mes, para que la rentabilidad refleje poder adquisitivo real y no solo la cifra en pantalla.",
+      },
+    ],
   },
   range: {
     label: "Rango temporal",
@@ -663,6 +749,7 @@ export const es = {
     table: {
       title: "Por posición",
       note: "Cada línea compara lo que ese instrumento vale hoy (más lo que cobraste al venderlo) con lo que ese mismo dinero valdría en el índice. Las líneas suman el diferencial total.",
+      noteTitle: "Cómo se lee esta tabla",
       instrument: "Instrumento",
       contributed: "Aportado",
       real: "Real",
@@ -709,6 +796,7 @@ export const es = {
       title: (years: number): string =>
         `Coste acumulado a ${years} ${years === 1 ? "año" : "años"}`,
       note: "El precio de un fondo ya viene neto de su TER: así funciona un fondo. Así que aquí no se resta nada, se simula el gemelo que no cobrara comisión y se compara camino a camino, mes sorteado a mes sorteado. La diferencia es la comisión, no ruido de muestreo.",
+      noteTitle: "Cómo se calcula este coste",
       p10: { label: "Escenario malo", sub: "percentil 10" },
       p50: { label: "Escenario central", sub: "mediana" },
       p90: { label: "Escenario bueno", sub: "percentil 90" },
