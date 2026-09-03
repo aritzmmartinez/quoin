@@ -2,6 +2,7 @@ import { X } from "lucide-react";
 import { useId, type ReactNode, type Ref } from "react";
 
 import { es } from "~/lib";
+import { Button } from "./Button";
 
 export function Modal({
   ref,
@@ -28,13 +29,14 @@ export function Modal({
           {title}
         </h2>
         <form method="dialog">
-          <button
+          <Button
             type="submit"
+            variant="ghost"
+            size="icon"
             aria-label={es.common.close}
-            className="rounded-lg p-2 text-muted transition-colors hover:text-text"
           >
             <X size={16} strokeWidth={1.75} aria-hidden />
-          </button>
+          </Button>
         </form>
       </div>
 

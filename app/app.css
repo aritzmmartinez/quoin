@@ -5,7 +5,6 @@
 @theme {
   --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
 
-  /* base (dark theme, default) */
   --color-bg: #0a0a0a;
   --color-surface: #141414;
   --color-surface-2: #1c1c1c;
@@ -13,25 +12,29 @@
   --color-text: #fafafa;
   --color-muted: #8a8a8a;
 
-  /* semantic (the only non-monochrome colors) */
   --color-positive: #00c776;
   --color-negative: #ff4d4d;
 
-  /* grayscale ramp for donut / look-through bars */
   --color-dn-1: #fafafa;
   --color-dn-2: #a6a6a6;
   --color-dn-3: #6f6f6f;
   --color-dn-4: #474747;
   --color-dn-5: #2b2b2b;
 
-  --spacing-gutter: 1.25rem; /* 20px — row padding, left and right */
-  --spacing-row: 0.625rem; /* 10px — row padding, top and bottom */
+  --spacing-gutter: 1.25rem;
+  --spacing-row: 0.625rem;
 
   --radius-card: 16px;
 }
 
 :root {
   color-scheme: dark;
+}
+
+@layer base {
+  button:not(:disabled) {
+    cursor: pointer;
+  }
 }
 
 option {

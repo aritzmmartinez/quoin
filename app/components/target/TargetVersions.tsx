@@ -1,6 +1,7 @@
 import { useFetcher } from "react-router";
 
 import { es, formatDate, formatMoney, type TargetVersionRow } from "~/lib";
+import { Button } from "../ui/Button";
 
 export function TargetVersions({ versions }: { versions: TargetVersionRow[] }) {
   const copy = es.target.history;
@@ -50,13 +51,9 @@ function VersionRow({ version }: { version: TargetVersionRow }) {
       <fetcher.Form method="post">
         <input type="hidden" name="intent" value="delete" />
         <input type="hidden" name="id" value={version.id} />
-        <button
-          type="submit"
-          disabled={busy}
-          className="rounded-md border border-border px-2 py-1.5 text-[12px] transition-colors hover:bg-surface-2 disabled:opacity-30"
-        >
+        <Button type="submit" size="sm" disabled={busy}>
           {busy ? copy.deleting : copy.delete}
-        </button>
+        </Button>
       </fetcher.Form>
     </li>
   );

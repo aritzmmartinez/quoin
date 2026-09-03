@@ -6,6 +6,7 @@ export * from "./allocation/OverlapPanel";
 export * from "./allocation/ReadingCard";
 export * from "./allocation/RebalancePanel";
 export * from "./allocation/ViewTabs";
+export * from "./ui/Button";
 export * from "./ui/Card";
 export * from "./ui/SleeveChip";
 export * from "./ui/StatTile";

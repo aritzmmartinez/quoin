@@ -16,6 +16,7 @@ import {
 
 import { Checkbox } from "../ui/Checkbox";
 import { HoldingsUpload } from "./HoldingsUpload";
+import { Button } from "../ui/Button";
 
 const KINDS = exposureKindSchema.options;
 const GRID =
@@ -141,13 +142,9 @@ function InstrumentRow({ item }: { item: InstrumentListItem }) {
             >
               {copy.hedgedShort}
             </Checkbox>
-            <button
-              type="submit"
-              disabled={!dirty || busy}
-              className="rounded-md border border-border px-2 py-1.5 text-[12px] transition-colors hover:bg-surface-2 disabled:opacity-30"
-            >
+            <Button type="submit" size="sm" disabled={!dirty || busy}>
               {busy ? copy.saving : saved ? copy.saved : copy.save}
-            </button>
+            </Button>
           </div>
         </fetcher.Form>
 
