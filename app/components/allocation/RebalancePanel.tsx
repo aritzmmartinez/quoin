@@ -16,6 +16,7 @@ import {
 import { Card } from "../ui/Card";
 import { Hint } from "../ui/Hint";
 import { MeterBar } from "../ui/MeterBar";
+import { Button } from "../ui/Button";
 
 const GRID =
   "grid-cols-[minmax(0,1fr)_110px_105px] gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(90px,140px)_110px_105px]";
@@ -76,12 +77,7 @@ export function RebalancePanel({
                 className={`${FIELD} w-24`}
               />
             </label>
-            <button
-              type="submit"
-              className="rounded-md border border-border px-3 py-1.5 text-[12px] transition-colors hover:bg-surface-2"
-            >
-              {copy.submit}
-            </button>
+            <Button type="submit">{copy.submit}</Button>
           </Form>
 
           {plan === null ? (

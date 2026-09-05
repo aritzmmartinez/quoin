@@ -8,11 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Tthe 15 % concentration threshold is now a slider, 5 % to 30 % in steps of 1.
+- "Refrescar precios" button on /instrumentos, syncing quotes from the screen instead of only from the CLI. The toast reports partial runs with the misses split into stale quotes and symbols the provider never answered for, rather than reporting a clean success.
+- The 15 % concentration threshold is now a slider, 5 % to 30 % in steps of 1.
+- Shared button, two variants (default, ghost) and three sizes (md, sm, icon), replacing eleven hand-rolled buttons that had drifted into three paddings.
 - Glossary modal reachable from the header on every page: 13 terms, each a one-line definition over a collapsed worked example.
 - Back link on every subpage (/realizado, /coste-oportunidad, /coste-ter, /instrument/:id).
 
 ### Changed
+- prices:sync logic extracted out of the script's main into syncPrices, so the CLI and the new route share one implementation and one set of counts. The script now only formats what the function returns.
+- A quote symbol mapped by two instruments now syncs both. Keying the instrument by symbol collapsed them, so one got the price and the other was reported as "no quote returned".
 - Shared modal folding the shell four modals.
 - Replaced four separate keys holding the word "Cerrar", four translations of one word the day a second locale lands.
 - Proyección: the "Cómo se ha calculado" card moved behind a link into its own modal, one card fewer on the page.
@@ -22,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Back link on every subpage (/realizado, /coste-oportunidad, /coste-ter, /instrument/:id).
 
 ### Fixed
+- Buttons had no pointer cursor anywhere in the app. Fixed once in the base layer.
+- A disabled button no longer paints its hover background.
 - Resumen allocation card: donut and legend are vertically centred in the card, which the grid stretches to match the taller Top posiciones beside it.
 - Expanding a leaf named the company on every line instead of the fund it came through, which fund holds this. Each contribution is now named after its container, the leaf itself still takes the direct position's name.
 - The expander was unreachable without a mouse.

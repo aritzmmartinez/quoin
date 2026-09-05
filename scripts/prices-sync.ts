@@ -2,86 +2,55 @@ import "dotenv/config";
 
 import { exit } from "node:process";
 
-import { isFreshQuote, YahooMarketDataProvider } from "~/adapters/marketdata";
-import {
-  PrismaInstrumentRepository,
-  PrismaPriceRepository,
-  prisma,
-} from "~/adapters/persistence";
-import type { PriceSnapshot } from "~/core/ports";
+import { prisma } from "~/adapters/persistence";
+import { syncPrices } from "~/lib/prices-sync.server";
 
 async function main(): Promise<void> {
-  const instruments = await new PrismaInstrumentRepository().list();
+  const result = await syncPrices();
 
-  const mapped = instruments.filter(
-    (i): i is typeof i & { quoteSymbol: string } => Boolean(i.quoteSymbol),
-  );
-  const unmapped = instruments.filter((i) => !i.quoteSymbol);
-  const symbolToId = new Map(mapped.map((i) => [i.quoteSymbol, i.id]));
-
+  const total = result.mapped + result.unmapped.length;
   console.log(
-    `Instruments: ${instruments.length} | mapped: ${mapped.length} | unmapped: ${unmapped.length}`,
+    `Instruments: ${total} | mapped: ${result.mapped} | unmapped: ${result.unmapped.length}`,
   );
-  if (unmapped.length > 0) {
+
+  if (result.unmapped.length > 0) {
     console.log(
       "\nNo quote symbol yet (set one with `pnpm prices:map <ISIN> <SYMBOL>`):",
     );
-    for (const i of unmapped) console.log(`  ${i.id}  ${i.name}`);
+    for (const i of result.unmapped) {
+      console.log(`  ${i.instrumentId}  ${i.name}`);
+    }
   }
-  if (mapped.length === 0) {
+  if (result.mapped === 0) {
     console.log("\nNothing to sync.");
     return;
   }
 
-  const provider = new YahooMarketDataProvider();
-  const quotes = await provider.getQuotes(mapped.map((i) => i.quoteSymbol));
-
-  const now = new Date();
-  const snapshots: PriceSnapshot[] = [];
-  const seen = new Set<string>();
-  const stale: { id: string; symbol: string; asOf: Date }[] = [];
-
-  for (const q of quotes) {
-    const instrumentId = symbolToId.get(q.symbol);
-    if (!instrumentId) continue;
-    seen.add(q.symbol);
-
-    if (!isFreshQuote(q, now)) {
-      stale.push({ id: instrumentId, symbol: q.symbol, asOf: q.asOf });
-      continue;
-    }
-
-    snapshots.push({
-      instrumentId,
-      price: q.price,
-      currency: q.currency,
-      asOf: q.asOf,
-      source: provider.source,
-    });
-  }
-
-  const noQuote = mapped.filter((i) => !seen.has(i.quoteSymbol));
-  const written = await new PrismaPriceRepository().saveMany(snapshots);
-
-  console.log(`\nPersisted ${written} fresh quote(s):`);
-  for (const s of snapshots) {
+  console.log(`\nPersisted ${result.updated} fresh quote(s):`);
+  for (const s of result.snapshots) {
     console.log(
       `  ${s.instrumentId}  ${s.price} ${s.currency}  @ ${s.asOf.toISOString()}`,
     );
   }
+
+  const stale = result.failures.filter((f) => f.reason === "stale");
   if (stale.length > 0) {
     console.log(
       "\nStale quotes skipped (provider returned an old timestamp — try another venue):",
     );
-    for (const s of stale) {
-      console.log(`  ${s.id}  (${s.symbol})  last @ ${s.asOf.toISOString()}`);
+    for (const f of stale) {
+      console.log(
+        `  ${f.instrumentId}  (${f.symbol})  last @ ${f.asOf?.toISOString() ?? "?"}`,
+      );
     }
   }
+
+  const noQuote = result.failures.filter((f) => f.reason === "no-quote");
   if (noQuote.length > 0) {
     console.log(
       "\nNo quote returned for (check the symbol on finance.yahoo.com):",
     );
-    for (const i of noQuote) console.log(`  ${i.id}  (${i.quoteSymbol})`);
+    for (const f of noQuote) console.log(`  ${f.instrumentId}  (${f.symbol})`);
   }
 }
 

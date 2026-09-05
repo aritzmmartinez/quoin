@@ -1,4 +1,5 @@
 import { es } from "~/lib";
+import { Button } from "../ui/Button";
 
 export function PortfolioError({ onRetry }: { onRetry?: () => void }) {
   return (
@@ -11,15 +12,7 @@ export function PortfolioError({ onRetry }: { onRetry?: () => void }) {
           {es.portfolio.error.body}
         </div>
       </div>
-      {onRetry && (
-        <button
-          type="button"
-          onClick={onRetry}
-          className="rounded-lg border border-border px-3 py-1.5 text-[13px] font-medium transition-colors hover:bg-surface-2"
-        >
-          {es.portfolio.error.retry}
-        </button>
-      )}
+      {onRetry && <Button onClick={onRetry}>{es.portfolio.error.retry}</Button>}
     </div>
   );
 }

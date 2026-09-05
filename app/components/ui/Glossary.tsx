@@ -4,20 +4,21 @@ import { useRef } from "react";
 import { es } from "~/lib";
 
 import { Modal } from "./Modal";
+import { Button } from "./Button";
 
 export function Glossary() {
   const dialog = useRef<HTMLDialogElement>(null);
 
   return (
     <>
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="icon"
         onClick={() => dialog.current?.showModal()}
         aria-label={es.glossary.open}
-        className="rounded-lg p-2 text-muted transition-colors hover:text-text"
       >
         <BookOpen size={18} strokeWidth={1.75} aria-hidden />
-      </button>
+      </Button>
 
       <Modal ref={dialog} title={es.glossary.title}>
         {es.glossary.terms.map((entry) => (

@@ -413,6 +413,22 @@ export const es = {
     saved: "Guardado",
     closed: "Cerrada",
     empty: "Sin instrumentos. Importa tus operaciones con pnpm ingest.",
+    sync: {
+      action: "Refrescar precios",
+      loading: "Sincronizando precios…",
+      nothing: "Ningún instrumento tiene símbolo de cotización todavía.",
+      done: (updated: number, mapped: number): string =>
+        `${updated} de ${mapped} ${mapped === 1 ? "precio actualizado" : "precios actualizados"}`,
+      failed: (count: number): string =>
+        count === 1 ? "1 fallido" : `${count} fallidos`,
+      staleDetail: (count: number): string =>
+        count === 1
+          ? "1 con cotización caducada"
+          : `${count} con cotización caducada`,
+      noQuoteDetail: (count: number): string =>
+        count === 1 ? "1 sin respuesta" : `${count} sin respuesta`,
+      error: "No se pudieron sincronizar los precios.",
+    },
   },
   target: {
     title: "Objetivo",

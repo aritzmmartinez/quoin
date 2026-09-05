@@ -22,6 +22,7 @@ import { Card } from "../ui/Card";
 import { Checkbox } from "../ui/Checkbox";
 import { Hint } from "../ui/Hint";
 import { NoteLink } from "../ui/NoteLink";
+import { Button } from "../ui/Button";
 
 const FIELD =
   "rounded-md border border-border bg-surface px-2 py-1.5 text-[13px] tabular-nums";
@@ -89,12 +90,7 @@ export function ProjectionPanel({ view }: { view: ProjectionView }) {
                   className={`${FIELD} w-44`}
                 />
               </label>
-              <button
-                type="submit"
-                className="rounded-md border border-border px-3 py-1.5 text-[12px] transition-colors hover:bg-surface-2"
-              >
-                {copy.form.submit}
-              </button>
+              <Button type="submit">{copy.form.submit}</Button>
               <div className="flex items-center gap-1.5">
                 <Checkbox name={DETAIL_PARAM} defaultChecked={view.extended}>
                   {copy.form.detail}
