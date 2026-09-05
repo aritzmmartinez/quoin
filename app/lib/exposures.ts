@@ -254,10 +254,21 @@ export function modeHref(params: URLSearchParams, mode: OverlapMode): string {
 }
 
 export const THRESHOLD_PARAM = "umbral";
+export const THRESHOLD_MIN_PERCENT = 5;
+export const THRESHOLD_MAX_PERCENT = 30;
 
 export function parseThreshold(params: URLSearchParams): string {
   const raw = Number(params.get(THRESHOLD_PARAM));
-  if (!Number.isFinite(raw) || raw < 5 || raw > 30)
+  if (
+    !Number.isFinite(raw) ||
+    raw < THRESHOLD_MIN_PERCENT ||
+    raw > THRESHOLD_MAX_PERCENT
+  ) {
     return CONCENTRATION_THRESHOLD;
+  }
   return new Decimal(raw).div(100).toString();
+}
+
+export function thresholdPercent(threshold: string): number {
+  return new Decimal(threshold).times(100).toNumber();
 }

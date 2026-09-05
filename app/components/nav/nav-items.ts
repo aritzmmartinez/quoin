@@ -27,3 +27,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { label: es.projection.title, icon: TrendingUp, to: "/proyeccion" },
   { label: es.nav.instruments, icon: Boxes, to: "/instrumentos" },
 ];
+
+export function navItemFor(parent: string | undefined): NavItem | undefined {
+  return NAV_ITEMS.find((item) => item.to === parent);
+}

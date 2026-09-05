@@ -1,6 +1,7 @@
 import { useFetcher } from "react-router";
 
 import { es } from "~/lib";
+import { Button } from "../ui/Button";
 
 const FIELD =
   "w-full rounded-md border border-border bg-surface px-2 py-1.5 text-[13px]";
@@ -57,13 +58,9 @@ export function TargetForm({ defaultLines = "" }: { defaultLines?: string }) {
       {error && <p className="text-[12px] text-negative">{error}</p>}
 
       <div>
-        <button
-          type="submit"
-          disabled={busy}
-          className="rounded-md border border-border px-3 py-1.5 text-[12px] transition-colors hover:bg-surface-2 disabled:opacity-30"
-        >
+        <Button type="submit" disabled={busy}>
           {busy ? copy.saving : copy.submit}
-        </button>
+        </Button>
       </div>
     </fetcher.Form>
   );

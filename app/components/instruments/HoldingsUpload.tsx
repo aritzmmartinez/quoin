@@ -8,6 +8,7 @@ import {
   type ParsedHoldings,
 } from "~/adapters/ingestion/holdings";
 import { es, formatPercent } from "~/lib";
+import { Button } from "../ui/Button";
 
 type Override = Partial<Pick<ColumnMap, "identity" | "name" | "weight">>;
 
@@ -303,21 +304,12 @@ function Preview({
       </p>
 
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={onConfirm}
-          disabled={busy}
-          className="rounded-md border border-border px-3 py-1.5 text-[12px] transition-colors hover:bg-surface-2 disabled:opacity-40"
-        >
+        <Button onClick={onConfirm} disabled={busy}>
           {busy ? copy.importing : copy.confirm}
-        </button>
-        <button
-          type="button"
-          onClick={onReset}
-          className="rounded-md px-3 py-1.5 text-[12px] text-muted transition-colors hover:text-text"
-        >
+        </Button>
+        <Button variant="ghost" onClick={onReset}>
           {copy.cancel}
-        </button>
+        </Button>
         <span className="text-[12px] text-muted">{copy.replaces}</span>
       </div>
     </div>

@@ -36,7 +36,11 @@ export function meta(_: Route.MetaArgs) {
   ];
 }
 
-export const handle = { title: es.realized.title, basis: true };
+export const handle = {
+  title: es.realized.title,
+  basis: true,
+  parent: "/",
+};
 
 export async function loader({ request }: Route.LoaderArgs) {
   const params = new URL(request.url).searchParams;

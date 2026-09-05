@@ -7,6 +7,7 @@ export * from "./movements";
 export * from "./opportunity-cost";
 export * from "./pagination";
 export * from "./portfolio";
+export * from "./prices-sync";
 export * from "./projection";
 export * from "./range";
 export * from "./realized";

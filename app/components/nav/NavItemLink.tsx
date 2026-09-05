@@ -4,6 +4,8 @@ import type { NavItem } from "./nav-items";
 
 import { es } from "~/lib";
 
+import { useParentNavItem } from "./BackLink";
+
 type Variant = "sidebar" | "bottom";
 
 export function NavItemLink({
@@ -16,6 +18,7 @@ export function NavItemLink({
   const Icon = item.icon;
   const isBottom = variant === "bottom";
   const size = isBottom ? 20 : 18;
+  const inSection = useParentNavItem()?.to === item.to;
 
   if (item.to === null) {
     return (
@@ -45,7 +48,7 @@ export function NavItemLink({
         end={item.end}
         className={({ isActive }) =>
           `flex flex-1 flex-col items-center gap-1 py-2 text-[11px] transition-colors ${
-            isActive ? "text-text" : "text-muted"
+            isActive || inSection ? "text-text" : "text-muted"
           }`
         }
       >
@@ -61,7 +64,9 @@ export function NavItemLink({
       end={item.end}
       className={({ isActive }) =>
         `flex items-center gap-3 rounded-lg px-3 py-2 text-[14px] transition-colors ${
-          isActive ? "bg-surface-2 text-text" : "text-muted hover:text-text"
+          isActive || inSection
+            ? "bg-surface-2 text-text"
+            : "text-muted hover:text-text"
         }`
       }
     >

@@ -15,6 +15,7 @@ import {
   OverlapPanel,
   ReadingCard,
   RebalancePanel,
+  ThresholdSlider,
   ViewTabs,
 } from "~/components";
 import {
@@ -54,7 +55,7 @@ import {
 export function meta(_: Route.MetaArgs) {
   return [
     { title: "Asignación · Quoin" },
-    { name: "description", content: "Exposición real con look-through" },
+    { name: "description", content: "Exposición real por transparencia" },
   ];
 }
 
@@ -106,7 +107,12 @@ export async function loader({ request }: Route.LoaderArgs) {
     ]),
   );
 
-  const exposures = computeExposures(positions, marketValues, resolutions);
+  const exposures = computeExposures(
+    positions,
+    marketValues,
+    resolutions,
+    new Map(instruments.map((i) => [i.id, i.name])),
+  );
   const summary = summarizeExposures(exposures);
   const rows = toExposureRows(exposures, summary.total);
 
@@ -273,9 +279,7 @@ export default function Allocation({ loaderData }: Route.ComponentProps) {
         <Card className="min-w-0 p-6">
           <div className="mb-1 flex flex-wrap items-baseline justify-between gap-3">
             <h2 className="text-[14px] font-semibold">{copy.title}</h2>
-            <span className="text-[11.5px] text-muted">
-              {copy.thresholdMark(formatPercent(threshold, 0))}
-            </span>
+            <ThresholdSlider key={threshold} threshold={threshold} />
           </div>
           <p className="mb-4 text-[12.5px] text-muted">{copy.intro}</p>
           <ExposureBars rows={rows} threshold={threshold} />

@@ -4,6 +4,7 @@ import { parseRange, type Range } from "~/lib";
 
 import { BasisReference } from "../ui/BasisReference";
 import { BasisToggle } from "../ui/BasisToggle";
+import { Glossary } from "../ui/Glossary";
 import { RangeSelector } from "../ui/RangeSelector";
 import { ThemeToggle } from "../ui/ThemeToggle";
 
@@ -88,6 +89,7 @@ export function AppHeader() {
           </>
         )}
         {showRange && <HeaderRangeSelector />}
+        <Glossary />
         <ThemeToggle />
       </div>
     </header>

@@ -1,4 +1,4 @@
-import { isRouteErrorResponse, Link } from "react-router";
+import { isRouteErrorResponse } from "react-router";
 
 import type { Route } from "./+types/instrument";
 
@@ -34,6 +34,7 @@ export const handle = {
   title: (data: unknown): string =>
     (data as { instrument?: { name?: string } } | undefined)?.instrument
       ?.name ?? es.instrument.viewFallback,
+  parent: "/cartera",
 };
 
 export async function loader({ params, request }: Route.LoaderArgs) {
@@ -179,12 +180,6 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
 
   return (
     <>
-      <Link
-        to="/cartera"
-        className="mb-4 inline-block text-[12.5px] text-muted transition-colors hover:text-text"
-      >
-        ← {es.instrument.back}
-      </Link>
       <div className="rounded-card border border-border bg-surface px-6 py-16 text-center">
         <div className="text-[15px] font-semibold">{copy.title}</div>
         <p className="mx-auto mt-1.5 max-w-sm text-[13px] text-muted">

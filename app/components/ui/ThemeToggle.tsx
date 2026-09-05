@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useRouteLoaderData } from "react-router";
 
 import { es } from "~/lib";
+import { Button } from "./Button";
 
 const COOKIE = "quoin-theme";
 const ONE_YEAR = 60 * 60 * 24 * 365;
@@ -23,17 +24,17 @@ export function ThemeToggle() {
   }
 
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
+      size="icon"
       onClick={toggle}
       aria-label={es.theme.toggle}
-      className="rounded-lg p-2 text-muted transition-colors hover:text-text"
     >
       {light ? (
         <Sun size={18} strokeWidth={1.75} aria-hidden />
       ) : (
         <Moon size={18} strokeWidth={1.75} aria-hidden />
       )}
-    </button>
+    </Button>
   );
 }

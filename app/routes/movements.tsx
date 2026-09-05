@@ -19,7 +19,7 @@ import {
 export function meta(_: Route.MetaArgs) {
   return [
     { title: "Movimientos · Quoin" },
-    { name: "description", content: "Tu ledger completo" },
+    { name: "description", content: "Tu registro completo de operaciones" },
   ];
 }
 

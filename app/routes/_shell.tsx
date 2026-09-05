@@ -1,6 +1,6 @@
 import { Outlet, useLoaderData } from "react-router";
 
-import { AppBottomNav, AppHeader, AppSidebar } from "~/components";
+import { AppBottomNav, AppHeader, AppSidebar, BackLink } from "~/components";
 import { APP_VERSION } from "~/lib/version.server";
 
 export function loader() {
@@ -15,6 +15,7 @@ export default function Shell() {
       <div className="flex flex-1 flex-col pb-16 md:pb-0">
         <AppHeader />
         <main className="px-4 py-8 md:px-6">
+          <BackLink />
           <Outlet />
         </main>
       </div>

@@ -13,7 +13,7 @@ import {
   PrismaLedgerRepository,
   PrismaPriceRepository,
 } from "~/adapters/persistence";
-import { Card, InstrumentsTable } from "~/components";
+import { Card, InstrumentsTable, SyncPricesButton } from "~/components";
 import {
   BASE_CURRENCY,
   KINDS_NEEDING_LEAF,
@@ -157,7 +157,10 @@ export default function Instruments({ loaderData }: Route.ComponentProps) {
   return (
     <>
       <header className="mb-4">
-        <p className="text-[13px] text-muted">{es.instruments.intro}</p>
+        <div className="flex items-start justify-between gap-4">
+          <p className="text-[13px] text-muted">{es.instruments.intro}</p>
+          <SyncPricesButton />
+        </div>
         {unmapped > 0 && (
           <p className="mt-2 text-[13px] text-muted">
             {es.instruments.unmappedHint(unmapped)}

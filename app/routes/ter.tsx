@@ -5,7 +5,7 @@ import {
   PrismaLedgerRepository,
   PrismaPriceRepository,
 } from "~/adapters/persistence";
-import { Card, Explainer, StatTile } from "~/components";
+import { Card, Explainer, NoteLink, StatTile } from "~/components";
 import { BASE_CURRENCY } from "~/core/domain";
 import {
   computeMarketValues,
@@ -35,7 +35,7 @@ export function meta(_: Route.MetaArgs) {
   ];
 }
 
-export const handle = { title: es.ter.title };
+export const handle = { title: es.ter.title, parent: "/" };
 
 type Unavailable = "no-target" | "no-history" | "no-window" | "thin-window";
 
@@ -213,9 +213,14 @@ export default function Ter({ loaderData }: Route.ComponentProps) {
         </div>
       </Card>
 
-      <Explainer tone="footnote" className="mt-2">
-        {t.projected.note}
-      </Explainer>
+      <NoteLink
+        title={t.projected.noteTitle}
+        className="mt-2 text-[11px] text-muted"
+      >
+        <p className="py-4 text-[12px] leading-relaxed text-muted">
+          {t.projected.note}
+        </p>
+      </NoteLink>
 
       <Card className="mt-4">
         <div className="border-b border-border px-gutter py-3">

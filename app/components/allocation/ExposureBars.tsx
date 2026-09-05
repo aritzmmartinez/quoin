@@ -56,9 +56,10 @@ function Row({
 }) {
   const copy = es.allocation;
   const [open, setOpen] = useState(false);
+  const toggle = () => setOpen((v) => !v);
 
   const hot = isConcentrated(row.weight, threshold);
-  const expandable = row.contributions.length > 1;
+  const expandable = row.contributions.some((c) => c.weightInParent !== null);
   const pct = (v: string): number =>
     scaleMax === 0 ? 0 : (Number(v) / scaleMax) * 100;
 
@@ -80,8 +81,20 @@ function Row({
   return (
     <div className="border-b border-border last:border-b-0">
       <div
-        className={`grid ${GRID} items-center gap-3.5 py-row ${expandable ? "cursor-pointer" : ""}`}
-        onClick={expandable ? () => setOpen((v) => !v) : undefined}
+        role={expandable ? "button" : undefined}
+        tabIndex={expandable ? 0 : undefined}
+        aria-expanded={expandable ? open : undefined}
+        className={`grid ${GRID} items-center gap-3.5 py-row ${expandable ? "cursor-pointer rounded focus-visible:outline focus-visible:outline-offset-2 focus-visible:outline-text" : ""}`}
+        onClick={expandable ? toggle : undefined}
+        onKeyDown={
+          expandable
+            ? (event) => {
+                if (event.key !== "Enter" && event.key !== " ") return;
+                event.preventDefault();
+                toggle();
+              }
+            : undefined
+        }
       >
         <div className="flex min-w-0 items-center gap-1">
           {expandable ? (
