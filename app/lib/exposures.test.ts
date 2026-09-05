@@ -19,6 +19,11 @@ import {
   PRESENTATION_THRESHOLD,
   isConcentrated,
   tailOf,
+  parseThreshold,
+  THRESHOLD_MAX_PERCENT,
+  THRESHOLD_MIN_PERCENT,
+  THRESHOLD_PARAM,
+  thresholdPercent,
   toExposureRows,
 } from "./exposures";
 
@@ -359,5 +364,28 @@ describe("currencyByLeaf", () => {
   it("falls back to the confirmed listing for a ticker with no usable venue", () => {
     const map = from([cached("NVDA", "TICKER", "BBG_NVDA", "US")]);
     expect(map.get("COMPANY:BBG_NVDA")).toBe("USD");
+  });
+});
+
+describe("parseThreshold", () => {
+  const of = (query: string) => parseThreshold(new URLSearchParams(query));
+
+  it("reads the slider's percent from the URL as a fraction", () => {
+    expect(of(`${THRESHOLD_PARAM}=20`)).toBe("0.2");
+    expect(of(`${THRESHOLD_PARAM}=${THRESHOLD_MIN_PERCENT}`)).toBe("0.05");
+    expect(of(`${THRESHOLD_PARAM}=${THRESHOLD_MAX_PERCENT}`)).toBe("0.3");
+  });
+
+  it("falls back to the default outside the slider's own range", () => {
+    expect(of(`${THRESHOLD_PARAM}=4`)).toBe(CONCENTRATION_THRESHOLD);
+    expect(of(`${THRESHOLD_PARAM}=31`)).toBe(CONCENTRATION_THRESHOLD);
+    expect(of(`${THRESHOLD_PARAM}=abc`)).toBe(CONCENTRATION_THRESHOLD);
+    expect(of(`${THRESHOLD_PARAM}=`)).toBe(CONCENTRATION_THRESHOLD);
+    expect(of("")).toBe(CONCENTRATION_THRESHOLD);
+  });
+
+  it("round-trips the slider's value through the percent helper", () => {
+    expect(thresholdPercent(of(`${THRESHOLD_PARAM}=22`))).toBe(22);
+    expect(thresholdPercent(CONCENTRATION_THRESHOLD)).toBe(15);
   });
 });
