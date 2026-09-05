@@ -9,7 +9,7 @@ and support for the Bizkaia *foral* tax regime that off-the-shelf trackers ignor
 The goal isn't to trade: it's to **understand** a portfolio, and to double as a
 learning project.
 
-> **Status: v0.5.2, actively built.** The immutable ledger, core domain
+> **Status: v0.6.0, actively built.** The immutable ledger, core domain
 > (Money, event types, `computePositions` with average cost), CSV and `.xlsx` ingestion
 > (Trade Republic + Kraken), a Yahoo price provider with daily history, the app shell
 > and the summary / holdings / movements / asset-detail / instruments / allocation /
