@@ -7,6 +7,8 @@ import {
   useRouteLoaderData,
 } from "react-router";
 
+import { Toaster } from "sonner";
+
 import type { Route } from "./+types/root";
 import { parseBasis } from "~/lib/basis";
 import "./app.css";
@@ -45,6 +47,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         {children}
+        <Toaster position="bottom-right" />
         <ScrollRestoration />
         <Scripts />
       </body>

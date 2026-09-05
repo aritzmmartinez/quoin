@@ -30,6 +30,7 @@ export * from "./charts/InvestedVsValueChart";
 export * from "./charts/DonutChart";
 export * from "./instruments/HoldingsUpload";
 export * from "./instruments/InstrumentsTable";
+export * from "./instruments/SyncPricesButton";
 export * from "./movements/MovementsTable";
 export * from "./movements/columns";
 export * from "./realized/RealizedTable";
