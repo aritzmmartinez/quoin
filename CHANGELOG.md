@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-05
+
 ### Added
 - "Refrescar precios" button on /instrumentos, syncing quotes from the screen instead of only from the CLI. The toast reports partial runs with the misses split into stale quotes and symbols the provider never answered for, rather than reporting a clean success.
 - The 15 % concentration threshold is now a slider, 5 % to 30 % in steps of 1.
@@ -17,24 +19,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - prices:sync logic extracted out of the script's main into syncPrices, so the CLI and the new route share one implementation and one set of counts. The script now only formats what the function returns.
 - A quote symbol mapped by two instruments now syncs both. Keying the instrument by symbol collapsed them, so one got the price and the other was reported as "no quote returned".
-- Shared modal folding the shell four modals.
-- Replaced four separate keys holding the word "Cerrar", four translations of one word the day a second locale lands.
+- Shared modal, folding the four hand-rolled ones into a single implementation: the glossary and the three method notes.
+- Replaced the four separate keys holding the word "Cerrar" with one. Four keys would be four translations of the same word the day a second locale lands.
 - Proyección: the "Cómo se ha calculado" card moved behind a link into its own modal, one card fewer on the page.
 - Coste del TER and Coste de oportunidad: the method footnotes under their tables moved behind a link into their own modals.
 - Shared notelink, the underlined link that opens a modal of explanatory text. All three sites that had one were identical but for where the link sits.
 - Resumen donut now classifies by exposureKind instead of Instrument.type. Trade Republic maps both FUND and SYNTHETIC to "ETF", so a physical-gold ETC was drawn as an index fund. Categories are now Acción, Fondo de renta variable, Fondo de bonos, Materias primas and Cripto. An instrument with no exposureKind set is reported as "Sin clasificar" instead of inheriting the broker's type, so the size of that slice is how much is still unmapped.
-- Back link on every subpage (/realizado, /coste-oportunidad, /coste-ter, /instrument/:id).
+- The sidebar keeps the parent section highlighted while on one of its subpages.
+- The instrument page's two hand-rolled back links folded into the shared one.
 
 ### Fixed
 - Buttons had no pointer cursor anywhere in the app. Fixed once in the base layer.
 - A disabled button no longer paints its hover background.
 - Resumen allocation card: donut and legend are vertically centred in the card, which the grid stretches to match the taller Top posiciones beside it.
-- Expanding a leaf named the company on every line instead of the fund it came through, which fund holds this. Each contribution is now named after its container, the leaf itself still takes the direct position's name.
+- Expanding a leaf named the company on every line instead of the fund it came through, which is the one question the expander exists to answer. Each contribution is now named after its container; the leaf itself still takes the direct position's name.
+- A leaf reached through exactly one fund did not expand at all, so that fund stayed invisible, while a leaf held directly by two instruments expanded into two lines that both read "directa". A row now expands when some contribution arrives through a fund, not when it has more than one contribution.
 - The expander was unreachable without a mouse.
-
-### Changed
-- The sidebar keeps the parent section highlighted while on one of its subpages.
-- The instrument page's two hand-rolled back links folded into the shared one.
 
 ## [0.5.2] - 2026-08-31
 
@@ -176,7 +176,8 @@ fund holdings must be supplied as CSV rather than the Excel most issuers publish
 Design rationale lives beside the code it explains, in `docs/ARCHITECTURE.md` and in the
 commit history — not here.
 
-[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/aritzmmartinez/quoin/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/aritzmmartinez/quoin/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/aritzmmartinez/quoin/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/aritzmmartinez/quoin/compare/v0.4.0...v0.5.0
