@@ -59,6 +59,25 @@ option {
   --color-dn-5: #d8d8d8;
 }
 
+[data-sonner-toast] {
+  font-family: var(--font-sans);
+
+  --normal-bg: var(--color-surface);
+  --normal-border: var(--color-border);
+  --normal-text: var(--color-text);
+  --border-radius: var(--radius-card);
+}
+
+[data-sonner-toaster]
+  [data-sonner-toast][data-styled="true"]
+  [data-description] {
+  color: var(--color-muted);
+}
+
+[data-sonner-toast] .sonner-loading-bar {
+  background: var(--color-muted);
+}
+
 html,
 body {
   background: var(--color-bg);
