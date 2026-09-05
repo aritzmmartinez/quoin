@@ -21,6 +21,8 @@ import type { ProjectionResult } from "~/core/projections";
 import { Card } from "../ui/Card";
 import { Checkbox } from "../ui/Checkbox";
 import { Hint } from "../ui/Hint";
+import { NoteLink } from "../ui/NoteLink";
+import { Button } from "../ui/Button";
 
 const FIELD =
   "rounded-md border border-border bg-surface px-2 py-1.5 text-[13px] tabular-nums";
@@ -88,12 +90,7 @@ export function ProjectionPanel({ view }: { view: ProjectionView }) {
                   className={`${FIELD} w-44`}
                 />
               </label>
-              <button
-                type="submit"
-                className="rounded-md border border-border px-3 py-1.5 text-[12px] transition-colors hover:bg-surface-2"
-              >
-                {copy.form.submit}
-              </button>
+              <Button type="submit">{copy.form.submit}</Button>
               <div className="flex items-center gap-1.5">
                 <Checkbox name={DETAIL_PARAM} defaultChecked={view.extended}>
                   {copy.form.detail}
@@ -126,8 +123,6 @@ export function ProjectionPanel({ view }: { view: ProjectionView }) {
       {view.result !== null && view.goalAnswer !== null && (
         <GoalCard view={view} />
       )}
-
-      {view.result !== null && <Method view={view} />}
     </div>
   );
 }
@@ -275,7 +270,16 @@ function Notes({ view }: { view: ProjectionView }) {
       {view.unpricedCount > 0 && (
         <p className="text-negative">{copy.unpriced(view.unpricedCount)}</p>
       )}
+      {view.result !== null && (
+        <p className="text-muted">
+          {copy.method.tailNoise(
+            view.result.simulations,
+            view.result.windowMonths,
+          )}
+        </p>
+      )}
       <p className="text-muted">{copy.hypothesis}</p>
+      {view.result !== null && <MethodDialog view={view} />}
     </div>
   );
 }
@@ -329,18 +333,14 @@ function offPlanNote(result: ProjectionResult): string {
   }
 }
 
-function Method({ view }: { view: ProjectionView }) {
+function MethodDialog({ view }: { view: ProjectionView }) {
   const copy = es.projection.method;
   const result = view.result;
   if (result === null) return null;
 
   return (
-    <Card className="min-w-0 p-6">
-      <h2 className="mb-3 text-[11px] uppercase tracking-[0.08em] text-muted">
-        {copy.title}
-      </h2>
-
-      <ul className="flex flex-col gap-2 text-[12px] leading-[1.6] text-muted">
+    <NoteLink title={copy.title} className="self-start">
+      <ul className="flex flex-col gap-2 py-4 text-[12px] leading-[1.6] text-muted">
         <li>{copy.window(result.windowMonths, view.limitingName)}</li>
         <li>
           {copy.drift(
@@ -349,13 +349,12 @@ function Method({ view }: { view: ProjectionView }) {
           )}
         </li>
         <li>{copy.simulations(result.simulations, result.seed)}</li>
-        <li>{copy.tailNoise(result.simulations, result.windowMonths)}</li>
         {view.annualInflation !== null && (
           <li>{copy.inflation(formatPercent(view.annualInflation, 2))}</li>
         )}
         <li>{copy.fixedWeights}</li>
         <li>{offPlanNote(result)}</li>
       </ul>
-    </Card>
+    </NoteLink>
   );
 }
