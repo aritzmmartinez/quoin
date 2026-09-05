@@ -1,7 +1,7 @@
 import type { ButtonHTMLAttributes } from "react";
 
 const BASE =
-  "inline-flex items-center gap-1.5 transition-colors disabled:pointer-events-none disabled:opacity-30";
+  "inline-flex items-center gap-1.5 whitespace-nowrap transition-colors disabled:pointer-events-none disabled:opacity-30";
 
 const VARIANTS = {
   default: "border border-border hover:bg-surface-2",

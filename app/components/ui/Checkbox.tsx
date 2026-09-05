@@ -20,7 +20,7 @@ export function Checkbox({
 }) {
   return (
     <label
-      className={`group inline-flex cursor-pointer select-none items-center gap-2 rounded-lg border border-border px-2.5 py-1.5 text-[12px] font-medium text-muted transition-colors hover:text-text has-checked:bg-surface-2 has-checked:text-text has-focus-visible:border-text ${className}`}
+      className={`group inline-flex cursor-pointer select-none items-center gap-2 rounded-md border border-border px-2.5 py-1.5 text-[12px] font-medium text-muted transition-colors hover:text-text has-checked:bg-surface-2 has-checked:text-text has-focus-visible:border-text ${className}`}
     >
       <input
         type="checkbox"
