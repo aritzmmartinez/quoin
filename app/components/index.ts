@@ -9,6 +9,7 @@ export * from "./allocation/ThresholdSlider";
 export * from "./allocation/ViewTabs";
 export * from "./ui/Button";
 export * from "./ui/Card";
+export * from "./ui/FileDropzone";
 export * from "./ui/SleeveChip";
 export * from "./ui/StatTile";
 export * from "./ui/MeterBar";
