@@ -8,34 +8,20 @@ import {
   PrismaPriceRepository,
   prisma,
 } from "~/adapters/persistence";
-import type { HistoryRange, PriceSnapshot } from "~/core/ports";
-
-const RANGES: readonly HistoryRange[] = ["1y", "2y", "5y", "10y", "max"];
-const DEFAULT_RANGE: HistoryRange = "5y";
-
-function isRange(value: string): value is HistoryRange {
-  return (RANGES as readonly string[]).includes(value);
-}
-
-function medianGapDays(quotes: readonly { asOf: Date }[]): number {
-  if (quotes.length < 2) return 0;
-  const gaps = quotes
-    .slice(1)
-    .map(
-      (quote, i) =>
-        (quote.asOf.getTime() - quotes[i]!.asOf.getTime()) / 86_400_000,
-    )
-    .sort((a, b) => a - b);
-  const mid = Math.floor(gaps.length / 2);
-  return gaps.length % 2 === 0 ? (gaps[mid - 1]! + gaps[mid]!) / 2 : gaps[mid]!;
-}
+import type { HistoryRange } from "~/core/ports";
+import {
+  DEFAULT_HISTORY_RANGE,
+  HISTORY_RANGES,
+  backfillInstrument,
+  isHistoryRange,
+} from "~/lib/prices-backfill";
 
 function usage(): string {
   return [
     "Usage: pnpm prices:backfill [ISIN] [range]",
     "",
     `  ISIN   backfill a single instrument (default: every mapped instrument)`,
-    `  range  one of ${RANGES.join(", ")} (default: ${DEFAULT_RANGE})`,
+    `  range  one of ${HISTORY_RANGES.join(", ")} (default: ${DEFAULT_HISTORY_RANGE})`,
   ].join("\n");
 }
 
@@ -46,8 +32,8 @@ async function main(): Promise<void> {
     return;
   }
 
-  const rangeArg = args.find((arg) => isRange(arg));
-  const range: HistoryRange = rangeArg ?? DEFAULT_RANGE;
+  const rangeArg = args.find((arg) => isHistoryRange(arg));
+  const range: HistoryRange = rangeArg ?? DEFAULT_HISTORY_RANGE;
   const isinArg = args.find((arg) => arg !== rangeArg);
 
   const instruments = await new PrismaInstrumentRepository().list();
@@ -78,38 +64,33 @@ async function main(): Promise<void> {
   let total = 0;
 
   for (const instrument of targets) {
-    const quotes = await provider.getHistory(instrument.quoteSymbol, range);
+    const report = await backfillInstrument(
+      provider,
+      repository,
+      { id: instrument.id, quoteSymbol: instrument.quoteSymbol },
+      range,
+    );
+    total += report.written;
 
-    if (quotes.length === 0) {
+    if (report.written === 0 && report.first === null) {
       console.log(
-        `  ${instrument.id}  (${instrument.quoteSymbol})  no history returned`,
+        `  ${report.instrumentId}  (${report.symbol})  no history returned`,
       );
       continue;
     }
 
-    const snapshots: PriceSnapshot[] = quotes.map((quote) => ({
-      instrumentId: instrument.id,
-      price: quote.price,
-      currency: quote.currency,
-      asOf: quote.asOf,
-      source: provider.source,
-    }));
-
-    const written = await repository.saveMany(snapshots);
-    total += written;
-
-    const first = quotes[0]?.asOf.toISOString().slice(0, 10);
-    const last = quotes[quotes.length - 1]?.asOf.toISOString().slice(0, 10);
-    const weekly =
-      medianGapDays(quotes) >= 4
-        ? "  ⚠ weekly candles — Yahoo degraded this range; try a shorter one for daily"
-        : "";
+    const weekly = report.weekly
+      ? "  ⚠ weekly candles — Yahoo degraded this range; try a shorter one for daily"
+      : "";
     console.log(
-      `  ${instrument.id}  (${instrument.quoteSymbol})  ${written} candle(s)  ${first} → ${last}  ${quotes[0]?.currency}${weekly}`,
+      `  ${report.instrumentId}  (${report.symbol})  ${report.written} candle(s)  ${report.first?.slice(0, 10)} → ${report.last?.slice(0, 10)}  ${report.currency}${weekly}`,
     );
   }
 
   console.log(`\nPersisted ${total} snapshot(s).`);
+  console.log(
+    "Run `pnpm prices:sync` next: the most recent session comes back without a close and is not in this history.",
+  );
 }
 
 main()

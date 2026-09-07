@@ -2,9 +2,7 @@ import "dotenv/config";
 
 import { argv, exit } from "node:process";
 
-import Decimal from "decimal.js";
-
-import { isFreshQuote, YahooMarketDataProvider } from "~/adapters/marketdata";
+import { YahooMarketDataProvider } from "~/adapters/marketdata";
 import {
   PrismaInstrumentRepository,
   PrismaLedgerRepository,
@@ -12,18 +10,13 @@ import {
   prisma,
 } from "~/adapters/persistence";
 import { computePositions } from "~/core/projections";
+import { remapQuoteSymbol } from "~/lib/quote-symbol";
+import { checkSymbol, heldQuantity } from "~/lib/symbol-check";
 
 const USAGE = `Usage:
   pnpm prices:map <ISIN>            show the current quote symbol
   pnpm prices:map <ISIN> <SYMBOL>   set the quote symbol (e.g. VWCE.DE, BTC-EUR)
   pnpm prices:map <ISIN> --clear    remove the quote symbol`;
-
-async function heldQuantity(instrumentId: string): Promise<Decimal> {
-  const events = await new PrismaLedgerRepository().list();
-  return computePositions(events)
-    .filter((p) => p.instrumentId === instrumentId)
-    .reduce((sum, p) => sum.plus(new Decimal(p.quantity)), new Decimal(0));
-}
 
 async function preview(symbol: string, instrumentId: string): Promise<void> {
   try {
@@ -34,18 +27,21 @@ async function preview(symbol: string, instrumentId: string): Promise<void> {
       );
       return;
     }
-    const qty = await heldQuantity(instrumentId);
-    const implied = new Decimal(quote.price).mul(qty).toFixed(2);
-    const stale = isFreshQuote(quote)
+
+    const events = await new PrismaLedgerRepository().list();
+    const check = checkSymbol(
+      quote,
+      heldQuantity(computePositions(events), instrumentId),
+    );
+
+    const stale = check.fresh
       ? ""
       : "  ⚠ STALE timestamp — likely the wrong/illiquid venue";
+    console.log(`  → ${check.price} ${check.currency} @ ${check.asOf}${stale}`);
     console.log(
-      `  → ${quote.price} ${quote.currency} @ ${quote.asOf.toISOString()}${stale}`,
+      `  → implied value: ${check.quantity} units = ${check.impliedValue} ${check.currency}`,
     );
-    console.log(
-      `  → implied value: ${qty.toFixed(qty.isInteger() ? 0 : 4)} units = ${implied} ${quote.currency}`,
-    );
-    if (qty.isZero()) {
+    if (check.closed) {
       console.log(
         "  ⚠ position is closed (0 units held) — a zero implied value can't sanity-check this symbol against what you paid, so verify the venue by hand.",
       );
@@ -78,12 +74,14 @@ async function main(): Promise<void> {
 
   const symbol = symbolArg === "--clear" ? null : symbolArg;
 
-  if (symbol !== instrument.quoteSymbol) {
-    const removed = await new PrismaPriceRepository().deleteForInstrument(id);
-    if (removed > 0) console.log(`Cleared ${removed} old price snapshot(s).`);
-  }
+  const { removed } = await remapQuoteSymbol(
+    repo,
+    new PrismaPriceRepository(),
+    id,
+    symbol,
+  );
+  if (removed > 0) console.log(`Cleared ${removed} old price snapshot(s).`);
 
-  await repo.setQuoteSymbol(id, symbol);
   console.log(
     `${instrument.id}  ${instrument.name}\n  quoteSymbol: ${symbol ?? "(cleared)"}`,
   );
