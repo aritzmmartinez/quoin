@@ -9,6 +9,7 @@ export * from "./pagination";
 export * from "./portfolio";
 export * from "./prices-sync";
 export * from "./projection";
+export * from "./quote-symbol";
 export * from "./range";
 export * from "./realized";
 export * from "./rebalance";
