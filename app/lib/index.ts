@@ -2,6 +2,7 @@ export * from "./basis";
 export * from "./exposures";
 export * from "./format";
 export * from "./i18n";
+export * from "./ingest";
 export * from "./instruments";
 export * from "./movements";
 export * from "./opportunity-cost";
