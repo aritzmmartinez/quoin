@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- prices:backfill logic extracted out of the script into backfillInstrument, so the CLI and the import step share one implementation. The script still prints per instrument as it goes.
+- prices:map now goes through remapQuoteSymbol, the one place that drops an instrument's snapshots before storing a different symbol. A test pins that order.
+- pnpm prices:backfill ends by pointing at pnpm prices:sync: the most recent session can come back without a close and is not in the history it just wrote.
+
 ## [0.6.0] - 2026-09-05
 
 ### Added

@@ -124,6 +124,17 @@ This has caused misdirected generation more than once:
   correct for "what is this worth now" and wrong for "what was this worth then".
 - `backfill` issues **sequential** requests (the chart endpoint is unofficial and
   rate-limits) and drops sessions without a close rather than interpolating.
+- **A backfill does not necessarily cover today, so a fresh mapping needs both steps.**
+  Yahoo consolidates the newest daily candle late: for hours after a session closes,
+  `range=` still returns it with `close: null`, and the parser drops it rather than
+  interpolate. Measured on VWCE.DE, IWDA.AS and SXR8.DE at 22:20Z on a Saturday — the
+  Friday candle was null; ten minutes later the same request had it filled. Crypto is
+  unaffected (24/7, no consolidation gap), which is why testing this on `BTC-EUR` shows
+  nothing. `prices:sync` is what closes the gap, writing the live session from
+  `regularMarketPrice`. The two never collide: different `asOf` (session open vs. market
+  timestamp), so `@@unique([instrumentId, asOf])` keeps both and `latest()` resolves the
+  sync's. Run backfill first and sync second — the requirement is that **both** run;
+  ending on the sync just means the last row written is also the newest in time.
 - `PriceSnapshot` is append-only and idempotent via `@@unique([instrumentId, asOf])`.
 - Remapping an `Instrument.quoteSymbol` **deletes** that instrument's existing snapshots.
   Two symbols' prices must never share a series.
