@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Four-step import ("Importar operaciones") from a modal on /cartera, so a broker export can be taken all the way to a valued position without touching the CLI: drop the CSV, map the missing quote symbols, download the prices, read the summary. Any step already reached is a link back.
+- The broker is detected from the header row (transaction_id for Trade Republic, refid for Kraken), with no selector to get wrong. A file matching neither is refused by name rather than guessed at from its contents.
+- Mapping a symbol shows the quote, its market timestamp and the implied value of the position held, so a venue line quoting a multiple of the right one is visible before anything is written. The same check now backs pnpm prices:map.
+- Shared file dropzone, used by the holdings import and the new one. It hands the caller the File and nothing else: one reads .xlsx as a buffer, the other sends text to the server, and neither wants the other's parsing.
+- The import step strip is a row of numbered markers: filled with a check once passed, outlined on the step in hand, muted ahead, joined by a rule that goes solid only behind you. Anterior/Siguiente sit at the foot of the modal, so navigating and acting are never the same button.
+
 ### Changed
 - prices:backfill logic extracted out of the script into backfillInstrument, so the CLI and the import step share one implementation. The script still prints per instrument as it goes.
 - prices:map now goes through remapQuoteSymbol, the one place that drops an instrument's snapshots before storing a different symbol. A test pins that order.

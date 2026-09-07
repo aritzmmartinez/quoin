@@ -8,16 +8,19 @@ export function Modal({
   ref,
   title,
   children,
+  onClose,
 }: {
   ref: Ref<HTMLDialogElement>;
   title: string;
   children: ReactNode;
+  onClose?: () => void;
 }) {
   const id = `modal-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
 
   return (
     <dialog
       ref={ref}
+      onClose={onClose}
       onClick={(event) => {
         if (event.target === event.currentTarget) event.currentTarget.close();
       }}

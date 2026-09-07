@@ -7,6 +7,7 @@ export * from "./allocation/ReadingCard";
 export * from "./allocation/RebalancePanel";
 export * from "./allocation/ThresholdSlider";
 export * from "./allocation/ViewTabs";
+export * from "./ingest/IngestModal";
 export * from "./ui/Button";
 export * from "./ui/Card";
 export * from "./ui/FileDropzone";
