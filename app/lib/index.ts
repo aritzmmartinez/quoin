@@ -14,6 +14,7 @@ export * from "./range";
 export * from "./realized";
 export * from "./rebalance";
 export * from "./summary";
+export * from "./symbol-check";
 export * from "./target";
 export * from "./tax";
 export * from "./ter";
