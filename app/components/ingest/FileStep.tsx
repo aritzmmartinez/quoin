@@ -49,8 +49,10 @@ export function FileStep({
 
       <SummaryList summary={preview.summary} />
 
-      {preview.summary.imported === 0 && (
+      {preview.summary.imported === 0 ? (
         <p className="mt-3 text-[12px] text-muted">{copy.nothingNew}</p>
+      ) : (
+        <p className="mt-3 text-[12px] text-muted">{copy.appliesNow}</p>
       )}
 
       <div className="mt-4">
@@ -58,7 +60,7 @@ export function FileStep({
           onClick={onConfirm}
           disabled={busy || imported || preview.summary.imported === 0}
         >
-          {busy ? copy.importing : copy.confirm}
+          {busy ? copy.importing : copy.confirmCount(preview.summary.imported)}
         </Button>
       </div>
     </>

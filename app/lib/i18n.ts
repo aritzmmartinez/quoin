@@ -380,7 +380,21 @@ export const es = {
     },
     nothingNew:
       "Nada nuevo que importar: todas las operaciones de este fichero ya estaban en el registro.",
-    confirm: "Importar",
+    confirmCount: (count: number): string =>
+      count === 1
+        ? "Importar 1 operación"
+        : `Importar ${count} operaciones`,
+    appliesNow:
+      "Las operaciones se guardan en el registro al pulsar. Los pasos siguientes solo añaden símbolos y precios: cerrar el asistente después no revierte la importación.",
+    closeConfirm: {
+      body: (count: number): string =>
+        count === 1
+          ? "Ya se ha importado 1 operación y se mantiene en el registro aunque cierres ahora."
+          : `Ya se han importado ${count} operaciones y se mantienen en el registro aunque cierres ahora.`,
+      hint: "Los símbolos que falten por mapear se completan en Instrumentos.",
+      keep: "Seguir con la importación",
+      close: "Cerrar de todos modos",
+    },
     map: {
       title: "Símbolos de cotización",
       intro:
@@ -428,7 +442,7 @@ export const es = {
       nothing: "Ningún instrumento nuevo con símbolo que actualizar.",
     },
     done: {
-      title: "Importación completada",
+      title: "Resumen de la importación",
       imported: (count: number): string =>
         count === 1
           ? "1 operación importada"

@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The import step strip is a row of numbered markers: filled with a check once passed, outlined on the step in hand, muted ahead, joined by a rule that goes solid only behind you. Anterior/Siguiente sit at the foot of the modal, so navigating and acting are never the same button.
 
 ### Changed
+- The import writes the ledger at step 1, not at the end — the later steps only add symbols and prices — so that button now reads "Importar N operaciones", not "Confirmar", with a line saying the operations are kept even if the assistant is closed after. The final step is titled "Resumen de la importación", not "Importación completada": it is a summary, not a commit.
+- The import modal cannot be closed while a request is in flight: Escape, the backdrop and the close button are all held until it resolves, so a click outside can no longer unmount the stepper mid-fetch and lose the response. Chrome force-closes a dialog whose Escape was intercepted twice with no gesture between; onClose reopens it while a request is still pending.
+- Closing the import modal after it has written, before the summary, asks first — stating that the N operations are kept and that the missing symbols are finished in Instrumentos — so an accidental close is a legible exit rather than a surprise.
 - prices:backfill logic extracted out of the script into backfillInstrument, so the CLI and the import step share one implementation. The script still prints per instrument as it goes.
 - prices:map now goes through remapQuoteSymbol, the one place that drops an instrument's snapshots before storing a different symbol. A test pins that order.
 - pnpm prices:backfill ends by pointing at pnpm prices:sync: the most recent session can come back without a close and is not in the history it just wrote.

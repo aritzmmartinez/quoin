@@ -1,5 +1,5 @@
 import { Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { Broker, ImportSummary } from "~/adapters/ingestion";
 import type { PendingMapping, PriceFillResult } from "~/lib/ingest";
@@ -18,7 +18,19 @@ interface Loaded {
   csv: string;
 }
 
-export function IngestStepper({ onFinish }: { onFinish: () => void }) {
+export interface IngestStatus {
+  imported: boolean;
+  atDone: boolean;
+  importedCount: number;
+}
+
+export function IngestStepper({
+  onFinish,
+  onStatusChange,
+}: {
+  onFinish: () => void;
+  onStatusChange?: (status: IngestStatus) => void;
+}) {
   const copy = es.ingest;
 
   const [stage, setStage] = useState<Stage>("file");
@@ -39,6 +51,14 @@ export function IngestStepper({ onFinish }: { onFinish: () => void }) {
     setStage(next);
     if (STAGES.indexOf(next) > STAGES.indexOf(reached)) setReached(next);
   }
+
+  useEffect(() => {
+    onStatusChange?.({
+      imported: summary !== null,
+      atDone: stage === "done",
+      importedCount: summary?.imported ?? 0,
+    });
+  }, [summary, stage, onStatusChange]);
 
   async function read(dropped: File): Promise<void> {
     setError(null);
