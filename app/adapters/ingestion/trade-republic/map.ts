@@ -133,8 +133,15 @@ export function mapRow(row: TradeRepublicRow): MappedItem {
       return { kind: "discard", reason: "card-spending" };
 
     default:
-      // Saveback, corporate actions, liquidations, and anything unrecognized.
-      return { kind: "discard", reason: "unsupported" };
+      return {
+        kind: "discard",
+        reason: "unsupported",
+        detail: {
+          date: row.datetime,
+          type: row.type,
+          instrument: row.name || null,
+        },
+      };
   }
 }
 

@@ -377,6 +377,11 @@ export const es = {
       discarded: "Descartadas",
       errors: "Con error",
       none: "ninguna",
+      unsupportedDetails: (count: number): string =>
+        count === 1
+          ? "Ver 1 fila sin soporte"
+          : `Ver ${count} filas sin soporte`,
+      noInstrument: "Sin instrumento",
     },
     nothingNew:
       "Nada nuevo que importar: todas las operaciones de este fichero ya estaban en el registro.",
