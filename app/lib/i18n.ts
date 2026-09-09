@@ -428,6 +428,8 @@ export const es = {
       none: "Todos los instrumentos importados ya tienen símbolo.",
       mapped: (done: number, total: number): string =>
         `${done} de ${total} mapeados`,
+      canContinue:
+        "Puedes continuar sin mapearlos todos: los símbolos que falten se completan en Instrumentos.",
     },
     prices: {
       title: "Precios",

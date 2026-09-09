@@ -37,6 +37,7 @@ export function DoneStep({
           <li className="text-negative">{copy.staleWarning(fill.stale)}</li>
         )}
         {unmapped > 0 && <li>{copy.unmapped(unmapped)}</li>}
+        {unmapped > 0 && <li>{es.ingest.closeConfirm.hint}</li>}
       </ul>
     </>
   );

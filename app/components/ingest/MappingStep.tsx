@@ -38,6 +38,9 @@ export function MappingStep({
       <p className="mt-3 text-[12px] text-muted">
         {copy.mapped(done, pending.length)}
       </p>
+      {done < pending.length && (
+        <p className="mt-1 text-[12px] text-muted">{copy.canContinue}</p>
+      )}
     </>
   );
 }
