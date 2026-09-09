@@ -12,6 +12,18 @@ import type { PriceSnapshot } from "~/core/ports";
 import type { MappedItem } from "../ingest";
 import type { KrakenRow } from "./row";
 
+function unsupported(row: KrakenRow): MappedItem {
+  return {
+    kind: "discard",
+    reason: "unsupported",
+    detail: {
+      date: parseTime(row.time).toISOString(),
+      type: row.type,
+      instrument: row.asset || null,
+    },
+  };
+}
+
 export type PriceAt = (instrumentId: string, ts: Date) => string | null;
 
 const MAX_PRICE_AGE_DAYS = 7;
@@ -111,11 +123,11 @@ export function mapGroup(
           ? reward(refid, row, priceAt)
           : [{ kind: "discard", reason: "non-btc" }];
       default:
-        return [{ kind: "discard", reason: "unsupported" }];
+        return [unsupported(row)];
     }
   }
 
-  return [{ kind: "discard", reason: "unsupported" }];
+  return [unsupported(rows[0]!)];
 }
 
 function trade(

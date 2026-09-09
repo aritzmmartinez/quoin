@@ -184,6 +184,30 @@ describe("Kraken mapGroup", () => {
     ]);
     expect(swap).toEqual([{ kind: "discard", reason: "non-btc" }]);
   });
+
+  it("discards an unrecognized row type as unsupported, keeping the row", () => {
+    const result = mapGroup([
+      row({
+        refid: "U1",
+        time: "2025-11-13 18:04:48",
+        type: "staking",
+        subclass: "crypto",
+        asset: "ETH",
+        amount: "0.1",
+      }),
+    ]);
+    expect(result).toEqual([
+      {
+        kind: "discard",
+        reason: "unsupported",
+        detail: {
+          date: "2025-11-13T18:04:48.000Z",
+          type: "staking",
+          instrument: "ETH",
+        },
+      },
+    ]);
+  });
 });
 
 describe("priceLookupFrom", () => {

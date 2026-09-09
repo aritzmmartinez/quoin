@@ -4,6 +4,7 @@ import type { Route } from "./+types/portfolio";
 
 import {
   Card,
+  IngestModal,
   PortfolioEmpty,
   PortfolioTable,
   SignedMoney,
@@ -30,7 +31,6 @@ import {
   totalMarketValue,
   totalUnrealizedPnL,
 } from "~/lib";
-
 
 export function meta(_: Route.MetaArgs) {
   return [
@@ -85,28 +85,31 @@ export default function Portfolio({ loaderData }: Route.ComponentProps) {
 
   return (
     <>
-      <header className="mb-4">
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      <header className="mb-4 flex items-start justify-between gap-4">
+        <div>
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            {rows.length > 0 && (
+              <span className="text-[13px] text-muted">
+                {es.portfolio.summary(rows.length, formatMoney(invested))}
+                {value !== null && <> · {formatMoney(value)} valor</>}
+              </span>
+            )}
+            {unrealized !== null && (
+              <SignedMoney
+                value={unrealized}
+                className="text-[13px] font-medium"
+              />
+            )}
+          </div>
           {rows.length > 0 && (
-            <span className="text-[13px] text-muted">
-              {es.portfolio.summary(rows.length, formatMoney(invested))}
-              {value !== null && <> · {formatMoney(value)} valor</>}
-            </span>
-          )}
-          {unrealized !== null && (
-            <SignedMoney
-              value={unrealized}
-              className="text-[13px] font-medium"
-            />
+            <p className="mt-1 text-[12px] text-muted">
+              {updatedAt
+                ? es.portfolio.updatedAt(formatRelativeTime(updatedAt))
+                : es.portfolio.noPrices}
+            </p>
           )}
         </div>
-        {rows.length > 0 && (
-          <p className="mt-1 text-[12px] text-muted">
-            {updatedAt
-              ? es.portfolio.updatedAt(formatRelativeTime(updatedAt))
-              : es.portfolio.noPrices}
-          </p>
-        )}
+        <IngestModal />
       </header>
 
       <Card>

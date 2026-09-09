@@ -7,7 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- New Quoin logo favicon
+- Four-step import ("Importar operaciones") from a modal on /cartera, so a broker export can be taken all the way to a valued position without touching the CLI: drop the CSV, map the missing quote symbols, download the prices, read the summary. Any step already reached is a link back.
+- The broker is detected from the header row (transaction_id for Trade Republic, refid for Kraken), with no selector to get wrong. A file matching neither is refused by name rather than guessed at from its contents.
+- Mapping a symbol shows the quote, its market timestamp and the implied value of the position held, so a venue line quoting a multiple of the right one is visible before anything is written. The same check now backs pnpm prices:map.
+- Shared file dropzone, used by the holdings import and the new one. It hands the caller the File and nothing else: one reads .xlsx as a buffer, the other sends text to the server, and neither wants the other's parsing.
+- The import step strip is a row of numbered markers: filled with a check once passed, outlined on the step in hand, muted ahead, joined by a rule that goes solid only behind you. Anterior/Siguiente sit at the foot of the modal, so navigating and acting are never the same button.
+- The import summary's "Descartadas" row now expands, for the "unsupported" reason only, into the date, broker type and instrument of every row that fell into it — a stock split or a share delivery can change a real position, so silently dropping one is a data-integrity risk, unlike expected discards (card spending, non-BTC crypto) which stay count-only. Applies to both Trade Republic and Kraken.
+
 ### Changed
+- The import writes the ledger at step 1, not at the end — the later steps only add symbols and prices — so that button now reads "Importar N operaciones", not "Confirmar", with a line saying the operations are kept even if the assistant is closed after. The final step is titled "Resumen de la importación", not "Importación completada": it is a summary, not a commit.
+- The import modal cannot be closed while a request is in flight: Escape, the backdrop and the close button are all held until it resolves, so a click outside can no longer unmount the stepper mid-fetch and lose the response. Chrome force-closes a dialog whose Escape was intercepted twice with no gesture between; onClose reopens it while a request is still pending.
+- Closing the import modal after it has written, before the summary, asks first — stating that the N operations are kept and that the missing symbols are finished in Instrumentos — so an accidental close is a legible exit rather than a surprise.
+- The mapping step and the summary step now say where the unmapped symbols get finished ("se completan en Instrumentos") — the mapping step also states outright that you can advance without mapping them all. The summary only shows it when instruments are in fact still unmapped.
 - prices:backfill logic extracted out of the script into backfillInstrument, so the CLI and the import step share one implementation. The script still prints per instrument as it goes.
 - prices:map now goes through remapQuoteSymbol, the one place that drops an instrument's snapshots before storing a different symbol. A test pins that order.
 - pnpm prices:backfill ends by pointing at pnpm prices:sync: the most recent session can come back without a close and is not in the history it just wrote.

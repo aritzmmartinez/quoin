@@ -16,6 +16,7 @@ export interface SyncPricesDeps {
   prices: PriceRepository;
   provider: MarketDataProvider;
   now?: Date;
+  only?: readonly string[];
 }
 
 export interface PriceSyncResult extends PriceSyncPlan {
@@ -25,7 +26,9 @@ export interface PriceSyncResult extends PriceSyncPlan {
 export async function syncPrices(
   deps: SyncPricesDeps = defaultDeps(),
 ): Promise<PriceSyncResult> {
-  const instruments = await deps.instruments.list();
+  const all = await deps.instruments.list();
+  const only = deps.only;
+  const instruments = only ? all.filter((i) => only.includes(i.id)) : all;
   const symbols = [
     ...new Set(
       instruments.map((i) => i.quoteSymbol).filter((s): s is string => !!s),
