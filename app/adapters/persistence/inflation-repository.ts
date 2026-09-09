@@ -38,12 +38,20 @@ export class PrismaInflationRepository implements InflationRepository {
   }
 
   async lastSyncedAt(series: string): Promise<Date | null> {
-    const row = await prisma.inflationIndex.findFirst({
+    const row = await prisma.inflationSync.findUnique({
       where: { series },
-      orderBy: { createdAt: "desc" },
-      select: { createdAt: true },
+      select: { checkedAt: true },
     });
-    return row?.createdAt ?? null;
+    return row?.checkedAt ?? null;
+  }
+
+  async markChecked(series: string): Promise<void> {
+    const now = new Date();
+    await prisma.inflationSync.upsert({
+      where: { series },
+      create: { series, checkedAt: now },
+      update: { checkedAt: now },
+    });
   }
 
   async deleteSeries(series: string): Promise<number> {
