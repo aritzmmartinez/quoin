@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- New Quoin logo favicon
 - Four-step import ("Importar operaciones") from a modal on /cartera, so a broker export can be taken all the way to a valued position without touching the CLI: drop the CSV, map the missing quote symbols, download the prices, read the summary. Any step already reached is a link back.
 - The broker is detected from the header row (transaction_id for Trade Republic, refid for Kraken), with no selector to get wrong. A file matching neither is refused by name rather than guessed at from its contents.
 - Mapping a symbol shows the quote, its market timestamp and the implied value of the position held, so a venue line quoting a multiple of the right one is visible before anything is written. The same check now backs pnpm prices:map.
