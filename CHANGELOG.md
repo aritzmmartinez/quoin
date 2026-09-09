@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- The inflation-basis notice on Resumen and /realizado now carries a "Sincronizar IPC" button. Every state that needs a fresh CPI series — none stored, a gap inside the range, or a series stale enough that INE may have published a month it does not hold — is a click, not a trip to the terminal.`pnpm ipc:sync still works and is unchanged for the caller.
+- Real mode now says when its CPI series is stale. basis.lag used to claim the reference was "a few weeks behind" whenever real mode worked, without checking anything; a series last fetched more than 35 days ago (past one INE publication cycle) now shows a distinct notice, because the app cannot see months INE has published that it has not fetched — only that nobody has looked lately.
 - New Quoin logo favicon
 - Four-step import ("Importar operaciones") from a modal on /cartera, so a broker export can be taken all the way to a valued position without touching the CLI: drop the CSV, map the missing quote symbols, download the prices, read the summary. Any step already reached is a link back.
 - The broker is detected from the header row (transaction_id for Trade Republic, refid for Kraken), with no selector to get wrong. A file matching neither is refused by name rather than guessed at from its contents.
@@ -17,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The import summary's "Descartadas" row now expands, for the "unsupported" reason only, into the date, broker type and instrument of every row that fell into it — a stock split or a share delivery can change a real position, so silently dropping one is a data-integrity risk, unlike expected discards (card spending, non-BTC crypto) which stay count-only. Applies to both Trade Republic and Kraken.
 
 ### Changed
+- pnpm ipc:sync logic extracted from the script into syncInflation, shared by the CLI and the new /api/ipc/sync endpoint the button posts to. --force-rebase stays CLI-only — it deletes a series wholesale, too destructive to sit behind a button, so the endpoint detects that a rebase is needed and names the series but never runs it.
+- The basis badge tooltip ("IPC actualizado hace X") now means when the series was last fetched from INE, not when its newest stored month first landed. A new InflationSync row records every sync attempt, so a re-sync that finds nothing new still refreshes it — which is what the freshness check needs and what the field was always documented to mean.
+- The "no hay datos de IPC" and "faltan datos de IPC" notices no longer end by telling the reader to run a command — the button beside them does it.
 - The import writes the ledger at step 1, not at the end — the later steps only add symbols and prices — so that button now reads "Importar N operaciones", not "Confirmar", with a line saying the operations are kept even if the assistant is closed after. The final step is titled "Resumen de la importación", not "Importación completada": it is a summary, not a commit.
 - The import modal cannot be closed while a request is in flight: Escape, the backdrop and the close button are all held until it resolves, so a click outside can no longer unmount the stepper mid-fetch and lose the response. Chrome force-closes a dialog whose Escape was intercepted twice with no gesture between; onClose reopens it while a request is still pending.
 - Closing the import modal after it has written, before the summary, asks first — stating that the N operations are kept and that the missing symbols are finished in Instrumentos — so an accidental close is a legible exit rather than a surprise.

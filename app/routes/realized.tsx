@@ -73,6 +73,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       missing: real.missing,
       hasIndex: real.hasIndex,
       syncedAt: real.syncedAt,
+      checkStale: real.checkStale,
     },
     fiscal: {
       years: taxYears,
