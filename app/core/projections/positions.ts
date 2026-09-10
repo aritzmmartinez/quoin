@@ -1,10 +1,9 @@
-import { Money, type LedgerEvent, type Revalue, type Sleeve } from "../domain";
+import { Money, type LedgerEvent, type Revalue } from "../domain";
 
 import { walkAvco } from "./avco";
 
 export interface Position {
   instrumentId: string;
-  sleeve: Sleeve;
   quantity: string;
   costBasis: string;
   averageCost: string;
@@ -19,8 +18,9 @@ export interface Position {
  * currency (each is multiplied by its `fxToBase`, which is "1" for base-currency events).
  *
  * Only BUY/SELL affect positions; dividends and cash movements are ignored here
- * (they belong to separate projections). Positions are keyed by instrument + sleeve
- * so the CORE and TRADING sleeves stay ring-fenced.
+ * (they belong to separate projections). One instrument is one position: the
+ * (instrument, sleeve) partition is gone, and with it the two AVCO lots the same
+ * instrument used to be split into.
  *
  * The AVCO arithmetic lives in `walkAvco`, shared with `computeRealizedGains` so the
  * portfolio total and the per-sale breakdown cannot drift apart.
@@ -41,7 +41,6 @@ export function computePositions(
       : lot.costBasis.divideBy(lot.quantity);
     return {
       instrumentId: lot.instrumentId,
-      sleeve: lot.sleeve,
       quantity: lot.quantity.toFixed(),
       costBasis: lot.costBasis.toString(),
       averageCost: averageCost.toString(),

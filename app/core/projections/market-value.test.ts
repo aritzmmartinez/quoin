@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import type { Position } from "./positions";
 import { computeMarketValues, type PriceLike } from "./market-value";
-import { tradeMetaKey } from "./trade-meta";
 
-function position(overrides: Partial<Position> & Pick<Position, "instrumentId">): Position {
+function position(
+  overrides: Partial<Position> & Pick<Position, "instrumentId">,
+): Position {
   return {
-    sleeve: "CORE",
     quantity: "10",
     costBasis: "1000",
     averageCost: "100",
@@ -15,12 +15,18 @@ function position(overrides: Partial<Position> & Pick<Position, "instrumentId">)
   };
 }
 
-const key = (id: string) => tradeMetaKey(id, "CORE");
+const key = (id: string) => id;
 
 describe("computeMarketValues", () => {
   it("computes value and unrealized P&L from price × quantity", () => {
-    const prices = new Map<string, PriceLike>([["A", { price: "120", currency: "EUR" }]]);
-    const result = computeMarketValues([position({ instrumentId: "A" })], prices, "EUR");
+    const prices = new Map<string, PriceLike>([
+      ["A", { price: "120", currency: "EUR" }],
+    ]);
+    const result = computeMarketValues(
+      [position({ instrumentId: "A" })],
+      prices,
+      "EUR",
+    );
 
     expect(result.get(key("A"))?.marketValue).toBe("1200");
     expect(result.get(key("A"))?.unrealizedPnL).toBe("200"); // 1200 − 1000
@@ -40,8 +46,14 @@ describe("computeMarketValues", () => {
   });
 
   it("ignores a snapshot that is not in the base currency (no FX here)", () => {
-    const prices = new Map<string, PriceLike>([["A", { price: "120", currency: "USD" }]]);
-    const result = computeMarketValues([position({ instrumentId: "A" })], prices, "EUR");
+    const prices = new Map<string, PriceLike>([
+      ["A", { price: "120", currency: "USD" }],
+    ]);
+    const result = computeMarketValues(
+      [position({ instrumentId: "A" })],
+      prices,
+      "EUR",
+    );
     expect(result.get(key("A"))?.marketValue).toBeNull();
   });
 

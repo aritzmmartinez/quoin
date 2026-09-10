@@ -1,4 +1,4 @@
-import type { ExposureKind, Instrument } from "~/core/domain";
+import type { ExposureKind, Instrument, Thesis } from "~/core/domain";
 import type { InstrumentRepository } from "~/core/ports";
 
 import { prisma } from "./db.server";
@@ -45,6 +45,10 @@ export class PrismaInstrumentRepository implements InstrumentRepository {
       where: { id },
       data: { hedgedToBase: hedged },
     });
+  }
+
+  async setThesis(id: string, thesis: Thesis): Promise<void> {
+    await prisma.instrument.update({ where: { id }, data: { thesis } });
   }
 
   async setExposure(

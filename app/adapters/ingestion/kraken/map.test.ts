@@ -43,7 +43,7 @@ describe("Kraken mapGroup", () => {
       expect(item!.event.quantity).toBe("0.003");
       expect(item!.event.grossAmount).toBe("150");
       expect(item!.event.price).toBe("50000");
-      expect(item!.event.sleeve).toBe("CORE");
+      expect(item!.instrument?.thesis).toBe("CORE");
     }
   });
 

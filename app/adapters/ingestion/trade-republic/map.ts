@@ -67,9 +67,6 @@ function base(row: TradeRepublicRow) {
  * Card spending is discarded (the CSV is the whole bank account, not just investing).
  * Saveback, corporate actions and any unrecognized type are discarded as "unsupported"
  * so they surface in the import summary instead of being silently mis-booked.
- *
- * Everything imported enters the CORE sleeve — the CSV has no sleeve information, so
- * TRADING reclassification is an explicit manual action later.
  */
 export function mapRow(row: TradeRepublicRow): MappedItem {
   switch (`${row.category}|${row.type}`) {
@@ -82,7 +79,6 @@ export function mapRow(row: TradeRepublicRow): MappedItem {
           ...base(row),
           type: row.type,
           instrumentId: row.symbol,
-          sleeve: "CORE",
           quantity: abs(row.shares),
           price: row.price,
           grossAmount: abs(row.amount),
@@ -98,7 +94,6 @@ export function mapRow(row: TradeRepublicRow): MappedItem {
           ...base(row),
           type: "DIVIDEND",
           instrumentId: row.symbol,
-          sleeve: "CORE",
           grossAmount: abs(row.amount),
           taxWithheld: absOrZero(row.tax),
         }),

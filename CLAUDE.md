@@ -185,21 +185,28 @@ ledger while that rule is in force. Useful, but do not mistake it for a sandbox.
 
 ## Privacy and the no-clobber rule
 
-`Instrument.quoteSymbol`, `exposureKind`, `exposureLeafId` and `ter` are set by CLI or the
-instruments screen and live **only** in the local, gitignored SQLite database. Never commit
-symbols, ISINs, quantities, holdings or broker exports — this repo is public and that data
-would publish the author's portfolio. `*.csv` is gitignored.
+`Instrument.quoteSymbol`, `exposureKind`, `exposureLeafId`, `ter`, `hedgedToBase` and
+`thesis` are set by CLI or the instruments screen and live **only** in the local,
+gitignored SQLite database. Never commit symbols, ISINs, quantities, holdings or broker
+exports — this repo is public and that data would publish the author's portfolio.
+`*.csv` is gitignored.
 
 **Test fixtures are synthetic, always.** This bites in a non-obvious place: the set of funds
 whose compositions get imported *is* the portfolio. A parser test using the real Vanguard
 and Amundi exports would disclose which funds are held, as surely as committing a
 `quoteSymbol` would. Copy the shape, invent the data.
 
-Ingestion must never write those four columns. This is enforced by the type, not by
+Ingestion must never write those columns. This is enforced by the type, not by
 convention — `InstrumentWriteData` is `Omit<InstrumentRow, "quoteSymbol" | "exposureKind" |
-"exposureLeafId" | "ter">`. Ingestion upserts **every** instrument on **every** import, so any
-column it can write is a column it will eventually overwrite. If you widen that type, a
-re-import silently destroys hand-set mappings.
+"exposureLeafId" | "ter" | "hedgedToBase" | "thesis">`. Ingestion upserts **every**
+instrument on **every** import, so any column it can write is a column it will eventually
+overwrite. If you widen that type, a re-import silently destroys hand-set mappings.
+
+**`Instrument.thesis` is CHECK-constrained in the migration, unlike the columns beside
+it.** It is the only one of them the UI writes as an enum, and `rowToInstrument` throws on
+a value the domain cannot read while `list()` maps every row — so an unexpected string
+inserts cleanly and then takes down every screen that lists instruments, far from the write
+that caused it. Same failure mode as `LedgerEntry.type`, same defence.
 
 ## Yahoo symbol mapping traps
 

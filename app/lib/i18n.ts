@@ -1,4 +1,4 @@
-import type { ExposureKind, InstrumentType, Sleeve } from "~/core/domain";
+import type { ExposureKind, InstrumentType, Thesis } from "~/core/domain";
 
 export const es = {
   common: {
@@ -386,9 +386,7 @@ export const es = {
     nothingNew:
       "Nada nuevo que importar: todas las operaciones de este fichero ya estaban en el registro.",
     confirmCount: (count: number): string =>
-      count === 1
-        ? "Importar 1 operación"
-        : `Importar ${count} operaciones`,
+      count === 1 ? "Importar 1 operación" : `Importar ${count} operaciones`,
     appliesNow:
       "Las operaciones se guardan en el registro al pulsar. Los pasos siguientes solo añaden símbolos y precios: cerrar el asistente después no revierte la importación.",
     closeConfirm: {
@@ -530,9 +528,12 @@ export const es = {
       composition: "Composición",
       ter: "TER %",
       hedged: "Divisa",
+      thesis: "Tesis",
       held: "Valor",
     },
     hedgedShort: "Cubierta",
+    thesisHint:
+      "La tesis dice por qué tienes el instrumento, no qué es: eso lo dice la exposición. Cambia cuando cambia tu razonamiento, así que vive aquí y no en la operación que lo compró.",
     defaultOption: "(por defecto del tipo)",
     leafPlaceholder: "XAU, BTC…",
     leafRequired: "Esta clase necesita una hoja (p. ej. XAU).",
@@ -1009,9 +1010,17 @@ export const es = {
   },
 } as const;
 
-const SLEEVE_LABELS: Record<Sleeve, string> = {
-  CORE: "Core",
-  TRADING: "Trading",
+const THESIS_LABELS: Record<Thesis, string> = {
+  CORE: "Núcleo",
+  CONVICTION: "Convicción",
+  TACTICAL: "Táctica",
+};
+
+const THESIS_DESCRIPTIONS: Record<Thesis, string> = {
+  CORE: "Núcleo indexado: lo que sostiene la cartera y no se toca.",
+  CONVICTION:
+    "Apuesta individual que quiero mantener años, no un índice ni un trade.",
+  TACTICAL: "Posición tomada con la salida en mente.",
 };
 
 const TYPE_LABELS: Record<InstrumentType, string> = {
@@ -1023,8 +1032,12 @@ const TYPE_LABELS: Record<InstrumentType, string> = {
   CASH: "Efectivo",
 };
 
-export function sleeveLabel(sleeve: Sleeve): string {
-  return SLEEVE_LABELS[sleeve];
+export function thesisLabel(thesis: Thesis): string {
+  return THESIS_LABELS[thesis];
+}
+
+export function thesisDescription(thesis: Thesis): string {
+  return THESIS_DESCRIPTIONS[thesis];
 }
 
 export function instrumentTypeLabel(type: InstrumentType): string {

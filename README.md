@@ -3,9 +3,9 @@
 A personal, open-source, local-first investment platform. Self-hosted: your data
 never leaves your machine.
 
-Quoin tracks a buy-and-hold portfolio (broad-index ETFs plus a few single names) and,
-later, a small trading sleeve — with allocation analysis, true look-through exposure,
-and support for the Bizkaia *foral* tax regime that off-the-shelf trackers ignore.
+Quoin tracks a buy-and-hold portfolio (broad-index ETFs plus a few single names) — with
+allocation analysis, true look-through exposure, and support for the Bizkaia *foral* tax
+regime that off-the-shelf trackers ignore.
 The goal isn't to trade: it's to **understand** a portfolio, and to double as a
 learning project.
 
@@ -22,8 +22,8 @@ learning project.
 > portfolio could end up, reported as a range and refused outright when the price history
 > is too short to resample. Realised gains are also computed under the Bizkaia *foral*
 > regime — FIFO by lot, a two-month wash-sale exclusion and four-year loss carryforward —
-> as a projection kept separate from the portfolio's average-cost view. The trading sleeve
-> is next — see the roadmap.
+> as a projection kept separate from the portfolio's average-cost view. Each instrument
+> carries a *thesis* — núcleo, convicción or táctica — recording why it is held.
 
 ![Quoin — pantalla de Asignación con look-through](docs/allocation_dark.png)
 

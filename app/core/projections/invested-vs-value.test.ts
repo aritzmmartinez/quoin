@@ -10,7 +10,6 @@ function trade(
     id: crypto.randomUUID(),
     type: "BUY",
     instrumentId: "VWCE",
-    sleeve: "CORE",
     currency: "EUR",
     fxToBase: "1",
     account: "tr",

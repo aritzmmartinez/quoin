@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { computePositions } from "./positions";
-import type { LedgerEvent, TradeEvent, Sleeve } from "../domain";
+import type { LedgerEvent, TradeEvent } from "../domain";
 
 let seq = 0;
 
@@ -9,14 +9,13 @@ function trade(
   instrumentId: string,
   quantity: string,
   grossAmount: string,
-  opts: { fees?: string; sleeve?: Sleeve; ts?: string; fxToBase?: string } = {},
+  opts: { fees?: string; ts?: string; fxToBase?: string } = {},
 ): TradeEvent {
   return {
     id: `evt-${seq++}`,
     ts: new Date(opts.ts ?? "2025-01-01"),
     type,
     instrumentId,
-    sleeve: opts.sleeve ?? "CORE",
     quantity,
     price: "0",
     grossAmount,
@@ -108,18 +107,16 @@ describe("computePositions (AVCO)", () => {
     expect(p.realizedPnL).toBe("1000");
   });
 
-  it("keeps the same instrument separate across sleeves (ring-fence)", () => {
+  it("folds every trade of one instrument into a single position", () => {
     const positions = computePositions([
-      trade("BUY", "X", "10", "1000", { sleeve: "CORE" }),
-      trade("BUY", "X", "5", "1000", { sleeve: "TRADING" }),
+      trade("BUY", "X", "10", "1000"),
+      trade("BUY", "X", "10", "2000"),
     ]);
-    expect(positions).toHaveLength(2);
-    const core = positions.find((p) => p.sleeve === "CORE")!;
-    const trading = positions.find((p) => p.sleeve === "TRADING")!;
-    expect(core.quantity).toBe("10");
-    expect(core.averageCost).toBe("100");
-    expect(trading.quantity).toBe("5");
-    expect(trading.averageCost).toBe("200");
+    expect(positions).toHaveLength(1);
+    const p = only(positions);
+    expect(p.quantity).toBe("20");
+    expect(p.costBasis).toBe("3000");
+    expect(p.averageCost).toBe("150");
   });
 
   it("groups multiple instruments independently", () => {
@@ -148,7 +145,6 @@ describe("computePositions (AVCO)", () => {
         ts: new Date("2025-02-01"),
         type: "DIVIDEND",
         instrumentId: "X",
-        sleeve: "CORE",
         grossAmount: "50",
         taxWithheld: "10",
         currency: "EUR",

@@ -4,6 +4,7 @@ import {
   Money,
   cashEventSchema,
   dividendEventSchema,
+  instrumentSchema,
   tradeEventSchema,
   type Instrument,
 } from "~/core/domain";
@@ -56,13 +57,13 @@ export function priceLookupFrom(snapshots: readonly PriceSnapshot[]): PriceAt {
   };
 }
 
-const BTC: Instrument = {
+const BTC: Instrument = instrumentSchema.parse({
   id: "BTC",
   name: "Bitcoin",
   type: "CRYPTO",
   currency: "EUR",
   assetClass: "crypto",
-};
+});
 
 function parseTime(time: string): Date {
   return new Date(`${time.replace(" ", "T")}Z`);
@@ -146,7 +147,6 @@ function trade(
       ts: parseTime(fiat.time),
       type,
       instrumentId: "BTC",
-      sleeve: "CORE",
       quantity: btc.toFixed(),
       price: btc.isZero() ? "0" : eur.dividedBy(btc).toFixed(),
       grossAmount: eur.toFixed(),
@@ -187,7 +187,6 @@ function reward(refid: string, row: KrakenRow, priceAt: PriceAt): MappedItem[] {
       ts,
       type: "BUY",
       instrumentId: "BTC",
-      sleeve: "CORE",
       quantity,
       price,
       grossAmount,
@@ -209,7 +208,6 @@ function reward(refid: string, row: KrakenRow, priceAt: PriceAt): MappedItem[] {
       ts,
       type: "DIVIDEND",
       instrumentId: "BTC",
-      sleeve: "CORE",
       grossAmount,
       taxWithheld: "0",
       currency: "EUR",

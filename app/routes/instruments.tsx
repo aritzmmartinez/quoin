@@ -19,6 +19,7 @@ import {
   KINDS_NEEDING_LEAF,
   exposureKindSchema,
   terPercentSchema,
+  thesisSchema,
 } from "~/core/domain";
 import { computeMarketValues, computePositions } from "~/core/projections";
 
@@ -59,6 +60,7 @@ const exposureForm = z.object({
   exposureLeafId: z.string().trim().default(""),
   ter: z.string().trim().default(""),
   hedgedToBase: z.string().optional(),
+  thesis: thesisSchema,
 });
 
 const holdingsForm = z.object({
@@ -103,6 +105,7 @@ export async function action({ request }: Route.ActionArgs) {
   );
   await repository.setTer(id, ter);
   await repository.setHedgedToBase(id, parsed.data.hedgedToBase === "1");
+  await repository.setThesis(id, parsed.data.thesis);
   return { ok: true as const };
 }
 

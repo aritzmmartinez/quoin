@@ -2,7 +2,12 @@ import { useState } from "react";
 import { ChevronDown, Upload } from "lucide-react";
 import { useFetcher } from "react-router";
 
-import { exposureKindSchema, KINDS_NEEDING_LEAF } from "~/core/domain";
+import {
+  exposureKindSchema,
+  KINDS_NEEDING_LEAF,
+  thesisSchema,
+  type Thesis,
+} from "~/core/domain";
 import {
   DASH,
   es,
@@ -11,6 +16,8 @@ import {
   formatPercent,
   terInputMatches,
   terToPercentInput,
+  thesisDescription,
+  thesisLabel,
   type InstrumentListItem,
 } from "~/lib";
 
@@ -19,8 +26,9 @@ import { HoldingsUpload } from "./HoldingsUpload";
 import { Button } from "../ui/Button";
 
 const KINDS = exposureKindSchema.options;
+const THESES = thesisSchema.options;
 const GRID =
-  "grid-cols-[minmax(0,1.4fr)_150px_120px_78px_168px_minmax(0,160px)_112px] items-center gap-2";
+  "grid-cols-[minmax(0,1.4fr)_150px_120px_78px_136px_168px_minmax(0,160px)_112px] items-center gap-2";
 
 export function InstrumentsTable({ items }: { items: InstrumentListItem[] }) {
   const copy = es.instruments;
@@ -35,7 +43,7 @@ export function InstrumentsTable({ items }: { items: InstrumentListItem[] }) {
 
   return (
     <div className="overflow-x-auto">
-      <div className="min-w-280">
+      <div className="min-w-7xl">
         <div
           className={`grid ${GRID} border-b border-border px-gutter py-row text-[11px] font-medium tracking-wide text-muted`}
         >
@@ -43,6 +51,7 @@ export function InstrumentsTable({ items }: { items: InstrumentListItem[] }) {
           <span>{copy.columns.exposure}</span>
           <span>{copy.columns.leaf}</span>
           <span>{copy.columns.ter}</span>
+          <span title={copy.thesisHint}>{copy.columns.thesis}</span>
           <span>{copy.columns.hedged}</span>
           <span>{copy.columns.composition}</span>
           <span className="text-right">{copy.columns.held}</span>
@@ -65,6 +74,7 @@ function InstrumentRow({ item }: { item: InstrumentListItem }) {
   const [leaf, setLeaf] = useState<string>(item.exposureLeafId ?? "");
   const [ter, setTer] = useState<string>(terToPercentInput(item.ter));
   const [hedged, setHedged] = useState<boolean>(item.hedgedToBase);
+  const [thesis, setThesis] = useState<Thesis>(item.thesis);
   const [uploading, setUploading] = useState(false);
 
   const needsLeaf = KINDS_NEEDING_LEAF.some((k) => k === kind);
@@ -72,7 +82,8 @@ function InstrumentRow({ item }: { item: InstrumentListItem }) {
     kind !== (item.exposureKind ?? "") ||
     leaf !== (item.exposureLeafId ?? "") ||
     !terInputMatches(ter, item.ter) ||
-    hedged !== item.hedgedToBase;
+    hedged !== item.hedgedToBase ||
+    thesis !== item.thesis;
   const busy = fetcher.state !== "idle";
   const saved = fetcher.data?.ok === true && !dirty;
   const error = fetcher.data?.ok === false ? fetcher.data.error : undefined;
@@ -132,6 +143,21 @@ function InstrumentRow({ item }: { item: InstrumentListItem }) {
             placeholder={copy.terPlaceholder}
             className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-right text-[12px] tabular-nums"
           />
+
+          <select
+            name="thesis"
+            value={thesis}
+            aria-label={copy.columns.thesis}
+            title={thesisDescription(thesis)}
+            onChange={(e) => setThesis(e.target.value as Thesis)}
+            className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-[12px]"
+          >
+            {THESES.map((t) => (
+              <option key={t} value={t} title={thesisDescription(t)}>
+                {thesisLabel(t)}
+              </option>
+            ))}
+          </select>
 
           <div className="flex items-center gap-2">
             <Checkbox

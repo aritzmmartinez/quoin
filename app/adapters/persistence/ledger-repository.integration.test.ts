@@ -22,6 +22,7 @@ const instrument: Instrument = {
   type: "ETF",
   currency: "EUR",
   assetClass: "FUND",
+  thesis: "CORE",
 };
 
 const event = (externalId: string): LedgerEvent => ({
@@ -29,7 +30,6 @@ const event = (externalId: string): LedgerEvent => ({
   ts: new Date("2025-01-01"),
   type: "BUY",
   instrumentId: instrument.id,
-  sleeve: "CORE",
   quantity: "1",
   price: "100",
   grossAmount: "100",

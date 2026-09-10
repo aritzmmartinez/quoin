@@ -24,6 +24,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - prices:backfill logic extracted out of the script into backfillInstrument, so the CLI and the import step share one implementation. The script still prints per instrument as it goes.
 - prices:map now goes through remapQuoteSymbol, the one place that drops an instrument's snapshots before storing a different symbol. A test pins that order.
 - pnpm prices:backfill ends by pointing at pnpm prices:sync: the most recent session can come back without a close and is not in the history it just wrote.
+- Instrument.thesis — CORE | CONVICTION | TACTICAL — recording why an instrument is held, editable inline on /instrumentos and constrained by a CHECK in the migration. Set by hand and excluded from InstrumentWriteData, so a re-import cannot clobber it.
+- The thesis chip is drawn only when the thesis is not CORE. Its predecessor drew "Core" on every row of five screens, distinguishing nothing.
+
+### Removed
+- LedgerEntry.sleeve. Both ingestion adapters wrote it as the literal CORE and no other write path existed, so the (instrument, sleeve) key that partitioned AVCO lots, FIFO queues, wash-sale candidates and trade metadata was a relabelling of the instrument id. Every tax figure is unchanged; the partition was never active on a real row.
+- tradeMetaKey, LedgerEventFilter.sleeve and MovementRow.sleeve. The last two were dead: no caller ever passed a sleeve filter, and no column rendered the field.
+
+### Fixed
+- An instrument held under two sleeves appeared twice under one exposure leaf, took two of the five Top-5 slots, and was counted twice by pricedCount / unpricedCount. One instrument is one position now, so none of the three is representable.
+- A repurchase within the wash-sale window escaped the rule when it carried a different sleeve. Art. 43 is about valores homogéneos, and a bookkeeping label does not make a share a different share.
+
+
 
 ## [0.6.0] - 2026-09-05
 

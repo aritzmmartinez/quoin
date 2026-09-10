@@ -4,15 +4,15 @@ import { Link } from "react-router";
 import { es, formatMoney, formatPercent } from "~/lib";
 
 import { Card } from "../ui/Card";
-import { SleeveChip } from "../ui/SleeveChip";
+import { ThesisChip } from "../ui/ThesisChip";
 import { signClass, signedPercent } from "../ui/signed";
 
-import type { Sleeve } from "~/core/domain";
+import type { Thesis } from "~/core/domain";
 
 export interface TopPositionRow {
   instrumentId: string;
   name: string;
-  sleeve: Sleeve;
+  thesis: Thesis;
   marketValue: string;
   weight: string;
   unrealizedPnLPct: string | null;
@@ -42,14 +42,14 @@ export function TopPositionsCard({
       ) : (
         <ul className="space-y-3">
           {rows.map((row) => (
-            <li key={`${row.instrumentId}-${row.sleeve}`}>
+            <li key={row.instrumentId}>
               <Link
                 to={`/instrument/${encodeURIComponent(row.instrumentId)}`}
                 className="flex items-center justify-between gap-3 rounded-lg px-1 py-1 transition-colors hover:bg-surface-2"
               >
                 <span className="flex min-w-0 items-center gap-2">
                   <span className="truncate text-[13px]">{row.name}</span>
-                  <SleeveChip sleeve={row.sleeve} />
+                  <ThesisChip thesis={row.thesis} />
                 </span>
                 <span className="flex shrink-0 items-center gap-3 text-[13px] tabular-nums">
                   <span className="text-muted">

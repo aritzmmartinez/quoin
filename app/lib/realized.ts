@@ -1,6 +1,6 @@
 import Decimal from "decimal.js";
 
-import type { Instrument, Sleeve } from "~/core/domain";
+import type { Instrument, Thesis } from "~/core/domain";
 import type { RealizedSale } from "~/core/projections";
 
 export interface RealizedRow {
@@ -9,7 +9,7 @@ export interface RealizedRow {
   year: number;
   instrumentId: string;
   name: string;
-  sleeve: Sleeve;
+  thesis: Thesis;
   quantity: string;
   price: string | null;
   grossAmount: string;
@@ -96,7 +96,7 @@ export function toRealizedRows(
     year: sale.ts.getFullYear(),
     instrumentId: sale.instrumentId,
     name: byId.get(sale.instrumentId)?.name ?? sale.instrumentId,
-    sleeve: sale.sleeve,
+    thesis: byId.get(sale.instrumentId)?.thesis ?? "CORE",
     quantity: sale.quantity,
     price: sale.price,
     grossAmount: sale.grossAmount,

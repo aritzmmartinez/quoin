@@ -6,13 +6,10 @@ import {
   type ExposureKind,
   type Instrument,
   type InstrumentType,
+  type Thesis,
 } from "~/core/domain";
 import type { EtfHolding } from "~/core/ports";
-import {
-  tradeMetaKey,
-  type MarketValue,
-  type Position,
-} from "~/core/projections";
+import type { MarketValue, Position } from "~/core/projections";
 
 export interface InstrumentListItem {
   id: string;
@@ -23,6 +20,7 @@ export interface InstrumentListItem {
   exposureLeafId: string | null;
   ter: string | null;
   hedgedToBase: boolean;
+  thesis: Thesis;
   resolvesTo: string;
   isExplicit: boolean;
   quantity: string;
@@ -43,22 +41,11 @@ export function toInstrumentListItems(
   const valued = new Map<string, Decimal>();
 
   for (const position of positions) {
-    const quantity = new Decimal(position.quantity);
-    held.set(
-      position.instrumentId,
-      (held.get(position.instrumentId) ?? new Decimal(0)).plus(quantity),
-    );
+    held.set(position.instrumentId, new Decimal(position.quantity));
 
-    const marketValue = marketValues.get(
-      tradeMetaKey(position.instrumentId, position.sleeve),
-    );
+    const marketValue = marketValues.get(position.instrumentId);
     if (marketValue?.marketValue != null) {
-      valued.set(
-        position.instrumentId,
-        (valued.get(position.instrumentId) ?? new Decimal(0)).plus(
-          new Decimal(marketValue.marketValue),
-        ),
-      );
+      valued.set(position.instrumentId, new Decimal(marketValue.marketValue));
     }
   }
 
@@ -81,6 +68,7 @@ export function toInstrumentListItems(
       exposureLeafId: instrument.exposureLeafId ?? null,
       ter: instrument.ter ?? null,
       hedgedToBase: instrument.hedgedToBase ?? false,
+      thesis: instrument.thesis,
       resolvesTo: leaf ? leafKey(leaf.leaf) : "—",
       isExplicit: Boolean(instrument.exposureKind),
       quantity: quantity.toFixed(),

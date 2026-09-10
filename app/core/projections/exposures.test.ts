@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   resolveIntrinsic,
   type Instrument,
+  type TradeEvent,
   type WeightedLeaf,
 } from "../domain";
 import {
@@ -11,9 +12,8 @@ import {
   leafWeight,
   summarizeExposures,
 } from "./exposures";
-import type { MarketValue } from "./market-value";
-import type { Position } from "./positions";
-import { tradeMetaKey } from "./trade-meta";
+import { computeMarketValues, type MarketValue } from "./market-value";
+import { computePositions, type Position } from "./positions";
 
 const instrument = (over: Partial<Instrument> = {}): Instrument => ({
   id: "IE00BK5BQT80",
@@ -24,20 +24,20 @@ const instrument = (over: Partial<Instrument> = {}): Instrument => ({
   quoteSymbol: null,
   exposureKind: null,
   exposureLeafId: null,
+  thesis: "CORE",
   ...over,
 });
 
 const position = (id: string, qty = "10"): Position =>
   ({
     instrumentId: id,
-    sleeve: "CORE",
     quantity: qty,
     costBasis: "100",
     realizedPnL: "0",
   }) as Position;
 
 const priced = (id: string, value: string | null): [string, MarketValue] => [
-  tradeMetaKey(id, "CORE"),
+  id,
   { marketValue: value } as MarketValue,
 ];
 
@@ -355,5 +355,44 @@ describe("naming a leaf that several instruments reach", () => {
       ]),
     );
     expect(exposures[0]?.name).toBe("NVIDIA Corp");
+  });
+});
+
+describe("one contribution per instrument", () => {
+  const buy = (id: string, n: number, gross: string): TradeEvent => ({
+    id: `evt-${id}-${n}`,
+    ts: new Date(`2025-0${n}-01`),
+    type: "BUY",
+    instrumentId: id,
+    quantity: "1",
+    price: gross,
+    grossAmount: gross,
+    fees: "0",
+    currency: "EUR",
+    fxToBase: "1",
+    account: "test",
+    source: "TEST",
+  });
+
+  it("lists an instrument once however many times it was traded", () => {
+    const events = [buy("NVDA", 1, "500"), buy("NVDA", 2, "700")];
+    const positions = computePositions(events);
+    const marketValues = computeMarketValues(
+      positions,
+      new Map([["NVDA", { price: "800", currency: "EUR" }]]),
+      "EUR",
+    );
+
+    const exposures = computeExposures(
+      positions,
+      marketValues,
+      new Map<string, WeightedLeaf[]>([
+        ["NVDA", direct("US67066G1040", "NVIDIA", "COMPANY")],
+      ]),
+    );
+
+    expect(exposures).toHaveLength(1);
+    expect(exposures[0]!.contributions).toHaveLength(1);
+    expect(leafTotal(exposures[0]!)).toBe("1600");
   });
 });
