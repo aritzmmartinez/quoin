@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
 
-import type { ExposureKind, Instrument, LedgerEvent } from "~/core/domain";
+import type {
+  ExposureKind,
+  Instrument,
+  LedgerEvent,
+  Thesis,
+} from "~/core/domain";
 import type {
   InstrumentRepository,
   LedgerEventFilter,
@@ -31,6 +36,11 @@ class FakeInstrumentRepository implements InstrumentRepository {
   async setHedgedToBase(id: string, hedged: boolean): Promise<void> {
     const instrument = this.upserted.find((i) => i.id === id);
     if (instrument) instrument.hedgedToBase = hedged;
+  }
+
+  async setThesis(id: string, thesis: Thesis): Promise<void> {
+    const instrument = this.upserted.find((i) => i.id === id);
+    if (instrument) instrument.thesis = thesis;
   }
   async setExposure(
     id: string,

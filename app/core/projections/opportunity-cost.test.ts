@@ -24,7 +24,6 @@ function trade(
     type,
     ts: new Date(ts),
     instrumentId,
-    sleeve: "CORE",
     quantity,
     price: new Decimal(grossAmount).div(quantity).toFixed(),
     grossAmount,

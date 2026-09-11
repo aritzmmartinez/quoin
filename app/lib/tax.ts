@@ -3,7 +3,7 @@ import Decimal from "decimal.js";
 import type {
   Instrument,
   LedgerEvent,
-  Sleeve,
+  Thesis,
   TradeEvent,
 } from "~/core/domain";
 import { Money } from "~/core/domain";
@@ -73,7 +73,7 @@ export interface TaxSaleRow {
   t: string;
   instrumentId: string;
   name: string;
-  sleeve: Sleeve;
+  thesis: Thesis;
   quantity: string;
   grossAmount: string;
   fees: string;
@@ -119,7 +119,7 @@ export function buildTaxYearView(
   instruments: readonly Instrument[],
   year: number,
 ): TaxYearView {
-  const names = new Map(instruments.map((i) => [i.id, i.name]));
+  const byId = new Map(instruments.map((i) => [i.id, i]));
   const result = computeTaxLots(events, year);
 
   const sales: TaxSaleRow[] = result.gains
@@ -127,8 +127,8 @@ export function buildTaxYearView(
       id: gain.eventId,
       t: gain.ts.toISOString(),
       instrumentId: gain.instrumentId,
-      name: names.get(gain.instrumentId) ?? gain.instrumentId,
-      sleeve: gain.sleeve,
+      name: byId.get(gain.instrumentId)?.name ?? gain.instrumentId,
+      thesis: byId.get(gain.instrumentId)?.thesis ?? "CORE",
       quantity: gain.quantity,
       grossAmount: gain.grossAmount,
       fees: gain.fees,

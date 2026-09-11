@@ -1,6 +1,6 @@
 import Decimal from "decimal.js";
 
-import type { LedgerEvent, Revalue, Sleeve } from "../domain";
+import type { LedgerEvent, Revalue } from "../domain";
 
 import { walkAvco } from "./avco";
 
@@ -10,7 +10,6 @@ export interface RealizedSale {
   eventId: string;
   ts: Date;
   instrumentId: string;
-  sleeve: Sleeve;
   quantity: string;
   price: string | null;
   grossAmount: string;
@@ -33,7 +32,6 @@ export function computeRealizedGains(
       eventId: trade.id,
       ts: trade.ts,
       instrumentId: trade.instrumentId,
-      sleeve: trade.sleeve,
       quantity: sale.quantity.toFixed(),
       price: sale.quantity.isZero()
         ? null

@@ -1,4 +1,4 @@
-import type { ExposureKind, Instrument } from "../domain";
+import type { ExposureKind, Instrument, Thesis } from "../domain";
 
 export interface InstrumentRepository {
   upsert(instruments: readonly Instrument[]): Promise<void>;
@@ -7,6 +7,7 @@ export interface InstrumentRepository {
   setQuoteSymbol(id: string, symbol: string | null): Promise<void>;
   setTer(id: string, ter: string | null): Promise<void>;
   setHedgedToBase(id: string, hedged: boolean): Promise<void>;
+  setThesis(id: string, thesis: Thesis): Promise<void>;
   setExposure(
     id: string,
     kind: ExposureKind | null,

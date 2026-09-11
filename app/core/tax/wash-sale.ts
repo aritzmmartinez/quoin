@@ -44,7 +44,6 @@ export function findWashSaleTrigger(
       (t) =>
         t.type === "BUY" &&
         t.instrumentId === sale.trade.instrumentId &&
-        t.sleeve === sale.trade.sleeve &&
         !consumedBuyIds.has(t.id) &&
         t.ts.getTime() >= windowStart &&
         t.ts.getTime() <= windowEnd,

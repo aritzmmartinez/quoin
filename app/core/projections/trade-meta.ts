@@ -1,4 +1,4 @@
-import type { LedgerEvent, Sleeve, TradeEvent } from "../domain";
+import type { LedgerEvent, TradeEvent } from "../domain";
 
 export interface TradeMeta {
   firstTradeAt: Date;
@@ -10,10 +10,6 @@ function isTrade(event: LedgerEvent): event is TradeEvent {
   return event.type === "BUY" || event.type === "SELL";
 }
 
-function keyOf(instrumentId: string, sleeve: Sleeve): string {
-  return `${instrumentId}::${sleeve}`;
-}
-
 export function computeTradeMeta(
   events: readonly LedgerEvent[],
 ): Map<string, TradeMeta> {
@@ -22,7 +18,7 @@ export function computeTradeMeta(
   for (const event of events) {
     if (!isTrade(event)) continue;
 
-    const key = keyOf(event.instrumentId, event.sleeve);
+    const key = event.instrumentId;
     const existing = meta.get(key);
 
     if (!existing) {
@@ -40,8 +36,4 @@ export function computeTradeMeta(
   }
 
   return meta;
-}
-
-export function tradeMetaKey(instrumentId: string, sleeve: Sleeve): string {
-  return keyOf(instrumentId, sleeve);
 }

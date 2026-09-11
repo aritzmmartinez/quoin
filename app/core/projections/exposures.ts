@@ -3,7 +3,6 @@ import Decimal from "decimal.js";
 import { Money, leafKey, type LeafId, type WeightedLeaf } from "../domain";
 import type { MarketValue } from "./market-value";
 import type { Position } from "./positions";
-import { tradeMetaKey } from "./trade-meta";
 
 export interface Contribution {
   instrumentId: string;
@@ -29,9 +28,7 @@ export function computeExposures(
   for (const position of positions) {
     if (new Decimal(position.quantity).isZero()) continue;
 
-    const marketValue = marketValues.get(
-      tradeMetaKey(position.instrumentId, position.sleeve),
-    );
+    const marketValue = marketValues.get(position.instrumentId);
     if (!marketValue || marketValue.marketValue === null) continue;
 
     const value = new Decimal(marketValue.marketValue);

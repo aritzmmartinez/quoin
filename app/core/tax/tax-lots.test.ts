@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { Sleeve, TradeEvent } from "../domain";
+import type { TradeEvent } from "../domain";
 
 import { computeTaxLots, fiscalYearOf } from "./tax-lots";
 
@@ -11,14 +11,13 @@ function trade(
   instrumentId: string,
   quantity: string,
   grossAmount: string,
-  opts: { fees?: string; sleeve?: Sleeve; ts?: string } = {},
+  opts: { fees?: string; ts?: string } = {},
 ): TradeEvent {
   return {
     id: `evt-${seq++}`,
     ts: new Date(opts.ts ?? "2025-01-01"),
     type,
     instrumentId,
-    sleeve: opts.sleeve ?? "CORE",
     quantity,
     price: "0",
     grossAmount,

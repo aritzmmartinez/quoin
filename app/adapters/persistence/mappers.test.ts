@@ -18,7 +18,6 @@ const trade: LedgerEvent = {
   ts: new Date("2025-01-01"),
   type: "BUY",
   instrumentId: "IE00TEST0010",
-  sleeve: "CORE",
   quantity: "1.5",
   price: "100",
   grossAmount: "150",
@@ -36,7 +35,6 @@ const dividend: LedgerEvent = {
   ts: new Date("2025-02-01"),
   type: "DIVIDEND",
   instrumentId: "US00TEST0020",
-  sleeve: "CORE",
   grossAmount: "12.34",
   taxWithheld: "2.34",
   currency: "EUR",
@@ -71,6 +69,7 @@ const instrument: Instrument = {
   exposureLeafId: null,
   ter: null,
   hedgedToBase: false,
+  thesis: "CONVICTION",
 };
 
 describe("ledger mappers", () => {
@@ -108,6 +107,7 @@ describe("instrument mappers", () => {
       ter: null,
       exposureLeafId: null,
       hedgedToBase: false,
+      thesis: "CONVICTION",
     };
     expect(rowToInstrument(row)).toEqual(instrument);
   });
@@ -120,12 +120,14 @@ describe("instrument mappers", () => {
       exposureLeafId: "X",
       ter: "0.0022",
       hedgedToBase: true,
+      thesis: "TACTICAL",
     });
     expect(data).not.toHaveProperty("quoteSymbol");
     expect(data).not.toHaveProperty("exposureKind");
     expect(data).not.toHaveProperty("exposureLeafId");
     expect(data).not.toHaveProperty("ter");
     expect(data).not.toHaveProperty("hedgedToBase");
+    expect(data).not.toHaveProperty("thesis");
   });
 
   it("defaults a missing assetClass to null", () => {

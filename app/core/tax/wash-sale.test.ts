@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { Sleeve, TradeEvent } from "../domain";
+import type { TradeEvent } from "../domain";
 
 import { findWashSaleTrigger } from "./wash-sale";
 import { walkFifo } from "./fifo";
@@ -12,14 +12,13 @@ function trade(
   instrumentId: string,
   quantity: string,
   grossAmount: string,
-  opts: { fees?: string; sleeve?: Sleeve; ts?: string } = {},
+  opts: { fees?: string; ts?: string } = {},
 ): TradeEvent {
   return {
     id: `evt-${seq++}`,
     ts: new Date(opts.ts ?? "2025-01-01"),
     type,
     instrumentId,
-    sleeve: opts.sleeve ?? "CORE",
     quantity,
     price: "0",
     grossAmount,
@@ -82,21 +81,28 @@ describe("findWashSaleTrigger", () => {
     expect(trigger).toBeNull();
   });
 
-  it("does not cross instruments or sleeves", () => {
+  it("does not cross instruments", () => {
     const buy1 = trade("BUY", "X", "10", "1000", { ts: "2025-01-01" });
     const sell = trade("SELL", "X", "10", "700", { ts: "2025-03-01" });
     const otherInstrument = trade("BUY", "Y", "10", "700", {
       ts: "2025-03-15",
     });
-    const otherSleeve = trade("BUY", "X", "10", "700", {
-      ts: "2025-03-20",
-      sleeve: "TRADING",
-    });
 
-    const trades = [buy1, sell, otherInstrument, otherSleeve];
+    const trades = [buy1, sell, otherInstrument];
     const trigger = findWashSaleTrigger(saleFor(trades, sell.id), trades);
 
     expect(trigger).toBeNull();
+  });
+
+  it("catches a repurchase that a different sleeve used to excuse", () => {
+    const buy1 = trade("BUY", "X", "10", "1000", { ts: "2025-01-01" });
+    const sell = trade("SELL", "X", "10", "700", { ts: "2025-03-01" });
+    const rebuy = trade("BUY", "X", "10", "700", { ts: "2025-03-20" });
+
+    const trades = [buy1, sell, rebuy];
+    const trigger = findWashSaleTrigger(saleFor(trades, sell.id), trades);
+
+    expect(trigger?.buyEventId).toBe(rebuy.id);
   });
 
   it("realistic scenario: a partial loss sale rebought a week later stays disallowed", () => {

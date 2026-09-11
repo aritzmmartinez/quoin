@@ -23,8 +23,6 @@ const USAGE = `Usage:
   pnpm db:seed --anchor=YYYY-MM-DD  seed deterministically from a fixed date`;
 
 const MONTHS = 14;
-const SLEEVE_CORE = "CORE";
-const SLEEVE_TRADING = "TRADING";
 
 interface DemoInstrument {
   id: string;
@@ -37,6 +35,7 @@ interface DemoInstrument {
   exposureLeafId: string | null;
   ter: string | null;
   hedgedToBase?: boolean;
+  thesis?: string;
   seedPrice: number | null;
   drift: number;
   volatility: number;
@@ -80,6 +79,7 @@ const INSTRUMENTS: readonly DemoInstrument[] = [
     assetClass: "STOCK",
     quoteSymbol: "DEMS.AS",
     exposureKind: "COMPANY",
+    thesis: "CONVICTION",
     exposureLeafId: null,
     ter: null,
     seedPrice: 412.5,
@@ -94,6 +94,7 @@ const INSTRUMENTS: readonly DemoInstrument[] = [
     assetClass: "CRYPTO",
     quoteSymbol: "BTC-EUR",
     exposureKind: "CRYPTO",
+    thesis: "TACTICAL",
     exposureLeafId: "BTC",
     ter: null,
     seedPrice: 58400,
@@ -225,7 +226,6 @@ interface LedgerRow {
   id: string;
   ts: Date;
   type: string;
-  sleeve: string | null;
   instrumentId: string | null;
   quantity: string | null;
   price: string | null;
@@ -256,7 +256,6 @@ function buildLedger(
     ts: Date,
     type: "BUY" | "SELL",
     instrumentId: string,
-    sleeve: string,
     amount: Decimal,
     fee: Decimal,
     note?: string,
@@ -271,7 +270,6 @@ function buildLedger(
       id: `demo-${id}`,
       ts,
       type,
-      sleeve,
       instrumentId,
       quantity: quantity.toFixed(6),
       price: price.toFixed(4),
@@ -300,7 +298,6 @@ function buildLedger(
       id: `demo-${id}`,
       ts,
       type,
-      sleeve: null,
       instrumentId,
       quantity: null,
       price: null,
@@ -332,7 +329,6 @@ function buildLedger(
       day,
       "BUY",
       "IE00DEMO0001",
-      SLEEVE_CORE,
       new Decimal(400),
       new Decimal(1),
       "savings plan",
@@ -341,7 +337,6 @@ function buildLedger(
       addDays(day, 1),
       "BUY",
       "IE00DEMO0002",
-      SLEEVE_CORE,
       new Decimal(100),
       new Decimal(1),
     );
@@ -351,7 +346,6 @@ function buildLedger(
         addDays(day, 2),
         "BUY",
         "IE00DEMO0005",
-        SLEEVE_CORE,
         new Decimal(80),
         new Decimal(1),
       );
@@ -361,7 +355,6 @@ function buildLedger(
         addDays(day, 4),
         "BUY",
         "BTC",
-        SLEEVE_TRADING,
         new Decimal(120),
         new Decimal(0.85),
       );
@@ -375,7 +368,6 @@ function buildLedger(
     q3,
     "BUY",
     "NL00DEMO0003",
-    SLEEVE_TRADING,
     new Decimal(1500),
     new Decimal(1),
   );
@@ -387,7 +379,6 @@ function buildLedger(
     sell,
     "SELL",
     "NL00DEMO0003",
-    SLEEVE_TRADING,
     new Decimal(600),
     new Decimal(1),
     "partial sell",
@@ -400,7 +391,6 @@ function buildLedger(
     id: "demo-9001",
     ts: bond,
     type: "BUY",
-    sleeve: SLEEVE_CORE,
     instrumentId: "LU00DEMO0006",
     quantity: "45.000000",
     price: "22.4000",

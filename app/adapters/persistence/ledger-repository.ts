@@ -55,10 +55,7 @@ export class PrismaLedgerRepository implements LedgerRepository {
 
   async list(filter?: LedgerEventFilter): Promise<LedgerEvent[]> {
     const rows = await prisma.ledgerEntry.findMany({
-      where: {
-        instrumentId: filter?.instrumentId,
-        sleeve: filter?.sleeve,
-      },
+      where: { instrumentId: filter?.instrumentId },
       orderBy: { ts: "asc" },
     });
     return rows.map(rowToEvent);

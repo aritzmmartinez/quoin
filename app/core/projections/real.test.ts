@@ -25,7 +25,6 @@ function buy(
     ts: new Date(ts),
     type: "BUY",
     instrumentId: "IE00TEST0001",
-    sleeve: "CORE",
     quantity,
     price: new Decimal(grossAmount).div(quantity).toString(),
     grossAmount,

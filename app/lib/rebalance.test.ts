@@ -30,11 +30,11 @@ const instrument = (id: string, name: string): Instrument => ({
   name,
   type: "ETF",
   currency: "EUR",
+  thesis: "CORE",
 });
 
 const position = (instrumentId: string, quantity: string): Position => ({
   instrumentId,
-  sleeve: "CORE",
   quantity,
   costBasis: "0",
   averageCost: "0",
@@ -132,8 +132,8 @@ describe("buildRebalancePlan", () => {
       ]),
       [position("A", "1"), position("B", "1")],
       new Map([
-        ["A::CORE", priced("400")],
-        ["B::CORE", priced("100")],
+        ["A", priced("400")],
+        ["B", priced("100")],
       ]),
       instruments,
       "200.00",
@@ -154,8 +154,8 @@ describe("buildRebalancePlan", () => {
       ]),
       [position("A", "1"), position("DARK", "1")],
       new Map([
-        ["A::CORE", priced("400")],
-        ["DARK::CORE", priced(null)],
+        ["A", priced("400")],
+        ["DARK", priced(null)],
       ]),
       instruments,
       "100.00",
@@ -171,8 +171,8 @@ describe("buildRebalancePlan", () => {
       target([["A", "500"]]),
       [position("A", "1"), position("OLD", "1")],
       new Map([
-        ["A::CORE", priced("400")],
-        ["OLD::CORE", priced("250")],
+        ["A", priced("400")],
+        ["OLD", priced("250")],
       ]),
       instruments,
       "100.00",
@@ -184,32 +184,6 @@ describe("buildRebalancePlan", () => {
     expect(plan.rows.map((r) => r.instrumentId)).toEqual(["A"]);
   });
 
-  it("sums the sleeves of one instrument into a single line", () => {
-    const plan = buildRebalancePlan(
-      target([
-        ["A", "500"],
-        ["B", "500"],
-      ]),
-      [
-        position("A", "1"),
-        { ...position("A", "1"), sleeve: "TRADING" },
-        position("B", "1"),
-      ],
-      new Map([
-        ["A::CORE", priced("300")],
-        ["A::TRADING", priced("100")],
-        ["B::CORE", priced("400")],
-      ]),
-      instruments,
-      "0.00",
-    );
-
-    expect(plan.rows.find((r) => r.instrumentId === "A")?.currentValue).toBe(
-      "400.00",
-    );
-    expect(plan.totalDriftBefore).toBe("0.000000");
-  });
-
   it("flags drift over the threshold", () => {
     const plan = buildRebalancePlan(
       target([
@@ -218,8 +192,8 @@ describe("buildRebalancePlan", () => {
       ]),
       [position("A", "1"), position("B", "1")],
       new Map([
-        ["A::CORE", priced("800")],
-        ["B::CORE", priced("200")],
+        ["A", priced("800")],
+        ["B", priced("200")],
       ]),
       instruments,
       "100.00",
@@ -240,8 +214,8 @@ describe("buildRebalancePlan", () => {
       ]),
       [position("A", "1"), position("B", "1")],
       new Map([
-        ["A::CORE", priced("800")],
-        ["B::CORE", priced("200")],
+        ["A", priced("800")],
+        ["B", priced("200")],
       ]),
       instruments,
       "100.00",
@@ -261,7 +235,7 @@ describe("buildRebalancePlan", () => {
         ["B", "500"],
       ]),
       [position("A", "1")],
-      new Map([["A::CORE", priced("1000")]]),
+      new Map([["A", priced("1000")]]),
       instruments,
       "200.00",
     );

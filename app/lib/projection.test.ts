@@ -33,6 +33,7 @@ const instrument = (id: string, name: string): Instrument => ({
   name,
   type: "ETF",
   currency: "EUR",
+  thesis: "CORE",
 });
 
 function monthlyCloses(

@@ -7,28 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-11
+
 ### Added
-- The inflation-basis notice on Resumen and /realizado now carries a "Sincronizar IPC" button. Every state that needs a fresh CPI series — none stored, a gap inside the range, or a series stale enough that INE may have published a month it does not hold — is a click, not a trip to the terminal.`pnpm ipc:sync still works and is unchanged for the caller.
-- Real mode now says when its CPI series is stale. basis.lag used to claim the reference was "a few weeks behind" whenever real mode worked, without checking anything; a series last fetched more than 35 days ago (past one INE publication cycle) now shows a distinct notice, because the app cannot see months INE has published that it has not fetched — only that nobody has looked lately.
-- New Quoin logo favicon
-- Four-step import ("Importar operaciones") from a modal on /cartera, so a broker export can be taken all the way to a valued position without touching the CLI: drop the CSV, map the missing quote symbols, download the prices, read the summary. Any step already reached is a link back.
-- The broker is detected from the header row (transaction_id for Trade Republic, refid for Kraken), with no selector to get wrong. A file matching neither is refused by name rather than guessed at from its contents.
-- Mapping a symbol shows the quote, its market timestamp and the implied value of the position held, so a venue line quoting a multiple of the right one is visible before anything is written. The same check now backs pnpm prices:map.
-- Shared file dropzone, used by the holdings import and the new one. It hands the caller the File and nothing else: one reads .xlsx as a buffer, the other sends text to the server, and neither wants the other's parsing.
-- The import step strip is a row of numbered markers: filled with a check once passed, outlined on the step in hand, muted ahead, joined by a rule that goes solid only behind you. Anterior/Siguiente sit at the foot of the modal, so navigating and acting are never the same button.
-- The import summary's "Descartadas" row now expands, for the "unsupported" reason only, into the date, broker type and instrument of every row that fell into it — a stock split or a share delivery can change a real position, so silently dropping one is a data-integrity risk, unlike expected discards (card spending, non-BTC crypto) which stay count-only. Applies to both Trade Republic and Kraken.
+- A "Sincronizar IPC" button on the inflation notice (Resumen and /realizado). Whenever the CPI series needs a refresh — nothing stored, a gap in the range, or data stale enough that INE may have published without us noticing — it's one click instead of a trip to the terminal. pnpm ipc:sync still works exactly as before.
+- Real mode now tells you when its CPI series is stale, instead of assuming it's "a few weeks behind" just because it's running. If nobody has synced in over 35 days (past one INE publication cycle), you'll see a different, more honest notice.
+- A new Quoin favicon.
+- A four-step import flow ("Importar operaciones") on /cartera: drop the CSV, map any symbols we don't recognise, fetch their prices, review the summary. You can always jump back to a step you've already completed.
+- The broker is detected automatically from the file's header row — no selector to get wrong. A file that matches neither Trade Republic nor Kraken is refused by name, not guessed at.
+- When mapping a symbol, you now see its quote, timestamp and implied position value — so a price that's off by a multiple is caught before it's saved. pnpm prices:map benefits from the same check.
+- A shared dropzone component for both import flows (holdings and operations) — each keeps parsing its own way, but neither reinvents the drop target.
+- A clearer step indicator for the import modal: checked steps, the current one outlined, the rest muted. Back and Next live at the bottom, separate from the action button, so moving and doing are never the same click.
+- The import summary's "Descartadas" row can now expand — for unsupported movement types only — into the date, broker and instrument behind each one. Stock splits and share deliveries can change a real position, so those stay visible; routine noise like card spending doesn't.
 
 ### Changed
-- pnpm ipc:sync logic extracted from the script into syncInflation, shared by the CLI and the new /api/ipc/sync endpoint the button posts to. --force-rebase stays CLI-only — it deletes a series wholesale, too destructive to sit behind a button, so the endpoint detects that a rebase is needed and names the series but never runs it.
-- The basis badge tooltip ("IPC actualizado hace X") now means when the series was last fetched from INE, not when its newest stored month first landed. A new InflationSync row records every sync attempt, so a re-sync that finds nothing new still refreshes it — which is what the freshness check needs and what the field was always documented to mean.
-- The "no hay datos de IPC" and "faltan datos de IPC" notices no longer end by telling the reader to run a command — the button beside them does it.
-- The import writes the ledger at step 1, not at the end — the later steps only add symbols and prices — so that button now reads "Importar N operaciones", not "Confirmar", with a line saying the operations are kept even if the assistant is closed after. The final step is titled "Resumen de la importación", not "Importación completada": it is a summary, not a commit.
-- The import modal cannot be closed while a request is in flight: Escape, the backdrop and the close button are all held until it resolves, so a click outside can no longer unmount the stepper mid-fetch and lose the response. Chrome force-closes a dialog whose Escape was intercepted twice with no gesture between; onClose reopens it while a request is still pending.
-- Closing the import modal after it has written, before the summary, asks first — stating that the N operations are kept and that the missing symbols are finished in Instrumentos — so an accidental close is a legible exit rather than a surprise.
-- The mapping step and the summary step now say where the unmapped symbols get finished ("se completan en Instrumentos") — the mapping step also states outright that you can advance without mapping them all. The summary only shows it when instruments are in fact still unmapped.
-- prices:backfill logic extracted out of the script into backfillInstrument, so the CLI and the import step share one implementation. The script still prints per instrument as it goes.
-- prices:map now goes through remapQuoteSymbol, the one place that drops an instrument's snapshots before storing a different symbol. A test pins that order.
-- pnpm prices:backfill ends by pointing at pnpm prices:sync: the most recent session can come back without a close and is not in the history it just wrote.
+- IPC sync logic moved out of the script and into a shared function, used by both the CLI and the new sync endpoint behind the button. --force-rebase stays CLI-only — it wipes a series outright, too destructive for a button — though the endpoint will now tell you when a rebase is needed.
+- The "last updated" tooltip on the basis badge now reflects when we last checked INE, not when the newest stored month arrived. A sync that finds nothing new still counts as a sync.
+- The "no IPC data" notices no longer tell you to run a command — the button next to them does it for you.
+- Import now writes to the ledger at step 1, with the later steps only filling in symbols and prices. The button says "Importar N operaciones", not "Confirmar" — and the operations stay saved even if you close the modal early. The last step is a summary, not a completion screen.
+- The import modal can no longer be closed mid-request — Escape, the backdrop, the close button all wait until it resolves. (Chrome has its own opinion on double-Escape, so we reopen the dialog if it tries to force-close while something's still in flight.)
+- Closing the modal after import but before the summary now asks first, and says plainly that your operations are already saved and where to finish mapping any leftover symbols.
+- Both the mapping and summary steps now point you to Instrumentos to finish any symbols you skipped — and the mapping step makes clear upfront that skipping is fine.
+- Price backfill and symbol remapping logic extracted into shared functions, so the CLI and the import flow don't drift apart.
+- pnpm prices:backfill now points you to pnpm prices:sync when it's done — the freshest prices you just fetched don't count as "synced" until you run it.
+- A new thesis field on each instrument (Core, Conviction, Tactical) — why you're holding it, not where the trade came from. Editable from /instrumentos, protected from being overwritten on re-import.
+- The thesis chip only shows up when it's not Core — no more "Core" repeated on every row of five screens.
+
+### Removed
+- LedgerEntry.sleeve. Every adapter wrote it as "Core" and nothing ever set it to anything else, so the field it powered — AVCO lots, FIFO queues, wash-sale matching — was quietly keyed by instrument alone the whole time. Nothing changes for your tax figures; the partition was never really active.
+- tradeMetaKey and the sleeve filters on ledger events and movement rows — dead code nobody was calling.
+
+### Fixed
+- An instrument held under two sleeves used to show up twice: duplicated in its exposure leaf, taking two Top-5 slots, double-counted in priced/unpriced totals. One instrument, one position, now.
+- A repurchase inside the wash-sale window could dodge the rule if it happened to carry a different sleeve label. Art. 43 cares about the security, not our internal bookkeeping.
 
 ## [0.6.0] - 2026-09-05
 
@@ -199,7 +210,8 @@ fund holdings must be supplied as CSV rather than the Excel most issuers publish
 Design rationale lives beside the code it explains, in `docs/ARCHITECTURE.md` and in the
 commit history — not here.
 
-[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/aritzmmartinez/quoin/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/aritzmmartinez/quoin/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/aritzmmartinez/quoin/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/aritzmmartinez/quoin/compare/v0.5.0...v0.5.1

@@ -212,7 +212,7 @@ fund is not part of today's concentration.
 
 The Bizkaia foral return pairs a disposal with the **oldest lots first**, where the
 portfolio view uses AVCO. `walkFifo` is the counterpart to `walkAvco` — one fold, per
-`(instrument, sleeve)` queue, that both `computeTaxLots` (one fiscal year) and
+instrument queue, that both `computeTaxLots` (one fiscal year) and
 `computeNetWithCarryforward` (the target year and the four before it) are views over. The
 fiscal year is Madrid's calendar, the same timezone rule as `periodOf`. Nothing FIFO is
 persisted: every figure is recomputed from the ledger on read, so it can never drift from

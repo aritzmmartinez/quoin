@@ -11,7 +11,7 @@ export * from "./ingest/IngestModal";
 export * from "./ui/Button";
 export * from "./ui/Card";
 export * from "./ui/FileDropzone";
-export * from "./ui/SleeveChip";
+export * from "./ui/ThesisChip";
 export * from "./ui/StatTile";
 export * from "./ui/MeterBar";
 export * from "./ui/Hint";

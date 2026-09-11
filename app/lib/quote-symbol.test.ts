@@ -15,6 +15,7 @@ const INSTRUMENT: Instrument = {
   exposureLeafId: null,
   ter: null,
   hedgedToBase: false,
+  thesis: "CORE",
 };
 
 function fakes(stored: Instrument | null = INSTRUMENT) {

@@ -56,7 +56,7 @@ export function PortfolioTable({
 
         <ul>
           {rows.map((row) => (
-            <PortfolioRowItem key={row.key} row={row} />
+            <PortfolioRowItem key={row.instrumentId} row={row} />
           ))}
         </ul>
       </div>

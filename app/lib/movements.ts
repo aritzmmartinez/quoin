@@ -1,11 +1,6 @@
 import Decimal from "decimal.js";
 
-import type {
-  Instrument,
-  LedgerEvent,
-  LedgerEventType,
-  Sleeve,
-} from "~/core/domain";
+import type { Instrument, LedgerEvent, LedgerEventType } from "~/core/domain";
 
 export interface MovementRow {
   id: string;
@@ -13,7 +8,6 @@ export interface MovementRow {
   type: LedgerEventType;
   instrumentId: string | null;
   instrumentName: string | null;
-  sleeve: Sleeve | null;
   quantity: string | null;
   price: string | null;
   costs: string;
@@ -72,7 +66,6 @@ export function toMovementRows(
         instrumentName: instrumentId
           ? (byId.get(instrumentId)?.name ?? instrumentId)
           : null,
-        sleeve: "sleeve" in event ? (event.sleeve ?? null) : null,
         quantity,
         price,
         costs: costs.mul(event.fxToBase).toFixed(2),

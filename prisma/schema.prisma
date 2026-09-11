@@ -24,6 +24,12 @@ model Instrument {
   /// Hedged)" ETC and an unhedged one quote on the same venue in the same
   /// currency and differ only in the prospectus.
   hedgedToBase Boolean @default(false)
+  /// Why the instrument is held: CORE | CONVICTION | TACTICAL. Set manually,
+  /// never from ingestion. Constrained by a CHECK in the migration, like
+  /// LedgerEntry.type and for the same reason: `rowToInstrument` throws on a
+  /// value the domain cannot read, and `list()` maps every row, so one bad
+  /// value takes down every screen far from the write that caused it.
+  thesis     String   @default("CORE")
   createdAt  DateTime @default(now())
 
   entries  LedgerEntry[]
@@ -47,7 +53,6 @@ model LedgerEntry {
   /// column on the trade and Kraken as `fee` on the ledger row, which is why
   /// `fees` and `taxWithheld` are columns rather than event types.
   type   String
-  sleeve String? // CORE | TRADING | null (cash-level movements have no sleeve)
 
   instrumentId String?
   instrument   Instrument? @relation(fields: [instrumentId], references: [id])

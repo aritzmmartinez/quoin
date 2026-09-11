@@ -26,8 +26,7 @@ function isTrade(event: LedgerEvent): event is TradeEvent {
  * one point per trade in chronological order. Mirrors `computePositions` exactly,
  * so the last point matches that instrument's current position.
  *
- * Sleeves are aggregated here (the detail view is per instrument); for holdings
- * that only use CORE this is identical to the per-sleeve position. Pure.
+ * Pure.
  */
 export function computeCostBasisTimeline(
   events: readonly LedgerEvent[],

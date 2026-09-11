@@ -34,13 +34,13 @@ describe("mapRow", () => {
       type: "ETF",
       currency: "EUR",
       assetClass: "FUND",
+      thesis: "CORE",
     });
     expect(result.event.type).toBe("BUY");
     if (result.event.type === "BUY") {
       expect(result.event.grossAmount).toBe("36.64");
       expect(result.event.fees).toBe("1");
       expect(result.event.quantity).toBe("1");
-      expect(result.event.sleeve).toBe("CORE");
       expect(result.event.externalId).toBe("tx-1");
     }
   });

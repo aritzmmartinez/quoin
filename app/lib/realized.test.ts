@@ -17,7 +17,6 @@ function sale(overrides: Partial<RealizedSale> = {}): RealizedSale {
     eventId: "evt-1",
     ts: new Date("2025-03-01T10:00:00"),
     instrumentId: "X",
-    sleeve: "CORE",
     quantity: "5",
     price: "120",
     grossAmount: "600",
@@ -42,6 +41,7 @@ describe("toRealizedRows", () => {
         name: "Fondo Global",
         type: "ETF" as const,
         currency: "EUR",
+        thesis: "CORE" as const,
       },
     ];
     const rows = toRealizedRows(

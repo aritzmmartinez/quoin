@@ -13,6 +13,7 @@ const instrument = (id: string, name: string): Instrument => ({
   quoteSymbol: null,
   exposureKind: null,
   exposureLeafId: null,
+  thesis: "CORE",
 });
 
 const plan: PortfolioTarget = {
