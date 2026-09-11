@@ -10,7 +10,7 @@ import {
 } from "~/lib";
 
 import { SignedMoney } from "../SignedMoney";
-import { SleeveChip } from "../ui/SleeveChip";
+import { ThesisChip } from "../ui/ThesisChip";
 import { TAX_LOT_GRID, TAX_SALE_GRID } from "./tax-columns";
 
 export function TaxSaleItem({ sale }: { sale: TaxSaleRow }) {
@@ -33,7 +33,7 @@ export function TaxSaleItem({ sale }: { sale: TaxSaleRow }) {
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <span className="truncate font-medium">{sale.name}</span>
-            <SleeveChip sleeve={sale.sleeve} />
+            <ThesisChip thesis={sale.thesis} />
             {sale.disallowed && (
               <span className="shrink-0 rounded-md border border-negative/40 bg-negative/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-negative">
                 {copy.disallowedBadge}

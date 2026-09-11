@@ -10,5 +10,6 @@ export interface InflationRepository {
   saveMany(points: readonly InflationPoint[]): Promise<number>;
   list(series: string): Promise<InflationPoint[]>;
   lastSyncedAt(series: string): Promise<Date | null>;
+  markChecked(series: string): Promise<void>;
   deleteSeries(series: string): Promise<number>;
 }

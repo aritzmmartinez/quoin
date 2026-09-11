@@ -1,6 +1,6 @@
 import Decimal from "decimal.js";
 
-import type { LedgerEvent, Revalue, Sleeve, TradeEvent } from "../domain";
+import type { LedgerEvent, Revalue, TradeEvent } from "../domain";
 
 import { WASH_SALE_WINDOW_MONTHS, type Territory } from "./config";
 import { walkFifo, type FifoSale } from "./fifo";
@@ -30,7 +30,6 @@ export interface RealizedGainDetail {
   eventId: string;
   ts: Date;
   instrumentId: string;
-  sleeve: Sleeve;
   quantity: string;
   grossAmount: string;
   fees: string;
@@ -92,7 +91,6 @@ function toGainDetail(
     eventId: sale.trade.id,
     ts: sale.trade.ts,
     instrumentId: sale.trade.instrumentId,
-    sleeve: sale.trade.sleeve,
     quantity: sale.quantity.toFixed(),
     grossAmount: sale.gross.toString(),
     fees: sale.fees.toString(),

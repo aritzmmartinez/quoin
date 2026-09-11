@@ -21,6 +21,7 @@ const instrument = (
   type: "ETF",
   currency: "EUR",
   quoteSymbol,
+  thesis: "CORE",
 });
 
 const line = (

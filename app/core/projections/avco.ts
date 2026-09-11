@@ -4,15 +4,11 @@ import {
   Money,
   type LedgerEvent,
   type Revalue,
-  type Sleeve,
   type TradeEvent,
 } from "../domain";
 
-import { tradeMetaKey } from "./trade-meta";
-
 export interface AvcoLot {
   instrumentId: string;
-  sleeve: Sleeve;
   quantity: Decimal;
   costBasis: Money;
   realizedPnL: Money;
@@ -52,12 +48,11 @@ export function walkAvco(
   const sales: AvcoSale[] = [];
 
   for (const trade of trades) {
-    const key = tradeMetaKey(trade.instrumentId, trade.sleeve);
+    const key = trade.instrumentId;
     let lot = lots.get(key);
     if (!lot) {
       lot = {
         instrumentId: trade.instrumentId,
-        sleeve: trade.sleeve,
         quantity: new Decimal(0),
         costBasis: Money.zero(),
         realizedPnL: Money.zero(),

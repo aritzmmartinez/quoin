@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { LedgerEvent, TradeEvent } from "../domain";
-import { computeTradeMeta, tradeMetaKey } from "./trade-meta";
+import { computeTradeMeta } from "./trade-meta";
 
 function trade(
   overrides: Partial<TradeEvent> & Pick<TradeEvent, "ts">,
@@ -10,7 +10,6 @@ function trade(
     id: crypto.randomUUID(),
     type: "BUY",
     instrumentId: "IE00BK5BQT80",
-    sleeve: "CORE",
     currency: "EUR",
     fxToBase: "1",
     account: "trade-republic",
@@ -24,7 +23,7 @@ function trade(
 }
 
 describe("computeTradeMeta", () => {
-  it("tracks first, last and count per instrument+sleeve", () => {
+  it("tracks first, last and count per instrument", () => {
     const events: LedgerEvent[] = [
       trade({ ts: new Date("2026-03-01") }),
       trade({ ts: new Date("2026-01-15"), type: "SELL" }),
@@ -32,26 +31,25 @@ describe("computeTradeMeta", () => {
     ];
 
     const meta = computeTradeMeta(events);
-    const entry = meta.get(tradeMetaKey("IE00BK5BQT80", "CORE"));
+    const entry = meta.get("IE00BK5BQT80");
 
     expect(entry?.tradeCount).toBe(3);
     expect(entry?.firstTradeAt).toEqual(new Date("2026-01-15"));
     expect(entry?.lastTradeAt).toEqual(new Date("2026-05-20"));
   });
 
-  it("keeps CORE and TRADING sleeves of the same instrument separate", () => {
+  it("keeps instruments separate and folds one instrument into one entry", () => {
     const events: LedgerEvent[] = [
-      trade({ ts: new Date("2026-01-01"), sleeve: "CORE" }),
-      trade({ ts: new Date("2026-02-01"), sleeve: "TRADING" }),
-      trade({ ts: new Date("2026-03-01"), sleeve: "TRADING" }),
+      trade({ ts: new Date("2026-01-01") }),
+      trade({ ts: new Date("2026-02-01") }),
+      trade({ ts: new Date("2026-03-01"), instrumentId: "NL0011821202" }),
     ];
 
     const meta = computeTradeMeta(events);
 
-    expect(meta.get(tradeMetaKey("IE00BK5BQT80", "CORE"))?.tradeCount).toBe(1);
-    expect(meta.get(tradeMetaKey("IE00BK5BQT80", "TRADING"))?.tradeCount).toBe(
-      2,
-    );
+    expect(meta.size).toBe(2);
+    expect(meta.get("IE00BK5BQT80")?.tradeCount).toBe(2);
+    expect(meta.get("NL0011821202")?.tradeCount).toBe(1);
   });
 
   it("ignores non-trade events", () => {

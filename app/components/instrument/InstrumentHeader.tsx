@@ -1,4 +1,4 @@
-import type { InstrumentType, Sleeve } from "~/core/domain";
+import type { InstrumentType, Thesis } from "~/core/domain";
 import {
   DASH,
   es,
@@ -9,13 +9,13 @@ import {
 } from "~/lib";
 
 import { SignedMoney } from "../SignedMoney";
-import { SleeveChip } from "../ui/SleeveChip";
+import { ThesisChip } from "../ui/ThesisChip";
 
 export interface InstrumentHeaderData {
   id: string;
   name: string;
   type: InstrumentType | null;
-  sleeves: Sleeve[];
+  thesis: Thesis;
   quantity: string;
   price: { value: string; asOf: string } | null;
   marketValue: string | null;
@@ -35,9 +35,7 @@ export function InstrumentHeader({
             <h1 className="truncate text-[22px] font-semibold tracking-tight">
               {instrument.name}
             </h1>
-            {instrument.sleeves.map((s) => (
-              <SleeveChip key={s} sleeve={s} />
-            ))}
+            <ThesisChip thesis={instrument.thesis} />
           </div>
           <div className="mt-0.5 text-[12.5px] text-muted">
             {instrument.id}

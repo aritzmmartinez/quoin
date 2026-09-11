@@ -1,8 +1,7 @@
-import type { LedgerEvent, Sleeve } from "../domain";
+import type { LedgerEvent } from "../domain";
 
 export interface LedgerEventFilter {
   instrumentId?: string;
-  sleeve?: Sleeve;
 }
 
 export function ledgerDedupKey(source: string, externalId: string): string {

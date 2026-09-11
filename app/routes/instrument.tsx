@@ -54,7 +54,6 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   );
   let quantity = new Decimal(0);
   let costBasis = Money.zero();
-  const sleeves = positions.map((p) => p.sleeve);
   for (const p of positions) {
     quantity = quantity.plus(new Decimal(p.quantity));
     costBasis = costBasis.add(Money.fromString(p.costBasis));
@@ -126,7 +125,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       id: instrument.id,
       name: instrument.name,
       type: instrument.type,
-      sleeves,
+      thesis: instrument.thesis,
       quantity: quantity.toFixed(),
       price: latest
         ? { value: latest.price, asOf: latest.asOf.toISOString() }

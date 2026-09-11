@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { Instrument, Sleeve } from "~/core/domain";
+import type { Instrument } from "~/core/domain";
 import type { MarketValue, Position } from "~/core/projections";
-import { tradeMetaKey } from "~/core/projections";
 
 import { needsMapping, toInstrumentListItems } from "./instruments";
 
@@ -15,24 +14,20 @@ const instrument = (over: Partial<Instrument> = {}): Instrument => ({
   quoteSymbol: null,
   exposureKind: null,
   exposureLeafId: null,
+  thesis: "CORE",
   ...over,
 });
 
-const position = (id: string, qty: string, sleeve: Sleeve = "CORE"): Position =>
+const position = (id: string, qty: string): Position =>
   ({
     instrumentId: id,
-    sleeve,
     quantity: qty,
     costBasis: "0",
     realizedPnL: "0",
   }) as Position;
 
-const priced = (
-  id: string,
-  value: string | null,
-  sleeve: Sleeve = "CORE",
-): [string, MarketValue] => [
-  tradeMetaKey(id, sleeve),
+const priced = (id: string, value: string | null): [string, MarketValue] => [
+  id,
   { marketValue: value } as MarketValue,
 ];
 
@@ -74,7 +69,6 @@ describe("toInstrumentListItems", () => {
   });
 
   it("reports an unpriced instrument as null, not zero", () => {
-    // Zero would read as "worth nothing"; null reads as "we do not know".
     const [item] = toInstrumentListItems(
       [instrument()],
       [position("IE00BK5BQT80", "10")],
@@ -83,21 +77,24 @@ describe("toInstrumentListItems", () => {
     expect(item?.value).toBeNull();
   });
 
-  it("sums quantity and value across sleeves of the same instrument", () => {
+  it("reports the position's quantity and value on the row", () => {
     const [item] = toInstrumentListItems(
       [instrument()],
-      [
-        position("IE00BK5BQT80", "10"),
-        position("IE00BK5BQT80", "5", "TRADING"),
-      ],
-      new Map([
-        priced("IE00BK5BQT80", "1000.00"),
-        priced("IE00BK5BQT80", "500.00", "TRADING"),
-      ]),
+      [position("IE00BK5BQT80", "15")],
+      new Map([priced("IE00BK5BQT80", "1500.00")]),
     );
     expect(item?.quantity).toBe("15");
     expect(item?.value).toBe("1500.00");
     expect(item?.isClosed).toBe(false);
+  });
+
+  it("carries the instrument's thesis through to the row", () => {
+    const [item] = toInstrumentListItems(
+      [instrument({ thesis: "TACTICAL" })],
+      [],
+      new Map(),
+    );
+    expect(item?.thesis).toBe("TACTICAL");
   });
 
   it("orders by value, so the biggest holding leads rather than the earliest id", () => {

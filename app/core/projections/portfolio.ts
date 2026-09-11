@@ -4,7 +4,6 @@ import { Money } from "../domain";
 import type { InvestedVsValuePoint } from "./invested-vs-value";
 import type { MarketValue } from "./market-value";
 import type { Position } from "./positions";
-import { tradeMetaKey } from "./trade-meta";
 
 export interface PortfolioSummary {
   totalValue: string;
@@ -32,9 +31,7 @@ export function computePortfolioSummary(
     const isOpen = !new Decimal(position.quantity).isZero();
     if (!isOpen) continue;
 
-    const marketValue = marketValues.get(
-      tradeMetaKey(position.instrumentId, position.sleeve),
-    );
+    const marketValue = marketValues.get(position.instrumentId);
 
     if (!marketValue || marketValue.marketValue === null) {
       unpricedCount += 1;
@@ -80,9 +77,7 @@ export function computeAllocation(
   let total = Money.zero();
 
   for (const position of positions) {
-    const marketValue = marketValues.get(
-      tradeMetaKey(position.instrumentId, position.sleeve),
-    );
+    const marketValue = marketValues.get(position.instrumentId);
     if (!marketValue || marketValue.marketValue === null) continue;
 
     const value = Money.fromString(marketValue.marketValue);
@@ -111,7 +106,6 @@ export function computeAllocation(
 
 export interface TopPosition {
   instrumentId: string;
-  sleeve: Position["sleeve"];
   marketValue: string;
   weight: string;
   unrealizedPnL: string;
@@ -128,9 +122,7 @@ export function computeTopPositions(
   for (const position of positions) {
     if (new Decimal(position.quantity).isZero()) continue;
 
-    const marketValue = marketValues.get(
-      tradeMetaKey(position.instrumentId, position.sleeve),
-    );
+    const marketValue = marketValues.get(position.instrumentId);
     if (
       !marketValue ||
       marketValue.marketValue === null ||
@@ -143,7 +135,6 @@ export function computeTopPositions(
     const costBasis = new Decimal(position.costBasis);
     rows.push({
       instrumentId: position.instrumentId,
-      sleeve: position.sleeve,
       marketValue: marketValue.marketValue,
       weight: marketValue.weight,
       unrealizedPnL: marketValue.unrealizedPnL,

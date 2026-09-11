@@ -15,7 +15,7 @@ import {
 } from "~/lib";
 
 import { SignedMoney } from "../SignedMoney";
-import { SleeveChip } from "../ui/SleeveChip";
+import { ThesisChip } from "../ui/ThesisChip";
 import { signClass, signedPercent } from "../ui/signed";
 import { SortableHeader } from "../portfolio/SortableHeader";
 import { REALIZED_COLUMNS, REALIZED_GRID, REALIZED_MIN_WIDTH } from "./columns";
@@ -133,7 +133,7 @@ function RealizedRowItem({ row }: { row: RealizedRow }) {
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <span className="truncate font-medium">{row.name}</span>
-            <SleeveChip sleeve={row.sleeve} />
+            <ThesisChip thesis={row.thesis} />
           </div>
           <div className="mt-0.5 text-[11.5px] text-muted">
             {row.instrumentId}

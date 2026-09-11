@@ -1,21 +1,20 @@
 import { describe, expect, it } from "vitest";
 
+import type { TradeEvent } from "../domain";
 import type { InvestedVsValuePoint } from "./invested-vs-value";
-import type { MarketValue } from "./market-value";
-import type { Position } from "./positions";
+import { computeMarketValues, type MarketValue } from "./market-value";
+import { computePositions, type Position } from "./positions";
 import {
   computeAllocation,
   computePortfolioInvestedVsValueSeries,
   computePortfolioSummary,
   computeTopPositions,
 } from "./portfolio";
-import { tradeMetaKey } from "./trade-meta";
 
 function position(
   overrides: Partial<Position> & { instrumentId: string },
 ): Position {
   return {
-    sleeve: "CORE",
     quantity: "10",
     costBasis: "1000",
     averageCost: "100",
@@ -41,9 +40,7 @@ const unpriced: MarketValue = {
 function marketValues(
   entries: readonly [Position, MarketValue][],
 ): Map<string, MarketValue> {
-  return new Map(
-    entries.map(([p, mv]) => [tradeMetaKey(p.instrumentId, p.sleeve), mv]),
-  );
+  return new Map(entries.map(([p, mv]) => [p.instrumentId, mv]));
 }
 
 describe("computePortfolioSummary", () => {
@@ -334,5 +331,55 @@ describe("computePortfolioInvestedVsValueSeries", () => {
   it("returns an empty series when there is nothing to merge", () => {
     expect(computePortfolioInvestedVsValueSeries([])).toEqual([]);
     expect(computePortfolioInvestedVsValueSeries([[], []])).toEqual([]);
+  });
+});
+
+describe("one instrument, one line", () => {
+  const buy = (id: string, month: number, gross: string): TradeEvent => ({
+    id: `evt-${id}-${month}`,
+    ts: new Date(`2025-0${month}-01`),
+    type: "BUY",
+    instrumentId: id,
+    quantity: "1",
+    price: gross,
+    grossAmount: gross,
+    fees: "0",
+    currency: "EUR",
+    fxToBase: "1",
+    account: "test",
+    source: "TEST",
+  });
+
+  const ledger = [
+    buy("A", 1, "500"),
+    buy("A", 2, "700"),
+    buy("B", 3, "300"),
+    buy("B", 4, "400"),
+  ];
+
+  const prices = new Map([["A", { price: "800", currency: "EUR" }]]);
+
+  it("gives a repeatedly traded instrument a single Top-5 row", () => {
+    const positions = computePositions(ledger);
+    const top = computeTopPositions(
+      positions,
+      computeMarketValues(positions, prices, "EUR"),
+    );
+
+    expect(top).toHaveLength(1);
+    expect(top[0]!.instrumentId).toBe("A");
+    expect(top[0]!.marketValue).toBe("1600");
+    expect(top[0]!.weight).toBe("1.000000");
+  });
+
+  it("counts instruments, not positions, when reporting price coverage", () => {
+    const positions = computePositions(ledger);
+    const summary = computePortfolioSummary(
+      positions,
+      computeMarketValues(positions, prices, "EUR"),
+    );
+
+    expect(summary.pricedCount).toBe(1);
+    expect(summary.unpricedCount).toBe(1);
   });
 });

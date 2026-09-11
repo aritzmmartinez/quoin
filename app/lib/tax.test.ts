@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { Instrument, Sleeve, TradeEvent } from "~/core/domain";
+import type { Instrument, TradeEvent } from "~/core/domain";
 
 import {
   buildTaxYearView,
@@ -16,14 +16,13 @@ function trade(
   instrumentId: string,
   quantity: string,
   grossAmount: string,
-  opts: { fees?: string; sleeve?: Sleeve; ts?: string } = {},
+  opts: { fees?: string; ts?: string } = {},
 ): TradeEvent {
   return {
     id: `evt-${seq++}`,
     ts: new Date(opts.ts ?? "2025-01-01"),
     type,
     instrumentId,
-    sleeve: opts.sleeve ?? "CORE",
     quantity,
     price: "0",
     grossAmount,
@@ -36,7 +35,7 @@ function trade(
 }
 
 function instrument(id: string, name: string): Instrument {
-  return { id, name, type: "STOCK", currency: "EUR" };
+  return { id, name, type: "STOCK", currency: "EUR", thesis: "CORE" };
 }
 
 describe("listTaxYears", () => {

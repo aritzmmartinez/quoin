@@ -34,13 +34,13 @@ describe("mapRow", () => {
       type: "ETF",
       currency: "EUR",
       assetClass: "FUND",
+      thesis: "CORE",
     });
     expect(result.event.type).toBe("BUY");
     if (result.event.type === "BUY") {
       expect(result.event.grossAmount).toBe("36.64");
       expect(result.event.fees).toBe("1");
       expect(result.event.quantity).toBe("1");
-      expect(result.event.sleeve).toBe("CORE");
       expect(result.event.externalId).toBe("tx-1");
     }
   });
@@ -104,24 +104,43 @@ describe("mapRow", () => {
     }
   });
 
-  it("discards saveback and corporate actions as unsupported", () => {
+  it("discards saveback and corporate actions as unsupported, keeping the row", () => {
     expect(
       mapRow(
-        row({ category: "CASH", type: "BENEFITS_SAVEBACK", amount: "0.5" }),
+        row({
+          category: "CASH",
+          type: "BENEFITS_SAVEBACK",
+          name: "Test ETF",
+          amount: "0.5",
+        }),
       ),
     ).toEqual({
       kind: "discard",
       reason: "unsupported",
+      detail: {
+        date: "2025-01-01T10:00:00.000Z",
+        type: "BENEFITS_SAVEBACK",
+        instrument: "Test ETF",
+      },
     });
     expect(
       mapRow(
         row({
           category: "CORPORATE_ACTION",
           type: "LIQUIDATION_DIVIDEND",
+          name: "",
           amount: "1",
         }),
       ),
-    ).toEqual({ kind: "discard", reason: "unsupported" });
+    ).toEqual({
+      kind: "discard",
+      reason: "unsupported",
+      detail: {
+        date: "2025-01-01T10:00:00.000Z",
+        type: "LIQUIDATION_DIVIDEND",
+        instrument: null,
+      },
+    });
   });
 
   it("maps asset classes to instrument types", () => {

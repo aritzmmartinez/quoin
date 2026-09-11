@@ -1,7 +1,7 @@
 import Decimal from "decimal.js";
 import { describe, expect, it } from "vitest";
 
-import type { LedgerEvent, Sleeve, TradeEvent } from "../domain";
+import type { LedgerEvent, TradeEvent } from "../domain";
 
 import { computePortfolioSummary } from "./portfolio";
 import { computePositions } from "./positions";
@@ -14,14 +14,13 @@ function trade(
   instrumentId: string,
   quantity: string,
   grossAmount: string,
-  opts: { fees?: string; sleeve?: Sleeve; ts?: string; fxToBase?: string } = {},
+  opts: { fees?: string; ts?: string; fxToBase?: string } = {},
 ): TradeEvent {
   return {
     id: `evt-${seq++}`,
     ts: new Date(opts.ts ?? "2025-01-01"),
     type,
     instrumentId,
-    sleeve: opts.sleeve ?? "CORE",
     quantity,
     price: "0",
     grossAmount,
@@ -161,17 +160,19 @@ describe("computeRealizedGains", () => {
     expect(sale.realizedPnL).toBe("180");
   });
 
-  it("keeps sleeves ring-fenced and reports sales chronologically", () => {
+  it("reports sales chronologically off one blended average", () => {
     const sales = computeRealizedGains([
-      trade("SELL", "X", "5", "700", { sleeve: "TRADING", ts: "2025-04-01" }),
-      trade("BUY", "X", "10", "1000", { sleeve: "CORE", ts: "2025-01-01" }),
-      trade("BUY", "X", "10", "2000", { sleeve: "TRADING", ts: "2025-02-01" }),
-      trade("SELL", "X", "5", "600", { sleeve: "CORE", ts: "2025-03-01" }),
+      trade("SELL", "X", "5", "700", { ts: "2025-04-01" }),
+      trade("BUY", "X", "10", "1000", { ts: "2025-01-01" }),
+      trade("BUY", "X", "10", "2000", { ts: "2025-02-01" }),
+      trade("SELL", "X", "5", "600", { ts: "2025-03-01" }),
     ]);
 
-    expect(sales.map((s) => s.sleeve)).toEqual(["CORE", "TRADING"]);
-    expect(sales[0]!.costBasis).toBe("500"); // CORE average 100
-    expect(sales[1]!.costBasis).toBe("1000"); // TRADING average 200
+    expect(sales.map((s) => s.ts.toISOString().slice(0, 10))).toEqual([
+      "2025-03-01",
+      "2025-04-01",
+    ]);
+    expect(sales.map((s) => s.costBasis)).toEqual(["750", "750"]);
   });
 });
 
@@ -199,8 +200,8 @@ describe("realized gains vs the portfolio total", () => {
       trade("SELL", "X", "4", "850", { fees: "1", ts: "2025-06-01" }),
       trade("BUY", "Y", "3", "600", { fees: "0.5", ts: "2025-01-15" }),
       trade("SELL", "Y", "1", "250", { ts: "2025-07-01" }),
-      trade("BUY", "Z", "2", "500", { sleeve: "TRADING", ts: "2025-02-20" }),
-      trade("SELL", "Z", "2", "460", { sleeve: "TRADING", ts: "2025-08-01" }),
+      trade("BUY", "Z", "2", "500", { ts: "2025-02-20" }),
+      trade("SELL", "Z", "2", "460", { ts: "2025-08-01" }),
     ];
 
     const { sales } = expectSumMatchesSummary(events);
@@ -245,7 +246,6 @@ describe("realized gains vs the portfolio total", () => {
         ts: new Date("2025-02-01"),
         type: "DIVIDEND",
         instrumentId: "X",
-        sleeve: "CORE",
         grossAmount: "50",
         taxWithheld: "10",
         currency: "EUR",

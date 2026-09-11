@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-11
+
+### Added
+- A "Sincronizar IPC" button on the inflation notice (Resumen and /realizado). Whenever the CPI series needs a refresh — nothing stored, a gap in the range, or data stale enough that INE may have published without us noticing — it's one click instead of a trip to the terminal. pnpm ipc:sync still works exactly as before.
+- Real mode now tells you when its CPI series is stale, instead of assuming it's "a few weeks behind" just because it's running. If nobody has synced in over 35 days (past one INE publication cycle), you'll see a different, more honest notice.
+- A new Quoin favicon.
+- A four-step import flow ("Importar operaciones") on /cartera: drop the CSV, map any symbols we don't recognise, fetch their prices, review the summary. You can always jump back to a step you've already completed.
+- The broker is detected automatically from the file's header row — no selector to get wrong. A file that matches neither Trade Republic nor Kraken is refused by name, not guessed at.
+- When mapping a symbol, you now see its quote, timestamp and implied position value — so a price that's off by a multiple is caught before it's saved. pnpm prices:map benefits from the same check.
+- A shared dropzone component for both import flows (holdings and operations) — each keeps parsing its own way, but neither reinvents the drop target.
+- A clearer step indicator for the import modal: checked steps, the current one outlined, the rest muted. Back and Next live at the bottom, separate from the action button, so moving and doing are never the same click.
+- The import summary's "Descartadas" row can now expand — for unsupported movement types only — into the date, broker and instrument behind each one. Stock splits and share deliveries can change a real position, so those stay visible; routine noise like card spending doesn't.
+
+### Changed
+- IPC sync logic moved out of the script and into a shared function, used by both the CLI and the new sync endpoint behind the button. --force-rebase stays CLI-only — it wipes a series outright, too destructive for a button — though the endpoint will now tell you when a rebase is needed.
+- The "last updated" tooltip on the basis badge now reflects when we last checked INE, not when the newest stored month arrived. A sync that finds nothing new still counts as a sync.
+- The "no IPC data" notices no longer tell you to run a command — the button next to them does it for you.
+- Import now writes to the ledger at step 1, with the later steps only filling in symbols and prices. The button says "Importar N operaciones", not "Confirmar" — and the operations stay saved even if you close the modal early. The last step is a summary, not a completion screen.
+- The import modal can no longer be closed mid-request — Escape, the backdrop, the close button all wait until it resolves. (Chrome has its own opinion on double-Escape, so we reopen the dialog if it tries to force-close while something's still in flight.)
+- Closing the modal after import but before the summary now asks first, and says plainly that your operations are already saved and where to finish mapping any leftover symbols.
+- Both the mapping and summary steps now point you to Instrumentos to finish any symbols you skipped — and the mapping step makes clear upfront that skipping is fine.
+- Price backfill and symbol remapping logic extracted into shared functions, so the CLI and the import flow don't drift apart.
+- pnpm prices:backfill now points you to pnpm prices:sync when it's done — the freshest prices you just fetched don't count as "synced" until you run it.
+- A new thesis field on each instrument (Core, Conviction, Tactical) — why you're holding it, not where the trade came from. Editable from /instrumentos, protected from being overwritten on re-import.
+- The thesis chip only shows up when it's not Core — no more "Core" repeated on every row of five screens.
+
+### Removed
+- LedgerEntry.sleeve. Every adapter wrote it as "Core" and nothing ever set it to anything else, so the field it powered — AVCO lots, FIFO queues, wash-sale matching — was quietly keyed by instrument alone the whole time. Nothing changes for your tax figures; the partition was never really active.
+- tradeMetaKey and the sleeve filters on ledger events and movement rows — dead code nobody was calling.
+
+### Fixed
+- An instrument held under two sleeves used to show up twice: duplicated in its exposure leaf, taking two Top-5 slots, double-counted in priced/unpriced totals. One instrument, one position, now.
+- A repurchase inside the wash-sale window could dodge the rule if it happened to carry a different sleeve label. Art. 43 cares about the security, not our internal bookkeeping.
+
 ## [0.6.0] - 2026-09-05
 
 ### Added
@@ -176,7 +210,8 @@ fund holdings must be supplied as CSV rather than the Excel most issuers publish
 Design rationale lives beside the code it explains, in `docs/ARCHITECTURE.md` and in the
 commit history — not here.
 
-[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/aritzmmartinez/quoin/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/aritzmmartinez/quoin/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/aritzmmartinez/quoin/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/aritzmmartinez/quoin/compare/v0.5.0...v0.5.1

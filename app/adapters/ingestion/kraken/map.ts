@@ -4,6 +4,7 @@ import {
   Money,
   cashEventSchema,
   dividendEventSchema,
+  instrumentSchema,
   tradeEventSchema,
   type Instrument,
 } from "~/core/domain";
@@ -11,6 +12,18 @@ import type { PriceSnapshot } from "~/core/ports";
 
 import type { MappedItem } from "../ingest";
 import type { KrakenRow } from "./row";
+
+function unsupported(row: KrakenRow): MappedItem {
+  return {
+    kind: "discard",
+    reason: "unsupported",
+    detail: {
+      date: parseTime(row.time).toISOString(),
+      type: row.type,
+      instrument: row.asset || null,
+    },
+  };
+}
 
 export type PriceAt = (instrumentId: string, ts: Date) => string | null;
 
@@ -44,13 +57,13 @@ export function priceLookupFrom(snapshots: readonly PriceSnapshot[]): PriceAt {
   };
 }
 
-const BTC: Instrument = {
+const BTC: Instrument = instrumentSchema.parse({
   id: "BTC",
   name: "Bitcoin",
   type: "CRYPTO",
   currency: "EUR",
   assetClass: "crypto",
-};
+});
 
 function parseTime(time: string): Date {
   return new Date(`${time.replace(" ", "T")}Z`);
@@ -111,11 +124,11 @@ export function mapGroup(
           ? reward(refid, row, priceAt)
           : [{ kind: "discard", reason: "non-btc" }];
       default:
-        return [{ kind: "discard", reason: "unsupported" }];
+        return [unsupported(row)];
     }
   }
 
-  return [{ kind: "discard", reason: "unsupported" }];
+  return [unsupported(rows[0]!)];
 }
 
 function trade(
@@ -134,7 +147,6 @@ function trade(
       ts: parseTime(fiat.time),
       type,
       instrumentId: "BTC",
-      sleeve: "CORE",
       quantity: btc.toFixed(),
       price: btc.isZero() ? "0" : eur.dividedBy(btc).toFixed(),
       grossAmount: eur.toFixed(),
@@ -175,7 +187,6 @@ function reward(refid: string, row: KrakenRow, priceAt: PriceAt): MappedItem[] {
       ts,
       type: "BUY",
       instrumentId: "BTC",
-      sleeve: "CORE",
       quantity,
       price,
       grossAmount,
@@ -197,7 +208,6 @@ function reward(refid: string, row: KrakenRow, priceAt: PriceAt): MappedItem[] {
       ts,
       type: "DIVIDEND",
       instrumentId: "BTC",
-      sleeve: "CORE",
       grossAmount,
       taxWithheld: "0",
       currency: "EUR",

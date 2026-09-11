@@ -4,15 +4,12 @@ import {
   Money,
   type LedgerEvent,
   type Revalue,
-  type Sleeve,
   type TradeEvent,
 } from "../domain";
-import { tradeMetaKey } from "../projections/trade-meta";
 
 export interface FifoLot {
   id: string;
   instrumentId: string;
-  sleeve: Sleeve;
   quantity: Decimal;
   unitCost: Money;
   acquiredAt: Date;
@@ -59,7 +56,7 @@ export function walkFifo(
   const sales: FifoSale[] = [];
 
   for (const trade of trades) {
-    const key = tradeMetaKey(trade.instrumentId, trade.sleeve);
+    const key = trade.instrumentId;
     let queue = queues.get(key);
     if (!queue) {
       queue = [];
@@ -83,7 +80,6 @@ export function walkFifo(
       queue.push({
         id: trade.id,
         instrumentId: trade.instrumentId,
-        sleeve: trade.sleeve,
         quantity,
         unitCost,
         acquiredAt: trade.ts,

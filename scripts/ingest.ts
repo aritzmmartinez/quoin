@@ -11,6 +11,8 @@ import {
   TradeRepublicCsvAdapter,
   persistBatch,
   previewBatch,
+  BROKERS,
+  type Broker,
   type ImportSummary,
 } from "~/adapters/ingestion";
 import {
@@ -19,10 +21,6 @@ import {
   PrismaPriceRepository,
   prisma,
 } from "~/adapters/persistence";
-
-const BROKERS = ["trade-republic", "kraken"] as const;
-
-type Broker = (typeof BROKERS)[number];
 
 const USAGE = `Usage: pnpm ingest --broker=<${BROKERS.join("|")}> <file.csv> [--yes]`;
 

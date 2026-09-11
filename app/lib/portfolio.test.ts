@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import type { Instrument } from "~/core/domain";
 import type { MarketValue, Position, TradeMeta } from "~/core/projections";
-import { tradeMetaKey } from "~/core/projections";
 
 import {
   DEFAULT_SORT,
@@ -22,21 +21,28 @@ const instruments: Instrument[] = [
     name: "Test World Equity",
     type: "ETF",
     currency: "EUR",
+    thesis: "CORE",
   },
   {
     id: "NL00TEST0032",
     name: "Test Semiconductors NV",
     type: "STOCK",
     currency: "EUR",
+    thesis: "CONVICTION",
   },
-  { id: "BTC", name: "Bitcoin", type: "CRYPTO", currency: "EUR" },
+  {
+    id: "BTC",
+    name: "Bitcoin",
+    type: "CRYPTO",
+    currency: "EUR",
+    thesis: "TACTICAL",
+  },
 ];
 
 function position(
   overrides: Partial<Position> & Pick<Position, "instrumentId">,
 ): Position {
   return {
-    sleeve: "CORE",
     quantity: "10",
     costBasis: "1000",
     averageCost: "100",
@@ -47,7 +53,7 @@ function position(
 
 const meta = new Map<string, TradeMeta>([
   [
-    tradeMetaKey("IE00TEST0031", "CORE"),
+    "IE00TEST0031",
     {
       firstTradeAt: new Date("2026-01-01"),
       lastTradeAt: new Date("2026-06-01"),
@@ -62,7 +68,7 @@ describe("toPortfolioRows", () => {
   it("joins position, instrument, trade meta and market values", () => {
     const market = new Map<string, MarketValue>([
       [
-        tradeMetaKey("IE00TEST0031", "CORE"),
+        "IE00TEST0031",
         { marketValue: "1200", unrealizedPnL: "200", weight: "1.000000" },
       ],
     ]);
@@ -128,13 +134,10 @@ describe("toPortfolioRows", () => {
 
 const market = new Map<string, MarketValue>([
   [
-    tradeMetaKey("IE00TEST0031", "CORE"),
+    "IE00TEST0031",
     { marketValue: "6000", unrealizedPnL: "1000", weight: "0.400000" },
   ],
-  [
-    tradeMetaKey("BTC", "CORE"),
-    { marketValue: "9000", unrealizedPnL: "1000", weight: "0.600000" },
-  ],
+  ["BTC", { marketValue: "9000", unrealizedPnL: "1000", weight: "0.600000" }],
   // NL00TEST0032 intentionally unpriced
 ]);
 

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useFetcher } from "react-router";
 
 import {
@@ -9,6 +9,7 @@ import {
 } from "~/adapters/ingestion/holdings";
 import { es, formatPercent } from "~/lib";
 import { Button } from "../ui/Button";
+import { FileDropzone } from "../ui/FileDropzone";
 
 type Override = Partial<Pick<ColumnMap, "identity" | "name" | "weight">>;
 
@@ -25,13 +26,11 @@ export function HoldingsUpload({
     error?: string;
     imported?: number;
   }>();
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const [csv, setCsv] = useState<string | null>(null);
   const [preview, setPreview] = useState<ParsedHoldings | null>(null);
   const [override, setOverride] = useState<Override>({});
   const [error, setError] = useState<string | null>(null);
-  const [dragging, setDragging] = useState(false);
 
   async function read(file: File, next: Override = {}) {
     try {
@@ -67,36 +66,12 @@ export function HoldingsUpload({
   return (
     <div className="border-t border-border bg-surface px-gutter py-4">
       {preview === null ? (
-        <div
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragging(true);
-          }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragging(false);
-            const file = e.dataTransfer.files[0];
-            if (file) read(file);
-          }}
-          onClick={() => inputRef.current?.click()}
-          className={`cursor-pointer rounded-lg border border-dashed px-4 py-8 text-center transition-colors ${
-            dragging ? "border-text bg-surface-2" : "border-border"
-          }`}
-        >
-          <p className="text-[13px]">{copy.drop}</p>
-          <p className="mt-1 text-[12px] text-muted">{copy.dropHint}</p>
-          <input
-            ref={inputRef}
-            type="file"
-            accept=".csv,.xlsx,text/csv"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) read(file);
-            }}
-          />
-        </div>
+        <FileDropzone
+          accept=".csv,.xlsx,text/csv"
+          label={copy.drop}
+          hint={copy.dropHint}
+          onFile={(file) => void read(file)}
+        />
       ) : (
         <Preview
           preview={preview}

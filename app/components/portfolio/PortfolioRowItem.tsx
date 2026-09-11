@@ -10,7 +10,7 @@ import {
 } from "~/lib";
 
 import { SignedMoney } from "../SignedMoney";
-import { SleeveChip } from "../ui/SleeveChip";
+import { ThesisChip } from "../ui/ThesisChip";
 import { GRID_TEMPLATE } from "./columns";
 
 function ChevronRight() {
@@ -45,7 +45,7 @@ export function PortfolioRowItem({ row }: { row: PortfolioRow }) {
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <span className="truncate text-sm font-medium">{row.name}</span>
-            <SleeveChip sleeve={row.sleeve} />
+            <ThesisChip thesis={row.thesis} />
           </div>
           <div className="mt-0.5 text-[11.5px] text-muted">
             {row.instrumentId}

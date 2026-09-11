@@ -9,7 +9,6 @@ export interface LedgerEntryRow {
   id: string;
   ts: Date;
   type: string;
-  sleeve: string | null;
   instrumentId: string | null;
   quantity: string | null;
   price: string | null;
@@ -45,7 +44,6 @@ export function rowToEvent(row: LedgerEntryRow): LedgerEvent {
         ...base,
         type: row.type,
         instrumentId: row.instrumentId,
-        sleeve: row.sleeve,
         quantity: row.quantity,
         price: row.price,
         grossAmount: row.grossAmount,
@@ -56,7 +54,6 @@ export function rowToEvent(row: LedgerEntryRow): LedgerEvent {
         ...base,
         type: "DIVIDEND",
         instrumentId: row.instrumentId,
-        sleeve: row.sleeve,
         grossAmount: row.grossAmount,
         taxWithheld: row.taxWithheld,
       });
@@ -91,7 +88,6 @@ export function eventToCreateData(event: LedgerEvent): LedgerEntryCreateData {
       return {
         ...base,
         type: event.type,
-        sleeve: event.sleeve,
         instrumentId: event.instrumentId,
         quantity: event.quantity,
         price: event.price,
@@ -103,7 +99,6 @@ export function eventToCreateData(event: LedgerEvent): LedgerEntryCreateData {
       return {
         ...base,
         type: "DIVIDEND",
-        sleeve: event.sleeve,
         instrumentId: event.instrumentId,
         quantity: null,
         price: null,
@@ -117,7 +112,6 @@ export function eventToCreateData(event: LedgerEvent): LedgerEntryCreateData {
       return {
         ...base,
         type: event.type,
-        sleeve: null,
         instrumentId: null,
         quantity: null,
         price: null,
@@ -139,11 +133,17 @@ export interface InstrumentRow {
   exposureLeafId: string | null;
   ter: string | null;
   hedgedToBase: boolean;
+  thesis: string;
 }
 
 export type InstrumentWriteData = Omit<
   InstrumentRow,
-  "quoteSymbol" | "exposureKind" | "exposureLeafId" | "ter" | "hedgedToBase"
+  | "quoteSymbol"
+  | "exposureKind"
+  | "exposureLeafId"
+  | "ter"
+  | "hedgedToBase"
+  | "thesis"
 >;
 
 export function rowToInstrument(row: InstrumentRow): Instrument {
@@ -158,6 +158,7 @@ export function rowToInstrument(row: InstrumentRow): Instrument {
     exposureLeafId: row.exposureLeafId ?? null,
     ter: row.ter ?? null,
     hedgedToBase: row.hedgedToBase,
+    thesis: row.thesis,
   });
 }
 

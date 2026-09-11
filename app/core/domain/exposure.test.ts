@@ -18,6 +18,7 @@ const fund = (over: Partial<Instrument> = {}): Instrument => ({
   quoteSymbol: null,
   exposureKind: "EQUITY_FUND",
   exposureLeafId: null,
+  thesis: "CORE",
   ...over,
 });
 

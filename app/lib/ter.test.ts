@@ -14,6 +14,7 @@ const instrument = (id: string, name: string): Instrument => ({
   exposureKind: null,
   exposureLeafId: null,
   ter: null,
+  thesis: "CORE",
 });
 
 describe("terPercentSchema", () => {

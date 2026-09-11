@@ -1,4 +1,4 @@
-import type { ExposureKind, InstrumentType, Sleeve } from "~/core/domain";
+import type { ExposureKind, InstrumentType, Thesis } from "~/core/domain";
 
 export const es = {
   common: {
@@ -126,11 +126,23 @@ export const es = {
     perFlow:
       "Cada aportación se ajusta con el IPC de su propio mes, no el total de golpe.",
     lag: "El valor de mercado es el de hoy: el IPC del mes en curso aún no está publicado, así que la referencia va unas semanas por detrás.",
+    maybeBehind:
+      "El último IPC guardado tiene ya varias semanas. Puede que el INE haya publicado algún mes que aún no tienes; la app no lo sabe sin volver a preguntar.",
     noIndex:
-      "No hay datos de IPC guardados. Ejecuta pnpm ipc:sync para descargarlos del INE.",
+      "No hay ningún dato de IPC guardado, así que no se puede ajustar por inflación.",
     gaps: (periods: string): string =>
-      `Faltan datos de IPC para ${periods}. No se ajusta nada: rellenar un hueco por interpolación inventaría un nivel de precios que nadie ha medido. Vuelve a ejecutar pnpm ipc:sync.`,
+      `Faltan datos de IPC para ${periods}. No se ajusta nada: rellenar un hueco por interpolación inventaría un nivel de precios que nadie ha medido.`,
     showingNominal: "Se muestran importes nominales.",
+    sync: {
+      action: "Sincronizar IPC",
+      loading: "Sincronizando IPC…",
+      upToDate: "El IPC ya estaba al día.",
+      added: (n: number): string =>
+        n === 1 ? "1 mes de IPC añadido" : `${n} meses de IPC añadidos`,
+      error: "No se pudo sincronizar el IPC.",
+      rebase: (series: string): string =>
+        `${series}: el INE cambió de año base. Reemplaza la serie con pnpm ipc:sync --force-rebase.`,
+    },
   },
   pagination: {
     label: "Paginación",
@@ -340,6 +352,136 @@ export const es = {
     empty:
       "Ninguna línea del objetivo se puede repartir todavía. Importa operaciones y sincroniza precios.",
   },
+  ingest: {
+    open: "Importar operaciones",
+    title: "Importar operaciones",
+    steps: {
+      file: "Fichero",
+      mapping: "Símbolos",
+      prices: "Precios",
+      done: "Resumen",
+    },
+    stepOf: (current: number, total: number): string =>
+      `Paso ${current} de ${total}`,
+    previous: "Anterior",
+    next: "Siguiente",
+    finish: "Cerrar",
+    goToStep: (label: string): string => `Volver a «${label}»`,
+    volatile:
+      "El fichero no sobrevive a un refresco de la página: si recargas ahora, vuelves al primer paso.",
+    drop: "Arrastra aquí el CSV de tu bróker",
+    dropHint:
+      "Trade Republic o Kraken, tal cual lo descargas. El bróker se detecta por las columnas del fichero, no hace falta elegirlo.",
+    unreadable: "No se ha podido leer el fichero.",
+    unknownBroker:
+      "No reconozco este export. Se espera un CSV de Trade Republic (con columna transaction_id) o de Kraken (con columna refid).",
+    failed: "La importación ha fallado.",
+    analysing: "Analizando el fichero…",
+    importing: "Importando…",
+    brokerLabel: (broker: string): string =>
+      broker === "kraken" ? "Kraken" : "Trade Republic",
+    detected: (broker: string): string => `Detectado: ${broker}`,
+    summary: {
+      total: "Operaciones en el fichero",
+      imported: "Nuevas",
+      duplicates: "Duplicadas",
+      instruments: "Instrumentos",
+      discarded: "Descartadas",
+      errors: "Con error",
+      none: "ninguna",
+      unsupportedDetails: (count: number): string =>
+        count === 1
+          ? "Ver 1 fila sin soporte"
+          : `Ver ${count} filas sin soporte`,
+      noInstrument: "Sin instrumento",
+    },
+    nothingNew:
+      "Nada nuevo que importar: todas las operaciones de este fichero ya estaban en el registro.",
+    confirmCount: (count: number): string =>
+      count === 1 ? "Importar 1 operación" : `Importar ${count} operaciones`,
+    appliesNow:
+      "Las operaciones se guardan en el registro al pulsar. Los pasos siguientes solo añaden símbolos y precios: cerrar el asistente después no revierte la importación.",
+    closeConfirm: {
+      body: (count: number): string =>
+        count === 1
+          ? "Ya se ha importado 1 operación y se mantiene en el registro aunque cierres ahora."
+          : `Ya se han importado ${count} operaciones y se mantienen en el registro aunque cierres ahora.`,
+      hint: "Los símbolos que falten por mapear se completan en Instrumentos.",
+      keep: "Seguir con la importación",
+      close: "Cerrar de todos modos",
+    },
+    map: {
+      title: "Símbolos de cotización",
+      intro:
+        "Estos instrumentos no tienen aún símbolo de Yahoo, así que no se pueden valorar. Mapea la línea en euros de la plaza correcta y comprueba el valor implícito antes de guardar.",
+      warning:
+        "Varias plazas cotizan en euros y aun así son otro fondo que replica el mismo índice, o el mismo fondo con otra proporción por participación. Compara el valor implícito con lo que dice tu bróker: la divisa sola no lo detecta, la magnitud sí.",
+      placeholder: "VWCE.DE, BTC-EUR…",
+      verify: "Verificar",
+      verifying: "Verificando…",
+      save: "Usar este símbolo",
+      saving: "Guardando…",
+      saved: "Guardado",
+      invalid: "Símbolo no válido.",
+      noQuote: (symbol: string): string =>
+        `Yahoo no devuelve precio para ${symbol}. Prueba otra plaza (.DE, .MI, .PA, .AS).`,
+      price: "Precio",
+      impliedValue: "Valor implícito",
+      quantity: "Unidades",
+      stale:
+        "La marca de tiempo es antigua: casi siempre significa que es la plaza equivocada, o una muy ilíquida.",
+      closed:
+        "No tienes unidades de este instrumento, así que el valor implícito no verifica nada. Comprueba la plaza a mano.",
+      removed: (count: number): string =>
+        count === 1
+          ? "Se ha borrado 1 precio del símbolo anterior."
+          : `Se han borrado ${count} precios del símbolo anterior.`,
+      pending: (count: number): string =>
+        count === 1
+          ? "1 instrumento sin símbolo"
+          : `${count} instrumentos sin símbolo`,
+      none: "Todos los instrumentos importados ya tienen símbolo.",
+      mapped: (done: number, total: number): string =>
+        `${done} de ${total} mapeados`,
+      canContinue:
+        "Puedes continuar sin mapearlos todos: los símbolos que falten se completan en Instrumentos.",
+    },
+    prices: {
+      title: "Precios",
+      intro:
+        "Se descarga el histórico diario y, después, la cotización de hoy. Hacen falta las dos: la sesión más reciente llega sin cierre en el histórico y solo la cotización en vivo la completa.",
+      range: "Histórico",
+      rangeHint:
+        "El histórico alimenta las proyecciones: por debajo de 60 meses la pantalla de Proyección no muestra ningún número.",
+      run: "Descargar precios",
+      running: "Descargando precios…",
+      invalid: "Rango no válido.",
+      nothing: "Ningún instrumento nuevo con símbolo que actualizar.",
+    },
+    done: {
+      title: "Resumen de la importación",
+      imported: (count: number): string =>
+        count === 1
+          ? "1 operación importada"
+          : `${count} operaciones importadas`,
+      duplicates: (count: number): string =>
+        count === 1 ? "1 duplicada omitida" : `${count} duplicadas omitidas`,
+      discarded: (count: number): string =>
+        count === 1 ? "1 fila descartada" : `${count} filas descartadas`,
+      candles: (count: number): string =>
+        count === 1 ? "1 precio histórico" : `${count} precios históricos`,
+      synced: (count: number): string =>
+        count === 1 ? "1 cotización de hoy" : `${count} cotizaciones de hoy`,
+      unmapped: (count: number): string =>
+        count === 1
+          ? "1 instrumento sigue sin símbolo y no se puede valorar."
+          : `${count} instrumentos siguen sin símbolo y no se pueden valorar.`,
+      staleWarning: (count: number): string =>
+        count === 1
+          ? "1 símbolo ha devuelto una cotización antigua: revisa la plaza."
+          : `${count} símbolos han devuelto cotizaciones antiguas: revisa las plazas.`,
+    },
+  },
   holdings: {
     drop: "Arrastra aquí el CSV o Excel de posiciones del fondo",
     dropHint:
@@ -398,9 +540,12 @@ export const es = {
       composition: "Composición",
       ter: "TER %",
       hedged: "Divisa",
+      thesis: "Tesis",
       held: "Valor",
     },
     hedgedShort: "Cubierta",
+    thesisHint:
+      "La tesis dice por qué tienes el instrumento, no qué es: eso lo dice la exposición. Cambia cuando cambia tu razonamiento, así que vive aquí y no en la operación que lo compró.",
     defaultOption: "(por defecto del tipo)",
     leafPlaceholder: "XAU, BTC…",
     leafRequired: "Esta clase necesita una hoja (p. ej. XAU).",
@@ -877,9 +1022,17 @@ export const es = {
   },
 } as const;
 
-const SLEEVE_LABELS: Record<Sleeve, string> = {
-  CORE: "Core",
-  TRADING: "Trading",
+const THESIS_LABELS: Record<Thesis, string> = {
+  CORE: "Núcleo",
+  CONVICTION: "Convicción",
+  TACTICAL: "Táctica",
+};
+
+const THESIS_DESCRIPTIONS: Record<Thesis, string> = {
+  CORE: "Núcleo indexado: lo que sostiene la cartera y no se toca.",
+  CONVICTION:
+    "Apuesta individual que quiero mantener años, no un índice ni un trade.",
+  TACTICAL: "Posición tomada con la salida en mente.",
 };
 
 const TYPE_LABELS: Record<InstrumentType, string> = {
@@ -891,8 +1044,12 @@ const TYPE_LABELS: Record<InstrumentType, string> = {
   CASH: "Efectivo",
 };
 
-export function sleeveLabel(sleeve: Sleeve): string {
-  return SLEEVE_LABELS[sleeve];
+export function thesisLabel(thesis: Thesis): string {
+  return THESIS_LABELS[thesis];
+}
+
+export function thesisDescription(thesis: Thesis): string {
+  return THESIS_DESCRIPTIONS[thesis];
 }
 
 export function instrumentTypeLabel(type: InstrumentType): string {

@@ -91,7 +91,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   ).map((row) => ({
     instrumentId: row.instrumentId,
     name: instrumentsById.get(row.instrumentId)?.name ?? row.instrumentId,
-    sleeve: row.sleeve,
+    thesis: instrumentsById.get(row.instrumentId)?.thesis ?? "CORE",
     marketValue: row.marketValue,
     weight: row.weight,
     unrealizedPnLPct: row.unrealizedPnLPct,
@@ -173,6 +173,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       missing: real.missing,
       hasIndex: real.hasIndex,
       syncedAt: real.syncedAt,
+      checkStale: real.checkStale,
     },
     change: computeHeroChange(range, series, summary),
     series: series.map((point) => ({

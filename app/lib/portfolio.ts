@@ -1,17 +1,15 @@
 import Decimal from "decimal.js";
 
-import type { Instrument, InstrumentType, Sleeve } from "~/core/domain";
+import type { Instrument, InstrumentType, Thesis } from "~/core/domain";
 import type { MarketValue, Position, TradeMeta } from "~/core/projections";
-import { tradeMetaKey } from "~/core/projections";
 
 import { instrumentTypeLabel } from "./i18n";
 
 export interface PortfolioRow {
-  key: string;
   instrumentId: string;
   name: string;
   type: InstrumentType | null;
-  sleeve: Sleeve;
+  thesis: Thesis;
   currency: string | null;
   assetClass: string | null;
   quantity: string;
@@ -89,16 +87,14 @@ export function toPortfolioRows(
   return positions
     .filter((p) => new Decimal(p.quantity).gt(0))
     .map((p) => {
-      const key = tradeMetaKey(p.instrumentId, p.sleeve);
       const instrument = byId.get(p.instrumentId);
-      const meta = tradeMeta.get(key);
-      const market = marketValues.get(key);
+      const meta = tradeMeta.get(p.instrumentId);
+      const market = marketValues.get(p.instrumentId);
       return {
-        key,
         instrumentId: p.instrumentId,
         name: instrument?.name ?? p.instrumentId,
         type: instrument?.type ?? null,
-        sleeve: p.sleeve,
+        thesis: instrument?.thesis ?? "CORE",
         currency: instrument?.currency ?? null,
         assetClass: instrument?.assetClass ?? null,
         quantity: p.quantity,
@@ -199,16 +195,11 @@ export function heldValuesByInstrument(
 
   for (const position of positions) {
     if (!new Decimal(position.quantity).gt(0)) continue;
-    const market = marketValues.get(
-      tradeMetaKey(position.instrumentId, position.sleeve),
-    );
-    const entry = held.get(position.instrumentId) ?? {
-      value: new Decimal(0),
-      unpriced: false,
-    };
-    if (market?.marketValue == null) entry.unpriced = true;
-    else entry.value = entry.value.plus(market.marketValue);
-    held.set(position.instrumentId, entry);
+    const market = marketValues.get(position.instrumentId);
+    held.set(position.instrumentId, {
+      value: new Decimal(market?.marketValue ?? 0),
+      unpriced: market?.marketValue == null,
+    });
   }
 
   return held;

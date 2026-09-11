@@ -12,6 +12,7 @@ const INSTRUMENTS: Instrument[] = [
     currency: "EUR",
     assetClass: "Equity",
     quoteSymbol: null,
+    thesis: "CORE",
   },
 ];
 
@@ -29,7 +30,6 @@ const buy = (over: Partial<LedgerEvent> = {}): LedgerEvent =>
     ts: new Date("2026-07-15T10:00:00Z"),
     type: "BUY",
     instrumentId: "IE00BK5BQT80",
-    sleeve: "CORE",
     quantity: "10",
     price: "89.54",
     grossAmount: "895.40",
@@ -66,7 +66,6 @@ describe("toMovementRows", () => {
           ts: new Date("2026-06-01T00:00:00Z"),
           type: "DIVIDEND",
           instrumentId: "IE00BK5BQT80",
-          sleeve: "CORE",
           grossAmount: "40.00",
           taxWithheld: "7.60",
         } as LedgerEvent,

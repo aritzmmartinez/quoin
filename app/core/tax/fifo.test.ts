@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { Sleeve, TradeEvent } from "../domain";
+import type { TradeEvent } from "../domain";
 
 import { walkFifo } from "./fifo";
 
@@ -11,14 +11,13 @@ function trade(
   instrumentId: string,
   quantity: string,
   grossAmount: string,
-  opts: { fees?: string; sleeve?: Sleeve; ts?: string; fxToBase?: string } = {},
+  opts: { fees?: string; ts?: string; fxToBase?: string } = {},
 ): TradeEvent {
   return {
     id: `evt-${seq++}`,
     ts: new Date(opts.ts ?? "2025-01-01"),
     type,
     instrumentId,
-    sleeve: opts.sleeve ?? "CORE",
     quantity,
     price: "0",
     grossAmount,
@@ -48,7 +47,7 @@ describe("walkFifo", () => {
     expect(sale.realizedPnL.toString()).toBe("200");
     expect(sale.lots).toHaveLength(1);
     expect(sale.lots[0]!.quantity.toFixed()).toBe("10");
-    expect(walk.lots.get("X::CORE")).toEqual([]);
+    expect(walk.lots.get("X")).toEqual([]);
   });
 
   it("crosses several lots oldest-first, keeping their own unit costs", () => {
@@ -68,7 +67,7 @@ describe("walkFifo", () => {
     expect(sale.lots[1]!.quantity.toFixed()).toBe("3");
     expect(sale.lots[1]!.unitCost.toString()).toBe("150");
 
-    const remaining = walk.lots.get("X::CORE")!;
+    const remaining = walk.lots.get("X")!;
     expect(remaining).toHaveLength(1);
     expect(remaining[0]!.quantity.toFixed()).toBe("2");
     expect(remaining[0]!.unitCost.toString()).toBe("150");
@@ -83,23 +82,24 @@ describe("walkFifo", () => {
     const sale = walk.sales[0]!;
     expect(sale.lots).toHaveLength(1);
     expect(sale.lots[0]!.quantity.toFixed()).toBe("5");
-    // Only the matched 5 units contribute cost; the unmatched 3 are free.
     expect(sale.costRemoved.toString()).toBe("500");
     expect(sale.realizedPnL.toString()).toBe("500");
-    expect(walk.lots.get("X::CORE")).toEqual([]);
+    expect(walk.lots.get("X")).toEqual([]);
   });
 
-  it("keeps separate FIFO queues per instrument and per sleeve", () => {
+  it("keeps one FIFO queue per instrument and consumes the oldest lot first", () => {
     const walk = walkFifo([
-      trade("BUY", "X", "5", "500", { ts: "2025-01-01", sleeve: "CORE" }),
-      trade("BUY", "X", "5", "600", { ts: "2025-01-02", sleeve: "TRADING" }),
-      trade("SELL", "X", "5", "700", { ts: "2025-02-01", sleeve: "CORE" }),
+      trade("BUY", "X", "5", "500", { ts: "2025-01-01" }),
+      trade("BUY", "X", "5", "600", { ts: "2025-01-02" }),
+      trade("SELL", "X", "5", "700", { ts: "2025-02-01" }),
     ]);
 
     expect(walk.sales).toHaveLength(1);
     expect(walk.sales[0]!.costRemoved.toString()).toBe("500");
-    expect(walk.lots.get("X::CORE")).toEqual([]);
-    expect(walk.lots.get("X::TRADING")).toHaveLength(1);
+
+    const remaining = walk.lots.get("X")!;
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0]!.unitCost.toString()).toBe("120");
   });
 
   it("bakes fees into the acquisition cost, same as AVCO", () => {

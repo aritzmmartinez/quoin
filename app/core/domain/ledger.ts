@@ -11,8 +11,8 @@ export const decimalString = z.string().refine((value) => {
   }
 }, "must be a finite decimal string");
 
-export const sleeveSchema = z.enum(["CORE", "TRADING"]);
-export type Sleeve = z.infer<typeof sleeveSchema>;
+export const thesisSchema = z.enum(["CORE", "CONVICTION", "TACTICAL"]);
+export type Thesis = z.infer<typeof thesisSchema>;
 
 export const instrumentTypeSchema = z.enum([
   "ETF",
@@ -35,6 +35,7 @@ export const instrumentSchema = z.object({
   exposureLeafId: z.string().nullish(),
   ter: decimalString.nullish(),
   hedgedToBase: z.boolean().optional(),
+  thesis: thesisSchema.default("CORE"),
 });
 export type Instrument = z.infer<typeof instrumentSchema>;
 
@@ -52,7 +53,6 @@ const baseEventSchema = z.object({
 export const tradeEventSchema = baseEventSchema.extend({
   type: z.enum(["BUY", "SELL"]),
   instrumentId: z.string(),
-  sleeve: sleeveSchema,
   quantity: decimalString,
   price: decimalString,
   grossAmount: decimalString,
@@ -63,7 +63,6 @@ export type TradeEvent = z.infer<typeof tradeEventSchema>;
 export const dividendEventSchema = baseEventSchema.extend({
   type: z.literal("DIVIDEND"),
   instrumentId: z.string(),
-  sleeve: sleeveSchema.nullable(),
   grossAmount: decimalString,
   taxWithheld: decimalString,
 });
