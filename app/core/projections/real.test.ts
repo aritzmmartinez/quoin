@@ -5,7 +5,7 @@ import { deflate, InflationIndex, Money, type TradeEvent } from "../domain";
 
 import { computePositions } from "./positions";
 import { computeRealizedGains } from "./realized";
-import { realBasis } from "./real";
+import { IPC_SYNC_MAX_AGE_DAYS, ipcSyncStale, realBasis } from "./real";
 
 const point = (period: string, indexValue: string, base = "2025") => ({
   period,
@@ -216,5 +216,28 @@ describe("realBasis", () => {
     if (!basis.ok) throw new Error("expected a usable basis");
 
     expect(computePositions(events, basis.revalue)[0]!.costBasis).toBe("1000");
+  });
+});
+
+describe("ipcSyncStale", () => {
+  const now = new Date("2026-09-09T12:00:00Z");
+  const daysAgo = (n: number) =>
+    new Date(now.getTime() - n * 24 * 60 * 60 * 1000);
+
+  it("is stale when the series has never been synced", () => {
+    expect(ipcSyncStale(null, now)).toBe(true);
+  });
+
+  it("is fresh within the publication window", () => {
+    expect(ipcSyncStale(daysAgo(10), now)).toBe(false);
+    expect(ipcSyncStale(daysAgo(IPC_SYNC_MAX_AGE_DAYS), now)).toBe(false);
+  });
+
+  it("is stale once a full publication cycle has certainly passed", () => {
+    expect(ipcSyncStale(daysAgo(IPC_SYNC_MAX_AGE_DAYS + 1), now)).toBe(true);
+  });
+
+  it("pins the threshold: INE publishes monthly, 35 days clears one cycle", () => {
+    expect(IPC_SYNC_MAX_AGE_DAYS).toBe(35);
   });
 });

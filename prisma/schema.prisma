@@ -132,6 +132,18 @@ model InflationIndex {
   @@index([series])
 }
 
+/// When each inflation series was last fetched from the provider.
+///
+/// Deliberately separate from InflationIndex.createdAt: that timestamp only
+/// moves when a *new* month is inserted, so a re-sync that finds nothing new
+/// never refreshed it and the real-basis view could not tell "checked
+/// yesterday, INE had nothing new" from "not checked in months". This row
+/// records the question (did we ask?), not the answer (did data change?).
+model InflationSync {
+  series    String   @id
+  checkedAt DateTime
+}
+
 // A fund's published composition.
 //
 // Unlike PriceSnapshot, this is REPLACE-only, not append-only: a holdings file is

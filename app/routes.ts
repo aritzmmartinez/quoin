@@ -20,5 +20,6 @@ export default [
     route("instrument/:instrumentId", "routes/instrument.tsx"),
   ]),
   route("api/prices/sync", "routes/prices-sync.ts"),
+  route("api/ipc/sync", "routes/ipc-sync.ts"),
   route("api/ingest", "routes/ingest.ts"),
 ] satisfies RouteConfig;

@@ -4,6 +4,7 @@ export * from "./format";
 export * from "./i18n";
 export * from "./ingest";
 export * from "./instruments";
+export * from "./ipc-sync";
 export * from "./movements";
 export * from "./opportunity-cost";
 export * from "./pagination";
