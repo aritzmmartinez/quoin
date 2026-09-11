@@ -15,14 +15,6 @@ function isTrade(event: LedgerEvent): boolean {
   return event.type === "BUY" || event.type === "SELL";
 }
 
-/**
- * Build the deflator for a set of events, or report why it cannot be built.
- *
- * The reference month is the last one the statistics office has published, not
- * the current month: the current month's index does not exist yet, and inventing
- * it is the one thing this feature must never do.
- *
- */
 export function realBasis(
   index: InflationIndex,
   events: readonly LedgerEvent[],
@@ -53,4 +45,15 @@ export function realBasis(
       return restated;
     },
   };
+}
+
+export const IPC_SYNC_MAX_AGE_DAYS = 35;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export function ipcSyncStale(lastCheckedAt: Date | null, now: Date): boolean {
+  if (lastCheckedAt === null) return true;
+  return (
+    now.getTime() - lastCheckedAt.getTime() > IPC_SYNC_MAX_AGE_DAYS * DAY_MS
+  );
 }

@@ -126,11 +126,23 @@ export const es = {
     perFlow:
       "Cada aportación se ajusta con el IPC de su propio mes, no el total de golpe.",
     lag: "El valor de mercado es el de hoy: el IPC del mes en curso aún no está publicado, así que la referencia va unas semanas por detrás.",
+    maybeBehind:
+      "El último IPC guardado tiene ya varias semanas. Puede que el INE haya publicado algún mes que aún no tienes; la app no lo sabe sin volver a preguntar.",
     noIndex:
-      "No hay datos de IPC guardados. Ejecuta pnpm ipc:sync para descargarlos del INE.",
+      "No hay ningún dato de IPC guardado, así que no se puede ajustar por inflación.",
     gaps: (periods: string): string =>
-      `Faltan datos de IPC para ${periods}. No se ajusta nada: rellenar un hueco por interpolación inventaría un nivel de precios que nadie ha medido. Vuelve a ejecutar pnpm ipc:sync.`,
+      `Faltan datos de IPC para ${periods}. No se ajusta nada: rellenar un hueco por interpolación inventaría un nivel de precios que nadie ha medido.`,
     showingNominal: "Se muestran importes nominales.",
+    sync: {
+      action: "Sincronizar IPC",
+      loading: "Sincronizando IPC…",
+      upToDate: "El IPC ya estaba al día.",
+      added: (n: number): string =>
+        n === 1 ? "1 mes de IPC añadido" : `${n} meses de IPC añadidos`,
+      error: "No se pudo sincronizar el IPC.",
+      rebase: (series: string): string =>
+        `${series}: el INE cambió de año base. Reemplaza la serie con pnpm ipc:sync --force-rebase.`,
+    },
   },
   pagination: {
     label: "Paginación",
@@ -386,9 +398,7 @@ export const es = {
     nothingNew:
       "Nada nuevo que importar: todas las operaciones de este fichero ya estaban en el registro.",
     confirmCount: (count: number): string =>
-      count === 1
-        ? "Importar 1 operación"
-        : `Importar ${count} operaciones`,
+      count === 1 ? "Importar 1 operación" : `Importar ${count} operaciones`,
     appliesNow:
       "Las operaciones se guardan en el registro al pulsar. Los pasos siguientes solo añaden símbolos y precios: cerrar el asistente después no revierte la importación.",
     closeConfirm: {

@@ -1,6 +1,6 @@
 import { PrismaInflationRepository } from "~/adapters/persistence";
 import { InflationIndex, type LedgerEvent, type Revalue } from "~/core/domain";
-import { realBasis } from "~/core/projections";
+import { ipcSyncStale, realBasis } from "~/core/projections";
 
 import { parseBasis, type Basis } from "./basis";
 
@@ -19,6 +19,7 @@ export interface RealView {
   missing: string[];
   hasIndex: boolean;
   syncedAt: string | null;
+  checkStale: boolean;
   revalue?: Revalue;
 }
 
@@ -29,6 +30,7 @@ const NOMINAL = (basis: Basis): RealView => ({
   missing: [],
   hasIndex: true,
   syncedAt: null,
+  checkStale: false,
 });
 
 export async function resolveRealView(
@@ -49,6 +51,7 @@ export async function resolveRealView(
     return { ...NOMINAL(basis), hasIndex: false };
   }
 
+  const checkStale = ipcSyncStale(syncedAt, new Date());
   const resolved = realBasis(index, events);
   if (!resolved.ok) {
     return {
@@ -58,6 +61,7 @@ export async function resolveRealView(
       missing: resolved.missing,
       hasIndex: true,
       syncedAt: syncedAt?.toISOString() ?? null,
+      checkStale,
     };
   }
 
@@ -68,6 +72,7 @@ export async function resolveRealView(
     missing: [],
     hasIndex: true,
     syncedAt: syncedAt?.toISOString() ?? null,
+    checkStale,
     revalue: resolved.revalue,
   };
 }
