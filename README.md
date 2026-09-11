@@ -9,7 +9,7 @@ regime that off-the-shelf trackers ignore.
 The goal isn't to trade: it's to **understand** a portfolio, and to double as a
 learning project.
 
-> **Status: v0.6.0, actively built.** The immutable ledger, core domain
+> **Status: v0.7.0, actively built.** The immutable ledger, core domain
 > (Money, event types, `computePositions` with average cost), CSV and `.xlsx` ingestion
 > (Trade Republic + Kraken), a Yahoo price provider with daily history, the app shell
 > and the summary / holdings / movements / asset-detail / instruments / allocation /
@@ -24,6 +24,9 @@ learning project.
 > regime — FIFO by lot, a two-month wash-sale exclusion and four-year loss carryforward —
 > as a projection kept separate from the portfolio's average-cost view. Each instrument
 > carries a *thesis* — núcleo, convicción or táctica — recording why it is held.
+> A broker export goes from file to valued position inside the app — import, symbol
+> mapping, price download and summary in one four-step assistant — so the CLI is a
+> fallback rather than the way in.
 
 ![Quoin — pantalla de Asignación con look-through](docs/allocation_dark.png)
 
@@ -74,6 +77,11 @@ pnpm identity:resolve --report    # what merged, and what is still ambiguous
 pnpm ipc:sync                     # INE consumer price index (national + Bizkaia)
 pnpm target:set [<file>]          # show, or record a version of, the savings plan
 ```
+
+`ingest`, `prices:map`, `prices:sync` and `prices:backfill` also have a screen:
+**Importar operaciones** on /cartera walks a broker export through all four without the
+terminal, and the IPC notice on Resumen syncs the price index with a button. The
+commands stay, and do the same work.
 
 Fund compositions are imported from the **Instrumentos** screen: drop the issuer's
 holdings CSV onto the fund's row. One parser handles every issuer — the weight column
@@ -165,7 +173,9 @@ on with decimal.js; data and secrets are never committed.
 - [x] Opportunity cost: every real purchase replayed into the index, in euros and in MWR
 - [x] Fee cost: the portfolio's weighted TER, and what it compounds to over the projection horizon
 - [x] Bizkaia foral tax module (FIFO lots)
-- [ ] Trading sleeve, watchlist and trade journal
+- [x] Instrument thesis: why each position is held (núcleo / convicción / táctica)
+- [x] Guided import: broker CSV to valued position from the app, no CLI
+- [ ] Watchlist and trade journal
 - [ ] DCF valuation module
 
 ## License

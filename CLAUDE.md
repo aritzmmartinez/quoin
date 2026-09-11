@@ -94,6 +94,30 @@ and it did not enforce this correctly.)
 No monolithic files. Extract reusable primitives (`ui/`, `charts/`) rather than
 duplicating logic across screens.
 
+## A command's logic never lives in its script
+
+Every CLI action that also has a button in the app lives in `app/lib/<name>.ts`, and the
+script under `scripts/` only parses argv and formats what the function returns:
+`syncPrices`, `syncInflation`, `backfillInstrument` / `backfillInstruments`,
+`remapQuoteSymbol`. Adding behaviour to the script gives it to the CLI and silently
+**not** to the route (`api/prices/sync`, `api/ipc/sync`), and the two then disagree about
+what a sync did — the counts on screen are the ones the function returns, not the ones the
+script printed. `api/ingest` is the exception and is allowed to be: `scripts/ingest.ts`
+and `ingest.server.ts` drive the same adapters but answer different questions (a whole
+file at once vs. a preview, a commit and two follow-up steps).
+
+- **The pure module and its wiring are two files, and the barrel carries only the pure
+  one.** `app/lib/x.ts` takes injected repositories and providers (so it is unit-testable
+  with fakes); `app/lib/x.server.ts` builds them from Prisma and the real provider. **No
+  `*.server.ts` is exported from `app/lib/index.ts`** — that barrel is what components
+  import, and one such export pulls Prisma into the client bundle. That exclusion covers
+  all seven `*.server.ts` files, including `real.server.ts` and `version.server.ts`, which
+  have no pure half at all; it is the rule, not a special case for any one of them.
+- **A destructive option stays CLI-only.** `ipc:sync --force-rebase` replaces a series
+  wholesale, so `scripts/ipc-sync.ts` owns the flag and `syncInflation` cannot rebase at
+  all: it *reports* `rebaseBlocked`, and the endpoint names the affected series without
+  acting. A button is one click; a flag is a decision. Same reasoning as `db-guard`.
+
 ## Money rules
 
 - Prisma's `Decimal` has a **confirmed read bug on SQLite**. Every money and quantity
@@ -137,7 +161,9 @@ This has caused misdirected generation more than once:
   ending on the sync just means the last row written is also the newest in time.
 - `PriceSnapshot` is append-only and idempotent via `@@unique([instrumentId, asOf])`.
 - Remapping an `Instrument.quoteSymbol` **deletes** that instrument's existing snapshots.
-  Two symbols' prices must never share a series.
+  Two symbols' prices must never share a series. That deletion lives in exactly one place,
+  `remapQuoteSymbol` — `prices:map` and the instruments screen both go through it, and a
+  test pins that the delete precedes the write.
 
 ## The live ledger — never the agent's target
 
@@ -531,8 +557,10 @@ manual aliasing was abandoned — 726 confirmations is not a system.
   `lastSyncedAt` is when we last asked — whether anybody has checked for a newer one. A
   fresh sync of a month-old index is normal; a stale sync of the same index is not, and one
   timestamp cannot say which is the case. Do not collapse them into "updated".
-- `real.server.ts` is deliberately **not** exported from `app/lib/index.ts` — that barrel is
-  what components import, and it would pull Prisma into the client bundle.
+- **`lastSyncedAt` comes from `InflationSync`, a row written on every sync attempt** —
+  including one that finds nothing new, which is the case the freshness check exists for.
+  Deriving it from the newest `InflationIndex` row instead collapses it back into
+  `latestPeriod()`, and the badge then answers the question it was meant to distinguish from.
 
 ## Fees (TER)
 
@@ -670,6 +698,13 @@ adding it in **both** places, in the same change.
   most column changes) will silently drop it. Re-add it in that migration.
 
 ## CSV ingestion
+
+**The broker is detected from the header row, never from the filename and never by
+guessing at the body.** `detectBroker` matches `transaction_id` → Trade Republic and
+`refid` → Kraken, and returns `null` unless **exactly one** signature matches — a file
+carrying both, or neither, is refused by name rather than half-parsed. The CLI still takes
+`--broker`; the import screen has no selector, because a selector is one more thing to get
+wrong about a file that already says what it is.
 
 papaparse behaves differently under ESM/tsx than under CJS. **Both** guards are required
 and are applied defensively to every adapter:
