@@ -21,6 +21,8 @@ export * from "./ui/Glossary";
 export * from "./ui/NoteLink";
 export * from "./ui/Checkbox";
 export * from "./ui/Segmented";
+export * from "./ui/Select";
+export * from "./ui/DatePicker";
 export * from "./ui/Explainer";
 export * from "./ui/Pagination";
 export * from "./ui/RangeSelector";

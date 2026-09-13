@@ -24,6 +24,13 @@ import {
 import { Checkbox } from "../ui/Checkbox";
 import { HoldingsUpload } from "./HoldingsUpload";
 import { Button } from "../ui/Button";
+import { Select } from "../ui/Select";
+import {
+  TABLE_CELLS,
+  TABLE_DIVIDER,
+  TABLE_HEAD,
+  TABLE_SCROLL,
+} from "../ui/table";
 
 const KINDS = exposureKindSchema.options;
 const THESES = thesisSchema.options;
@@ -42,11 +49,9 @@ export function InstrumentsTable({ items }: { items: InstrumentListItem[] }) {
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className={TABLE_SCROLL}>
       <div className="min-w-7xl">
-        <div
-          className={`grid ${GRID} border-b border-border px-gutter py-row text-[11px] font-medium tracking-wide text-muted`}
-        >
+        <div className={`${TABLE_HEAD} ${GRID}`}>
           <span>{copy.columns.instrument}</span>
           <span>{copy.columns.exposure}</span>
           <span>{copy.columns.leaf}</span>
@@ -90,10 +95,10 @@ function InstrumentRow({ item }: { item: InstrumentListItem }) {
   const canImport = item.exposureKind === "EQUITY_FUND";
 
   return (
-    <li className="border-b border-border last:border-b-0">
-      <div className={`grid ${GRID} px-gutter py-row text-[13px]`}>
+    <li className={TABLE_DIVIDER}>
+      <div className={`${TABLE_CELLS} ${GRID} min-h-14 text-[13px]`}>
         <div className="min-w-0">
-          <div className="truncate">{item.name}</div>
+          <div className="truncate font-semibold">{item.name}</div>
           <div className="font-mono text-[11px] text-muted">
             {item.id}
             {item.isClosed && (
@@ -108,20 +113,17 @@ function InstrumentRow({ item }: { item: InstrumentListItem }) {
           <input type="hidden" name="id" value={item.id} />
           <input type="hidden" name="intent" value="exposure" />
 
-          <select
-            name="exposureKind"
+          <input type="hidden" name="exposureKind" value={kind} />
+          <Select
+            label={copy.columns.exposure}
             value={kind}
-            aria-label={copy.columns.exposure}
-            onChange={(e) => setKind(e.target.value)}
-            className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-[12px]"
-          >
-            <option value="">{copy.defaultOption}</option>
-            {KINDS.map((k) => (
-              <option key={k} value={k}>
-                {k}
-              </option>
-            ))}
-          </select>
+            onChange={setKind}
+            options={[
+              { value: "", label: copy.defaultOption },
+              ...KINDS.map((k) => ({ value: k, label: k })),
+            ]}
+            className="w-full"
+          />
 
           <input
             name="exposureLeafId"
@@ -144,20 +146,18 @@ function InstrumentRow({ item }: { item: InstrumentListItem }) {
             className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-right text-[12px] tabular-nums"
           />
 
-          <select
-            name="thesis"
+          <input type="hidden" name="thesis" value={thesis} />
+          <Select
+            label={copy.columns.thesis}
             value={thesis}
-            aria-label={copy.columns.thesis}
-            title={thesisDescription(thesis)}
-            onChange={(e) => setThesis(e.target.value as Thesis)}
-            className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-[12px]"
-          >
-            {THESES.map((t) => (
-              <option key={t} value={t} title={thesisDescription(t)}>
-                {thesisLabel(t)}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => setThesis(value as Thesis)}
+            options={THESES.map((t) => ({
+              value: t,
+              label: thesisLabel(t),
+              desc: thesisDescription(t),
+            }))}
+            className="w-full"
+          />
 
           <div className="flex items-center gap-2">
             <Checkbox
