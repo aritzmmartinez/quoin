@@ -11,10 +11,12 @@ import {
 } from "~/lib";
 
 import { Pagination } from "../ui/Pagination";
+import { TABLE_HEAD, TABLE_NUM, TABLE_ROW, TABLE_SCROLL } from "../ui/table";
 import {
   movementColumns,
   movementsGrid,
   movementsMinWidth,
+  type MovementColumnDef,
   type MovementColumnKey,
 } from "./columns";
 
@@ -22,6 +24,12 @@ const TYPE_TONE: Partial<Record<MovementRow["type"], string>> = {
   BUY: "text-positive",
   SELL: "text-negative",
 };
+
+function cellClass(col: MovementColumnDef): string {
+  if (col.align === "right") return `${TABLE_NUM} text-right`;
+  if (col.key === "date") return "truncate font-mono";
+  return "truncate";
+}
 
 export function MovementsTable({
   rows,
@@ -44,12 +52,9 @@ export function MovementsTable({
 
   return (
     <>
-      <div className="overflow-x-auto">
+      <div className={TABLE_SCROLL}>
         <div className={movementsMinWidth(showInstrument)}>
-          <div
-            role="row"
-            className={`grid ${grid} gap-2 border-b border-border px-gutter py-row text-[11px] font-medium tracking-wide text-muted`}
-          >
+          <div role="row" className={`${TABLE_HEAD} ${grid}`}>
             {columns.map((col) => (
               <span
                 key={col.key}
@@ -64,15 +69,10 @@ export function MovementsTable({
             {rows.map((row) => (
               <li
                 key={row.id}
-                className={`grid ${grid} gap-2 border-b border-border px-gutter py-row text-[13px] tabular-nums last:border-b-0`}
+                className={`${TABLE_ROW} ${grid} min-h-11 text-[13px]`}
               >
                 {columns.map((col) => (
-                  <span
-                    key={col.key}
-                    className={
-                      col.align === "right" ? "text-right" : "truncate"
-                    }
-                  >
+                  <span key={col.key} className={cellClass(col)}>
                     <Cell row={row} column={col.key} />
                   </span>
                 ))}
