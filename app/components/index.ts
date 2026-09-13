@@ -28,7 +28,7 @@ export * from "./ui/BasisToggle";
 export * from "./ui/BasisNotice";
 export * from "./ui/BasisReference";
 export * from "./ui/IpcSyncButton";
-export * from "./ui/ThemeToggle";
+export * from "./ui/ThemeSetting";
 export * from "./ui/signed";
 export * from "./SignedMoney";
 export * from "./charts/InvestedVsValueChart";

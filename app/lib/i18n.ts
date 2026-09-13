@@ -4,6 +4,32 @@ export const es = {
   common: {
     close: "Cerrar",
   },
+  notFound: {
+    title: "Página no encontrada",
+    body: "Esa dirección no corresponde a ninguna pantalla de Quoin.",
+    home: "Ir al resumen",
+  },
+  select: {
+    empty: "Sin resultados",
+  },
+  datePicker: {
+    placeholder: "Elegir fecha",
+    open: "Abrir calendario",
+    prevMonth: "Mes anterior",
+    nextMonth: "Mes siguiente",
+    today: "Hoy",
+    clear: "Quitar",
+    weekdays: ["L", "M", "X", "J", "V", "S", "D"],
+    weekdayNames: [
+      "lunes",
+      "martes",
+      "miércoles",
+      "jueves",
+      "viernes",
+      "sábado",
+      "domingo",
+    ],
+  },
   nav: {
     brand: "Quoin",
     overview: "Resumen",
@@ -13,9 +39,27 @@ export const es = {
     instruments: "Instrumentos",
     soon: "Pronto",
     version: (v: string): string => `v${v}`,
+    groups: {
+      portfolio: "Cartera",
+      analysis: "Análisis",
+      system: "Sistema",
+    },
+    collapse: "Contraer el menú",
+    expand: "Desplegar el menú",
   },
   theme: {
-    toggle: "Cambiar tema",
+    label: "Tema",
+    dark: "Oscuro",
+    light: "Claro",
+    system: "Sistema",
+  },
+  settings: {
+    title: "Ajustes",
+    appearance: {
+      title: "Apariencia",
+      desc: "Cómo se muestra Quoin en este dispositivo.",
+      themeHint: "Oscuro es el tema principal de Quoin",
+    },
   },
   glossary: {
     open: "Glosario de términos",
@@ -116,6 +160,7 @@ export const es = {
   },
   basis: {
     label: "Base de cálculo",
+    about: "Sobre la base real",
     nominal: "Nominal",
     real: "Real",
     nominalHint: "Euros corrientes, sin ajustar por inflación",
@@ -200,7 +245,7 @@ export const es = {
     },
     allocation: {
       title: "Asignación",
-      link: "Ver detalle",
+      link: "Ver asignación",
       empty: "Sin datos de asignación.",
     },
     top: {
@@ -380,7 +425,8 @@ export const es = {
     importing: "Importando…",
     brokerLabel: (broker: string): string =>
       broker === "kraken" ? "Kraken" : "Trade Republic",
-    detected: (broker: string): string => `Detectado: ${broker}`,
+    detected: (broker: string): string => `${broker} detectado`,
+    change: "Cambiar",
     summary: {
       total: "Operaciones en el fichero",
       imported: "Nuevas",
@@ -788,6 +834,9 @@ export const es = {
       title: "No se pudieron cargar las posiciones",
       body: "Comprueba la fuente de datos y vuelve a intentarlo.",
       retry: "Reintentar",
+      sources: "Fuentes de datos",
+      lastAttempt: (time: string): string =>
+        `Último intento a las ${time} · sin cambios en tu cartera`,
     },
     expandLabel: "Ver detalle",
     sort: {
@@ -798,6 +847,7 @@ export const es = {
   },
   realized: {
     title: "Realizado",
+    about: "Sobre el resultado realizado",
     views: {
       label: "Vista",
       ventas: "Ventas",
@@ -830,6 +880,7 @@ export const es = {
       body: "Cuando vendas algo, aquí aparecerá el resultado de cada operación.",
     },
     fiscal: {
+      about: "Sobre el criterio fiscal",
       intro:
         "Mismas ventas, con criterio FIFO en vez de AVCO, que es el que exige la declaración foral de Bizkaia y no el de la pestaña de Ventas. Cálculo puro: computeTaxLots y computeNetWithCarryforward, sin cifras nuevas.",
       yearLabel: "Año fiscal",
@@ -885,6 +936,9 @@ export const es = {
   },
   opportunity: {
     title: "Coste de oportunidad",
+    headlinePre: "Tu cartera frente a",
+    headlinePost: "con las mismas compras, fechas y comisiones",
+    about: "Sobre el coste de oportunidad",
     intro: (symbol: string): string =>
       `Qué habría pasado si cada compra hubiera ido al índice (${symbol}) en vez del activo que elegiste: mismas fechas, mismos importes y las mismas comisiones a ambos lados. Lo que sobra o falta es selección de activos, no coste de operar.`,
     taxWarning:
@@ -938,6 +992,7 @@ export const es = {
   },
   ter: {
     title: "Coste del TER",
+    about: "Sobre el coste del TER",
     intro:
       "Lo que te cuesta al año la gestión de tus fondos, y cuánto suma ese coste proyectado hacia delante. El TER lo escribes tú en la pantalla de instrumentos: no viene en ningún extracto, y un instrumento sin dato se queda fuera del ponderado en vez de contar como gratis.",
     weighted: {
@@ -975,6 +1030,7 @@ export const es = {
     },
     table: {
       title: "Por posición",
+      only: "Solo instrumentos con TER en ficha",
       instrument: "Instrumento",
       value: "Valor",
       ter: "TER",
@@ -1018,6 +1074,7 @@ export const es = {
     notFound: {
       title: "Instrumento no encontrado",
       body: "No hay ningún instrumento con ese identificador.",
+      back: "Volver a la cartera",
     },
   },
 } as const;

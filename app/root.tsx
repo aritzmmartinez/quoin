@@ -11,9 +11,8 @@ import { Toaster } from "sonner";
 
 import type { Route } from "./+types/root";
 import { parseBasis } from "~/lib/basis";
+import { parseTheme, resolveTheme, THEME_SCRIPT } from "~/lib/theme";
 import "./app.css";
-
-type Theme = "light" | "dark";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -24,24 +23,24 @@ export const links: Route.LinksFunction = () => [
   },
   {
     rel: "stylesheet",
-    href: "https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap",
+    href: "https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600;700&display=swap",
   },
 ];
 
 export function loader({ request }: Route.LoaderArgs) {
   const cookie = request.headers.get("Cookie") ?? "";
-  const theme: Theme = cookie.includes("quoin-theme=light") ? "light" : "dark";
-  return { theme, basis: parseBasis(cookie) };
+  return { theme: parseTheme(cookie), basis: parseBasis(cookie) };
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const data = useRouteLoaderData<typeof loader>("root");
-  const theme: Theme = data?.theme ?? "dark";
+  const theme = resolveTheme(data?.theme ?? "dark", false);
   return (
-    <html lang="es" className={theme}>
+    <html lang="es" className={theme} suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
         <Meta />
         <Links />
       </head>
