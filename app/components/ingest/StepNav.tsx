@@ -29,31 +29,34 @@ export function StepNav({
         const available = index <= furthest && index !== current;
 
         return (
-          <li key={step} className="flex flex-1 items-start last:flex-none">
-            <div className="flex flex-col items-center gap-1.5">
-              <Marker
-                index={index}
-                done={done}
-                current={index === current}
-                label={label}
-                onGo={available ? () => onGo(step) : null}
-                disabled={disabled}
-              />
-              <span
-                className={`text-[11px] ${
-                  index <= current ? "text-text" : "text-muted"
-                }`}
-              >
-                {label}
-              </span>
-            </div>
-
+          <li
+            key={step}
+            className="relative flex min-w-0 flex-1 flex-col items-center gap-2"
+          >
             {index < STAGES.length - 1 && (
               <span
                 aria-hidden
-                className={`mt-3 h-px flex-1 ${done ? "bg-text" : "bg-border"}`}
+                className={`absolute left-[calc(50%+18px)] right-[calc(-50%+18px)] top-3.25 h-px ${
+                  done ? "bg-accent/40" : "bg-border"
+                }`}
               />
             )}
+
+            <Marker
+              index={index}
+              done={done}
+              current={index === current}
+              label={label}
+              onGo={available ? () => onGo(step) : null}
+              disabled={disabled}
+            />
+            <span
+              className={`whitespace-nowrap text-[11px] font-medium leading-none ${
+                index === current ? "text-text" : "text-muted"
+              }`}
+            >
+              {label}
+            </span>
           </li>
         );
       })}
@@ -77,15 +80,15 @@ function Marker({
   disabled: boolean;
 }) {
   const shape =
-    "flex size-6 items-center justify-center rounded-full border text-[11px] tabular-nums transition-colors";
-  const tone = done
-    ? "border-text bg-text text-bg"
-    : current
-      ? "border-text text-text"
+    "flex size-[26px] items-center justify-center rounded-full border font-mono text-[11px] font-semibold leading-none transition-colors";
+  const tone = current
+    ? "border-accent bg-accent text-on-accent"
+    : done
+      ? "border-accent bg-accent/15 text-accent"
       : "border-border text-muted";
 
   const inner = done ? (
-    <Check size={13} strokeWidth={2} aria-hidden />
+    <Check size={12} strokeWidth={1.8} aria-hidden />
   ) : (
     index + 1
   );
@@ -107,7 +110,7 @@ function Marker({
       disabled={disabled}
       onClick={onGo}
       aria-label={es.ingest.goToStep(label)}
-      className={`${shape} ${tone} hover:border-text disabled:pointer-events-none disabled:opacity-30`}
+      className={`${shape} ${tone} hover:border-accent disabled:pointer-events-none disabled:opacity-30`}
     >
       {inner}
     </button>

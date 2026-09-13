@@ -9,10 +9,11 @@ import {
 import {
   BasisNotice,
   Card,
-  Explainer,
   RealizedTable,
   RealizedViewTabs,
   TaxYearPanel,
+  InfoHint,
+  signClass,
 } from "~/components";
 import { computeRealizedGains } from "~/core/projections";
 import {
@@ -94,7 +95,9 @@ export default function Realized({ loaderData }: Route.ComponentProps) {
   if (view === "fiscal") {
     return (
       <>
-        <RealizedViewTabs value={view} />
+        <header className="mb-4">
+          <RealizedViewTabs value={view} />
+        </header>
         <TaxYearPanel
           years={fiscal.years}
           year={fiscal.year}
@@ -105,21 +108,34 @@ export default function Realized({ loaderData }: Route.ComponentProps) {
   }
 
   return (
-    <>
-      <RealizedViewTabs value={view} />
-      <header className="mb-4">
-        {totals.count > 0 && (
-          <span className="text-[13px] text-muted">
-            {es.realized.summary(
-              totals.count,
-              formatSignedMoney(totals.realizedPnL).text,
-            )}
-          </span>
-        )}
-        <Explainer className="mt-1">{es.realized.intro}</Explainer>
-        <Explainer tone="notice" className="mt-2">
-          {es.realized.avcoWarning}
-        </Explainer>
+    <div className="flex flex-col gap-4">
+      <header className="flex flex-wrap items-center justify-between gap-4">
+        <RealizedViewTabs value={view} />
+        <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted">
+          {totals.count > 0 && (
+            <>
+              <span>
+                <span className="font-mono text-text">{totals.count}</span>{" "}
+                {es.realized.salesNoun(totals.count)}
+              </span>
+              <span
+                className={`font-mono font-medium ${signClass(totals.realizedPnL)}`}
+              >
+                {formatSignedMoney(totals.realizedPnL).text}
+              </span>
+              <span>{es.realized.resultNoun}</span>
+            </>
+          )}
+          <InfoHint
+            name={es.realized.about}
+            label={
+              <>
+                <span>{es.realized.intro}</span>
+                <span className="text-muted">{es.realized.avcoWarning}</span>
+              </>
+            }
+          />
+        </div>
       </header>
 
       <BasisNotice {...real} />
@@ -143,7 +159,7 @@ export default function Realized({ loaderData }: Route.ComponentProps) {
           />
         )}
       </Card>
-    </>
+    </div>
   );
 }
 

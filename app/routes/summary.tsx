@@ -201,16 +201,14 @@ export default function Summary({ loaderData }: Route.ComponentProps) {
 
   if (!hasPositions) {
     return (
-      <>
-        <Card>
-          <PortfolioEmpty />
-        </Card>
-      </>
+      <Card>
+        <PortfolioEmpty />
+      </Card>
     );
   }
 
   return (
-    <>
+    <div className="flex flex-col gap-6">
       <BasisNotice {...real} />
 
       <SummaryHero
@@ -240,13 +238,16 @@ export default function Summary({ loaderData }: Route.ComponentProps) {
       />
 
       <div
-        className="grid gap-4"
-        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}
+        className="grid items-stretch gap-3"
+        style={{
+          gridTemplateColumns:
+            "repeat(auto-fit, minmax(min(100%, 420px), 1fr))",
+        }}
       >
         <AllocationCard rows={allocation} />
         <TopPositionsCard rows={top} />
       </div>
-    </>
+    </div>
   );
 }
 

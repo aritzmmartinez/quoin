@@ -1,4 +1,6 @@
 import {
+  isRouteErrorResponse,
+  Link,
   Links,
   Meta,
   Outlet,
@@ -7,10 +9,14 @@ import {
   useRouteLoaderData,
 } from "react-router";
 
+import { SearchX, TriangleAlert } from "lucide-react";
 import { Toaster } from "sonner";
 
 import type { Route } from "./+types/root";
+import { buttonClass } from "~/components/ui/Button";
+import { ErrorState } from "~/components/ui/ErrorState";
 import { parseBasis } from "~/lib/basis";
+import { es } from "~/lib/i18n";
 import { parseTheme, resolveTheme, THEME_SCRIPT } from "~/lib/theme";
 import "./app.css";
 
@@ -59,19 +65,22 @@ export default function App() {
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
-  let message = "Error";
-  let details = "An unexpected error occurred.";
-  if (error && typeof error === "object" && "status" in error) {
-    message = (error as { status: number }).status === 404 ? "404" : "Error";
-    details =
-      (error as { statusText?: string; data?: string }).statusText ||
-      (error as { data?: string }).data ||
-      details;
-  }
+  const notFound = isRouteErrorResponse(error) && error.status === 404;
+  const copy = notFound ? es.notFound : es.portfolio.error;
+
   return (
-    <main className="mx-auto max-w-md p-8">
-      <h1 className="text-2xl font-semibold">{message}</h1>
-      <p className="mt-2 text-muted">{details}</p>
+    <main>
+      <ErrorState
+        icon={notFound ? SearchX : TriangleAlert}
+        tone={notFound ? "neutral" : "negative"}
+        frame="viewport"
+        title={copy.title}
+        body={copy.body}
+      >
+        <Link to="/" className={buttonClass()}>
+          {es.notFound.home}
+        </Link>
+      </ErrorState>
     </main>
   );
 }

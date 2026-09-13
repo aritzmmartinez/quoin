@@ -5,7 +5,16 @@ import {
   PrismaLedgerRepository,
   PrismaPriceRepository,
 } from "~/adapters/persistence";
-import { Card, Explainer, NoteLink, StatTile } from "~/components";
+import {
+  Card,
+  Explainer,
+  InfoHint,
+  StatTile,
+  TABLE_HEAD,
+  TABLE_NUM,
+  TABLE_ROW,
+  TABLE_SCROLL,
+} from "~/components";
 import { BASE_CURRENCY } from "~/core/domain";
 import {
   computeMarketValues,
@@ -135,13 +144,24 @@ export default function Ter({ loaderData }: Route.ComponentProps) {
 
   return (
     <>
-      <header className="mb-4">
-        <Explainer>{t.intro}</Explainer>
+      <header className="mb-4 flex flex-wrap items-center gap-2 text-[13px] text-muted">
+        <span>
+          <span className="font-mono text-text">
+            {formatMoney(weighted.coveredValue)}
+          </span>{" "}
+          {t.coverageOf}{" "}
+          <span className="font-mono">{formatMoney(weighted.totalValue)}</span>{" "}
+          {t.coverageSuffix}
+        </span>
+        <span className="rounded border border-border px-1.5 py-1 font-mono text-[11px] font-medium leading-none">
+          {formatPercent(weighted.coverage)}
+        </span>
+        <InfoHint name={t.about} label={t.intro} />
       </header>
 
       <div
         className="mb-3 grid gap-3"
-        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))" }}
+        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}
       >
         <StatTile
           label={t.weighted.label}
@@ -155,82 +175,79 @@ export default function Ter({ loaderData }: Route.ComponentProps) {
         />
       </div>
 
-      <p className="text-[11px] text-muted">
-        {t.coverage(
-          formatMoney(weighted.coveredValue),
-          formatMoney(weighted.totalValue),
-        )}
-      </p>
       {unknown.length > 0 && (
         <Explainer tone="notice" className="mt-2">
           {t.unknown(unknown.join(", "))}
         </Explainer>
       )}
 
-      <Card className="mt-4">
-        <div className="border-b border-border px-gutter py-3">
-          <h2 className="text-[14px] font-semibold">
-            {t.projected.title(horizonYears)}
-          </h2>
-          <p className="mt-0.5 text-[11px] text-muted">
-            {t.projected.horizon(horizonYears, formatMoney(contribution))}
+      <Card className="mt-4 flex flex-col gap-4 p-5">
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-1.5">
+            <h2 className="text-[14px] font-semibold">
+              {t.projected.title(horizonYears)}
+            </h2>
+            <InfoHint
+              size={18}
+              name={t.projected.noteTitle}
+              label={t.projected.note}
+            />
+          </div>
+          <p className="text-[12px] leading-snug text-muted">
+            {t.projected.horizonPre(horizonYears)}{" "}
+            <span className="font-mono">{formatMoney(contribution)}</span>{" "}
+            {t.projected.horizonPost}
           </p>
         </div>
 
-        <div className="px-gutter py-4">
-          {projected === null ? (
-            <p className="text-[12px] text-muted">
-              {unavailable === "thin-window"
-                ? t.unavailable["thin-window"](windowMonths, limitingName)
-                : unavailable === "no-window" || unavailable === "no-history"
-                  ? t.unavailable["no-window"]
-                  : t.unavailable["no-target"]}
-            </p>
-          ) : (
-            <div
-              className="grid gap-3"
-              style={{
-                gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
-              }}
-            >
-              <StatTile
-                label={t.projected.p10.label}
-                sub={t.projected.p10.sub}
-                value={formatMoney(projected.p10)}
-              />
-              <StatTile
-                label={t.projected.p50.label}
-                sub={t.projected.p50.sub}
-                value={formatMoney(projected.p50)}
-              />
-              <StatTile
-                label={t.projected.p90.label}
-                sub={t.projected.p90.sub}
-                value={formatMoney(projected.p90)}
-              />
-            </div>
-          )}
-        </div>
+        {projected === null ? (
+          <p className="text-[12px] text-muted">
+            {unavailable === "thin-window"
+              ? t.unavailable["thin-window"](windowMonths, limitingName)
+              : unavailable === "no-window" || unavailable === "no-history"
+                ? t.unavailable["no-window"]
+                : t.unavailable["no-target"]}
+          </p>
+        ) : (
+          <div
+            className="grid gap-3"
+            style={{
+              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            }}
+          >
+            <StatTile
+              tone="inset"
+              subClass="font-mono text-faint"
+              label={t.projected.p10.label}
+              sub={t.projected.p10.sub}
+              value={formatMoney(projected.p10)}
+            />
+            <StatTile
+              tone="inset"
+              subClass="font-mono text-faint"
+              label={t.projected.p50.label}
+              sub={t.projected.p50.sub}
+              value={formatMoney(projected.p50)}
+            />
+            <StatTile
+              tone="inset"
+              subClass="font-mono text-faint"
+              label={t.projected.p90.label}
+              sub={t.projected.p90.sub}
+              value={formatMoney(projected.p90)}
+            />
+          </div>
+        )}
       </Card>
 
-      <NoteLink
-        title={t.projected.noteTitle}
-        className="mt-2 text-[11px] text-muted"
-      >
-        <p className="py-4 text-[12px] leading-relaxed text-muted">
-          {t.projected.note}
-        </p>
-      </NoteLink>
-
       <Card className="mt-4">
-        <div className="border-b border-border px-gutter py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle px-gutter py-4">
           <h2 className="text-[14px] font-semibold">{t.table.title}</h2>
+          <span className="text-[12px] text-muted">{t.table.only}</span>
         </div>
-        <div className="overflow-x-auto">
+        <div className={TABLE_SCROLL}>
           <div className="min-w-140">
-            <div
-              className={`grid ${GRID} gap-2 border-b border-border px-gutter py-row text-[11px] font-medium tracking-wide text-muted`}
-            >
+            <div className={`${TABLE_HEAD} ${GRID}`}>
               <span>{t.table.instrument}</span>
               <span className="text-right">{t.table.value}</span>
               <span className="text-right">{t.table.ter}</span>
@@ -240,16 +257,18 @@ export default function Ter({ loaderData }: Route.ComponentProps) {
               {rows.map((row) => (
                 <li
                   key={row.instrumentId}
-                  className={`grid ${GRID} gap-2 border-b border-border px-gutter py-row text-[13px] last:border-b-0`}
+                  className={`${TABLE_ROW} ${GRID} min-h-11 text-[13px]`}
                 >
-                  <span className="truncate">{row.name}</span>
-                  <span className="text-right tabular-nums">
+                  <span className="truncate font-medium">{row.name}</span>
+                  <span className={`${TABLE_NUM} text-right`}>
                     {formatMoney(row.value)}
                   </span>
-                  <span className="text-right tabular-nums text-muted">
+                  <span
+                    className={`${TABLE_NUM} text-right font-normal text-muted`}
+                  >
                     {row.ter === null ? DASH : formatPercent(row.ter, 2)}
                   </span>
-                  <span className="text-right tabular-nums">
+                  <span className={`${TABLE_NUM} text-right`}>
                     {row.annualCost === null ? (
                       <span className="text-muted">{t.table.unknown}</span>
                     ) : (

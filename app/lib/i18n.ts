@@ -857,8 +857,9 @@ export const es = {
       "Cada venta cerrada, con el coste que consumió en el momento de venderla. Las comisiones de compra ya van dentro del coste y las de venta se restan del bruto.",
     avcoWarning:
       "Cálculo AVCO (coste medio ponderado), el mismo criterio que la cartera. No coincide con el criterio fiscal FIFO: en la declaración cada venta se empareja con las compras más antiguas, así que el resultado por operación será otro.",
-    summary: (count: number, result: string): string =>
-      `${count} ${count === 1 ? "venta" : "ventas"} · ${result} de resultado`,
+    salesNoun: (count: number): string =>
+      count === 1 ? "venta ·" : "ventas ·",
+    resultNoun: "de resultado",
     columns: {
       date: "Fecha",
       name: "Instrumento",
@@ -1001,8 +1002,8 @@ export const es = {
         `Sobre el ${coverage} de tu valor con TER conocido`,
     },
     annual: { label: "Coste anual", sub: "Al ritmo de hoy, un año" },
-    coverage: (covered: string, total: string): string =>
-      `${covered} de ${total} tienen TER en ficha.`,
+    coverageOf: "de",
+    coverageSuffix: "tienen TER en ficha",
     unknown: (names: string): string =>
       `Sin TER en ficha: ${names}. Quedan fuera del ponderado y cuentan como 0 % en la proyección, así que el coste acumulado es un suelo, no una estimación. Anótalo en la pantalla de instrumentos.`,
     none: {
@@ -1017,8 +1018,9 @@ export const es = {
       p10: { label: "Escenario malo", sub: "percentil 10" },
       p50: { label: "Escenario central", sub: "mediana" },
       p90: { label: "Escenario bueno", sub: "percentil 90" },
-      horizon: (years: number, contribution: string): string =>
-        `${years} ${years === 1 ? "año" : "años"} aportando ${contribution} al mes, sobre lo que ya tienes.`,
+      horizonPre: (years: number): string =>
+        `${years} ${years === 1 ? "año" : "años"} aportando`,
+      horizonPost: "al mes, sobre lo que ya tienes.",
     },
     unavailable: {
       "no-target":
