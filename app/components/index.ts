@@ -49,7 +49,6 @@ export * from "./portfolio/PortfolioTable";
 export * from "./portfolio/PortfolioRowItem";
 export * from "./portfolio/SortableHeader";
 export * from "./portfolio/PortfolioEmpty";
-export * from "./portfolio/PortfolioError";
 export * from "./portfolio/columns";
 export * from "./instrument/InstrumentHeader";
 export * from "./instrument/InstrumentStats";
