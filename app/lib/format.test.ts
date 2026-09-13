@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  formatClock,
   formatDate,
   formatMoney,
   formatPercent,
@@ -9,7 +10,6 @@ import {
   formatSignedMoney,
 } from "./format";
 
-/** Strip NBSP / thin spaces so assertions don't depend on ICU spacing details. */
 const norm = (s: string) => s.replace(/[\s\u00a0\u202f]/g, " ");
 
 describe("formatMoney", () => {
@@ -102,8 +102,18 @@ describe("formatRelativeTime", () => {
     expect(out).toContain("minuto");
   });
   it("uses days for older times", () => {
-    // numeric:"auto" -> "hace 5 días" (and "ayer" for exactly one day)
     const out = formatRelativeTime("2026-07-07T12:00:00.000Z", now);
     expect(out.toLowerCase()).toContain("días");
+  });
+});
+
+describe("formatClock", () => {
+  it("reads the clock in Madrid, not UTC, across the DST switch", () => {
+    expect(norm(formatClock(new Date("2026-07-01T12:32:00.000Z")))).toBe(
+      "14:32",
+    );
+    expect(norm(formatClock(new Date("2026-01-15T12:32:00.000Z")))).toBe(
+      "13:32",
+    );
   });
 });

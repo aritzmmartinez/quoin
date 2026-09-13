@@ -64,6 +64,19 @@ export function formatDate(iso: string): string {
   }).format(new Date(iso));
 }
 
+export function formatTimeTick(
+  timestamp: number,
+  unit: "day" | "month",
+  withYear = false,
+): string {
+  return new Intl.DateTimeFormat(LOCALE, {
+    ...(unit === "day"
+      ? { day: "numeric", month: "short" }
+      : { month: "short" }),
+    ...(withYear ? { year: "2-digit" as const } : {}),
+  }).format(new Date(timestamp));
+}
+
 /**
  * Format a "YYYY-MM" period as an es-ES month, e.g. "2026-07" -> "julio de 2026".
  *
@@ -125,4 +138,25 @@ export function formatRelativeTime(
   if (abs < HOUR) return rtf.format(Math.round(diffMs / MIN), "minute");
   if (abs < DAY) return rtf.format(Math.round(diffMs / HOUR), "hour");
   return rtf.format(Math.round(diffMs / DAY), "day");
+}
+
+const CLOCK_IN_MADRID = new Intl.DateTimeFormat(LOCALE, {
+  timeZone: "Europe/Madrid",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+export function formatClock(now: Date = new Date()): string {
+  return CLOCK_IN_MADRID.format(now);
+}
+
+const DAY_IN_MADRID = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Europe/Madrid",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+export function todayInMadrid(now: Date = new Date()): string {
+  return DAY_IN_MADRID.format(now);
 }

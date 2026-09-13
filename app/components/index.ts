@@ -15,6 +15,7 @@ export * from "./ui/ThesisChip";
 export * from "./ui/StatTile";
 export * from "./ui/MeterBar";
 export * from "./ui/Hint";
+export * from "./ui/table";
 export * from "./ui/Modal";
 export * from "./ui/Glossary";
 export * from "./ui/NoteLink";
