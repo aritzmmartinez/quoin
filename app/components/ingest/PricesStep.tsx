@@ -5,6 +5,7 @@ import type { PriceFillResult } from "~/lib/ingest";
 
 import { DEFAULT_HISTORY_RANGE, HISTORY_RANGES, es } from "~/lib";
 import { Button } from "../ui/Button";
+import { Select } from "../ui/Select";
 import { postIngest } from "./api";
 
 export function PricesStep({
@@ -44,21 +45,22 @@ export function PricesStep({
       <p className="mb-2 text-[12px] text-muted">{copy.intro}</p>
       <p className="mb-4 text-[12px] text-muted">{copy.rangeHint}</p>
 
-      <label className="mb-4 block">
-        <span className="mb-1 block text-[11px] text-muted">{copy.range}</span>
-        <select
+      <div className="mb-4">
+        <span aria-hidden className="mb-1 block text-[11px] text-muted">
+          {copy.range}
+        </span>
+        <Select
+          label={copy.range}
           value={range}
-          onChange={(event) => setRange(event.target.value as HistoryRange)}
+          onChange={(value) => setRange(value as HistoryRange)}
+          options={HISTORY_RANGES.map((option) => ({
+            value: option,
+            label: option,
+          }))}
           disabled={busy}
-          className="w-40 rounded-md border border-border bg-surface px-2 py-1.5 text-[12px]"
-        >
-          {HISTORY_RANGES.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
-      </label>
+          className="w-40"
+        />
+      </div>
 
       <Button onClick={() => void run()} disabled={busy}>
         {busy ? copy.running : copy.run}

@@ -3,7 +3,8 @@ import { useNavigate, useSearchParams } from "react-router";
 import { DASH, es, formatMoney, taxYearHref, type TaxYearView } from "~/lib";
 
 import { Card } from "../ui/Card";
-import { Explainer } from "../ui/Explainer";
+import { InfoHint } from "../ui/Hint";
+import { Select } from "../ui/Select";
 import { SignedMoney } from "../SignedMoney";
 import { TaxSaleItem } from "./TaxSaleItem";
 import { TAX_SALE_GRID, TAX_SALE_MIN_WIDTH } from "./tax-columns";
@@ -14,19 +15,12 @@ function TaxYearSelect({ years, year }: { years: number[]; year: number }) {
   const copy = es.realized.fiscal;
 
   return (
-    <select
-      id="tax-year"
-      aria-label={copy.yearLabel}
-      value={year}
-      onChange={(e) => navigate(taxYearHref(params, Number(e.target.value)))}
-      className="rounded-md border border-border bg-surface px-2 py-1.5 text-[12px]"
-    >
-      {years.map((y) => (
-        <option key={y} value={y}>
-          {y}
-        </option>
-      ))}
-    </select>
+    <Select
+      label={copy.yearLabel}
+      value={String(year)}
+      options={years.map((y) => ({ value: String(y), label: String(y) }))}
+      onChange={(value) => navigate(taxYearHref(params, Number(value)))}
+    />
   );
 }
 
@@ -53,13 +47,12 @@ export function TaxYearPanel({
 
   return (
     <div className="flex flex-col gap-4">
-      <Explainer>{copy.intro}</Explainer>
-
       <div className="flex items-center gap-2">
-        <label className="text-[12px] text-muted" htmlFor="tax-year">
+        <span aria-hidden className="text-[12px] text-muted">
           {copy.yearLabel}
-        </label>
+        </span>
         <TaxYearSelect years={years} year={year} />
+        <InfoHint size={18} name={copy.about} label={copy.intro} />
       </div>
 
       {view && (

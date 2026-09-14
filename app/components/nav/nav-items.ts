@@ -3,6 +3,7 @@ import {
   Boxes,
   LayoutDashboard,
   PieChart,
+  Settings,
   Target,
   TrendingUp,
   Wallet,
@@ -31,3 +32,28 @@ export const NAV_ITEMS: readonly NavItem[] = [
 export function navItemFor(parent: string | undefined): NavItem | undefined {
   return NAV_ITEMS.find((item) => item.to === parent);
 }
+
+export const SYSTEM_ITEMS: readonly NavItem[] = [
+  { label: es.settings.title, icon: Settings, to: "/ajustes" },
+];
+
+export interface NavGroup {
+  title: string;
+  items: readonly NavItem[];
+}
+
+export const NAV_GROUPS: readonly NavGroup[] = [
+  { title: es.nav.groups.portfolio, items: NAV_ITEMS.slice(0, 4) },
+  { title: es.nav.groups.analysis, items: NAV_ITEMS.slice(4) },
+];
+
+export interface SubView {
+  label: string;
+  to: string;
+}
+
+export const SUMMARY_SUBVIEWS: readonly SubView[] = [
+  { label: es.realized.title, to: "/realizado" },
+  { label: es.opportunity.title, to: "/coste-oportunidad" },
+  { label: es.ter.title, to: "/coste-ter" },
+];

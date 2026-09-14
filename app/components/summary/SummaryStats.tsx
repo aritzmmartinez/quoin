@@ -23,7 +23,7 @@ export function SummaryStats({
   const s = es.summary.stats;
   return (
     <div
-      className="mb-6 grid gap-3"
+      className="grid gap-3"
       style={{ gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))" }}
     >
       <StatTile

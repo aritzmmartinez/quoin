@@ -1,9 +1,13 @@
-import { isRouteErrorResponse } from "react-router";
+import { isRouteErrorResponse, Link } from "react-router";
 
 import type { Route } from "./+types/instrument";
 
 import Decimal from "decimal.js";
+import { SearchX } from "lucide-react";
 
+import { ErrorBoundary as SharedErrorBoundary } from "~/components/ui/ErrorBoundary";
+import { buttonClass } from "~/components/ui/Button";
+import { ErrorState } from "~/components/ui/ErrorState";
 import {
   Card,
   InstrumentHeader,
@@ -172,19 +176,20 @@ export default function Instrument({ loaderData }: Route.ComponentProps) {
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
-  const notFound = isRouteErrorResponse(error) && error.status === 404;
-  const copy = notFound
-    ? es.instrument.notFound
-    : { title: es.portfolio.error.title, body: es.portfolio.error.body };
+  if (!isRouteErrorResponse(error) || error.status !== 404) {
+    return <SharedErrorBoundary />;
+  }
 
   return (
-    <>
-      <div className="rounded-card border border-border bg-surface px-6 py-16 text-center">
-        <div className="text-[15px] font-semibold">{copy.title}</div>
-        <p className="mx-auto mt-1.5 max-w-sm text-[13px] text-muted">
-          {copy.body}
-        </p>
-      </div>
-    </>
+    <ErrorState
+      icon={SearchX}
+      tone="neutral"
+      title={es.instrument.notFound.title}
+      body={es.instrument.notFound.body}
+    >
+      <Link to="/cartera" className={buttonClass()}>
+        {es.instrument.notFound.back}
+      </Link>
+    </ErrorState>
   );
 }

@@ -8,6 +8,8 @@ import {
   type SortKey,
 } from "~/lib";
 
+import { TABLE_HEAD, TABLE_SCROLL } from "../ui/table";
+
 import { COLUMNS, GRID_TEMPLATE, TABLE_MIN_WIDTH } from "./columns";
 import { PortfolioRowItem } from "./PortfolioRowItem";
 import { SortableHeader } from "./SortableHeader";
@@ -34,13 +36,10 @@ export function PortfolioTable({
   return (
     <div
       aria-busy={busy}
-      className={`overflow-x-auto transition-opacity ${busy ? "opacity-60" : ""}`}
+      className={`${TABLE_SCROLL} transition-opacity ${busy ? "opacity-60" : ""}`}
     >
       <div className={TABLE_MIN_WIDTH}>
-        <div
-          role="row"
-          className={`grid ${GRID_TEMPLATE} items-center gap-2 border-b border-border px-gutter py-row`}
-        >
+        <div role="row" className={`${TABLE_HEAD} ${GRID_TEMPLATE}`}>
           <span />
           {COLUMNS.map((col) => (
             <SortableHeader

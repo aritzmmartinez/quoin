@@ -10,6 +10,7 @@ import {
 } from "~/lib";
 
 import { MeterBar } from "../ui/MeterBar";
+import { TABLE_DIVIDER } from "../ui/table";
 
 const GRID = "grid-cols-[minmax(120px,180px)_minmax(0,1fr)_74px]";
 
@@ -79,7 +80,7 @@ function Row({
           : copy.splitVia;
 
   return (
-    <div className="border-b border-border last:border-b-0">
+    <div className={TABLE_DIVIDER}>
       <div
         role={expandable ? "button" : undefined}
         tabIndex={expandable ? 0 : undefined}
@@ -134,13 +135,13 @@ function Row({
 
         <div className="text-right">
           <div
-            className={`text-[13px] tabular-nums ${hot ? "font-medium text-negative" : ""}`}
+            className={`font-mono text-[13px] ${hot ? "font-medium text-negative" : ""}`}
           >
             {row.weight === null
               ? "—"
               : formatPercent(row.weight, 2, { floorNonZero: true })}
           </div>
-          <div className="text-[10.5px] tabular-nums text-muted">
+          <div className="font-mono text-[10.5px] text-muted">
             {formatMoney(row.value)}
           </div>
         </div>

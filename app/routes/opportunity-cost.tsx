@@ -7,13 +7,13 @@ import {
 } from "~/adapters/persistence";
 import {
   Card,
-  NoteLink,
   OpportunityTable,
   Explainer,
   SignedMoney,
   StatTile,
   signClass,
   signedPercent,
+  InfoHint,
 } from "~/components";
 import {
   es,
@@ -91,11 +91,20 @@ export default function OpportunityCost({ loaderData }: Route.ComponentProps) {
 
   return (
     <>
-      <header className="mb-4">
-        <Explainer>{o.intro(symbol)}</Explainer>
-        <Explainer tone="notice" className="mt-2">
-          {o.taxWarning}
-        </Explainer>
+      <header className="mb-4 flex flex-wrap items-center gap-2 text-[13px] text-muted">
+        <span>
+          {o.headlinePre} <span className="font-mono text-text">{symbol}</span>{" "}
+          {o.headlinePost}
+        </span>
+        <InfoHint
+          name={o.about}
+          label={
+            <>
+              <span>{o.intro(symbol)}</span>
+              <span className="text-muted">{o.taxWarning}</span>
+            </>
+          }
+        />
       </header>
 
       {rows.length === 0 ? (
@@ -119,6 +128,14 @@ export default function OpportunityCost({ loaderData }: Route.ComponentProps) {
               label={o.stats.real.label}
               sub={o.stats.real.sub}
               value={formatMoney(totals.realValue)}
+              hint={
+                totals.realizedProceeds === "0"
+                  ? undefined
+                  : {
+                      name: o.stats.real.label,
+                      label: o.proceeds(formatMoney(totals.realizedProceeds)),
+                    }
+              }
             />
             <StatTile
               label={o.stats.benchmark.label}
@@ -186,31 +203,28 @@ export default function OpportunityCost({ loaderData }: Route.ComponentProps) {
               {o.unpriced(unpriced.join(", "))}
             </Explainer>
           )}
-          {totals.realizedProceeds !== "0" && (
-            <Explainer tone="notice" className="mt-2">
-              {o.proceeds(formatMoney(totals.realizedProceeds))}
-            </Explainer>
-          )}
 
           <Card className="mt-4">
-            <div className="flex items-baseline justify-between gap-3 border-b border-border px-gutter py-3">
-              <h2 className="text-[14px] font-semibold">{o.table.title}</h2>
-              <span className="text-[13px] tabular-nums">
+            <div className="flex items-center justify-between gap-3 border-b border-border-subtle px-gutter py-4">
+              <div className="flex items-center gap-1.5">
+                <h2 className="text-[14px] font-semibold">{o.table.title}</h2>
+                <InfoHint
+                  size={18}
+                  name={o.table.noteTitle}
+                  label={
+                    <>
+                      <span>{o.table.note}</span>
+                      <span className="text-muted">{o.nominal}</span>
+                    </>
+                  }
+                />
+              </div>
+              <span className="font-mono text-[13px]">
                 <SignedMoney value={totals.difference} />
               </span>
             </div>
             <OpportunityTable rows={rows} />
           </Card>
-
-          <NoteLink
-            title={o.table.noteTitle}
-            className="mt-2 text-[11px] text-muted"
-          >
-            <div className="flex flex-col gap-2 py-4 text-[12px] leading-relaxed text-muted">
-              <p>{o.table.note}</p>
-              <p>{o.nominal}</p>
-            </div>
-          </NoteLink>
         </>
       )}
     </>

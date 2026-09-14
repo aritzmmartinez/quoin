@@ -35,16 +35,16 @@ export function SummaryHero({
   const Arrow = negative ? TrendingDown : TrendingUp;
 
   return (
-    <header className="mb-6">
+    <header className="flex flex-col gap-3">
       <p className="text-[12px] text-muted">{h.label}</p>
       <p
-        className="mt-1 font-semibold tabular-nums"
-        style={{ fontSize: "clamp(36px, 5vw, 52px)", letterSpacing: "-0.03em" }}
+        className="font-mono font-bold tabular-nums"
+        style={{ fontSize: "clamp(36px, 5vw, 52px)", letterSpacing: "-0.04em" }}
       >
         {hasPositions ? formatMoney(totalValue) : h.empty}
       </p>
       {changeAbs !== null && (
-        <p className="mt-1.5 flex items-center gap-2 text-[13px]">
+        <p className="flex items-center gap-2 font-mono text-[13px]">
           <Arrow
             className={signClass(changeAbs)}
             size={16}
@@ -57,13 +57,11 @@ export function SummaryHero({
           <span className={`font-medium tabular-nums ${signClass(changePct)}`}>
             {signedPercent(changePct)}
           </span>
-          <span className="text-muted">{rangeLabel}</span>
+          <span className="font-sans text-muted">{rangeLabel}</span>
         </p>
       )}
       {unpricedCount > 0 && (
-        <p className="mt-1.5 text-[12px] text-muted">
-          {h.unpriced(unpricedCount)}
-        </p>
+        <p className="text-[12px] text-muted">{h.unpriced(unpricedCount)}</p>
       )}
     </header>
   );

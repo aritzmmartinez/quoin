@@ -6,19 +6,42 @@ import { es } from "~/lib";
 import { Modal } from "./Modal";
 import { Button } from "./Button";
 
-export function Glossary() {
+export function Glossary({
+  variant = "icon",
+  className = "",
+}: {
+  variant?: "icon" | "nav";
+  className?: string;
+}) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const open = () => dialog.current?.showModal();
 
   return (
     <>
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={() => dialog.current?.showModal()}
-        aria-label={es.glossary.open}
-      >
-        <BookOpen size={18} strokeWidth={1.75} aria-hidden />
-      </Button>
+      {variant === "nav" ? (
+        <button
+          type="button"
+          onClick={open}
+          className={`${className} text-muted hover:bg-surface`}
+        >
+          <BookOpen
+            size={18}
+            strokeWidth={1.75}
+            aria-hidden
+            className="shrink-0"
+          />
+          <span>{es.glossary.title}</span>
+        </button>
+      ) : (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={open}
+          aria-label={es.glossary.open}
+        >
+          <BookOpen size={18} strokeWidth={1.75} aria-hidden />
+        </Button>
+      )}
 
       <Modal ref={dialog} title={es.glossary.title}>
         {es.glossary.terms.map((entry) => (

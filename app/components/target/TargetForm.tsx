@@ -2,11 +2,18 @@ import { useFetcher } from "react-router";
 
 import { es } from "~/lib";
 import { Button } from "../ui/Button";
+import { DatePicker } from "../ui/DatePicker";
 
 const FIELD =
   "w-full rounded-md border border-border bg-surface px-2 py-1.5 text-[13px]";
 
-export function TargetForm({ defaultLines = "" }: { defaultLines?: string }) {
+export function TargetForm({
+  defaultLines = "",
+  today,
+}: {
+  defaultLines?: string;
+  today: string;
+}) {
   const copy = es.target.form;
   const fetcher = useFetcher<{ ok: boolean; error?: string }>();
   const busy = fetcher.state !== "idle";
@@ -27,10 +34,15 @@ export function TargetForm({ defaultLines = "" }: { defaultLines?: string }) {
           />
         </label>
 
-        <label className="grid gap-1 text-[12px] text-muted">
+        <div className="grid gap-1 text-[12px] text-muted">
           {copy.activeFrom}
-          <input type="date" name="activeFrom" required className={FIELD} />
-        </label>
+          <DatePicker
+            name="activeFrom"
+            label={copy.activeFrom}
+            defaultValue={today}
+            required
+          />
+        </div>
       </div>
 
       <label className="grid gap-1 text-[12px] text-muted">

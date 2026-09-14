@@ -1,7 +1,10 @@
+import { Info } from "lucide-react";
 import { useId, useRef, type ReactNode } from "react";
 
+import { placePopover } from "./popover-place";
+
 const PANEL =
-  "m-0 inset-auto w-max max-w-[min(17rem,calc(100vw-2rem))] rounded-md border border-border bg-surface-2 p-3 text-[12px] font-normal normal-case leading-[1.55] tracking-normal text-text shadow-lg";
+  "m-0 inset-auto w-max max-w-[min(320px,calc(100vw-48px))] rounded-xl border border-border bg-surface-2 px-4 py-3.5 text-[12px] font-normal normal-case leading-[1.55] tracking-normal text-body shadow-lg [text-wrap:pretty] [&:popover-open]:flex [&:popover-open]:flex-col [&:popover-open]:gap-2.5";
 
 export function Hint({
   label,
@@ -9,7 +12,7 @@ export function Hint({
   children,
   className = "",
 }: {
-  label: string;
+  label: ReactNode;
   name?: string;
   children: ReactNode;
   className?: string;
@@ -25,30 +28,38 @@ export function Hint({
     if (!anchor || !box) return;
 
     const { width, height } = box.getBoundingClientRect();
-    const margin = 8;
-
-    const below = anchor.bottom + margin;
-    const top =
-      below + height > window.innerHeight && anchor.top - height - margin > 0
-        ? anchor.top - height - margin
-        : below;
-
-    const left = Math.min(
-      Math.max(margin, anchor.left + anchor.width / 2 - width / 2),
-      window.innerWidth - width - margin,
-    );
+    const { left, top } = placePopover({
+      anchor,
+      panel: { width, height },
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+    });
 
     box.style.left = `${left}px`;
-    box.style.top = `${Math.min(top, window.innerHeight - height - margin)}px`;
+    box.style.top = `${top}px`;
   }
+
+  const pinned = useRef(false);
+  const show = () => panel.current?.showPopover();
+  const hide = () => {
+    if (!pinned.current) panel.current?.hidePopover();
+  };
 
   return (
     <>
       <button
         ref={trigger}
         type="button"
-        popoverTarget={id}
         aria-label={name}
+        aria-expanded={undefined}
+        onMouseEnter={show}
+        onMouseLeave={hide}
+        onFocus={show}
+        onBlur={hide}
+        onClick={() => {
+          pinned.current = !pinned.current;
+          if (pinned.current) show();
+          else panel.current?.hidePopover();
+        }}
         className={`cursor-help text-left transition-colors hover:text-text ${className}`}
       >
         {children}
@@ -58,11 +69,38 @@ export function Hint({
         id={id}
         popover="auto"
         role="tooltip"
-        onToggle={place}
+        onToggle={(event) => {
+          if (event.newState !== "open") pinned.current = false;
+          place(event);
+        }}
         className={PANEL}
       >
         {label}
       </div>
     </>
+  );
+}
+
+export function InfoHint({
+  label,
+  name,
+  size = 22,
+  className = "",
+}: {
+  label: ReactNode;
+  name: string;
+  size?: 18 | 22;
+  className?: string;
+}) {
+  return (
+    <Hint
+      label={label}
+      name={name}
+      className={`inline-flex shrink-0 items-center justify-center rounded-full text-faint ${
+        size === 22 ? "size-5.5" : "size-4.5"
+      } ${className}`}
+    >
+      <Info size={size === 22 ? 14 : 13} strokeWidth={1.5} aria-hidden />
+    </Hint>
   );
 }

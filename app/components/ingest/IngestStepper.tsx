@@ -152,6 +152,7 @@ export function IngestStepper({
             busy={busy !== null}
             onFile={(dropped) => void read(dropped)}
             onConfirm={() => void commit()}
+            onReset={reset}
           />
         )}
 

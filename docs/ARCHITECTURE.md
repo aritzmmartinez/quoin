@@ -33,7 +33,7 @@ Convention: internal imports always use the `~/...` alias.
 
 ### adapters
 - `ingestion/`   `TradeRepublicCsvAdapter` + `KrakenCsvAdapter` (CSV -> events; filter card spending / non-BTC crypto; dedup by transaction id) and `holdings/`, one issuer-agnostic parser for fund compositions
-- `persistence/` Prisma 7 + SQLite (schema, generated client, ledger/instrument/price/holdings/identity repositories)
+- `persistence/` Prisma 7 + SQLite (schema, generated client, and the repositories behind every port: ledger, instrument, price, holdings, identity, inflation and target)
 - `marketdata/`  `YahooMarketDataProvider` behind the `MarketDataProvider` port; `quoteSymbol` per instrument (local DB only)
 - `identity/`    `OpenFigiIdentityResolver` behind the `SecurityIdentityResolver` port; maps an ISIN or a ticker to a share-class FIGI
 - `inflation/`   `ine/`, the consumer price index from INE's Tempus3 API (national and Bizkaia), parsed pure and separately from the fetch that feeds it
@@ -247,12 +247,17 @@ trust nobody earned.
   (`app/adapters/persistence/generated/`, gitignored). The client lives where it can be used,
   and the lint boundary keeps `core` from importing it.
 - The connection URL lives in **`prisma.config.ts`** (Prisma 7), not in the datasource block.
-- **Models**: `Instrument` (master, key = ISIN or symbol; `quoteSymbol` for price lookups and
-  `exposureKind`/`exposureLeafId` for look-through, `ter` for the annual fee — all four set by
-  CLI or the instruments screen, never by ingestion, and omitted from `InstrumentWriteData` at
-  the type level so a re-import cannot clobber them), `LedgerEntry` (immutable ledger), `PriceSnapshot`
+- **Models**: `Instrument` (master, key = ISIN or symbol; `quoteSymbol` for price lookups,
+  `exposureKind`/`exposureLeafId` for look-through, `ter` for the annual fee,
+  `hedgedToBase` for a currency-hedged vehicle and `thesis` for why it is held — all six set
+  by CLI or the instruments screen, never by ingestion, and omitted from
+  `InstrumentWriteData` at the type level so a re-import cannot clobber them),
+  `LedgerEntry` (immutable ledger), `PriceSnapshot`
   (append-only price history, `@@unique([instrumentId, asOf])`), `EtfHolding` (a fund's
-  published composition), `InflationIndex` (monthly CPI levels), `PortfolioTarget` +
+  published composition), `InflationIndex` (monthly CPI levels), `InflationSync` (one row per
+  sync attempt, including one that finds nothing new — which is the whole point: it answers
+  "has anybody checked", where the newest `InflationIndex` row answers "what do the euros on
+  screen mean", and one timestamp cannot do both), `PortfolioTarget` +
   `PortfolioTargetLine` (the savings plan, one version per `activeFrom`, one line per
   instrument per version) and `SecurityIdentity` (the identity cache). Every
   amount/quantity/price/weight is a `String` (decimal) -> operated on with decimal.js.
@@ -314,6 +319,16 @@ React Router 8 (SSR) · React 19 · strict TypeScript (`noUncheckedIndexedAccess
 Tailwind v4 · Lucide · Zod · Recharts · Papa Parse ·
 SQLite + Prisma 7 (better-sqlite3 adapter) · decimal.js · Vitest.
 
-No form library: the one mutation in the app is a native React Router `action` validating
-with the same Zod schema the CLI uses, which works without JavaScript and keeps one source
-for the vocabulary.
+No form library, and no component library either. Every mutation is a native React Router
+`action` — five of them: the savings plan, the instruments screen, and the three endpoints
+behind the import, price-sync and IPC-sync buttons — each validating with the same Zod
+schema the CLI uses, so there is one source for the vocabulary rather than a second
+definition living in the browser.
+
+The controls are hand-built for the same reason (`ui/Select.tsx`, `ui/DatePicker.tsx`,
+`ui/Hint.tsx`, all placed by the pure `popover-place.ts`): a native `<select>` popup and a
+native date picker are drawn by the operating system, so they ignore the palette and cannot
+carry a description per option. The cost is honest and worth stating — both post through a
+hidden input, so with JavaScript disabled a form still submits, but only with the value it
+was rendered with. The screens that mutate are already interactive ones; nothing that only
+*reads* the portfolio depends on this.
