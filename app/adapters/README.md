@@ -8,9 +8,10 @@ Rule (enforced by lint):
 
 Contents:
 - `ingestion/`   `TradeRepublicCsvAdapter` + `KrakenCsvAdapter` (CSV -> ledger events; filters card spending / non-BTC crypto; dedup by transaction id), plus `holdings/`: one issuer-agnostic parser for fund compositions
-- `persistence/` Prisma 7 + SQLite (schema, generated client, repositories for ledger, instruments, prices, holdings and identities)
+- `persistence/` Prisma 7 + SQLite (schema, generated client, repositories for ledger, instruments, prices, holdings, identities, inflation levels and the savings plan)
 - `marketdata/`  `YahooMarketDataProvider` behind the `MarketDataProvider` port; per-instrument `quoteSymbol` mapping (kept in the local DB, not the repo)
 - `identity/`    `OpenFigiIdentityResolver` behind the `SecurityIdentityResolver` port; maps an ISIN or a venue-qualified ticker to a share-class FIGI so the same company stops being two leaves
+- `inflation/`   `ine/`, the monthly consumer price index from INE's Tempus3 API (national and Bizkaia); the fetch is one file and `parseIneSeries` is another, pure and tested without a network. The levels land through `InflationRepository`, implemented in `persistence/`
 - `fx/`          (planned) exchange rates for non-EUR quotes (e.g. ECB / `EURUSD=X`)
 
 ## holdings/ — no per-issuer branch

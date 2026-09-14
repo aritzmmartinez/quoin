@@ -1,34 +1,44 @@
-# Quoin
+<p align="center">
+  <img src="docs/logo.png" width="72" height="72" alt="">
+</p>
 
-A personal, open-source, local-first investment platform. Self-hosted: your data
-never leaves your machine.
+<h1 align="center">Quoin</h1>
 
-Quoin tracks a buy-and-hold portfolio (broad-index ETFs plus a few single names) — with
-allocation analysis, true look-through exposure, and support for the Bizkaia *foral* tax
-regime that off-the-shelf trackers ignore.
-The goal isn't to trade: it's to **understand** a portfolio, and to double as a
+<p align="center">
+An open-source portfolio tracker: allocation analysis, true look-through exposure, and tax support. Self-hosted, so your data never leaves your machine.
+</p>
+
+<p align="center">
+  <a href="https://github.com/aritzmmartinez/quoin/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/aritzmmartinez/quoin/ci.yml?branch=main&logo=github&label=CI" alt="CI status"></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/github/package-json/v/aritzmmartinez/quoin?label=version&color=blue" alt="Version"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/aritzmmartinez/quoin?color=blue" alt="AGPL-3.0 licence"></a>
+</p>
+
+<p align="center">
+  <a href="#why">Why</a>
+  ·
+  <a href="#getting-started">Getting started</a>
+  ·
+  <a href="#roadmap">Roadmap</a>
+</p>
+
+---
+
+Quoin tracks a buy-and-hold portfolio (broad-index ETFs plus a few single
+names): allocation analysis, true look-through exposure, and support for the
+Bizkaia foral tax regime that off-the-shelf trackers ignore. It's not built
+for trading. It's built to understand a portfolio, and it doubles as a
 learning project.
 
-> **Status: v0.7.0, actively built.** The immutable ledger, core domain
-> (Money, event types, `computePositions` with average cost), CSV and `.xlsx` ingestion
-> (Trade Republic + Kraken), a Yahoo price provider with daily history, the app shell
-> and the summary / holdings / movements / asset-detail / instruments / allocation /
-> realised / target / projection / opportunity-cost / fee-cost screens are in place. Look-through works end to end: fund
-> compositions are imported from whatever the issuer publishes, and holdings are matched
-> across issuers by canonical identity. Returns are reported both time-weighted and
-> money-weighted, per instrument and for the portfolio, and can be read in today's
-> purchasing power against INE's consumer price index. The savings plan drives both a
-> no-sell rebalance of the next contribution and a bootstrap projection of where the
-> portfolio could end up, reported as a range and refused outright when the price history
-> is too short to resample. Realised gains are also computed under the Bizkaia *foral*
-> regime — FIFO by lot, a two-month wash-sale exclusion and four-year loss carryforward —
-> as a projection kept separate from the portfolio's average-cost view. Each instrument
-> carries a *thesis* — núcleo, convicción or táctica — recording why it is held.
-> A broker export goes from file to valued position inside the app — import, symbol
-> mapping, price download and summary in one four-step assistant — so the CLI is a
-> fallback rather than the way in.
+![Quoin — Summary screen](docs/summary_dark_es.png)
 
-![Quoin — pantalla de Asignación con look-through](docs/allocation_dark.png)
+> **Status: v0.8.0, actively built.** A broker CSV goes from file to valued,
+> look-through position inside the app: fund compositions are matched by
+> canonical identity, not by name, so a holding counts once whether you bought
+> it directly or it arrived inside an index. Returns are time-weighted and
+> money-weighted, adjustable to today's purchasing power. Realised gains follow
+> the Bizkaia *foral* regime (FIFO, wash-sale rule, loss carryforward) as a
+> separate projection from the portfolio's average-cost view.
 
 ## Why
 
@@ -155,7 +165,7 @@ on with decimal.js; data and secrets are never committed.
 - [x] Market data: Yahoo price provider, `PriceSnapshot` persistence, `prices:sync`, `prices:backfill`
 - [x] Surface market columns (value, unrealized P&L, weight) + price freshness in the UI
 - [x] Asset-detail view (price chart, invested-vs-value, TWR/MWR)
-- [x] App shell (sidebar / bottom nav, theme toggle) and summary screen
+- [x] App shell (sidebar / bottom nav, light and dark) and summary screen
 - [x] Movements screen (full ledger, URL-driven pagination)
 - [x] Exposure model: leaves, intrinsic resolution, `exposure:map`
 - [x] Instruments screen: classify exposure, import fund compositions by dropping a CSV
@@ -175,6 +185,7 @@ on with decimal.js; data and secrets are never committed.
 - [x] Bizkaia foral tax module (FIFO lots)
 - [x] Instrument thesis: why each position is held (núcleo / convicción / táctica)
 - [x] Guided import: broker CSV to valued position from the app, no CLI
+- [x] Interface redesign: new palette, mono figures, grouped sidebar, theme setting
 - [ ] Watchlist and trade journal
 - [ ] DCF valuation module
 

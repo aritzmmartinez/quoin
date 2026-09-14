@@ -24,8 +24,11 @@ License: AGPL-3.0-only.
 - UI: **Spanish**, and only via `app/lib/i18n.ts` (a typed `es` object `as const`).
   Never hardcode a user-facing string in a component.
 - Formatting: es-ES, and only via `app/lib/format.ts` (`formatMoney`, `formatQuantity`,
-  `formatSignedMoney`, `formatDate`, `formatPercent`, `formatRelativeTime`).
-  Never call `toLocaleString` from a component.
+  `formatSignedMoney`, `formatPercent`, `formatDate`, `formatPeriod`, `formatTimeTick`,
+  `formatRelativeTime`, `formatClock`, `todayInMadrid`).
+  Never call `toLocaleString` from a component. The last three are the only ones that
+  read the clock: `formatClock` and `todayInMadrid` resolve through `Europe/Madrid`, the
+  same rule as `periodOf` and `fiscalYearOf`.
 - Note on es-ES: CLDR `min2` means 4-digit numbers carry **no** thousands separator
   (`1234,56 €`). This is correct output, not a bug.
 
@@ -46,6 +49,9 @@ pnpm db:migrate                   # prisma migrate dev
 pnpm db:studio
 pnpm db:backup                    # VACUUM INTO data/backups/, keeps the last 30
 pnpm db:seed [--anchor=YYYY-MM-DD]   # synthetic portfolio into the scratch database
+pnpm db:seed:showcase [--months=N] [--range=…]   # real instruments, invented quantities,
+                                                 # into data/showcase.sqlite — for screenshots
+pnpm showcase <command>               # run any command against data/showcase.sqlite
 pnpm ingest --broker=<tr|kraken> <file>
 pnpm prices:sync                  # quote every mapped instrument
 pnpm prices:map <ISIN> <SYMBOL>   # set / show / --clear a Yahoo symbol
@@ -60,6 +66,7 @@ pnpm projection:converge              # seed-to-seed spread of p10/p50/p90 at se
 pnpm projection:converge [--sims=1000,3000] [--seeds=8] [--horizon=240] [--contribution=…]
 pnpm twr:explain [--top=N]            # print the portfolio TWR chain, worst link first
 pnpm twr:explain --around=YYYY-MM-DD  # open one link: holdings and implied prices at both ends
+pnpm tax:explain [YYYY|--year=YYYY]   # replay the Bizkaia foral FIFO, lot by lot
 ```
 
 Fund compositions have **no command**: the CSV is dropped onto the fund's row in
@@ -179,8 +186,9 @@ Three defences, and it is worth knowing which one actually carries the weight:
    having to remember. Everything that reads `DATABASE_URL` is pointed away from the
    ledger by default rather than by discipline.
 2. **`assertScratchDatabase` in `scripts/lib/db-target.ts`** — the programmatic barrier
-   for code in this repo. It is an **allow-list**: the target must be exactly
-   `data/dev.sqlite`. "Not the ledger" would wave through `data/quoin.sqlite.bak`, a
+   for code in this repo. It is an **allow-list** of exact paths, `SCRATCH_DATABASE_FILES`:
+   `data/dev.sqlite` (development, `db:seed`) and `data/showcase.sqlite`
+   (`db:seed:showcase`). "Not the ledger" would wave through `data/quoin.sqlite.bak`, a
    mistyped path, or a snapshot under `data/backups/` — every one a file nobody chose to
    destroy. It also **fails closed**: unset, in-memory or non-`file:` refuses too,
    because a guard that passes when it cannot tell what it is guarding is not a guard.
@@ -208,6 +216,15 @@ ledger while that rule is in force. Useful, but do not mistake it for a sandbox.
 - The seed is **synthetic and stays synthetic** — same reason fixtures are (see *Privacy*).
   It encodes the shapes that have caused bugs: `fees ≠ 0`, an unpriced position, a fund
   with no holdings, two funds sharing constituents, a partial sell.
+- **`db:seed:showcase` is the one deliberate exception, and it buys its realism with a
+  separate file.** Real instruments, real Yahoo history, invented quantities, for README
+  screenshots. It writes `data/showcase.sqlite` and never `data/dev.sqlite`, because
+  `db:seed` would wipe twenty thousand candles that cost a network round trip each, and
+  because a screenshot session must not be one stale `DATABASE_URL` away from the ledger:
+  the script **sets** the variable from a constant before the guard runs. `pnpm showcase
+  <command>` aims anything else at the same file. Nothing in it is chosen by the author —
+  it is the most common European index lines, so it discloses nothing, but check it still
+  holds nothing you hold before publishing a picture of it.
 
 ## Privacy and the no-clobber rule
 
@@ -758,11 +775,44 @@ shareable. A route opts into the header's range selector with `handle = { range:
 `bg-surface-1` and `text-warning` do not exist in this theme. Tailwind emits nothing for an
 unknown token and raises nothing, so **typecheck, lint and build all pass** and the element
 simply renders unstyled. Check `app/app.css` for the real tokens before inventing one:
-`--color-bg`, `--color-surface`, `--color-surface-2`, `--color-border`, `--color-text`,
-`--color-muted`, `--color-positive`, `--color-negative`, `--color-dn-1..5`.
+
+- surfaces — `--color-bg`, `--color-surface`, `--color-surface-2`
+- lines — `--color-border`, `--color-border-subtle`
+- text, lightest to faintest — `--color-text`, `--color-body`, `--color-muted`,
+  `--color-faint`
+- the inverted pair — `--color-accent` and `--color-on-accent`, always together: accent is
+  near-white on dark and near-black on light, so anything painted `bg-accent` needs
+  `text-on-accent` or it disappears in one theme
+- signals — `--color-positive`, `--color-negative`
+- the ramp — `--color-dn-1..5`
+- non-colour — `--font-sans`, `--font-mono`, `--spacing-gutter`, `--spacing-row`,
+  `--spacing-header`, `--radius-card`
 
 `dn-1..5` is a **greyscale ramp**, not a categorical palette. The design is monochrome and
 green/red are reserved as semantic signals — a category is not a warning.
+
+**Every figure carries `font-mono`** (Geist Mono, `TABLE_NUM` in `app/components/ui/table.ts`
+for table cells). Amounts are read down a column, and a proportional face makes the digits
+of one row a different width from the row above it. Prose stays `--font-sans`.
+
+## Theme — the server cannot know what "system" resolves to
+
+`Theme` is `dark | light | system` (`app/lib/theme.ts`), stored in the `quoin-theme`
+cookie and written by `/ajustes`. The third value is what makes this awkward: the OS
+preference lives in the browser, and the cookie does not carry it.
+
+- **The server always renders `resolveTheme(theme, false)`**, so `system` arrives as
+  `dark`. That is a deliberate lie corrected before paint, not a default to "fix" by
+  guessing in the loader. `prefers-color-scheme` is not a request header.
+- **`THEME_SCRIPT` runs inline in `<head>`, before React.** It reads the cookie, asks
+  `matchMedia` and sets `document.documentElement.className` itself. Move it below `<Meta/>`
+  and `<Links/>`, or defer it, and a light-mode user gets a dark flash on every navigation.
+- **`suppressHydrationWarning` on `<html>` is load-bearing**, because that script has
+  already changed the class React is about to hydrate against. Removing it turns the
+  correction into a console error on every load for anyone on `system` plus a light OS.
+- The setting writes the cookie and the class **from the client**, with no revalidation:
+  nothing on screen depends on the theme server-side, so a round trip would only cost a
+  flash. Do not turn it into an action.
 
 ## Spacing
 
@@ -788,16 +838,25 @@ flexible track when `instrument` was filtered out, leaving every track a fixed p
 whole table hugged the left edge. `movements/columns.test.ts` pins the second shape — one
 track per rendered column, exactly one flexible.
 
-**A shared `ui/Table` was considered and deliberately not built** (v0.5.2). Nine tables,
-too dissimilar to fold: two are real `<table>` elements and seven are `div[role=row]` +
-`<ul>`; some sort, some are clickable rows, one is inline-editable. Collapsing them behind
-one component before the shapes converge would be the abstraction built for generality
-rather than for a second real case. What they actually shared was spacing, and that is what
-the tokens above fix. Revisit when a tenth table wants something the ninth already has —
-not before, and not as a tidy-up.
+**A shared `ui/Table` component was considered and deliberately not built** (v0.5.2, still
+true). Nine tables, too dissimilar to fold: two are real `<table>` elements and seven are
+`div[role=row]` + `<ul>`; some sort, some are clickable rows, one is inline-editable.
+Collapsing them behind one component before the shapes converge would be the abstraction
+built for generality rather than for a second real case. Revisit when a tenth table wants
+something the ninth already has — not before, and not as a tidy-up.
 
-Also declare `color-scheme` when adding native controls: a `<select>` popup is drawn by the
-OS, and without it the panel comes back light while the options inherit white text.
+**What they do share is a stylesheet, not a component: `app/components/ui/table.ts`.**
+`TABLE_SCROLL`, `TABLE_HEAD`, `TABLE_CELLS`, `TABLE_DIVIDER`, `TABLE_ROW` (cells +
+divider) and `TABLE_NUM` are class strings every table imports. Compose them with the
+route's own grid template — `` `${TABLE_ROW} ${GRID}` `` — and add the row height there,
+since it is the one thing that legitimately differs per table. This is the spacing fix the
+tokens above started: a header and its body rows cannot drift when both read the same
+constant. Add a class string here before adding a prop to a component that does not exist.
+
+Also declare `color-scheme` when adding native controls, so the OS draws the popup in the
+right theme. The app currently has **no native `<select>` left** (`ui/Select.tsx`) and no
+native date input (`ui/DatePicker.tsx`), so nothing exercises this today — which is
+exactly why it is written down.
 
 ## Testing
 

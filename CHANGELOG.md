@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-14
+
+### Added
+- Ajustes screen at /ajustes, with the theme setting: Oscuro, Claro or Sistema. Sistema follows the operating system and updates with it.
+- The theme is applied before the first paint, so a light theme no longer flashes dark on load.
+- Sidebar sections (Cartera, Análisis, Sistema) and a collapsed mode that folds it down to icons. Collapsed items show their name on hover.
+- While you are on Realizado, Coste de oportunidad or Coste del TER, those three appear nested under Resumen in the sidebar.
+- Breadcrumb in the header, replacing the back link that sat above each subpage.
+- Custom dropdown replacing the native select on Instrumentos, the holdings import, the symbol mapping step and the fiscal year picker. It is searchable where the list is long.
+- Custom calendar for the date field of a savings plan version, replacing the native date input.
+- 404 page for an address that matches no screen.
+- Full page error state with a retry button, a link to Instrumentos and the time of the last attempt.
+- Info glyph beside a title or a figure, opening its explanation on hover and pinning it on click. The long intro paragraphs of Realizado, Coste de oportunidad and Coste del TER now live behind it instead of above the table.
+- Shared table styles (header, row, divider, numeric cell) used by the nine tables in the app.
+- Geist Mono for every figure, so amounts line up column by column.
+- Chart time axis that picks day or month ticks from the range shown, instead of always printing the month.
+- Styled scrollbars and a styled slider for the concentration threshold.
+- Tests for the tick spacing, the calendar grid and the popover placement.
+
+### Changed
+- New colour palette in both themes, with tokens for a subtle border, body text, faint text and an accent pair. The header height is a token too, so the error state can centre itself against it.
+- Stat tiles redesigned: mono figures, an optional info glyph, an arrow when the tile is a link, and a quieter inset variant for tiles inside a card.
+- New primary button variant, used for the main action of each error state, with fixed heights across the three sizes.
+- Charts redesigned: accent colour for value, a dashed line for aportado, legend at the top left, richer tooltip, and a donut with separated segments over a track.
+- File dropzone redesigned, with a larger target and a clearer hint.
+- The inflation notice only appears when something is wrong. The reference month and how far behind it runs moved into the info glyph next to the badge in the header.
+- Headers of Realizado, Coste de oportunidad and Coste del TER cut down to a single line of figures.
+- The glossary moved from the header into the sidebar. On mobile it stays in the header, next to a link to Ajustes.
+
+### Removed
+- The light and dark toggle in the header, replaced by the theme setting in Ajustes.
+- The back link component, replaced by the breadcrumb.
+- The portfolio specific error card, folded into the shared error state.
+
 ## [0.7.0] - 2026-09-11
 
 ### Added
@@ -210,7 +244,8 @@ fund holdings must be supplied as CSV rather than the Excel most issuers publish
 Design rationale lives beside the code it explains, in `docs/ARCHITECTURE.md` and in the
 commit history — not here.
 
-[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/aritzmmartinez/quoin/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/aritzmmartinez/quoin/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/aritzmmartinez/quoin/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/aritzmmartinez/quoin/compare/v0.5.1...v0.5.2
