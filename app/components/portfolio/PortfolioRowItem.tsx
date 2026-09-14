@@ -11,6 +11,7 @@ import {
 
 import { SignedMoney } from "../SignedMoney";
 import { ThesisChip } from "../ui/ThesisChip";
+import { TABLE_CELLS, TABLE_DIVIDER, TABLE_NUM } from "../ui/table";
 import { GRID_TEMPLATE } from "./columns";
 
 function ChevronRight() {
@@ -33,21 +34,23 @@ function ChevronRight() {
 
 export function PortfolioRowItem({ row }: { row: PortfolioRow }) {
   return (
-    <li className="border-b border-border last:border-b-0">
+    <li className={TABLE_DIVIDER}>
       <Link
         to={`/instrument/${encodeURIComponent(row.instrumentId)}`}
-        className={`grid ${GRID_TEMPLATE} items-center gap-2 px-gutter py-row transition-colors hover:bg-surface-2`}
+        className={`${TABLE_CELLS} ${GRID_TEMPLATE} min-h-15.25 hover:bg-surface-2`}
       >
-        <span className="grid size-6 place-items-center text-muted">
+        <span className="grid size-6 place-items-center text-faint">
           <ChevronRight />
         </span>
 
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="truncate text-sm font-medium">{row.name}</span>
+            <span className="truncate text-[14px] font-semibold">
+              {row.name}
+            </span>
             <ThesisChip thesis={row.thesis} />
           </div>
-          <div className="mt-0.5 text-[11.5px] text-muted">
+          <div className="mt-1 font-mono text-[11px] text-muted">
             {row.instrumentId}
           </div>
         </div>
@@ -55,26 +58,26 @@ export function PortfolioRowItem({ row }: { row: PortfolioRow }) {
         <div className="text-[13px] text-muted">
           {row.type ? instrumentTypeLabel(row.type) : DASH}
         </div>
-        <div className="text-right text-[13.5px]">
+        <div className={`${TABLE_NUM} text-right`}>
           {formatQuantity(row.quantity)}
         </div>
-        <div className="text-right text-[13.5px]">
+        <div className={`${TABLE_NUM} text-right`}>
           {formatMoney(row.averageCost)}
         </div>
-        <div className="text-right text-[13.5px]">
+        <div className={`${TABLE_NUM} text-right`}>
           {formatMoney(row.costBasis)}
         </div>
-        <div className="text-right text-[13.5px] font-medium">
+        <div className={`${TABLE_NUM} text-right`}>
           {row.marketValue !== null ? formatMoney(row.marketValue) : DASH}
         </div>
-        <div className="text-right text-[13.5px] font-medium">
+        <div className={`${TABLE_NUM} text-right`}>
           {row.unrealizedPnL !== null ? (
             <SignedMoney value={row.unrealizedPnL} />
           ) : (
             DASH
           )}
         </div>
-        <div className="text-right text-[13.5px] text-muted">
+        <div className={`${TABLE_NUM} text-right font-normal text-muted`}>
           {row.weight !== null ? formatPercent(row.weight) : DASH}
         </div>
       </Link>

@@ -23,7 +23,7 @@ export function RangeSelector({
       label={es.range.label}
       value={value}
       onSelect={onChange}
-      className={className}
+      className={`font-mono ${className}`}
       segments={RANGE_KEYS.map((key) => ({ key, label: LABELS[key] }))}
     />
   );

@@ -1,5 +1,5 @@
 import Decimal from "decimal.js";
-import { useState } from "react";
+import { type CSSProperties, useState } from "react";
 import { useSearchParams } from "react-router";
 
 import {
@@ -32,12 +32,16 @@ export function ThresholdSlider({ threshold }: { threshold: string }) {
     );
   }
 
+  const fill =
+    ((percent - THRESHOLD_MIN_PERCENT) /
+      (THRESHOLD_MAX_PERCENT - THRESHOLD_MIN_PERCENT)) *
+    100;
+
   return (
     <label className="flex items-center gap-2 text-[11.5px] text-muted">
-      <span className="tabular-nums">
-        {copy.thresholdMark(
-          formatPercent(new Decimal(percent).div(100).toString(), 0),
-        )}
+      <span>{copy.thresholdMark}</span>
+      <span className="font-mono">
+        {formatPercent(new Decimal(percent).div(100).toString(), 0)}
       </span>
       <input
         type="range"
@@ -49,7 +53,8 @@ export function ThresholdSlider({ threshold }: { threshold: string }) {
         onChange={(event) => setPercent(Number(event.currentTarget.value))}
         onPointerUp={(event) => commit(Number(event.currentTarget.value))}
         onKeyUp={(event) => commit(Number(event.currentTarget.value))}
-        className="h-1 w-24 cursor-pointer accent-text"
+        className="q-range ml-1.5 cursor-pointer"
+        style={{ "--range-fill": `${fill}%` } as CSSProperties}
       />
     </label>
   );

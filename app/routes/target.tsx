@@ -21,7 +21,7 @@ import {
   type PortfolioTarget,
 } from "~/core/domain";
 import { computePositions } from "~/core/projections";
-import { es, toTargetRows, toTargetVersionRows } from "~/lib";
+import { es, todayInMadrid, toTargetRows, toTargetVersionRows } from "~/lib";
 
 export function meta(_: Route.MetaArgs) {
   return [
@@ -62,6 +62,7 @@ export async function loader(_: Route.LoaderArgs) {
       : null,
     rows,
     versions: toTargetVersionRows(targets, active?.id ?? null),
+    today: todayInMadrid(),
     defaultLines: rows
       .map((row) => `${row.instrumentId} ${row.monthlyAmount}`)
       .join("\n"),
@@ -145,7 +146,7 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 export default function Target({ loaderData }: Route.ComponentProps) {
-  const { active, rows, versions, defaultLines } = loaderData;
+  const { active, rows, versions, defaultLines, today } = loaderData;
   const copy = es.target;
 
   return (
@@ -179,7 +180,7 @@ export default function Target({ loaderData }: Route.ComponentProps) {
 
       <h2 className="mb-2 text-[13px] text-muted">{copy.form.title}</h2>
       <Card className="mb-6">
-        <TargetForm defaultLines={defaultLines} />
+        <TargetForm defaultLines={defaultLines} today={today} />
       </Card>
 
       <h2 className="mb-2 text-[13px] text-muted">{copy.history.title}</h2>

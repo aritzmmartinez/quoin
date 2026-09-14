@@ -48,26 +48,26 @@ export function FileDropzone({
       tabIndex={disabled ? -1 : 0}
       aria-describedby={hint ? describedBy : undefined}
       aria-disabled={disabled || undefined}
-      className={`rounded-lg border border-dashed px-4 py-8 text-center transition-colors ${
+      className={`flex flex-col items-center gap-3 rounded-card border-[1.5px] border-dashed bg-surface px-6 py-10 text-center transition-colors ${
         disabled
           ? "cursor-not-allowed opacity-50"
-          : "cursor-pointer hover:border-text"
-      } ${dragging ? "border-text bg-surface-2" : "border-border"}`}
+          : "cursor-pointer hover:border-accent"
+      } ${dragging ? "border-accent bg-surface-2" : "border-border"}`}
     >
-      <UploadCloud
-        size={20}
-        strokeWidth={1.5}
-        aria-hidden
-        className="mx-auto mb-2 text-muted"
-      />
-      <p className="text-[13px]">{label}</p>
+      <span className="flex size-11 items-center justify-center rounded-full bg-accent/15 text-accent">
+        <UploadCloud size={20} strokeWidth={1.5} aria-hidden />
+      </span>
+      <p className="text-[14px] font-semibold leading-snug">{label}</p>
       {hint && (
-        <p id={describedBy} className="mt-1 text-[12px] text-muted">
+        <p
+          id={describedBy}
+          className="max-w-105 text-[12px] leading-relaxed text-muted text-pretty"
+        >
           {hint}
         </p>
       )}
       {fileName && (
-        <p className="mt-2 font-mono text-[12px] text-text">{fileName}</p>
+        <p className="font-mono text-[12px] text-text">{fileName}</p>
       )}
       <input
         ref={input}

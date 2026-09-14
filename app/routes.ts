@@ -18,6 +18,7 @@ export default [
     route("proyeccion", "routes/projection.tsx"),
     route("instrumentos", "routes/instruments.tsx"),
     route("instrument/:instrumentId", "routes/instrument.tsx"),
+    route("ajustes", "routes/settings.tsx"),
   ]),
   route("api/prices/sync", "routes/prices-sync.ts"),
   route("api/ipc/sync", "routes/ipc-sync.ts"),

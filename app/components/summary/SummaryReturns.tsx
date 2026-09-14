@@ -17,11 +17,8 @@ export function SummaryReturns({
   const r = es.summary.returns;
 
   return (
-    <section className="mb-6">
-      <div
-        className="grid gap-3"
-        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))" }}
-      >
+    <section className="flex flex-col gap-3">
+      <div className="grid grid-cols-2 gap-3">
         <StatTile
           label={r.twr.label}
           sub={twr === null ? r.unavailable : r.twr.sub}
@@ -35,7 +32,7 @@ export function SummaryReturns({
           valueClass={signClass(mwr)}
         />
       </div>
-      <p className="mt-2 text-[11px] leading-relaxed text-muted">
+      <p className="text-[12px] leading-relaxed text-muted">
         {r.note}
         {realBasis && ` ${r.nominal}`}
       </p>

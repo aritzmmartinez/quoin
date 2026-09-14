@@ -1,6 +1,6 @@
 import { Outlet, useLoaderData } from "react-router";
 
-import { AppBottomNav, AppHeader, AppSidebar, BackLink } from "~/components";
+import { AppBottomNav, AppHeader, AppSidebar } from "~/components";
 import { APP_VERSION } from "~/lib/version.server";
 
 export function loader() {
@@ -12,10 +12,9 @@ export default function Shell() {
   return (
     <div className="min-h-dvh md:flex">
       <AppSidebar version={version} />
-      <div className="flex flex-1 flex-col pb-16 md:pb-0">
+      <div className="flex min-w-0 flex-1 flex-col pb-16 md:pb-0">
         <AppHeader />
-        <main className="px-4 py-8 md:px-6">
-          <BackLink />
+        <main className="px-4 pb-10 pt-6 md:px-6">
           <Outlet />
         </main>
       </div>

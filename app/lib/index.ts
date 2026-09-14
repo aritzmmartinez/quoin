@@ -19,5 +19,6 @@ export * from "./rebalance";
 export * from "./summary";
 export * from "./symbol-check";
 export * from "./target";
+export * from "./theme";
 export * from "./tax";
 export * from "./ter";

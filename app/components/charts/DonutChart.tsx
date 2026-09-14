@@ -14,8 +14,9 @@ export function donutColor(index: number): string {
   return DONUT_COLORS[index % DONUT_COLORS.length]!;
 }
 
-const SIZE = 120;
-const STROKE = 16;
+const SIZE = 124;
+const STROKE = 12;
+const GAP = 2.5;
 const RADIUS = (SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
@@ -38,9 +39,17 @@ export function DonutChart({
       className="shrink-0"
     >
       <g transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}>
+        <circle
+          cx={SIZE / 2}
+          cy={SIZE / 2}
+          r={RADIUS}
+          fill="none"
+          stroke="var(--color-border-subtle)"
+          strokeWidth={STROKE}
+        />
         {slices.map((slice, index) => {
           const fraction = Number(slice.weight);
-          const dash = fraction * CIRCUMFERENCE;
+          const dash = Math.max(fraction * CIRCUMFERENCE - GAP, 0);
           const circle = (
             <circle
               key={index}
@@ -54,7 +63,7 @@ export function DonutChart({
               strokeDashoffset={-offset}
             />
           );
-          offset += dash;
+          offset += dash + GAP;
           return circle;
         })}
       </g>

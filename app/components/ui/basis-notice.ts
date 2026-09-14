@@ -8,36 +8,21 @@ export interface BasisNoticeProps {
   checkStale: boolean;
 }
 
-export interface Notice {
-  body: string;
-  offerSync: boolean;
-}
-
 export function basisNotice({
   basis,
   active,
   missing,
   hasIndex,
   checkStale,
-}: BasisNoticeProps): Notice | null {
+}: BasisNoticeProps): string | null {
   if (basis === "nominal") return null;
 
-  if (!hasIndex) return { body: es.basis.noIndex, offerSync: true };
+  if (!hasIndex) return es.basis.noIndex;
 
   if (!active) {
     const periods = missing.map(formatPeriod).join(", ");
-    return {
-      body: `${es.basis.gaps(periods)} ${es.basis.showingNominal}`,
-      offerSync: true,
-    };
+    return `${es.basis.gaps(periods)} ${es.basis.showingNominal}`;
   }
 
-  if (checkStale) {
-    return {
-      body: `${es.basis.perFlow} ${es.basis.maybeBehind}`,
-      offerSync: true,
-    };
-  }
-
-  return { body: `${es.basis.perFlow} ${es.basis.lag}`, offerSync: false };
+  return checkStale ? es.basis.maybeBehind : null;
 }

@@ -9,7 +9,7 @@ Rule (enforced by lint, not by convention):
 
 Contents:
 - `domain/`      value objects (Money as string + decimal.js), ledger event types (Zod schemas), exposure leaves, and the three steps that turn a position into leaves: `resolveIntrinsic`, `resolveWithHoldings`, `canonicaliseLeaves`
-- `ports/`       interfaces: `LedgerRepository`, `InstrumentRepository`, `MarketDataProvider`, `PriceRepository`, `HoldingsRepository`, `SecurityIdentityResolver`, `SecurityIdentityRepository` (planned: `FxProvider`)
+- `ports/`       interfaces: `LedgerRepository`, `InstrumentRepository`, `MarketDataProvider`, `PriceRepository`, `HoldingsRepository`, `SecurityIdentityResolver`, `SecurityIdentityRepository`, `InflationRepository`, `TargetRepository` (planned: `FxProvider`)
 - `projections/` pure functions: `computePositions` (average cost), `computeTradeMeta`, `computeReturns` (TWR + XIRR), `computeAllocation`, `computeExposures` (look-through), `computeCurrencyExposure`, `computeFundOverlap`, `computeProjection`
 - `tax/`         Bizkaia *foral* capital-gains projection (`walkFifo`, `computeTaxLots`, wash-sale exclusion, loss carryforward, per-year bracket scale) — FIFO, separate from the AVCO portfolio view, nothing persisted. `Territory` is `"bizkaia"` only, not a multi-country abstraction.
 

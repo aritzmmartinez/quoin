@@ -1,12 +1,14 @@
-import { useMatches, useSearchParams } from "react-router";
+import { ChevronRight, Settings } from "lucide-react";
+import { Link, useMatches, useSearchParams } from "react-router";
 
-import { parseRange, type Range } from "~/lib";
+import { es, parseRange, type Range } from "~/lib";
 
 import { BasisReference } from "../ui/BasisReference";
 import { BasisToggle } from "../ui/BasisToggle";
 import { Glossary } from "../ui/Glossary";
 import { RangeSelector } from "../ui/RangeSelector";
-import { ThemeToggle } from "../ui/ThemeToggle";
+
+import { useParentNavItem } from "./use-parent-nav-item";
 
 type RouteHandle = {
   title?: string | ((data: unknown) => string);
@@ -54,6 +56,37 @@ function useBasisReference(
   return undefined;
 }
 
+function Breadcrumb({ title }: { title: string }) {
+  const parent = useParentNavItem();
+  const chevron = (
+    <ChevronRight
+      size={10}
+      strokeWidth={1.75}
+      aria-hidden
+      className="shrink-0 text-faint"
+    />
+  );
+
+  return (
+    <nav aria-label="Ruta" className="flex min-w-0 items-center gap-2">
+      {parent?.to && (
+        <>
+          <Link
+            to={parent.to}
+            className="shrink-0 text-[13px] text-faint transition-colors hover:text-text"
+          >
+            {parent.label}
+          </Link>
+          {chevron}
+        </>
+      )}
+      <h1 className="truncate text-[14px] font-semibold tracking-tight">
+        {title}
+      </h1>
+    </nav>
+  );
+}
+
 function HeaderRangeSelector() {
   const [searchParams, setSearchParams] = useSearchParams();
   const range = parseRange(searchParams);
@@ -75,9 +108,9 @@ export function AppHeader() {
   const real = useBasisReference(matches);
 
   return (
-    <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-3 border-b border-border bg-bg px-4 md:px-6">
-      <h1 className="text-[15px] font-semibold tracking-tight">{title}</h1>
-      <div className="flex items-center gap-2">
+    <header className="sticky top-0 z-10 flex h-header items-center justify-between gap-4 bg-bg px-4 md:px-6">
+      <Breadcrumb title={title} />
+      <div className="flex shrink-0 items-center gap-2">
         {showBasis && (
           <>
             <BasisReference
@@ -89,8 +122,16 @@ export function AppHeader() {
           </>
         )}
         {showRange && <HeaderRangeSelector />}
-        <Glossary />
-        <ThemeToggle />
+        <span className="flex items-center gap-2 md:hidden">
+          <Glossary />
+          <Link
+            to="/ajustes"
+            aria-label={es.settings.title}
+            className="rounded-lg p-2 text-muted transition-colors hover:text-text"
+          >
+            <Settings size={18} strokeWidth={1.75} aria-hidden />
+          </Link>
+        </span>
       </div>
     </header>
   );

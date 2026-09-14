@@ -18,6 +18,13 @@ import { SignedMoney } from "../SignedMoney";
 import { ThesisChip } from "../ui/ThesisChip";
 import { signClass, signedPercent } from "../ui/signed";
 import { SortableHeader } from "../portfolio/SortableHeader";
+import {
+  TABLE_CELLS,
+  TABLE_DIVIDER,
+  TABLE_HEAD,
+  TABLE_NUM,
+  TABLE_SCROLL,
+} from "../ui/table";
 import { REALIZED_COLUMNS, REALIZED_GRID, REALIZED_MIN_WIDTH } from "./columns";
 
 export function RealizedTable({
@@ -44,13 +51,10 @@ export function RealizedTable({
   return (
     <div
       aria-busy={busy}
-      className={`overflow-x-auto transition-opacity ${busy ? "opacity-60" : ""}`}
+      className={`${TABLE_SCROLL} transition-opacity ${busy ? "opacity-60" : ""}`}
     >
       <div className={REALIZED_MIN_WIDTH}>
-        <div
-          role="row"
-          className={`grid ${REALIZED_GRID} items-center gap-2 border-b border-border px-gutter py-row`}
-        >
+        <div role="row" className={`${TABLE_HEAD} ${REALIZED_GRID}`}>
           {REALIZED_COLUMNS.map((col) => (
             <SortableHeader
               key={col.key}
@@ -101,16 +105,22 @@ function TotalsBand({
 }) {
   return (
     <div
-      className={`grid ${REALIZED_GRID} items-center gap-2 border-b border-border px-gutter py-row text-[12.5px] tabular-nums ${className}`}
+      className={`${TABLE_CELLS} ${REALIZED_GRID} min-h-10 border-b border-border-subtle font-mono text-[12.5px] ${className}`}
     >
       <span className="font-semibold text-text">{label}</span>
       <span className="truncate">{es.realized.sales(totals.count)}</span>
       <span />
       <span />
-      <span className="text-right">{formatMoney(totals.grossAmount)}</span>
-      <span className="text-right">{formatMoney(totals.fees)}</span>
-      <span className="text-right">{formatMoney(totals.costBasis)}</span>
-      <span className="text-right font-medium">
+      <span className={`${TABLE_NUM} text-right`}>
+        {formatMoney(totals.grossAmount)}
+      </span>
+      <span className={`${TABLE_NUM} text-right`}>
+        {formatMoney(totals.fees)}
+      </span>
+      <span className={`${TABLE_NUM} text-right`}>
+        {formatMoney(totals.costBasis)}
+      </span>
+      <span className={`${TABLE_NUM} text-right`}>
         <SignedMoney value={totals.realizedPnL} />
       </span>
       <span className={`text-right ${signClass(totals.returnPct)}`}>
@@ -123,39 +133,49 @@ function TotalsBand({
 
 function RealizedRowItem({ row }: { row: RealizedRow }) {
   return (
-    <li className="border-b border-border last:border-b-0">
+    <li className={TABLE_DIVIDER}>
       <Link
         to={`/instrument/${encodeURIComponent(row.instrumentId)}`}
-        className={`grid ${REALIZED_GRID} items-center gap-2 px-gutter py-row text-[13px] tabular-nums transition-colors hover:bg-surface-2`}
+        className={`${TABLE_CELLS} ${REALIZED_GRID} min-h-11 hover:bg-surface-2`}
       >
-        <span className="text-muted">{formatDate(row.t)}</span>
+        <span className={`${TABLE_NUM} font-normal text-muted`}>
+          {formatDate(row.t)}
+        </span>
 
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="truncate font-medium">{row.name}</span>
+            <span className="truncate text-[13px] font-semibold">
+              {row.name}
+            </span>
             <ThesisChip thesis={row.thesis} />
           </div>
-          <div className="mt-0.5 text-[11.5px] text-muted">
+          <div className="mt-1 font-mono text-[11px] text-muted">
             {row.instrumentId}
           </div>
         </div>
 
-        <span className="text-right">{formatQuantity(row.quantity)}</span>
-        <span className="text-right">
+        <span className={`${TABLE_NUM} text-right`}>
+          {formatQuantity(row.quantity)}
+        </span>
+        <span className={`${TABLE_NUM} text-right`}>
           {row.price === null ? DASH : formatMoney(row.price)}
         </span>
-        <span className="text-right">{formatMoney(row.grossAmount)}</span>
-        <span className="text-right text-muted">
+        <span className={`${TABLE_NUM} text-right`}>
+          {formatMoney(row.grossAmount)}
+        </span>
+        <span className={`${TABLE_NUM} text-right font-normal text-muted`}>
           {Number(row.fees) === 0 ? DASH : formatMoney(row.fees)}
         </span>
-        <span className="text-right">{formatMoney(row.costBasis)}</span>
-        <span className="text-right font-medium">
+        <span className={`${TABLE_NUM} text-right`}>
+          {formatMoney(row.costBasis)}
+        </span>
+        <span className={`${TABLE_NUM} text-right`}>
           <SignedMoney value={row.realizedPnL} />
         </span>
-        <span className={`text-right ${signClass(row.returnPct)}`}>
+        <span className={`${TABLE_NUM} text-right ${signClass(row.returnPct)}`}>
           {signedPercent(row.returnPct)}
         </span>
-        <span className="text-right text-muted">
+        <span className={`${TABLE_NUM} text-right font-normal text-muted`}>
           {row.holdingDays === null ? DASH : es.realized.days(row.holdingDays)}
         </span>
       </Link>

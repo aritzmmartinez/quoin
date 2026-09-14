@@ -1,3 +1,5 @@
+import { FileText } from "lucide-react";
+
 import type { Broker, ImportSummary } from "~/adapters/ingestion";
 
 import { es } from "~/lib";
@@ -12,6 +14,7 @@ export function FileStep({
   busy,
   onFile,
   onConfirm,
+  onReset,
 }: {
   fileName: string | null;
   preview: { broker: Broker; summary: ImportSummary } | null;
@@ -19,6 +22,7 @@ export function FileStep({
   busy: boolean;
   onFile: (file: File) => void;
   onConfirm: () => void;
+  onReset: () => void;
 }) {
   const copy = es.ingest;
 
@@ -40,12 +44,22 @@ export function FileStep({
 
   return (
     <>
-      <p className="mb-1 text-[13px]">
-        {copy.detected(copy.brokerLabel(preview.broker))}
-      </p>
-      {fileName && (
-        <p className="mb-3 font-mono text-[12px] text-muted">{fileName}</p>
-      )}
+      <div className="mb-3 flex items-center gap-3.5 rounded-card border border-border bg-surface p-4">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-accent/15 text-accent">
+          <FileText size={18} strokeWidth={1.5} aria-hidden />
+        </span>
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className="truncate font-mono text-[13px] font-semibold">
+            {fileName}
+          </span>
+          <span className="text-[11px] leading-none text-muted">
+            {copy.detected(copy.brokerLabel(preview.broker))}
+          </span>
+        </div>
+        <Button size="sm" onClick={onReset} disabled={busy || imported}>
+          {copy.change}
+        </Button>
+      </div>
 
       <SummaryList summary={preview.summary} />
 

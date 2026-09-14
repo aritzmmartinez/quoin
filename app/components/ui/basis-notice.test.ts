@@ -17,31 +17,27 @@ describe("basisNotice", () => {
     expect(basisNotice({ ...base, basis: "nominal" })).toBeNull();
   });
 
-  it("offers a sync when no index is stored", () => {
-    const notice = basisNotice({ ...base, hasIndex: false });
-    expect(notice?.offerSync).toBe(true);
-    expect(notice?.body).toBe(es.basis.noIndex);
+  it("reports that no index is stored", () => {
+    expect(basisNotice({ ...base, hasIndex: false })).toBe(es.basis.noIndex);
   });
 
-  it("offers a sync when a month inside the range is missing", () => {
+  it("names the missing months inside the range", () => {
     const notice = basisNotice({
       ...base,
       active: false,
       missing: ["2026-03"],
     });
-    expect(notice?.offerSync).toBe(true);
-    expect(notice?.body).toContain("marzo");
+    expect(notice).toContain("marzo");
+    expect(notice).toContain(es.basis.showingNominal);
   });
 
-  it("offers a sync when real mode works but the series is stale", () => {
-    const notice = basisNotice({ ...base, checkStale: true });
-    expect(notice?.offerSync).toBe(true);
-    expect(notice?.body).toContain(es.basis.maybeBehind);
+  it("reports a stale series when real mode works", () => {
+    expect(basisNotice({ ...base, checkStale: true })).toBe(
+      es.basis.maybeBehind,
+    );
   });
 
-  it("does not offer a sync when real mode works and the series is fresh", () => {
-    const notice = basisNotice(base);
-    expect(notice?.offerSync).toBe(false);
-    expect(notice?.body).toContain(es.basis.lag);
+  it("says nothing when real mode works and the series is fresh", () => {
+    expect(basisNotice(base)).toBeNull();
   });
 });

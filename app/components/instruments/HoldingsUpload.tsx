@@ -10,6 +10,7 @@ import {
 import { es, formatPercent } from "~/lib";
 import { Button } from "../ui/Button";
 import { FileDropzone } from "../ui/FileDropzone";
+import { Select } from "../ui/Select";
 
 type Override = Partial<Pick<ColumnMap, "identity" | "name" | "weight">>;
 
@@ -305,22 +306,18 @@ function ColumnSelect({
   note?: string;
 }) {
   return (
-    <label className="block">
-      <span className="mb-1 block text-[11px] text-muted">
+    <div>
+      <span aria-hidden className="mb-1 block text-[11px] text-muted">
         {label}
         {note && <span className="ml-1 font-mono">({note})</span>}
       </span>
-      <select
+      <Select
+        label={label}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-[12px]"
-      >
-        {headers.map((h) => (
-          <option key={h} value={h}>
-            {h}
-          </option>
-        ))}
-      </select>
-    </label>
+        onChange={onChange}
+        options={headers.map((h) => ({ value: h, label: h }))}
+        className="w-full"
+      />
+    </div>
   );
 }
