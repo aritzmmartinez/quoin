@@ -1,13 +1,6 @@
 import { Link } from "react-router";
 
-import {
-  DASH,
-  formatMoney,
-  formatPercent,
-  formatQuantity,
-  instrumentTypeLabel,
-  type PortfolioRow,
-} from "~/lib";
+import { DASH, type PortfolioRow, useCopy, useFormat } from "~/lib";
 
 import { SignedMoney } from "../SignedMoney";
 import { ThesisChip } from "../ui/ThesisChip";
@@ -33,6 +26,8 @@ function ChevronRight() {
 }
 
 export function PortfolioRowItem({ row }: { row: PortfolioRow }) {
+  const { formatMoney, formatQuantity, formatPercent } = useFormat();
+  const { labels } = useCopy();
   return (
     <li className={TABLE_DIVIDER}>
       <Link
@@ -56,7 +51,7 @@ export function PortfolioRowItem({ row }: { row: PortfolioRow }) {
         </div>
 
         <div className="text-[13px] text-muted">
-          {row.type ? instrumentTypeLabel(row.type) : DASH}
+          {row.type ? labels.instrumentType[row.type] : DASH}
         </div>
         <div className={`${TABLE_NUM} text-right`}>
           {formatQuantity(row.quantity)}

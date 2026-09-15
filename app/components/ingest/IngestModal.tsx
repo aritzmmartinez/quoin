@@ -2,7 +2,7 @@ import { Upload } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import { useRevalidator } from "react-router";
 
-import { es } from "~/lib";
+import { useCopy } from "~/lib";
 import { Button } from "../ui/Button";
 import { Modal } from "../ui/Modal";
 import { ingestRequestPending } from "./api";
@@ -16,13 +16,14 @@ import { IngestStepper, type IngestStatus } from "./IngestStepper";
 const IDLE: IngestStatus = { imported: false, atDone: false, importedCount: 0 };
 
 export function IngestModal() {
+  const t = useCopy();
   const dialog = useRef<HTMLDialogElement>(null);
   const revalidator = useRevalidator();
   const [run, setRun] = useState(0);
   const [status, setStatus] = useState<IngestStatus>(IDLE);
   const [confirmingClose, setConfirmingClose] = useState(false);
 
-  const copy = es.ingest;
+  const copy = t.ingest;
 
   const onCloseAttempt = useCallback(() => {
     const intent = ingestCloseIntent({

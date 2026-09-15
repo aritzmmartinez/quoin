@@ -1,4 +1,4 @@
-import { formatSignedMoney, type MoneySign } from "~/lib";
+import { type MoneySign, useFormat } from "~/lib";
 
 const SIGN_CLASS: Record<MoneySign, string> = {
   positive: "text-positive",
@@ -13,6 +13,7 @@ export function SignedMoney({
   value: string;
   className?: string;
 }) {
+  const { formatSignedMoney } = useFormat();
   const { text, sign } = formatSignedMoney(value);
   return <span className={`${SIGN_CLASS[sign]} ${className}`}>{text}</span>;
 }

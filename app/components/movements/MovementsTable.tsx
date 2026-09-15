@@ -2,12 +2,10 @@ import { Link } from "react-router";
 
 import {
   DASH,
-  es,
-  formatDate,
-  formatMoney,
-  formatQuantity,
   type MovementRow,
   type PageInfo,
+  useCopy,
+  useFormat,
 } from "~/lib";
 
 import { Pagination } from "../ui/Pagination";
@@ -40,7 +38,8 @@ export function MovementsTable({
   info: PageInfo;
   showInstrument?: boolean;
 }) {
-  const copy = es.movements;
+  const t = useCopy();
+  const copy = t.movements;
   const columns = movementColumns(showInstrument);
   const grid = movementsGrid(showInstrument);
 
@@ -94,6 +93,8 @@ function Cell({
   row: MovementRow;
   column: MovementColumnKey;
 }) {
+  const { formatMoney, formatQuantity, formatDate } = useFormat();
+  const t = useCopy();
   switch (column) {
     case "date":
       return <>{formatDate(row.t)}</>;
@@ -101,7 +102,7 @@ function Cell({
     case "type":
       return (
         <span className={TYPE_TONE[row.type]}>
-          {es.movements.types[row.type]}
+          {t.movements.types[row.type]}
         </span>
       );
 

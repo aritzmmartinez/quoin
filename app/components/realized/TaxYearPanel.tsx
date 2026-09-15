@@ -1,6 +1,6 @@
 import { useNavigate, useSearchParams } from "react-router";
 
-import { DASH, es, formatMoney, taxYearHref, type TaxYearView } from "~/lib";
+import { DASH, taxYearHref, type TaxYearView, useCopy, useFormat } from "~/lib";
 
 import { Card } from "../ui/Card";
 import { InfoHint } from "../ui/Hint";
@@ -10,9 +10,10 @@ import { TaxSaleItem } from "./TaxSaleItem";
 import { TAX_SALE_GRID, TAX_SALE_MIN_WIDTH } from "./tax-columns";
 
 function TaxYearSelect({ years, year }: { years: number[]; year: number }) {
+  const t = useCopy();
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const copy = es.realized.fiscal;
+  const copy = t.realized.fiscal;
 
   return (
     <Select
@@ -33,7 +34,9 @@ export function TaxYearPanel({
   year: number | null;
   view: TaxYearView | null;
 }) {
-  const copy = es.realized.fiscal;
+  const { formatMoney } = useFormat();
+  const t = useCopy();
+  const copy = t.realized.fiscal;
 
   if (years.length === 0 || year === null) {
     return (

@@ -5,32 +5,33 @@ import { toast } from "sonner";
 
 import type { PriceSyncResponse } from "~/routes/prices-sync";
 
-import { es, priceSyncToast } from "~/lib";
+import { priceSyncToast, useCopy } from "~/lib";
 import { Button } from "../ui/Button";
 
 const ENDPOINT = "/api/prices/sync";
 
 type Synced = Extract<PriceSyncResponse, { ok: true }>;
 
-async function run(): Promise<Synced> {
+async function run(error: string): Promise<Synced> {
   const response = await fetch(ENDPOINT, { method: "POST" });
   const body = (await response.json()) as PriceSyncResponse;
-  if (!response.ok || !body.ok) throw new Error(es.instruments.sync.error);
+  if (!response.ok || !body.ok) throw new Error(error);
   return body;
 }
 
 export function SyncPricesButton() {
+  const t = useCopy();
   const revalidator = useRevalidator();
   const [busy, setBusy] = useState(false);
-  const copy = es.instruments.sync;
+  const copy = t.instruments.sync;
 
   function onClick() {
     setBusy(true);
-    toast.promise(run(), {
+    toast.promise(run(copy.error), {
       loading: copy.loading,
       success: (result) => {
         void revalidator.revalidate();
-        return priceSyncToast(result);
+        return priceSyncToast(t, result);
       },
       error: copy.error,
       finally: () => setBusy(false),

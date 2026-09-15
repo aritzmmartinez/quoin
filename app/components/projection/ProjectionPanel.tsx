@@ -6,15 +6,14 @@ import {
   carriedParams,
   CONTRIBUTION_PARAM,
   DETAIL_PARAM,
-  es,
-  formatMoney,
-  formatPercent,
   GOAL_PARAM,
   HORIZON_PARAM,
   MAX_HORIZON_YEARS,
   MIN_WINDOW_MONTHS,
   offPlanState,
   type ProjectionView,
+  useCopy,
+  useFormat,
 } from "~/lib";
 import type { ProjectionResult } from "~/core/projections";
 
@@ -35,7 +34,8 @@ const OWNED: readonly string[] = [
 ];
 
 export function ProjectionPanel({ view }: { view: ProjectionView }) {
-  const copy = es.projection;
+  const t = useCopy();
+  const copy = t.projection;
   const [params] = useSearchParams();
 
   return (
@@ -128,7 +128,8 @@ export function ProjectionPanel({ view }: { view: ProjectionView }) {
 }
 
 function ThinWindow({ view }: { view: ProjectionView }) {
-  const copy = es.projection.thinWindow;
+  const t = useCopy();
+  const copy = t.projection.thinWindow;
 
   return (
     <div className="rounded-md border border-border bg-surface-2 px-4 py-3.5">
@@ -145,7 +146,9 @@ function ThinWindow({ view }: { view: ProjectionView }) {
 }
 
 function Bands({ view }: { view: ProjectionView }) {
-  const copy = es.projection;
+  const { formatMoney } = useFormat();
+  const t = useCopy();
+  const copy = t.projection;
   const result = view.result;
   if (result === null) return null;
 
@@ -243,7 +246,9 @@ function Bands({ view }: { view: ProjectionView }) {
 }
 
 function Notes({ view }: { view: ProjectionView }) {
-  const copy = es.projection;
+  const { formatMoney, formatPercent } = useFormat();
+  const t = useCopy();
+  const copy = t.projection;
   const unsimulatedTotal = view.unsimulated.reduce(
     (sum, row) => sum.plus(new Decimal(row.value)),
     new Decimal(0),
@@ -285,7 +290,9 @@ function Notes({ view }: { view: ProjectionView }) {
 }
 
 function GoalCard({ view }: { view: ProjectionView }) {
-  const copy = es.projection.goal;
+  const { formatMoney } = useFormat();
+  const t = useCopy();
+  const copy = t.projection.goal;
   const answer = view.goalAnswer;
   if (answer === null) return null;
 
@@ -311,7 +318,7 @@ function GoalCard({ view }: { view: ProjectionView }) {
               ? copy.horizonNow
               : copy.horizon(
                   formatMoney(view.contribution),
-                  es.projection.horizonLabel(answer.horizonMonths),
+                  t.projection.horizonLabel(answer.horizonMonths),
                 )}
         </li>
       </ul>
@@ -322,7 +329,9 @@ function GoalCard({ view }: { view: ProjectionView }) {
 }
 
 function offPlanNote(result: ProjectionResult): string {
-  const copy = es.projection.method;
+  const { formatMoney } = useFormat();
+  const t = useCopy();
+  const copy = t.projection.method;
   switch (offPlanState(result)) {
     case "simulated":
       return copy.twoPots(formatMoney(result.offPlanValue));
@@ -334,7 +343,9 @@ function offPlanNote(result: ProjectionResult): string {
 }
 
 function MethodDialog({ view }: { view: ProjectionView }) {
-  const copy = es.projection.method;
+  const { formatPercent } = useFormat();
+  const t = useCopy();
+  const copy = t.projection.method;
   const result = view.result;
   if (result === null) return null;
 

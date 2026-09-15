@@ -1,12 +1,18 @@
 import { useSearchParams } from "react-router";
 
-import { ALLOCATION_VIEWS, es, viewHref, type AllocationView } from "~/lib";
+import {
+  ALLOCATION_VIEWS,
+  type AllocationView,
+  useCopy,
+  viewHref,
+} from "~/lib";
 
 import { PillLinks } from "../ui/Segmented";
 
 export function ViewTabs({ value }: { value: AllocationView }) {
+  const t = useCopy();
   const [params] = useSearchParams();
-  const copy = es.allocation.views;
+  const copy = t.allocation.views;
 
   return (
     <PillLinks

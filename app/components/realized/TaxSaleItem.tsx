@@ -1,13 +1,6 @@
 import { useState } from "react";
 
-import {
-  DASH,
-  es,
-  formatDate,
-  formatMoney,
-  formatQuantity,
-  type TaxSaleRow,
-} from "~/lib";
+import { DASH, type TaxSaleRow, useCopy, useFormat } from "~/lib";
 
 import { SignedMoney } from "../SignedMoney";
 import { ThesisChip } from "../ui/ThesisChip";
@@ -15,8 +8,10 @@ import { TABLE_CELLS, TABLE_DIVIDER, TABLE_NUM } from "../ui/table";
 import { TAX_LOT_GRID, TAX_SALE_GRID } from "./tax-columns";
 
 export function TaxSaleItem({ sale }: { sale: TaxSaleRow }) {
+  const { formatMoney, formatQuantity, formatDate } = useFormat();
+  const t = useCopy();
   const [open, setOpen] = useState(false);
-  const copy = es.realized.fiscal;
+  const copy = t.realized.fiscal;
 
   return (
     <li className={TABLE_DIVIDER}>

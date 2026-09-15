@@ -1,13 +1,6 @@
-import { es, RANGE_KEYS, type Range } from "~/lib";
+import { type Range, RANGE_KEYS, useCopy } from "~/lib";
 
 import { SegmentedButtons } from "./Segmented";
-
-const LABELS: Record<Range, string> = {
-  "1m": es.range.m1,
-  "6m": es.range.m6,
-  "1y": es.range.y1,
-  all: es.range.all,
-};
 
 export function RangeSelector({
   value,
@@ -18,13 +11,20 @@ export function RangeSelector({
   onChange: (range: Range) => void;
   className?: string;
 }) {
+  const t = useCopy();
+  const labels: Record<Range, string> = {
+    "1m": t.range.m1,
+    "6m": t.range.m6,
+    "1y": t.range.y1,
+    all: t.range.all,
+  };
   return (
     <SegmentedButtons
-      label={es.range.label}
+      label={t.range.label}
       value={value}
       onSelect={onChange}
       className={`font-mono ${className}`}
-      segments={RANGE_KEYS.map((key) => ({ key, label: LABELS[key] }))}
+      segments={RANGE_KEYS.map((key) => ({ key, label: labels[key] }))}
     />
   );
 }

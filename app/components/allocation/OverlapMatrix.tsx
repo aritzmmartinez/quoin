@@ -1,5 +1,5 @@
 import type { FundOverlapPair } from "~/core/projections";
-import { es, formatPercent } from "~/lib";
+import { useCopy, useFormat } from "~/lib";
 
 import { Card } from "../ui/Card";
 import type { OverlapFund } from "./OverlapPanel";
@@ -13,7 +13,9 @@ export function OverlapMatrix({
   funds: readonly OverlapFund[];
   pairs: readonly FundOverlapPair[];
 }) {
-  const copy = es.overlap;
+  const { formatPercent } = useFormat();
+  const t = useCopy();
+  const copy = t.overlap;
 
   const byPair = new Map<string, string>();
   for (const pair of pairs) {

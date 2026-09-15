@@ -1,15 +1,8 @@
 import { TrendingDown, TrendingUp } from "lucide-react";
 
-import { es, formatMoney, formatSignedMoney, type Range } from "~/lib";
+import { type Range, useCopy, useFormat } from "~/lib";
 
 import { signClass, signedPercent } from "../ui/signed";
-
-const RANGE_LABEL: Record<Range, string> = {
-  "1m": es.range.m1,
-  "6m": es.range.m6,
-  "1y": es.range.y1,
-  all: es.range.all,
-};
 
 export interface SummaryHeroProps {
   totalValue: string;
@@ -28,9 +21,17 @@ export function SummaryHero({
   unpricedCount,
   hasPositions,
 }: SummaryHeroProps) {
-  const h = es.summary.hero;
+  const { formatMoney, formatSignedMoney, formatPercent } = useFormat();
+  const t = useCopy();
+  const rangeLabels: Record<Range, string> = {
+    "1m": t.range.m1,
+    "6m": t.range.m6,
+    "1y": t.range.y1,
+    all: t.range.all,
+  };
+  const h = t.summary.hero;
   const rangeLabel =
-    range === "all" ? h.allTimeLabel : h.rangeLabel(RANGE_LABEL[range]);
+    range === "all" ? h.allTimeLabel : h.rangeLabel(rangeLabels[range]);
   const negative = changeAbs !== null && Number(changeAbs) < 0;
   const Arrow = negative ? TrendingDown : TrendingUp;
 
@@ -55,7 +56,7 @@ export function SummaryHero({
             {formatSignedMoney(changeAbs).text}
           </span>
           <span className={`font-medium tabular-nums ${signClass(changePct)}`}>
-            {signedPercent(changePct)}
+            {signedPercent(formatPercent, changePct)}
           </span>
           <span className="font-sans text-muted">{rangeLabel}</span>
         </p>

@@ -1,4 +1,4 @@
-import { es, formatPercent, type Reading } from "~/lib";
+import { type Reading, useCopy, useFormat } from "~/lib";
 
 import { Card } from "../ui/Card";
 
@@ -9,7 +9,9 @@ export function ReadingCard({
   reading: Reading | null;
   threshold: string;
 }) {
-  const copy = es.allocation.reading;
+  const { formatPercent } = useFormat();
+  const t = useCopy();
+  const copy = t.allocation.reading;
 
   return (
     <Card className="p-6">
@@ -25,7 +27,9 @@ export function ReadingCard({
             {copy.lead}
             <strong>{reading.name}</strong>
             {copy.isA}
-            <strong>{formatPercent(reading.total, 2, { floorNonZero: true })}</strong>
+            <strong>
+              {formatPercent(reading.total, 2, { floorNonZero: true })}
+            </strong>
             {Number(reading.direct) > 0 && Number(reading.via) > 0
               ? copy.breakdown(
                   formatPercent(reading.direct, 2, { floorNonZero: true }),

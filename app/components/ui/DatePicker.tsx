@@ -1,7 +1,7 @@
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { es, formatDate, formatPeriod, todayInMadrid } from "~/lib";
+import { todayInMadrid, useCopy, useFormat } from "~/lib";
 
 import { addDays, addMonths, monthGrid, monthOf } from "./calendar";
 import { placePopover } from "./popover-place";
@@ -31,7 +31,9 @@ export function DatePicker({
   required?: boolean;
   className?: string;
 }) {
-  const copy = es.datePicker;
+  const { formatDate, formatPeriod } = useFormat();
+  const t = useCopy();
+  const copy = t.datePicker;
   const [value, setValue] = useState(defaultValue);
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState(() => monthOf(defaultValue) ?? "");

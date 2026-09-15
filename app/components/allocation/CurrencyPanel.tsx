@@ -1,5 +1,5 @@
 import type { CurrencyExposure } from "~/core/projections";
-import { es, formatMoney, formatPercent } from "~/lib";
+import { useCopy, useFormat } from "~/lib";
 
 import { Card } from "../ui/Card";
 import { MeterBar } from "../ui/MeterBar";
@@ -14,7 +14,9 @@ export function CurrencyPanel({
   exposure: CurrencyExposure;
   hedgedCount: number;
 }) {
-  const copy = es.currency;
+  const { formatMoney, formatPercent } = useFormat();
+  const t = useCopy();
+  const copy = t.currency;
 
   if (exposure.buckets.length === 0) {
     return (

@@ -1,7 +1,7 @@
 import type { ImportSummary } from "~/adapters/ingestion";
 import type { PriceFillResult } from "~/lib/ingest";
 
-import { es } from "~/lib";
+import { useCopy } from "~/lib";
 import { SummaryList } from "./SummaryList";
 
 export function DoneStep({
@@ -13,7 +13,8 @@ export function DoneStep({
   fill: PriceFillResult | null;
   unmapped: number;
 }) {
-  const copy = es.ingest.done;
+  const t = useCopy();
+  const copy = t.ingest.done;
   const discarded = Object.values(summary.discarded).reduce(
     (sum, count) => sum + count,
     0,
@@ -37,7 +38,7 @@ export function DoneStep({
           <li className="text-negative">{copy.staleWarning(fill.stale)}</li>
         )}
         {unmapped > 0 && <li>{copy.unmapped(unmapped)}</li>}
-        {unmapped > 0 && <li>{es.ingest.closeConfirm.hint}</li>}
+        {unmapped > 0 && <li>{t.ingest.closeConfirm.hint}</li>}
       </ul>
     </>
   );

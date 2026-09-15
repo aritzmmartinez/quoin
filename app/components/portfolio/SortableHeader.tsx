@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 
-import { es, type SortDir } from "~/lib";
+import { type SortDir, useCopy } from "~/lib";
 
 function SortArrow({ dir }: { dir: SortDir }) {
   return (
@@ -34,7 +34,8 @@ export function SortableHeader({
   active: boolean;
   dir: SortDir;
 }) {
-  const copy = es.portfolio.sort;
+  const t = useCopy();
+  const copy = t.portfolio.sort;
   const state = active ? `, ${dir === "asc" ? copy.asc : copy.desc}` : "";
   return (
     <Link

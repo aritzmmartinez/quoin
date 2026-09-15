@@ -1,4 +1,4 @@
-import { es, formatMoney } from "~/lib";
+import { useCopy, useFormat } from "~/lib";
 
 import { Card } from "../ui/Card";
 import { signClass, signedPercent } from "../ui/signed";
@@ -36,20 +36,22 @@ function Tile({
 }
 
 export function InstrumentStats({ kpis }: { kpis: InstrumentKpis }) {
-  const k = es.instrument.kpis;
+  const { formatMoney, formatPercent } = useFormat();
+  const t = useCopy();
+  const k = t.instrument.kpis;
   return (
     <Card className="mb-6">
       <div className="grid grid-cols-2 divide-x divide-y divide-border sm:grid-cols-3 lg:grid-cols-5 lg:divide-y-0">
         <Tile
           label={k.twr.label}
           sub={k.twr.sub}
-          value={signedPercent(kpis.twr)}
+          value={signedPercent(formatPercent, kpis.twr)}
           valueClass={signClass(kpis.twr)}
         />
         <Tile
           label={k.mwr.label}
           sub={k.mwr.sub}
-          value={signedPercent(kpis.mwr)}
+          value={signedPercent(formatPercent, kpis.mwr)}
           valueClass={signClass(kpis.mwr)}
         />
         <Tile

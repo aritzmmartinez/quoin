@@ -4,16 +4,18 @@ import { useSearchParams } from "react-router";
 
 import {
   CONCENTRATION_THRESHOLD,
-  es,
-  formatPercent,
   THRESHOLD_MAX_PERCENT,
   THRESHOLD_MIN_PERCENT,
   THRESHOLD_PARAM,
   thresholdPercent,
+  useCopy,
+  useFormat,
 } from "~/lib";
 
 export function ThresholdSlider({ threshold }: { threshold: string }) {
-  const copy = es.allocation;
+  const { formatPercent } = useFormat();
+  const t = useCopy();
+  const copy = t.allocation;
   const [, setParams] = useSearchParams();
   const [percent, setPercent] = useState(() => thresholdPercent(threshold));
 

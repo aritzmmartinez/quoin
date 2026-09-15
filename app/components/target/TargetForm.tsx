@@ -1,6 +1,6 @@
 import { useFetcher } from "react-router";
 
-import { es } from "~/lib";
+import { useCopy } from "~/lib";
 import { Button } from "../ui/Button";
 import { DatePicker } from "../ui/DatePicker";
 
@@ -14,7 +14,8 @@ export function TargetForm({
   defaultLines?: string;
   today: string;
 }) {
-  const copy = es.target.form;
+  const t = useCopy();
+  const copy = t.target.form;
   const fetcher = useFetcher<{ ok: boolean; error?: string }>();
   const busy = fetcher.state !== "idle";
   const error = fetcher.data?.ok === false ? fetcher.data.error : undefined;
