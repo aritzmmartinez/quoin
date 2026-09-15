@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-09-15
+
+### Added
+- English interface, alongside Spanish. Spanish stays the default; the choice lives in a quoin-locale cookie read by the server, so the page arrives already translated instead of switching after paint.
+- Language setting on /settings, which also changes how figures and dates are written: 1.234,56 € in Spanish, €1,234.56 in English. English is en-GB, not en-US, since the app is euro-denominated and day-first.
+- Settings screen regrouped into Apariencia, Preferencias and Cartera, each a card of rows. Moneda de visualización, Umbral de concentración and Índice de referencia show up as disabled rows for now: the layout is ready, the features aren't.
+
+### Changed
+- Every route, search param and param value moved from Spanish to English: /cartera to /portfolio, /asignacion to /allocation, /movimientos to /movements, /realizado to /realized, /coste-oportunidad to /opportunity-cost, /coste-ter to /ter-cost, /objetivo to /target, /proyeccion to /projection, /instrumentos to /instruments, /ajustes to /settings, and the same for the query params and their values. Old links and bookmarks stop working, and nothing forwards them: a redirect table for a single-user app is a permanent thing to maintain for what's really a one-off retype. URLs don't follow the interface language either, since a link is an address, not copy.
+- Every user-facing string now resolves through the active locale, read with useCopy(). Numbers, currency, dates and relative time are bound to the locale too, with no locale-free formatter left to call by accident. Sorting follows the locale's collation for names and instrument types.
+- The wash-sale notice on the foral tax view now comes from the copy layer instead of being assembled directly in app/lib/tax.ts.
+
+### Fixed
+- Three aria-labels were hardcoded in Spanish: the sidebar, the bottom bar and the breadcrumb. Screen-reader-only text, so nothing on screen ever gave it away.
+
 ## [0.8.0] - 2026-09-14
 
 ### Added
@@ -244,7 +259,8 @@ fund holdings must be supplied as CSV rather than the Excel most issuers publish
 Design rationale lives beside the code it explains, in `docs/ARCHITECTURE.md` and in the
 commit history — not here.
 
-[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/aritzmmartinez/quoin/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/aritzmmartinez/quoin/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/aritzmmartinez/quoin/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/aritzmmartinez/quoin/compare/v0.5.2...v0.6.0
