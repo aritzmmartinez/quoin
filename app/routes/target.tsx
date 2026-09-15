@@ -21,16 +21,26 @@ import {
   type PortfolioTarget,
 } from "~/core/domain";
 import { computePositions } from "~/core/projections";
-import { es, todayInMadrid, toTargetRows, toTargetVersionRows } from "~/lib";
+import {
+  type Copy,
+  copyFor,
+  copyFromMatches,
+  parseLocale,
+  todayInMadrid,
+  toTargetRows,
+  toTargetVersionRows,
+  useCopy,
+} from "~/lib";
 
-export function meta(_: Route.MetaArgs) {
+export function meta({ matches }: Route.MetaArgs) {
+  const t = copyFromMatches(matches);
   return [
-    { title: "Objetivo · Quoin" },
-    { name: "description", content: "Objetivo de aportación mensual" },
+    { title: t.meta.target.title },
+    { name: "description", content: t.meta.target.description },
   ];
 }
 
-export const handle = { title: es.target.title };
+export const handle = { title: (t: Copy) => t.target.title };
 
 export async function loader(_: Route.LoaderArgs) {
   const [targets, instruments, events] = await Promise.all([
@@ -79,12 +89,13 @@ const createForm = z.object({
 const deleteForm = z.object({ id: z.string().min(1) });
 
 export async function action({ request }: Route.ActionArgs) {
+  const t = copyFor(parseLocale(request.headers.get("Cookie")));
   const form = Object.fromEntries(await request.formData());
 
   if (form.intent === "delete") {
     const parsed = deleteForm.safeParse(form);
     if (!parsed.success) {
-      return { ok: false as const, error: es.target.form.invalid };
+      return { ok: false as const, error: t.target.form.invalid };
     }
     await new PrismaTargetRepository().remove(parsed.data.id);
     return { ok: true as const };
@@ -92,12 +103,12 @@ export async function action({ request }: Route.ActionArgs) {
 
   const parsed = createForm.safeParse(form);
   if (!parsed.success) {
-    return { ok: false as const, error: es.target.form.invalid };
+    return { ok: false as const, error: t.target.form.invalid };
   }
 
   const activeFrom = new Date(parsed.data.activeFrom);
   if (Number.isNaN(activeFrom.getTime())) {
-    return { ok: false as const, error: es.target.form.invalid };
+    return { ok: false as const, error: t.target.form.invalid };
   }
 
   let target: PortfolioTarget;
@@ -118,7 +129,7 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   if (target.lines.length === 0) {
-    return { ok: false as const, error: es.target.form.invalid };
+    return { ok: false as const, error: t.target.form.invalid };
   }
 
   const instruments = await new PrismaInstrumentRepository().list();
@@ -129,7 +140,7 @@ export async function action({ request }: Route.ActionArgs) {
   if (mismatches.length > 0) {
     return {
       ok: false as const,
-      error: es.target.form.idMismatch(
+      error: t.target.form.idMismatch(
         mismatches.map((m) => `${m.given} → ${m.likely}`).join(", "),
       ),
     };
@@ -139,15 +150,16 @@ export async function action({ request }: Route.ActionArgs) {
     await new PrismaTargetRepository().create(target);
   } catch (error) {
     console.error("Recording a target version failed", error);
-    return { ok: false as const, error: es.target.form.saveFailed };
+    return { ok: false as const, error: t.target.form.saveFailed };
   }
 
   return { ok: true as const };
 }
 
 export default function Target({ loaderData }: Route.ComponentProps) {
+  const t = useCopy();
   const { active, rows, versions, defaultLines, today } = loaderData;
-  const copy = es.target;
+  const copy = t.target;
 
   return (
     <>
@@ -155,10 +167,10 @@ export default function Target({ loaderData }: Route.ComponentProps) {
         <p className="text-[13px] text-muted">{copy.intro}</p>
         {active && (
           <Link
-            to="/proyeccion"
+            to="/projection"
             className="mt-2 inline-block text-[12.5px] text-muted underline decoration-dotted underline-offset-2 transition-colors hover:text-text"
           >
-            {es.projection.fromTarget}
+            {t.projection.fromTarget}
           </Link>
         )}
       </header>

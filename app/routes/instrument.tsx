@@ -28,17 +28,25 @@ import {
   computePositions,
   computeReturns,
 } from "~/core/projections";
-import { es, paginate, parsePage, toMovementRows } from "~/lib";
+import {
+  type Copy,
+  copyFromMatches,
+  paginate,
+  parsePage,
+  toMovementRows,
+  useCopy,
+} from "~/lib";
 
-export function meta(_: Route.MetaArgs) {
-  return [{ title: "Detalle de activo · Quoin" }];
+export function meta({ matches }: Route.MetaArgs) {
+  const t = copyFromMatches(matches);
+  return [{ title: t.meta.instrument.title }];
 }
 
 export const handle = {
-  title: (data: unknown): string =>
+  title: (t: Copy, data: unknown): string =>
     (data as { instrument?: { name?: string } } | undefined)?.instrument
-      ?.name ?? es.instrument.viewFallback,
-  parent: "/cartera",
+      ?.name ?? t.instrument.viewFallback,
+  parent: "/portfolio",
 };
 
 export async function loader({ params, request }: Route.LoaderArgs) {
@@ -147,6 +155,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 }
 
 export default function Instrument({ loaderData }: Route.ComponentProps) {
+  const t = useCopy();
   const {
     instrument,
     kpis,
@@ -163,7 +172,7 @@ export default function Instrument({ loaderData }: Route.ComponentProps) {
       <InvestedVsValue data={ivvData} />
       <Card className="overflow-hidden">
         <div className="px-gutter pb-3 pt-4 text-[14px] font-semibold">
-          {es.instrument.movements.title}
+          {t.instrument.movements.title}
         </div>
         <MovementsTable
           rows={movements}
@@ -176,6 +185,7 @@ export default function Instrument({ loaderData }: Route.ComponentProps) {
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+  const t = useCopy();
   if (!isRouteErrorResponse(error) || error.status !== 404) {
     return <SharedErrorBoundary />;
   }
@@ -184,11 +194,11 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
     <ErrorState
       icon={SearchX}
       tone="neutral"
-      title={es.instrument.notFound.title}
-      body={es.instrument.notFound.body}
+      title={t.instrument.notFound.title}
+      body={t.instrument.notFound.body}
     >
-      <Link to="/cartera" className={buttonClass()}>
-        {es.instrument.notFound.back}
+      <Link to="/portfolio" className={buttonClass()}>
+        {t.instrument.notFound.back}
       </Link>
     </ErrorState>
   );

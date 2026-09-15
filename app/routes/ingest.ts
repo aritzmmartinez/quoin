@@ -15,7 +15,7 @@ import {
 import type { PendingMapping, PriceFillResult } from "~/lib/ingest";
 import type { SymbolCheck } from "~/lib/symbol-check";
 
-import { es } from "~/lib";
+import { copyFor, parseLocale } from "~/lib";
 
 const csvForm = z.object({ csv: z.string().min(1) });
 const symbolForm = z.object({
@@ -48,14 +48,15 @@ function fail(error: string, status = 400): Response {
 }
 
 export async function action({ request }: Route.ActionArgs) {
+  const t = copyFor(parseLocale(request.headers.get("Cookie")));
   const form = Object.fromEntries(await request.formData());
 
   try {
     switch (form.intent) {
       case "preview": {
         const parsed = csvForm.safeParse(form);
-        if (!parsed.success) return fail(es.ingest.unreadable);
-        const { broker, summary } = await previewIngest(parsed.data.csv);
+        if (!parsed.success) return fail(t.ingest.unreadable);
+        const { broker, summary } = await previewIngest(t, parsed.data.csv);
         return Response.json({
           ok: true,
           step: "preview",
@@ -66,8 +67,8 @@ export async function action({ request }: Route.ActionArgs) {
 
       case "commit": {
         const parsed = csvForm.safeParse(form);
-        if (!parsed.success) return fail(es.ingest.unreadable);
-        const result = await commitIngest(parsed.data.csv);
+        if (!parsed.success) return fail(t.ingest.unreadable);
+        const result = await commitIngest(t, parsed.data.csv);
         return Response.json({
           ok: true,
           step: "commit",
@@ -77,8 +78,9 @@ export async function action({ request }: Route.ActionArgs) {
 
       case "check": {
         const parsed = symbolForm.safeParse(form);
-        if (!parsed.success) return fail(es.ingest.map.invalid);
+        if (!parsed.success) return fail(t.ingest.map.invalid);
         const check = await checkQuoteSymbol(
+          t,
           parsed.data.instrumentId,
           parsed.data.symbol,
         );
@@ -91,7 +93,7 @@ export async function action({ request }: Route.ActionArgs) {
 
       case "map": {
         const parsed = symbolForm.safeParse(form);
-        if (!parsed.success) return fail(es.ingest.map.invalid);
+        if (!parsed.success) return fail(t.ingest.map.invalid);
         const { removed } = await mapQuoteSymbol(
           parsed.data.instrumentId,
           parsed.data.symbol,
@@ -106,7 +108,7 @@ export async function action({ request }: Route.ActionArgs) {
 
       case "fill": {
         const parsed = fillForm.safeParse(form);
-        if (!parsed.success) return fail(es.ingest.prices.invalid);
+        if (!parsed.success) return fail(t.ingest.prices.invalid);
         const ids = parsed.data.instrumentIds
           .split(",")
           .map((id) => id.trim())
@@ -120,11 +122,11 @@ export async function action({ request }: Route.ActionArgs) {
       }
 
       default:
-        return fail(es.ingest.unreadable);
+        return fail(t.ingest.unreadable);
     }
   } catch (error) {
     if (error instanceof IngestError) return fail(error.message);
     console.error("Ingest action failed", error);
-    return fail(es.ingest.failed, 500);
+    return fail(t.ingest.failed, 500);
   }
 }

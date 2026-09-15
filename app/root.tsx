@@ -16,7 +16,8 @@ import type { Route } from "./+types/root";
 import { buttonClass } from "~/components/ui/Button";
 import { ErrorState } from "~/components/ui/ErrorState";
 import { parseBasis } from "~/lib/basis";
-import { es } from "~/lib/i18n";
+import { useCopy } from "~/lib/i18n";
+import { parseLocale } from "~/lib/locale";
 import { parseTheme, resolveTheme, THEME_SCRIPT } from "~/lib/theme";
 import "./app.css";
 
@@ -35,14 +36,19 @@ export const links: Route.LinksFunction = () => [
 
 export function loader({ request }: Route.LoaderArgs) {
   const cookie = request.headers.get("Cookie") ?? "";
-  return { theme: parseTheme(cookie), basis: parseBasis(cookie) };
+  return {
+    theme: parseTheme(cookie),
+    basis: parseBasis(cookie),
+    locale: parseLocale(cookie),
+  };
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const data = useRouteLoaderData<typeof loader>("root");
   const theme = resolveTheme(data?.theme ?? "dark", false);
+  const locale = data?.locale ?? "es";
   return (
-    <html lang="es" className={theme} suppressHydrationWarning>
+    <html lang={locale} className={theme} suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -66,7 +72,8 @@ export default function App() {
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   const notFound = isRouteErrorResponse(error) && error.status === 404;
-  const copy = notFound ? es.notFound : es.portfolio.error;
+  const t = useCopy();
+  const copy = notFound ? t.notFound : t.portfolio.error;
 
   return (
     <main>
@@ -78,7 +85,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
         body={copy.body}
       >
         <Link to="/" className={buttonClass()}>
-          {es.notFound.home}
+          {t.notFound.home}
         </Link>
       </ErrorState>
     </main>

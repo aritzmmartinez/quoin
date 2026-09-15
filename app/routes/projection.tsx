@@ -8,25 +8,27 @@ import {
   solveHorizon,
 } from "~/core/projections";
 import {
-  es,
+  type Copy,
+  copyFromMatches,
   MIN_WINDOW_MONTHS,
+  type NamedValue,
   parseContribution,
   parseExtended,
   parseGoal,
   parseHorizonYears,
-  type NamedValue,
   type ProjectionView,
 } from "~/lib";
 import { loadProjectionContext } from "~/lib/projection.server";
 
-export function meta(_: Route.MetaArgs) {
+export function meta({ matches }: Route.MetaArgs) {
+  const t = copyFromMatches(matches);
   return [
-    { title: "Proyección · Quoin" },
-    { name: "description", content: "Hacia dónde puede ir tu plan" },
+    { title: t.meta.projection.title },
+    { name: "description", content: t.meta.projection.description },
   ];
 }
 
-export const handle = { title: es.projection.title };
+export const handle = { title: (t: Copy) => t.projection.title };
 
 export async function loader({ request }: Route.LoaderArgs) {
   const params = new URL(request.url).searchParams;

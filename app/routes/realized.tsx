@@ -18,27 +18,33 @@ import {
 import { computeRealizedGains } from "~/core/projections";
 import {
   buildTaxYearView,
-  es,
-  formatSignedMoney,
+  type Copy,
+  copyFor,
+  copyFromMatches,
+  createFormat,
   groupRealizedByYear,
   listTaxYears,
+  parseLocale,
   parseRealizedSort,
   parseRealizedView,
   parseTaxYear,
   realizedTotals,
   toRealizedRows,
+  useCopy,
+  useFormat,
 } from "~/lib";
 import { resolveRealView } from "~/lib/real.server";
 
-export function meta(_: Route.MetaArgs) {
+export function meta({ matches }: Route.MetaArgs) {
+  const t = copyFromMatches(matches);
   return [
-    { title: "Realizado · Quoin" },
-    { name: "description", content: "Resultado de tus ventas cerradas" },
+    { title: t.meta.realized.title },
+    { name: "description", content: t.meta.realized.description },
   ];
 }
 
 export const handle = {
-  title: es.realized.title,
+  title: (t: Copy) => t.realized.title,
   basis: true,
   parent: "/",
 };
@@ -47,6 +53,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   const params = new URL(request.url).searchParams;
   const view = parseRealizedView(params);
   const sort = parseRealizedSort(params);
+  const locale = parseLocale(request.headers.get("Cookie"));
+  const tag = createFormat(locale).tag;
 
   const [events, instruments] = await Promise.all([
     new PrismaLedgerRepository().list(),
@@ -64,7 +72,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   return {
     view,
-    years: groupRealizedByYear(rows, sort),
+    years: groupRealizedByYear(rows, sort, tag),
     totals: realizedTotals(rows),
     sort,
     real: {
@@ -80,19 +88,21 @@ export async function loader({ request }: Route.LoaderArgs) {
       years: taxYears,
       year: taxYear,
       view:
-        view !== "fiscal" || taxYear === null
+        view !== "tax" || taxYear === null
           ? null
-          : buildTaxYearView(events, instruments, taxYear),
+          : buildTaxYearView(events, instruments, taxYear, copyFor(locale)),
     },
   };
 }
 
 export default function Realized({ loaderData }: Route.ComponentProps) {
+  const { formatSignedMoney } = useFormat();
+  const t = useCopy();
   const { view, years, totals, sort, real, fiscal } = loaderData;
   const navigation = useNavigation();
   const busy = navigation.state === "loading";
 
-  if (view === "fiscal") {
+  if (view === "tax") {
     return (
       <>
         <header className="mb-4">
@@ -116,22 +126,22 @@ export default function Realized({ loaderData }: Route.ComponentProps) {
             <>
               <span>
                 <span className="font-mono text-text">{totals.count}</span>{" "}
-                {es.realized.salesNoun(totals.count)}
+                {t.realized.salesNoun(totals.count)}
               </span>
               <span
                 className={`font-mono font-medium ${signClass(totals.realizedPnL)}`}
               >
                 {formatSignedMoney(totals.realizedPnL).text}
               </span>
-              <span>{es.realized.resultNoun}</span>
+              <span>{t.realized.resultNoun}</span>
             </>
           )}
           <InfoHint
-            name={es.realized.about}
+            name={t.realized.about}
             label={
               <>
-                <span>{es.realized.intro}</span>
-                <span className="text-muted">{es.realized.avcoWarning}</span>
+                <span>{t.realized.intro}</span>
+                <span className="text-muted">{t.realized.avcoWarning}</span>
               </>
             }
           />
@@ -144,10 +154,10 @@ export default function Realized({ loaderData }: Route.ComponentProps) {
         {totals.count === 0 ? (
           <div className="px-6 py-16 text-center">
             <div className="text-[15px] font-semibold">
-              {es.realized.empty.title}
+              {t.realized.empty.title}
             </div>
             <p className="mx-auto mt-1.5 max-w-sm text-[13px] text-muted">
-              {es.realized.empty.body}
+              {t.realized.empty.body}
             </p>
           </div>
         ) : (
