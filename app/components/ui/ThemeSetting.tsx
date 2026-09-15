@@ -1,21 +1,27 @@
 import { useState } from "react";
 import { useRouteLoaderData } from "react-router";
 
-import { es, resolveTheme, THEME_COOKIE, THEME_KEYS, type Theme } from "~/lib";
+import {
+  resolveTheme,
+  type Theme,
+  THEME_COOKIE,
+  THEME_KEYS,
+  useCopy,
+} from "~/lib";
 
 import { SegmentedButtons } from "./Segmented";
 
 const ONE_YEAR = 60 * 60 * 24 * 365;
 
-const LABELS: Record<Theme, string> = {
-  dark: es.theme.dark,
-  light: es.theme.light,
-  system: es.theme.system,
-};
-
 type RootData = { theme?: Theme };
 
 export function ThemeSetting() {
+  const t = useCopy();
+  const labels: Record<Theme, string> = {
+    dark: t.theme.dark,
+    light: t.theme.light,
+    system: t.theme.system,
+  };
   const root = useRouteLoaderData("root") as RootData | undefined;
   const [theme, setTheme] = useState<Theme>(root?.theme ?? "dark");
 
@@ -31,10 +37,10 @@ export function ThemeSetting() {
 
   return (
     <SegmentedButtons
-      label={es.theme.label}
+      label={t.theme.label}
       value={theme}
       onSelect={select}
-      segments={THEME_KEYS.map((key) => ({ key, label: LABELS[key] }))}
+      segments={THEME_KEYS.map((key) => ({ key, label: labels[key] }))}
     />
   );
 }
