@@ -3,7 +3,8 @@ import Decimal from "decimal.js";
 import type { Instrument, InstrumentType, Thesis } from "~/core/domain";
 import type { MarketValue, Position, TradeMeta } from "~/core/projections";
 
-import { instrumentTypeLabel } from "./i18n";
+import type { Copy } from "./i18n";
+import { intlTag, type Locale } from "./locale";
 
 export interface PortfolioRow {
   instrumentId: string;
@@ -120,26 +121,35 @@ const NUMERIC_KEYS = new Set<SortKey>([
   "weight",
 ]);
 
-function compareValues(a: PortfolioRow, b: PortfolioRow, key: SortKey): number {
+function compareValues(
+  a: PortfolioRow,
+  b: PortfolioRow,
+  key: SortKey,
+  labels: Copy["labels"],
+  tag: string,
+): number {
   if (NUMERIC_KEYS.has(key)) {
     return new Decimal(a[key] as string).comparedTo(
       new Decimal(b[key] as string),
     );
   }
   if (key === "type") {
-    return instrumentTypeLabel(a.type as InstrumentType).localeCompare(
-      instrumentTypeLabel(b.type as InstrumentType),
-      "es",
+    return labels.instrumentType[a.type as InstrumentType].localeCompare(
+      labels.instrumentType[b.type as InstrumentType],
+      tag,
       { sensitivity: "base" },
     );
   }
-  return a.name.localeCompare(b.name, "es", { sensitivity: "base" });
+  return a.name.localeCompare(b.name, tag, { sensitivity: "base" });
 }
 
 export function sortPortfolioRows(
   rows: readonly PortfolioRow[],
   sort: Sort,
+  labels: Copy["labels"],
+  locale: Locale,
 ): PortfolioRow[] {
+  const tag = intlTag(locale);
   const factor = sort.dir === "asc" ? 1 : -1;
   return [...rows].sort((a, b) => {
     const av = a[sort.key];
@@ -149,7 +159,7 @@ export function sortPortfolioRows(
     if (aNull && bNull) return 0;
     if (aNull) return 1;
     if (bNull) return -1;
-    return factor * compareValues(a, b, sort.key);
+    return factor * compareValues(a, b, sort.key, labels, tag);
   });
 }
 

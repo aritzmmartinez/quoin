@@ -8,22 +8,25 @@ import {
 } from "~/adapters/persistence";
 import { Card, MovementsTable } from "~/components";
 import {
-  es,
-  formatMoney,
+  type Copy,
+  copyFromMatches,
   netCashFlow,
   paginate,
   parsePage,
   toMovementRows,
+  useCopy,
+  useFormat,
 } from "~/lib";
 
-export function meta(_: Route.MetaArgs) {
+export function meta({ matches }: Route.MetaArgs) {
+  const t = copyFromMatches(matches);
   return [
-    { title: "Movimientos · Quoin" },
-    { name: "description", content: "Tu registro completo de operaciones" },
+    { title: t.meta.movements.title },
+    { name: "description", content: t.meta.movements.description },
   ];
 }
 
-export const handle = { title: es.movements.title };
+export const handle = { title: (t: Copy) => t.movements.title };
 
 export async function loader({ request }: Route.LoaderArgs) {
   const page = parsePage(new URL(request.url).searchParams);
@@ -44,6 +47,8 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export default function Movements({ loaderData }: Route.ComponentProps) {
+  const { formatMoney } = useFormat();
+  const t = useCopy();
   const { rows, info, net } = loaderData;
   const navigation = useNavigation();
   const busy = navigation.state === "loading";
@@ -54,10 +59,10 @@ export default function Movements({ loaderData }: Route.ComponentProps) {
         {info.total > 0 && (
           <>
             <span className="text-[13px] text-muted">
-              {es.movements.summary(info.total, formatMoney(net))}
+              {t.movements.summary(info.total, formatMoney(net))}
             </span>
             <p className="mt-1 text-[12px] text-muted">
-              {es.movements.amountHint}
+              {t.movements.amountHint}
             </p>
           </>
         )}
@@ -69,10 +74,10 @@ export default function Movements({ loaderData }: Route.ComponentProps) {
         {info.total === 0 ? (
           <div className="px-6 py-16 text-center">
             <div className="text-[15px] font-semibold">
-              {es.movements.emptyScreen.title}
+              {t.movements.emptyScreen.title}
             </div>
             <p className="mx-auto mt-1.5 max-w-sm text-[13px] text-muted">
-              {es.movements.emptyScreen.body}
+              {t.movements.emptyScreen.body}
             </p>
           </div>
         ) : (

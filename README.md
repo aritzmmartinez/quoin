@@ -30,9 +30,9 @@ Bizkaia foral tax regime that off-the-shelf trackers ignore. It's not built
 for trading. It's built to understand a portfolio, and it doubles as a
 learning project.
 
-![Quoin — Summary screen](docs/summary_dark_es.png)
+![Quoin — Summary screen](docs/summary_dark_en.png)
 
-> **Status: v0.8.0, actively built.** A broker CSV goes from file to valued,
+> **Status: v0.9.0, actively built.** A broker CSV goes from file to valued,
 > look-through position inside the app: fund compositions are matched by
 > canonical identity, not by name, so a holding counts once whether you bought
 > it directly or it arrived inside an index. Returns are time-weighted and
@@ -89,11 +89,11 @@ pnpm target:set [<file>]          # show, or record a version of, the savings pl
 ```
 
 `ingest`, `prices:map`, `prices:sync` and `prices:backfill` also have a screen:
-**Importar operaciones** on /cartera walks a broker export through all four without the
-terminal, and the IPC notice on Resumen syncs the price index with a button. The
+**Import transactions** on /portfolio walks a broker export through all four without the
+terminal, and the IPC notice on Summary syncs the price index with a button. The
 commands stay, and do the same work.
 
-Fund compositions are imported from the **Instrumentos** screen: drop the issuer's
+Fund compositions are imported from the **Instruments** screen: drop the issuer's
 holdings CSV onto the fund's row. One parser handles every issuer — the weight column
 is found by being the one that adds up to about 100, so it survives a different
 language, layout or number format without a rule per provider. There is no command
@@ -183,9 +183,11 @@ on with decimal.js; data and secrets are never committed.
 - [x] Opportunity cost: every real purchase replayed into the index, in euros and in MWR
 - [x] Fee cost: the portfolio's weighted TER, and what it compounds to over the projection horizon
 - [x] Bizkaia foral tax module (FIFO lots)
-- [x] Instrument thesis: why each position is held (núcleo / convicción / táctica)
+- [x] Instrument thesis: why each position is held (core / conviction / tactical)
 - [x] Guided import: broker CSV to valued position from the app, no CLI
 - [x] Interface redesign: new palette, mono figures, grouped sidebar, theme setting
+- [x] English interface alongside Spanish, with figures and dates formatted per locale
+- [ ] Display currency: show every amount converted, with historical rates
 - [ ] Watchlist and trade journal
 - [ ] DCF valuation module
 

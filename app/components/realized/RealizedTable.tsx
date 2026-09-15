@@ -2,16 +2,14 @@ import { Link, useSearchParams } from "react-router";
 
 import {
   DASH,
-  es,
-  formatDate,
-  formatMoney,
-  formatQuantity,
   nextRealizedSort,
   type RealizedRow,
   type RealizedSort,
   type RealizedSortKey,
   type RealizedTotals,
   type RealizedYear,
+  useCopy,
+  useFormat,
 } from "~/lib";
 
 import { SignedMoney } from "../SignedMoney";
@@ -38,6 +36,7 @@ export function RealizedTable({
   sort: RealizedSort;
   busy?: boolean;
 }) {
+  const t = useCopy();
   const [params] = useSearchParams();
 
   const hrefFor = (key: RealizedSortKey): string => {
@@ -58,7 +57,7 @@ export function RealizedTable({
           {REALIZED_COLUMNS.map((col) => (
             <SortableHeader
               key={col.key}
-              label={es.realized.columns[col.key]}
+              label={t.realized.columns[col.key]}
               href={hrefFor(col.key)}
               align={col.align}
               active={sort.key === col.key}
@@ -84,7 +83,7 @@ export function RealizedTable({
 
         {years.length > 1 && (
           <TotalsBand
-            label={es.realized.total}
+            label={t.realized.total}
             totals={totals}
             className="border-t-2 border-border font-medium"
           />
@@ -103,12 +102,14 @@ function TotalsBand({
   totals: RealizedTotals;
   className?: string;
 }) {
+  const { formatMoney, formatPercent } = useFormat();
+  const t = useCopy();
   return (
     <div
       className={`${TABLE_CELLS} ${REALIZED_GRID} min-h-10 border-b border-border-subtle font-mono text-[12.5px] ${className}`}
     >
       <span className="font-semibold text-text">{label}</span>
-      <span className="truncate">{es.realized.sales(totals.count)}</span>
+      <span className="truncate">{t.realized.sales(totals.count)}</span>
       <span />
       <span />
       <span className={`${TABLE_NUM} text-right`}>
@@ -124,7 +125,7 @@ function TotalsBand({
         <SignedMoney value={totals.realizedPnL} />
       </span>
       <span className={`text-right ${signClass(totals.returnPct)}`}>
-        {signedPercent(totals.returnPct)}
+        {signedPercent(formatPercent, totals.returnPct)}
       </span>
       <span />
     </div>
@@ -132,6 +133,9 @@ function TotalsBand({
 }
 
 function RealizedRowItem({ row }: { row: RealizedRow }) {
+  const { formatMoney, formatQuantity, formatDate, formatPercent } =
+    useFormat();
+  const t = useCopy();
   return (
     <li className={TABLE_DIVIDER}>
       <Link
@@ -173,10 +177,10 @@ function RealizedRowItem({ row }: { row: RealizedRow }) {
           <SignedMoney value={row.realizedPnL} />
         </span>
         <span className={`${TABLE_NUM} text-right ${signClass(row.returnPct)}`}>
-          {signedPercent(row.returnPct)}
+          {signedPercent(formatPercent, row.returnPct)}
         </span>
         <span className={`${TABLE_NUM} text-right font-normal text-muted`}>
-          {row.holdingDays === null ? DASH : es.realized.days(row.holdingDays)}
+          {row.holdingDays === null ? DASH : t.realized.days(row.holdingDays)}
         </span>
       </Link>
     </li>

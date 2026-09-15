@@ -1,7 +1,7 @@
 import { ArrowRight } from "lucide-react";
 import { Link } from "react-router";
 
-import { es, formatMoney, formatPercent } from "~/lib";
+import { useCopy, useFormat } from "~/lib";
 
 import { DonutChart, donutColor } from "../charts/DonutChart";
 import { Card } from "../ui/Card";
@@ -15,14 +15,16 @@ export interface AllocationRow {
 }
 
 export function AllocationCard({ rows }: { rows: readonly AllocationRow[] }) {
-  const a = es.summary.allocation;
+  const { formatMoney, formatPercent } = useFormat();
+  const t = useCopy();
+  const a = t.summary.allocation;
 
   return (
     <Card className="flex min-w-0 flex-col justify-between gap-6 p-4 md:p-6">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-[14px] font-semibold">{a.title}</h2>
         <Link
-          to="/asignacion"
+          to="/allocation"
           className="flex shrink-0 items-center gap-1.5 text-[12px] font-medium text-muted transition-colors hover:text-text"
         >
           {a.link}

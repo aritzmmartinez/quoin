@@ -188,21 +188,21 @@ export function isCashLine(leafId: string, name: string): boolean {
 }
 
 export const ALLOCATION_VIEWS = [
-  "exposicion",
-  "rebalanceo",
-  "divisa",
-  "solapamiento",
+  "exposure",
+  "rebalance",
+  "currency",
+  "overlap",
 ] as const;
 export type AllocationView = (typeof ALLOCATION_VIEWS)[number];
-export const DEFAULT_ALLOCATION_VIEW: AllocationView = "exposicion";
-export const VIEW_PARAM = "vista";
+export const DEFAULT_ALLOCATION_VIEW: AllocationView = "exposure";
+export const VIEW_PARAM = "view";
 
-export const OVERLAP_MODES = ["lista", "matriz"] as const;
+export const OVERLAP_MODES = ["list", "matrix"] as const;
 export type OverlapMode = (typeof OVERLAP_MODES)[number];
-export const DEFAULT_OVERLAP_MODE: OverlapMode = "lista";
-export const MODE_PARAM = "modo";
+export const DEFAULT_OVERLAP_MODE: OverlapMode = "list";
+export const MODE_PARAM = "mode";
 
-export const INCLUDE_SOLD_PARAM = "incluirVendidos";
+export const INCLUDE_SOLD_PARAM = "includeSold";
 
 export function parseAllocationView(params: URLSearchParams): AllocationView {
   const raw = params.get(VIEW_PARAM);
@@ -239,7 +239,7 @@ export function viewHref(
   const next = new URLSearchParams(params);
   if (view === DEFAULT_ALLOCATION_VIEW) next.delete(VIEW_PARAM);
   else next.set(VIEW_PARAM, view);
-  if (view !== "solapamiento") {
+  if (view !== "overlap") {
     next.delete(MODE_PARAM);
     next.delete(INCLUDE_SOLD_PARAM);
   }
@@ -253,7 +253,7 @@ export function modeHref(params: URLSearchParams, mode: OverlapMode): string {
   return `?${next.toString()}`;
 }
 
-export const THRESHOLD_PARAM = "umbral";
+export const THRESHOLD_PARAM = "threshold";
 export const THRESHOLD_MIN_PERCENT = 5;
 export const THRESHOLD_MAX_PERCENT = 30;
 

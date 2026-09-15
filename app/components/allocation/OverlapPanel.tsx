@@ -2,11 +2,11 @@ import { Link, useSearchParams } from "react-router";
 
 import type { FundOverlapPair } from "~/core/projections";
 import {
-  OVERLAP_MODES,
-  es,
   includeSoldHref,
   modeHref,
+  OVERLAP_MODES,
   type OverlapMode,
+  useCopy,
 } from "~/lib";
 
 import { Card } from "../ui/Card";
@@ -31,7 +31,8 @@ export function OverlapPanel({
   mode: OverlapMode;
   includeSold: boolean;
 }) {
-  const copy = es.overlap;
+  const t = useCopy();
+  const copy = t.overlap;
 
   if (funds.length < 2) {
     return (
@@ -65,7 +66,7 @@ export function OverlapPanel({
         </div>
       </Card>
 
-      {mode === "matriz" ? (
+      {mode === "matrix" ? (
         <OverlapMatrix funds={funds} pairs={pairs} />
       ) : (
         <OverlapList funds={funds} pairs={pairs} />
@@ -77,8 +78,9 @@ export function OverlapPanel({
 }
 
 function IncludeSoldToggle({ value }: { value: boolean }) {
+  const t = useCopy();
   const [params] = useSearchParams();
-  const copy = es.overlap;
+  const copy = t.overlap;
 
   return (
     <Link
@@ -97,8 +99,9 @@ function IncludeSoldToggle({ value }: { value: boolean }) {
 }
 
 function ModeTabs({ value }: { value: OverlapMode }) {
+  const t = useCopy();
   const [params] = useSearchParams();
-  const copy = es.overlap.modes;
+  const copy = t.overlap.modes;
 
   return (
     <SegmentedLinks

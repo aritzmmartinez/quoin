@@ -21,28 +21,33 @@ import {
   computeTradeMeta,
 } from "~/core/projections";
 import {
-  es,
-  formatMoney,
-  formatRelativeTime,
+  type Copy,
+  copyFor,
+  copyFromMatches,
+  parseLocale,
   parseSort,
   sortPortfolioRows,
   toPortfolioRows,
   totalInvested,
   totalMarketValue,
   totalUnrealizedPnL,
+  useCopy,
+  useFormat,
 } from "~/lib";
 
-export function meta(_: Route.MetaArgs) {
+export function meta({ matches }: Route.MetaArgs) {
+  const t = copyFromMatches(matches);
   return [
-    { title: "Cartera · Quoin" },
-    { name: "description", content: "Tus posiciones actuales" },
+    { title: t.meta.portfolio.title },
+    { name: "description", content: t.meta.portfolio.description },
   ];
 }
 
-export const handle = { title: es.portfolio.title };
+export const handle = { title: (t: Copy) => t.portfolio.title };
 
 export async function loader({ request }: Route.LoaderArgs) {
   const sort = parseSort(new URL(request.url).searchParams);
+  const locale = parseLocale(request.headers.get("Cookie"));
 
   const [events, instruments, prices] = await Promise.all([
     new PrismaLedgerRepository().list(),
@@ -57,9 +62,10 @@ export async function loader({ request }: Route.LoaderArgs) {
   const rows = sortPortfolioRows(
     toPortfolioRows(positions, instruments, tradeMeta, marketValues),
     sort,
+    copyFor(locale).labels,
+    locale,
   );
 
-  // Freshness: newest quote timestamp among held instruments.
   let updatedAt: string | null = null;
   for (const row of rows) {
     const snapshot = prices.get(row.instrumentId);
@@ -79,6 +85,8 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export default function Portfolio({ loaderData }: Route.ComponentProps) {
+  const { formatMoney, formatRelativeTime } = useFormat();
+  const t = useCopy();
   const { rows, sort, invested, value, unrealized, updatedAt } = loaderData;
   const navigation = useNavigation();
   const busy = navigation.state === "loading";
@@ -90,7 +98,7 @@ export default function Portfolio({ loaderData }: Route.ComponentProps) {
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             {rows.length > 0 && (
               <span className="text-[13px] text-muted">
-                {es.portfolio.summary(rows.length, formatMoney(invested))}
+                {t.portfolio.summary(rows.length, formatMoney(invested))}
                 {value !== null && <> · {formatMoney(value)} valor</>}
               </span>
             )}
@@ -104,8 +112,8 @@ export default function Portfolio({ loaderData }: Route.ComponentProps) {
           {rows.length > 0 && (
             <p className="mt-1 text-[12px] text-muted">
               {updatedAt
-                ? es.portfolio.updatedAt(formatRelativeTime(updatedAt))
-                : es.portfolio.noPrices}
+                ? t.portfolio.updatedAt(formatRelativeTime(updatedAt))
+                : t.portfolio.noPrices}
             </p>
           )}
         </div>

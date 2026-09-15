@@ -1,7 +1,7 @@
 import { BookOpen, ChevronDown } from "lucide-react";
 import { useRef } from "react";
 
-import { es } from "~/lib";
+import { useCopy } from "~/lib";
 
 import { Modal } from "./Modal";
 import { Button } from "./Button";
@@ -13,6 +13,7 @@ export function Glossary({
   variant?: "icon" | "nav";
   className?: string;
 }) {
+  const t = useCopy();
   const dialog = useRef<HTMLDialogElement>(null);
   const open = () => dialog.current?.showModal();
 
@@ -30,21 +31,21 @@ export function Glossary({
             aria-hidden
             className="shrink-0"
           />
-          <span>{es.glossary.title}</span>
+          <span>{t.glossary.title}</span>
         </button>
       ) : (
         <Button
           variant="ghost"
           size="icon"
           onClick={open}
-          aria-label={es.glossary.open}
+          aria-label={t.glossary.open}
         >
           <BookOpen size={18} strokeWidth={1.75} aria-hidden />
         </Button>
       )}
 
-      <Modal ref={dialog} title={es.glossary.title}>
-        {es.glossary.terms.map((entry) => (
+      <Modal ref={dialog} title={t.glossary.title}>
+        {t.glossary.terms.map((entry) => (
           <details
             key={entry.term}
             className="group border-b border-border last:border-b-0"

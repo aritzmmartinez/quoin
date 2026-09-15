@@ -15,6 +15,7 @@ export interface TerRow {
 export function toTerRows(
   lines: readonly TerLine[],
   instruments: readonly Instrument[],
+  tag = "es-ES",
 ): TerRow[] {
   const byId = new Map(instruments.map((i) => [i.id, i]));
 
@@ -33,7 +34,7 @@ export function toTerRows(
     })
     .sort((a, b) => {
       if (a.annualCost === null && b.annualCost === null) {
-        return a.name.localeCompare(b.name, "es");
+        return a.name.localeCompare(b.name, tag);
       }
       if (a.annualCost === null) return 1;
       if (b.annualCost === null) return -1;

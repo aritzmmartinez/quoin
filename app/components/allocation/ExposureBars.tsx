@@ -1,13 +1,7 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 
-import {
-  es,
-  formatMoney,
-  formatPercent,
-  isConcentrated,
-  type ExposureRow,
-} from "~/lib";
+import { type ExposureRow, isConcentrated, useCopy, useFormat } from "~/lib";
 
 import { MeterBar } from "../ui/MeterBar";
 import { TABLE_DIVIDER } from "../ui/table";
@@ -21,7 +15,8 @@ export function ExposureBars({
   rows: ExposureRow[];
   threshold: string;
 }) {
-  const copy = es.allocation;
+  const t = useCopy();
+  const copy = t.allocation;
 
   if (rows.length === 0) {
     return (
@@ -55,7 +50,9 @@ function Row({
   scaleMax: number;
   threshold: string;
 }) {
-  const copy = es.allocation;
+  const { formatMoney, formatPercent } = useFormat();
+  const t = useCopy();
+  const copy = t.allocation;
   const [open, setOpen] = useState(false);
   const toggle = () => setOpen((v) => !v);
 

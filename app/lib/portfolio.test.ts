@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Instrument } from "~/core/domain";
+import { es } from "./i18n";
 import type { MarketValue, Position, TradeMeta } from "~/core/projections";
 
 import {
@@ -162,7 +163,12 @@ const rows: PortfolioRow[] = toPortfolioRows(
 
 describe("sortPortfolioRows", () => {
   it("sorts by cost basis descending", () => {
-    const sorted = sortPortfolioRows(rows, { key: "costBasis", dir: "desc" });
+    const sorted = sortPortfolioRows(
+      rows,
+      { key: "costBasis", dir: "desc" },
+      es.labels,
+      "es",
+    );
     expect(sorted.map((r) => r.instrumentId)).toEqual([
       "BTC",
       "IE00TEST0031",
@@ -171,7 +177,12 @@ describe("sortPortfolioRows", () => {
   });
 
   it("sorts by name ascending using locale order", () => {
-    const sorted = sortPortfolioRows(rows, { key: "name", dir: "asc" });
+    const sorted = sortPortfolioRows(
+      rows,
+      { key: "name", dir: "asc" },
+      es.labels,
+      "es",
+    );
     expect(sorted.map((r) => r.name)).toEqual([
       "Bitcoin",
       "Test Semiconductors NV",
@@ -180,21 +191,30 @@ describe("sortPortfolioRows", () => {
   });
 
   it("pushes unpriced rows to the bottom regardless of direction", () => {
-    const desc = sortPortfolioRows(rows, { key: "weight", dir: "desc" });
+    const desc = sortPortfolioRows(
+      rows,
+      { key: "weight", dir: "desc" },
+      es.labels,
+      "es",
+    );
     expect(desc.map((r) => r.instrumentId)).toEqual([
       "BTC",
       "IE00TEST0031",
       "NL00TEST0032",
     ]);
-    const asc = sortPortfolioRows(rows, { key: "weight", dir: "asc" });
-    // the unpriced ASML stays last even ascending
+    const asc = sortPortfolioRows(
+      rows,
+      { key: "weight", dir: "asc" },
+      es.labels,
+      "es",
+    );
     expect(asc.at(-1)?.instrumentId).toBe("NL00TEST0032");
     expect(asc[0]?.instrumentId).toBe("IE00TEST0031");
   });
 
   it("does not mutate the input", () => {
     const before = rows.map((r) => r.instrumentId);
-    sortPortfolioRows(rows, { key: "quantity", dir: "asc" });
+    sortPortfolioRows(rows, { key: "quantity", dir: "asc" }, es.labels, "es");
     expect(rows.map((r) => r.instrumentId)).toEqual(before);
   });
 });

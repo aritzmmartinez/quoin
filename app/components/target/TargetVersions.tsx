@@ -1,10 +1,11 @@
 import { useFetcher } from "react-router";
 
-import { es, formatDate, formatMoney, type TargetVersionRow } from "~/lib";
+import { type TargetVersionRow, useCopy, useFormat } from "~/lib";
 import { Button } from "../ui/Button";
 
 export function TargetVersions({ versions }: { versions: TargetVersionRow[] }) {
-  const copy = es.target.history;
+  const t = useCopy();
+  const copy = t.target.history;
 
   if (versions.length === 0) {
     return (
@@ -24,7 +25,9 @@ export function TargetVersions({ versions }: { versions: TargetVersionRow[] }) {
 }
 
 function VersionRow({ version }: { version: TargetVersionRow }) {
-  const copy = es.target.history;
+  const { formatMoney, formatDate } = useFormat();
+  const t = useCopy();
+  const copy = t.target.history;
   const fetcher = useFetcher();
   const busy = fetcher.state !== "idle";
 

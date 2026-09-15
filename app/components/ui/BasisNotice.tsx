@@ -1,10 +1,14 @@
+import { useCopy, useFormat } from "~/lib";
+
 import { basisNotice, type BasisNoticeProps } from "./basis-notice";
 import { IpcSyncButton } from "./IpcSyncButton";
 
 export type { BasisNoticeProps };
 
 export function BasisNotice(props: BasisNoticeProps) {
-  const body = basisNotice(props);
+  const t = useCopy();
+  const { formatPeriod } = useFormat();
+  const body = basisNotice(t, formatPeriod, props);
   if (body === null) return null;
 
   return (

@@ -1,4 +1,4 @@
-import { es } from "~/lib";
+import { useCopy, useFormat } from "~/lib";
 
 import { signClass, signedPercent } from "../ui/signed";
 import { StatTile } from "../ui/StatTile";
@@ -14,7 +14,9 @@ export function SummaryReturns({
   mwr,
   realBasis = false,
 }: SummaryReturnsProps) {
-  const r = es.summary.returns;
+  const t = useCopy();
+  const { formatPercent } = useFormat();
+  const r = t.summary.returns;
 
   return (
     <section className="flex flex-col gap-3">
@@ -22,13 +24,13 @@ export function SummaryReturns({
         <StatTile
           label={r.twr.label}
           sub={twr === null ? r.unavailable : r.twr.sub}
-          value={signedPercent(twr)}
+          value={signedPercent(formatPercent, twr)}
           valueClass={signClass(twr)}
         />
         <StatTile
           label={r.mwr.label}
           sub={mwr === null ? r.unavailable : r.mwr.sub}
-          value={signedPercent(mwr)}
+          value={signedPercent(formatPercent, mwr)}
           valueClass={signClass(mwr)}
         />
       </div>

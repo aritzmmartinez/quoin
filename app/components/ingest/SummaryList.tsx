@@ -2,7 +2,7 @@ import { ChevronDown } from "lucide-react";
 
 import type { ImportSummary } from "~/adapters/ingestion";
 
-import { es, formatDate } from "~/lib";
+import { useCopy, useFormat } from "~/lib";
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -14,7 +14,9 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 export function SummaryList({ summary }: { summary: ImportSummary }) {
-  const copy = es.ingest.summary;
+  const { formatDate } = useFormat();
+  const t = useCopy();
+  const copy = t.ingest.summary;
   const discarded = Object.entries(summary.discarded);
   const unsupported = summary.discardedDetails.unsupported ?? [];
 

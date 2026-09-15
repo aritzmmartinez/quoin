@@ -1,6 +1,6 @@
 import type { IngestResponse } from "~/routes/ingest";
 
-import { es } from "~/lib";
+import type { Copy } from "~/lib";
 
 const ENDPOINT = "/api/ingest";
 
@@ -11,6 +11,7 @@ export function ingestRequestPending(): boolean {
 }
 
 export async function postIngest(
+  t: Copy,
   body: Record<string, string>,
 ): Promise<IngestResponse> {
   pending += 1;
@@ -21,7 +22,7 @@ export async function postIngest(
     });
     return (await response.json()) as IngestResponse;
   } catch {
-    return { ok: false, error: es.ingest.failed };
+    return { ok: false, error: t.ingest.failed };
   } finally {
     pending -= 1;
   }

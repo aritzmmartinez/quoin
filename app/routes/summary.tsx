@@ -31,10 +31,13 @@ import {
 } from "~/core/projections";
 import {
   computeHeroChange,
-  es,
+  type Copy,
+  copyFor,
+  copyFromMatches,
   exposureKindLabel,
   filterByRange,
   heldValuesByInstrument,
+  parseLocale,
   parseRange,
 } from "~/lib";
 
@@ -44,17 +47,23 @@ import { resolveRealView } from "~/lib/real.server";
 
 const TOP_POSITIONS = 5;
 
-export function meta(_: Route.MetaArgs) {
+export function meta({ matches }: Route.MetaArgs) {
+  const t = copyFromMatches(matches);
   return [
-    { title: "Resumen · Quoin" },
-    { name: "description", content: "Valor y evolución de tu cartera" },
+    { title: t.meta.summary.title },
+    { name: "description", content: t.meta.summary.description },
   ];
 }
 
-export const handle = { title: es.summary.title, range: true, basis: true };
+export const handle = {
+  title: (t: Copy) => t.summary.title,
+  range: true,
+  basis: true,
+};
 
 export async function loader({ request }: Route.LoaderArgs) {
   const range = parseRange(new URL(request.url).searchParams);
+  const t = copyFor(parseLocale(request.headers.get("Cookie")));
   const priceRepository = new PrismaPriceRepository();
 
   const [events, instruments, prices] = await Promise.all([
@@ -81,7 +90,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     categories,
   ).map((slice) => ({
     ...slice,
-    label: exposureKindLabel(slice.category),
+    label: exposureKindLabel(t, slice.category),
   }));
 
   const top: TopPositionRow[] = computeTopPositions(

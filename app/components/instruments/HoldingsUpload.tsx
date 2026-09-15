@@ -7,7 +7,7 @@ import {
   type ColumnMap,
   type ParsedHoldings,
 } from "~/adapters/ingestion/holdings";
-import { es, formatPercent } from "~/lib";
+import { useCopy, useFormat } from "~/lib";
 import { Button } from "../ui/Button";
 import { FileDropzone } from "../ui/FileDropzone";
 import { Select } from "../ui/Select";
@@ -21,7 +21,8 @@ export function HoldingsUpload({
   instrumentId: string;
   onDone: () => void;
 }) {
-  const copy = es.holdings;
+  const t = useCopy();
+  const copy = t.holdings;
   const fetcher = useFetcher<{
     ok: boolean;
     error?: string;
@@ -123,7 +124,9 @@ function Preview({
   onConfirm: () => void;
   busy: boolean;
 }) {
-  const copy = es.holdings;
+  const { formatPercent } = useFormat();
+  const t = useCopy();
+  const copy = t.holdings;
   const residual = Number(preview.residual);
   const [correcting, setCorrecting] = useState(false);
   const [expanded, setExpanded] = useState(false);

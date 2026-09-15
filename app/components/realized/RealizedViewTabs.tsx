@@ -1,12 +1,18 @@
 import { useSearchParams } from "react-router";
 
-import { REALIZED_VIEWS, es, realizedViewHref, type RealizedView } from "~/lib";
+import {
+  REALIZED_VIEWS,
+  type RealizedView,
+  realizedViewHref,
+  useCopy,
+} from "~/lib";
 
 import { PillLinks } from "../ui/Segmented";
 
 export function RealizedViewTabs({ value }: { value: RealizedView }) {
+  const t = useCopy();
   const [params] = useSearchParams();
-  const copy = es.realized.views;
+  const copy = t.realized.views;
 
   return (
     <PillLinks

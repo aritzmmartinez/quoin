@@ -10,7 +10,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { es } from "~/lib";
+import type { Copy } from "~/lib";
 
 export interface NavItem {
   label: string;
@@ -19,41 +19,51 @@ export interface NavItem {
   end?: boolean;
 }
 
-export const NAV_ITEMS: readonly NavItem[] = [
-  { label: es.nav.overview, icon: LayoutDashboard, to: "/", end: true },
-  { label: es.nav.portfolio, icon: Wallet, to: "/cartera" },
-  { label: es.nav.allocation, icon: PieChart, to: "/asignacion" },
-  { label: es.nav.movements, icon: ArrowLeftRight, to: "/movimientos" },
-  { label: es.target.title, icon: Target, to: "/objetivo" },
-  { label: es.projection.title, icon: TrendingUp, to: "/proyeccion" },
-  { label: es.nav.instruments, icon: Boxes, to: "/instrumentos" },
-];
-
-export function navItemFor(parent: string | undefined): NavItem | undefined {
-  return NAV_ITEMS.find((item) => item.to === parent);
+export function navItems(t: Copy): readonly NavItem[] {
+  return [
+    { label: t.nav.overview, icon: LayoutDashboard, to: "/", end: true },
+    { label: t.nav.portfolio, icon: Wallet, to: "/portfolio" },
+    { label: t.nav.allocation, icon: PieChart, to: "/allocation" },
+    { label: t.nav.movements, icon: ArrowLeftRight, to: "/movements" },
+    { label: t.target.title, icon: Target, to: "/target" },
+    { label: t.projection.title, icon: TrendingUp, to: "/projection" },
+    { label: t.nav.instruments, icon: Boxes, to: "/instruments" },
+  ];
 }
 
-export const SYSTEM_ITEMS: readonly NavItem[] = [
-  { label: es.settings.title, icon: Settings, to: "/ajustes" },
-];
+export function navItemFor(
+  t: Copy,
+  parent: string | undefined,
+): NavItem | undefined {
+  return navItems(t).find((item) => item.to === parent);
+}
+
+export function systemItems(t: Copy): readonly NavItem[] {
+  return [{ label: t.settings.title, icon: Settings, to: "/settings" }];
+}
 
 export interface NavGroup {
   title: string;
   items: readonly NavItem[];
 }
 
-export const NAV_GROUPS: readonly NavGroup[] = [
-  { title: es.nav.groups.portfolio, items: NAV_ITEMS.slice(0, 4) },
-  { title: es.nav.groups.analysis, items: NAV_ITEMS.slice(4) },
-];
+export function navGroups(t: Copy): readonly NavGroup[] {
+  const items = navItems(t);
+  return [
+    { title: t.nav.groups.portfolio, items: items.slice(0, 4) },
+    { title: t.nav.groups.analysis, items: items.slice(4) },
+  ];
+}
 
 export interface SubView {
   label: string;
   to: string;
 }
 
-export const SUMMARY_SUBVIEWS: readonly SubView[] = [
-  { label: es.realized.title, to: "/realizado" },
-  { label: es.opportunity.title, to: "/coste-oportunidad" },
-  { label: es.ter.title, to: "/coste-ter" },
-];
+export function summarySubviews(t: Copy): readonly SubView[] {
+  return [
+    { label: t.realized.title, to: "/realized" },
+    { label: t.opportunity.title, to: "/opportunity-cost" },
+    { label: t.ter.title, to: "/ter-cost" },
+  ];
+}

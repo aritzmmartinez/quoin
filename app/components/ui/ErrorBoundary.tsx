@@ -1,12 +1,14 @@
 import { RotateCw, TriangleAlert } from "lucide-react";
 import { Link } from "react-router";
 
-import { es, formatClock } from "~/lib";
+import { useCopy, useFormat } from "~/lib";
 import { Button, buttonClass } from "./Button";
 import { ErrorState } from "./ErrorState";
 
 export function ErrorBoundary() {
-  const copy = es.portfolio.error;
+  const { formatClock } = useFormat();
+  const t = useCopy();
+  const copy = t.portfolio.error;
 
   return (
     <ErrorState
@@ -19,7 +21,7 @@ export function ErrorBoundary() {
         <RotateCw size={14} strokeWidth={1.7} aria-hidden />
         {copy.retry}
       </Button>
-      <Link to="/instrumentos" className={buttonClass()}>
+      <Link to="/instruments" className={buttonClass()}>
         {copy.sources}
       </Link>
     </ErrorState>

@@ -1,10 +1,4 @@
-import {
-  es,
-  formatDate,
-  formatMoney,
-  formatPercent,
-  type TargetRow,
-} from "~/lib";
+import { type TargetRow, useCopy, useFormat } from "~/lib";
 
 const GRID = "grid-cols-[minmax(0,1fr)_140px_90px] items-center gap-2";
 
@@ -19,7 +13,9 @@ export function TargetLines({
   activeFrom: string;
   note: string | null;
 }) {
-  const copy = es.target;
+  const { formatMoney, formatDate, formatPercent } = useFormat();
+  const t = useCopy();
+  const copy = t.target;
 
   return (
     <div>

@@ -71,23 +71,23 @@ describe("parseContribution", () => {
 describe("carriedParams", () => {
   it("carries the view, or calculating throws the user back to Exposición", () => {
     const carried = carriedParams(
-      new URLSearchParams("vista=rebalanceo&aportacion=500&desvio=2"),
+      new URLSearchParams("view=rebalance&contribution=500&drift=2"),
     );
 
-    expect(carried).toEqual([["vista", "rebalanceo"]]);
+    expect(carried).toEqual([["view", "rebalance"]]);
   });
 
   it("carries every param the form does not own, not a hand-kept list", () => {
     const carried = carriedParams(
-      new URLSearchParams("vista=rebalanceo&umbral=20&futuro=x&aportacion=500"),
+      new URLSearchParams("view=rebalance&threshold=20&futuro=x&contribution=500"),
     );
 
-    expect(carried.map(([key]) => key)).toEqual(["vista", "umbral", "futuro"]);
+    expect(carried.map(([key]) => key)).toEqual(["view", "threshold", "futuro"]);
   });
 
   it("drops the fields the form renders itself, so they are not submitted twice", () => {
     expect(
-      carriedParams(new URLSearchParams("aportacion=500&desvio=2")),
+      carriedParams(new URLSearchParams("contribution=500&drift=2")),
     ).toEqual([]);
   });
 });

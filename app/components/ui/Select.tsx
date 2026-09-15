@@ -1,7 +1,7 @@
 import { Check, ChevronDown, Search } from "lucide-react";
 import { useRef, useState } from "react";
 
-import { es } from "~/lib";
+import { useCopy } from "~/lib";
 
 import { placePopover } from "./popover-place";
 
@@ -37,6 +37,7 @@ export function Select({
   disabled?: boolean;
   className?: string;
 }) {
+  const t = useCopy();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const trigger = useRef<HTMLButtonElement>(null);
@@ -209,7 +210,7 @@ export function Select({
 
           {shown.length === 0 && (
             <div className="px-2.5 py-4 text-center text-[12px] text-muted">
-              {es.select.empty}
+              {t.select.empty}
             </div>
           )}
         </div>

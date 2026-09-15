@@ -1,5 +1,5 @@
 import type { FundOverlapPair } from "~/core/projections";
-import { es, formatPercent } from "~/lib";
+import { useCopy, useFormat } from "~/lib";
 
 import { Card } from "../ui/Card";
 import { MeterBar } from "../ui/MeterBar";
@@ -14,7 +14,9 @@ export function OverlapList({
   funds: readonly OverlapFund[];
   pairs: readonly FundOverlapPair[];
 }) {
-  const copy = es.overlap;
+  const { formatPercent } = useFormat();
+  const t = useCopy();
+  const copy = t.overlap;
   const nameOf = new Map(funds.map((fund) => [fund.id, fund.name]));
 
   const peak = pairs.reduce(

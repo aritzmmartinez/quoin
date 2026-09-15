@@ -1,4 +1,4 @@
-import { es } from "~/lib";
+import { useCopy } from "~/lib";
 
 import { Button } from "../ui/Button";
 
@@ -17,6 +17,7 @@ export function StepperNav({
   canGoNext: boolean;
   disabled: boolean;
 }) {
+  const t = useCopy();
   return (
     <div className="mt-6 flex items-center justify-between gap-2 border-t border-border pt-4">
       <Button
@@ -24,7 +25,7 @@ export function StepperNav({
         onClick={onPrevious}
         disabled={!canGoBack || disabled}
       >
-        {es.ingest.previous}
+        {t.ingest.previous}
       </Button>
       <Button onClick={onNext} disabled={!canGoNext || disabled}>
         {nextLabel}

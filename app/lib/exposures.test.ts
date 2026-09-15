@@ -174,51 +174,51 @@ describe("parseAllocationView", () => {
   const of = (query: string) => parseAllocationView(new URLSearchParams(query));
 
   it("reads the view from the URL", () => {
-    expect(of("vista=rebalanceo")).toBe("rebalanceo");
-    expect(of("vista=divisa")).toBe("divisa");
-    expect(of("vista=exposicion")).toBe("exposicion");
+    expect(of("view=rebalance")).toBe("rebalance");
+    expect(of("view=currency")).toBe("currency");
+    expect(of("view=exposure")).toBe("exposure");
   });
 
   it("falls back to the reading view for anything else", () => {
     expect(of("")).toBe(DEFAULT_ALLOCATION_VIEW);
-    expect(of("vista=")).toBe(DEFAULT_ALLOCATION_VIEW);
-    expect(of("vista=Rebalanceo")).toBe(DEFAULT_ALLOCATION_VIEW);
-    expect(of("vista=../etc")).toBe(DEFAULT_ALLOCATION_VIEW);
+    expect(of("view=")).toBe(DEFAULT_ALLOCATION_VIEW);
+    expect(of("view=Rebalanceo")).toBe(DEFAULT_ALLOCATION_VIEW);
+    expect(of("view=../etc")).toBe(DEFAULT_ALLOCATION_VIEW);
   });
 });
 
 describe("viewHref", () => {
-  const params = new URLSearchParams("umbral=20&aportacion=500.00&desvio=3");
+  const params = new URLSearchParams(
+    "threshold=20&contribution=500.00&drift=3",
+  );
 
   it("keeps every other param, so a tab glance costs no state", () => {
-    const href = viewHref(params, "rebalanceo");
-    expect(new URLSearchParams(href).get("umbral")).toBe("20");
-    expect(new URLSearchParams(href).get("aportacion")).toBe("500.00");
-    expect(new URLSearchParams(href).get("desvio")).toBe("3");
+    const href = viewHref(params, "rebalance");
+    expect(new URLSearchParams(href).get("threshold")).toBe("20");
+    expect(new URLSearchParams(href).get("contribution")).toBe("500.00");
+    expect(new URLSearchParams(href).get("drift")).toBe("3");
   });
 
   it("omits the param for the default view instead of spelling it out", () => {
-    expect(viewHref(params, "exposicion")).not.toContain("vista");
-    expect(viewHref(params, "rebalanceo")).toContain("vista=rebalanceo");
+    expect(viewHref(params, "exposure")).not.toContain("view");
+    expect(viewHref(params, "rebalance")).toContain("view=rebalance");
   });
 
   it("drops a stale view when returning to the default", () => {
-    const away = new URLSearchParams(viewHref(params, "rebalanceo"));
-    expect(viewHref(away, "exposicion")).not.toContain("vista");
+    const away = new URLSearchParams(viewHref(params, "rebalance"));
+    expect(viewHref(away, "exposure")).not.toContain("view");
   });
 
   it("leaves the overlap mode behind when leaving the overlap tab", () => {
-    const inOverlap = new URLSearchParams("vista=solapamiento&modo=matriz");
-    expect(viewHref(inOverlap, "divisa")).not.toContain("modo");
-    expect(viewHref(inOverlap, "solapamiento")).toContain("modo=matriz");
+    const inOverlap = new URLSearchParams("view=overlap&mode=matrix");
+    expect(viewHref(inOverlap, "currency")).not.toContain("mode");
+    expect(viewHref(inOverlap, "overlap")).toContain("mode=matrix");
   });
 
   it("leaves the include-sold switch behind when leaving the overlap tab", () => {
-    const inOverlap = new URLSearchParams(
-      "vista=solapamiento&incluirVendidos=1",
-    );
-    expect(viewHref(inOverlap, "divisa")).not.toContain("incluirVendidos");
-    expect(viewHref(inOverlap, "solapamiento")).toContain("incluirVendidos=1");
+    const inOverlap = new URLSearchParams("view=overlap&includeSold=1");
+    expect(viewHref(inOverlap, "currency")).not.toContain("includeSold");
+    expect(viewHref(inOverlap, "overlap")).toContain("includeSold=1");
   });
 });
 
@@ -245,20 +245,20 @@ describe("parseOverlapMode", () => {
   const of = (query: string) => parseOverlapMode(new URLSearchParams(query));
 
   it("reads the mode from the URL and falls back to the list", () => {
-    expect(of("modo=matriz")).toBe("matriz");
-    expect(of("modo=lista")).toBe("lista");
+    expect(of("mode=matrix")).toBe("matrix");
+    expect(of("mode=lista")).toBe("list");
     expect(of("")).toBe(DEFAULT_OVERLAP_MODE);
-    expect(of("modo=Matriz")).toBe(DEFAULT_OVERLAP_MODE);
+    expect(of("mode=Matriz")).toBe(DEFAULT_OVERLAP_MODE);
   });
 });
 
 describe("modeHref", () => {
-  const params = new URLSearchParams("vista=solapamiento&umbral=20");
+  const params = new URLSearchParams("view=overlap&threshold=20");
 
   it("keeps the tab it belongs to and omits the default mode", () => {
-    expect(modeHref(params, "matriz")).toContain("vista=solapamiento");
-    expect(modeHref(params, "matriz")).toContain("modo=matriz");
-    expect(modeHref(params, "lista")).not.toContain("modo");
+    expect(modeHref(params, "matrix")).toContain("view=overlap");
+    expect(modeHref(params, "matrix")).toContain("mode=matrix");
+    expect(modeHref(params, "list")).not.toContain("mode");
   });
 });
 
@@ -267,26 +267,26 @@ describe("parseIncludeSold", () => {
 
   it("is off by default: sold funds stay out of the overlap unless asked for", () => {
     expect(of("")).toBe(false);
-    expect(of("incluirVendidos=0")).toBe(false);
-    expect(of("incluirVendidos=si")).toBe(false);
+    expect(of("includeSold=0")).toBe(false);
+    expect(of("includeSold=si")).toBe(false);
   });
 
   it("turns on only for the exact flag", () => {
-    expect(of("incluirVendidos=1")).toBe(true);
+    expect(of("includeSold=1")).toBe(true);
   });
 });
 
 describe("includeSoldHref", () => {
-  const params = new URLSearchParams("vista=solapamiento&umbral=20");
+  const params = new URLSearchParams("view=overlap&threshold=20");
 
   it("sets the flag on and omits it when off", () => {
-    expect(includeSoldHref(params, true)).toContain("incluirVendidos=1");
-    expect(includeSoldHref(params, false)).not.toContain("incluirVendidos");
+    expect(includeSoldHref(params, true)).toContain("includeSold=1");
+    expect(includeSoldHref(params, false)).not.toContain("includeSold");
   });
 
   it("keeps every other param", () => {
-    expect(includeSoldHref(params, true)).toContain("vista=solapamiento");
-    expect(includeSoldHref(params, true)).toContain("umbral=20");
+    expect(includeSoldHref(params, true)).toContain("view=overlap");
+    expect(includeSoldHref(params, true)).toContain("threshold=20");
   });
 });
 

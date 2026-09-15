@@ -25,6 +25,29 @@ no heavy plugins):
 
 Convention: internal imports always use the `~/...` alias.
 
+### app — interface language
+
+`Locale` is `es | en`, Spanish by default, stored in a `quoin-locale` cookie and parsed
+once in the `root` loader. Components read the copy with `useCopy()` and the formatters
+with `useFormat()`, both over that loader's data — the same route-loader read the
+calculation basis already used, so there is no context provider. Anything outside a
+component (pure helpers, loaders, actions, `meta`) takes the copy as an argument.
+
+Three decisions worth keeping:
+
+- **`Copy` is `typeof es`, and `es` is deliberately not `as const`.** Literal types would
+  force every other locale to repeat the Spanish strings verbatim; widened to `string`,
+  `en: Copy` turns a missing or misspelled key into a compile error. That type is the only
+  thing standing between an eleven-hundred-key object and a string that silently stays
+  Spanish forever.
+- **Formatters have no default locale; collators do.** `createFormat(locale)` exports no
+  free `formatMoney`, because a Spanish figure under an English label is unfalsifiable on
+  screen — `1.234,56` is a valid English number too. The collation tag defaults to `es-ES`,
+  because a name list in the wrong collation is a different order, not a wrong number.
+- **URLs are English and do not follow the locale.** One route tree, no `/en/` prefix: a
+  link is an address, not copy, and localising it would make the same link mean different
+  things to two people.
+
 ### core
 - `domain/`      value objects (Money as string + decimal.js), ledger event types, exposure leaves, `resolveIntrinsic` / `resolveWithHoldings` / `canonicaliseLeaves`, `InflationIndex` + `Period` / `periodOf` / `deflate` and the `Revalue` function every projection takes to work in real terms, the portfolio target and `getActiveTarget`
 - `ports/`       interfaces: `LedgerRepository`, `InstrumentRepository`, `MarketDataProvider`, `PriceRepository`, `HoldingsRepository`, `SecurityIdentityResolver`, `SecurityIdentityRepository`, `InflationRepository`, `TargetRepository` (planned: `FxProvider`)

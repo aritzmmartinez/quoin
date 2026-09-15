@@ -16,26 +16,24 @@ import {
   InfoHint,
 } from "~/components";
 import {
-  es,
-  formatDate,
-  formatMoney,
-  formatSignedMoney,
+  type Copy,
+  copyFromMatches,
   namesOf,
   toOpportunityRows,
+  useCopy,
+  useFormat,
 } from "~/lib";
 import { loadOpportunityCost } from "~/lib/opportunity-cost.server";
 
-export function meta(_: Route.MetaArgs) {
+export function meta({ matches }: Route.MetaArgs) {
+  const t = copyFromMatches(matches);
   return [
-    { title: "Coste de oportunidad · Quoin" },
-    {
-      name: "description",
-      content: "Tus flujos reales, comprados en el índice",
-    },
+    { title: t.meta.opportunity.title },
+    { name: "description", content: t.meta.opportunity.description },
   ];
 }
 
-export const handle = { title: es.opportunity.title, parent: "/" };
+export const handle = { title: (t: Copy) => t.opportunity.title, parent: "/" };
 
 export async function loader(_: Route.LoaderArgs) {
   const [events, instruments, prices] = await Promise.all([
@@ -70,7 +68,10 @@ export async function loader(_: Route.LoaderArgs) {
 }
 
 export default function OpportunityCost({ loaderData }: Route.ComponentProps) {
-  const o = es.opportunity;
+  const { formatMoney, formatSignedMoney, formatDate, formatPercent } =
+    useFormat();
+  const t = useCopy();
+  const o = t.opportunity;
 
   if (!loaderData.ok) {
     return (
@@ -163,7 +164,7 @@ export default function OpportunityCost({ loaderData }: Route.ComponentProps) {
                   ? o.stats.unavailable
                   : o.stats.realMwr.sub
               }
-              value={signedPercent(totals.realMwr)}
+              value={signedPercent(formatPercent, totals.realMwr)}
               valueClass={signClass(totals.realMwr)}
             />
             <StatTile
@@ -173,7 +174,7 @@ export default function OpportunityCost({ loaderData }: Route.ComponentProps) {
                   ? o.stats.unavailable
                   : o.stats.benchmarkMwr.sub
               }
-              value={signedPercent(totals.benchmarkMwr)}
+              value={signedPercent(formatPercent, totals.benchmarkMwr)}
               valueClass={signClass(totals.benchmarkMwr)}
             />
             <StatTile
@@ -183,7 +184,7 @@ export default function OpportunityCost({ loaderData }: Route.ComponentProps) {
                   ? o.stats.unavailable
                   : o.stats.mwrDifference.sub
               }
-              value={signedPercent(totals.mwrDifference)}
+              value={signedPercent(formatPercent, totals.mwrDifference)}
               valueClass={signClass(totals.mwrDifference)}
             />
           </div>

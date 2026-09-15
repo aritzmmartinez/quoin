@@ -1,7 +1,7 @@
 import { ChevronRight, Settings } from "lucide-react";
 import { Link, useMatches, useSearchParams } from "react-router";
 
-import { es, parseRange, type Range } from "~/lib";
+import { parseRange, type Copy, type Range, useCopy } from "~/lib";
 
 import { BasisReference } from "../ui/BasisReference";
 import { BasisToggle } from "../ui/BasisToggle";
@@ -11,7 +11,7 @@ import { RangeSelector } from "../ui/RangeSelector";
 import { useParentNavItem } from "./use-parent-nav-item";
 
 type RouteHandle = {
-  title?: string | ((data: unknown) => string);
+  title?: (t: Copy, data: unknown) => string;
   range?: boolean;
   basis?: boolean;
 };
@@ -25,13 +25,12 @@ function useLeafHandles(): { handle: RouteHandle; data: unknown }[] {
 
 function useViewTitle(
   matches: { handle: RouteHandle; data: unknown }[],
+  t: Copy,
 ): string {
   for (let i = matches.length - 1; i >= 0; i--) {
     const match = matches[i];
     if (match?.handle.title) {
-      return typeof match.handle.title === "function"
-        ? match.handle.title(match.data)
-        : match.handle.title;
+      return match.handle.title(t, match.data);
     }
   }
   return "";
@@ -57,6 +56,7 @@ function useBasisReference(
 }
 
 function Breadcrumb({ title }: { title: string }) {
+  const t = useCopy();
   const parent = useParentNavItem();
   const chevron = (
     <ChevronRight
@@ -68,7 +68,10 @@ function Breadcrumb({ title }: { title: string }) {
   );
 
   return (
-    <nav aria-label="Ruta" className="flex min-w-0 items-center gap-2">
+    <nav
+      aria-label={t.a11y.breadcrumb}
+      className="flex min-w-0 items-center gap-2"
+    >
       {parent?.to && (
         <>
           <Link
@@ -101,8 +104,9 @@ function HeaderRangeSelector() {
 }
 
 export function AppHeader() {
+  const t = useCopy();
   const matches = useLeafHandles();
-  const title = useViewTitle(matches);
+  const title = useViewTitle(matches, t);
   const showRange = matches.some((match) => match.handle.range === true);
   const showBasis = matches.some((match) => match.handle.basis === true);
   const real = useBasisReference(matches);
@@ -125,8 +129,8 @@ export function AppHeader() {
         <span className="flex items-center gap-2 md:hidden">
           <Glossary />
           <Link
-            to="/ajustes"
-            aria-label={es.settings.title}
+            to="/settings"
+            aria-label={t.settings.title}
             className="rounded-lg p-2 text-muted transition-colors hover:text-text"
           >
             <Settings size={18} strokeWidth={1.75} aria-hidden />

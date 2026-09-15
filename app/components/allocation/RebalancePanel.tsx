@@ -6,11 +6,10 @@ import {
   carriedParams,
   CONTRIBUTION_PARAM,
   DRIFT_THRESHOLD_PARAM,
-  es,
-  formatMoney,
-  formatPercent,
   type RebalancePlan,
   type RebalanceRow,
+  useCopy,
+  useFormat,
 } from "~/lib";
 
 import { Card } from "../ui/Card";
@@ -33,7 +32,8 @@ export function RebalancePanel({
   hasTarget: boolean;
   driftThreshold: string;
 }) {
-  const copy = es.rebalance;
+  const t = useCopy();
+  const copy = t.rebalance;
   const [params] = useSearchParams();
   const driftPercent = new Decimal(driftThreshold).times(100).toString();
 
@@ -98,7 +98,9 @@ export function RebalancePanel({
 }
 
 function Split({ plan }: { plan: RebalancePlan }) {
-  const copy = es.rebalance;
+  const { formatMoney, formatPercent } = useFormat();
+  const t = useCopy();
+  const copy = t.rebalance;
   const peak = plan.rows.reduce((max, r) => Math.max(max, Number(r.share)), 0);
 
   return (
@@ -145,7 +147,9 @@ function Split({ plan }: { plan: RebalancePlan }) {
 }
 
 function Row({ row, peak }: { row: RebalanceRow; peak: number }) {
-  const copy = es.rebalance;
+  const { formatMoney, formatPercent } = useFormat();
+  const t = useCopy();
+  const copy = t.rebalance;
   const funded = Number(row.amount) > 0;
   const worsens = Number(row.driftAfter) > Number(row.driftBefore);
 
@@ -215,7 +219,9 @@ function Notes({
   plan: RebalancePlan;
   driftThreshold: string;
 }) {
-  const copy = es.rebalance;
+  const { formatPercent } = useFormat();
+  const t = useCopy();
+  const copy = t.rebalance;
 
   return (
     <div className="mt-4 flex flex-col gap-2 text-[12px] leading-[1.6]">
@@ -238,7 +244,9 @@ function Notes({
 }
 
 function OffPlan({ plan }: { plan: RebalancePlan }) {
-  const copy = es.rebalance;
+  const { formatMoney } = useFormat();
+  const t = useCopy();
+  const copy = t.rebalance;
   if (plan.offPlan.length === 0) return null;
 
   return (

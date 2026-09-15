@@ -11,7 +11,7 @@ import {
   YAxis,
 } from "recharts";
 
-import { formatDate, formatMoney, formatTimeTick } from "~/lib";
+import { useFormat } from "~/lib";
 
 import { timeTicks } from "./time-ticks";
 
@@ -20,8 +20,6 @@ export interface InvestedVsValueDatum {
   invested: number;
   value: number;
 }
-
-const axisEur = (v: number) => formatMoney(String(v), 0);
 
 const TOOLTIP_STYLE = {
   background: "var(--color-surface)",
@@ -57,6 +55,8 @@ export function InvestedVsValueChart({
   labels: { value: string; invested: string };
   height?: number;
 }) {
+  const { formatMoney, formatDate, formatTimeTick } = useFormat();
+  const axisEur = (v: number) => formatMoney(String(v), 0);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 

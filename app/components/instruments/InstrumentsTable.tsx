@@ -10,15 +10,11 @@ import {
 } from "~/core/domain";
 import {
   DASH,
-  es,
-  formatDate,
-  formatMoney,
-  formatPercent,
+  type InstrumentListItem,
   terInputMatches,
   terToPercentInput,
-  thesisDescription,
-  thesisLabel,
-  type InstrumentListItem,
+  useCopy,
+  useFormat,
 } from "~/lib";
 
 import { Checkbox } from "../ui/Checkbox";
@@ -38,7 +34,7 @@ const GRID =
   "grid-cols-[minmax(0,1.4fr)_150px_120px_78px_136px_168px_minmax(0,160px)_112px] items-center gap-2";
 
 export function InstrumentsTable({ items }: { items: InstrumentListItem[] }) {
-  const copy = es.instruments;
+  const copy = useCopy().instruments;
 
   if (items.length === 0) {
     return (
@@ -72,7 +68,8 @@ export function InstrumentsTable({ items }: { items: InstrumentListItem[] }) {
 }
 
 function InstrumentRow({ item }: { item: InstrumentListItem }) {
-  const copy = es.instruments;
+  const { formatMoney } = useFormat();
+  const { instruments: copy, labels } = useCopy();
   const fetcher = useFetcher<{ ok: boolean; error?: string }>();
 
   const [kind, setKind] = useState<string>(item.exposureKind ?? "");
@@ -153,8 +150,8 @@ function InstrumentRow({ item }: { item: InstrumentListItem }) {
             onChange={(value) => setThesis(value as Thesis)}
             options={THESES.map((t) => ({
               value: t,
-              label: thesisLabel(t),
-              desc: thesisDescription(t),
+              label: labels.thesis[t],
+              desc: labels.thesisDescription[t],
             }))}
             className="w-full"
           />
@@ -216,7 +213,8 @@ function Composition({
   open: boolean;
   onToggle: () => void;
 }) {
-  const copy = es.holdings;
+  const { formatDate, formatPercent } = useFormat();
+  const copy = useCopy().holdings;
 
   return (
     <button

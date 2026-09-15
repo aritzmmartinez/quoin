@@ -1,5 +1,33 @@
 import type { ExposureKind, InstrumentType, Thesis } from "~/core/domain";
 
+const THESIS_LABELS: Record<Thesis, string> = {
+  CORE: "Núcleo",
+  CONVICTION: "Convicción",
+  TACTICAL: "Táctica",
+};
+const THESIS_DESCRIPTIONS: Record<Thesis, string> = {
+  CORE: "Núcleo indexado: lo que sostiene la cartera y no se toca.",
+  CONVICTION:
+    "Apuesta individual que quiero mantener años, no un índice ni un trade.",
+  TACTICAL: "Posición tomada con la salida en mente.",
+};
+const TYPE_LABELS: Record<InstrumentType, string> = {
+  ETF: "ETF",
+  STOCK: "Acción",
+  CRYPTO: "Cripto",
+  BOND: "Bono",
+  COMMODITY: "Materia prima",
+  CASH: "Efectivo",
+};
+
+const EXPOSURE_KIND_LABELS: Record<ExposureKind, string> = {
+  COMPANY: "Acción",
+  EQUITY_FUND: "Fondo de renta variable",
+  BOND_FUND: "Fondo de bonos",
+  COMMODITY: "Materias primas",
+  CRYPTO: "Cripto",
+};
+
 export const es = {
   common: {
     close: "Cerrar",
@@ -55,10 +83,33 @@ export const es = {
   },
   settings: {
     title: "Ajustes",
+    soon: "Próximamente",
     appearance: {
       title: "Apariencia",
       desc: "Cómo se muestra Quoin en este dispositivo.",
-      themeHint: "Oscuro es el tema principal de Quoin",
+      theme: { label: "Tema", hint: "Oscuro es el tema principal de Quoin" },
+    },
+    preferences: {
+      title: "Preferencias",
+      desc: "Formato de las cifras y el idioma de la interfaz.",
+      currency: {
+        label: "Moneda de visualización",
+        hint: "Convierte todos los importes a esta divisa",
+      },
+      language: { label: "Idioma" },
+    },
+    portfolio: {
+      title: "Cartera",
+      desc: "Parámetros que usan los análisis de Asignación y Coste de oportunidad.",
+      threshold: {
+        label: "Umbral de concentración",
+        hint: "Una posición por encima se marca como concentrada",
+      },
+      benchmark: {
+        label: "Índice de referencia",
+        hint: "Usado en Coste de oportunidad",
+        search: "Buscar ticker o nombre",
+      },
     },
   },
   glossary: {
@@ -257,10 +308,10 @@ export const es = {
   allocation: {
     views: {
       label: "Vista",
-      exposicion: "Exposición",
-      rebalanceo: "Rebalanceo",
-      divisa: "Divisa",
-      solapamiento: "Solapamiento",
+      exposure: "Exposición",
+      rebalance: "Rebalanceo",
+      currency: "Divisa",
+      overlap: "Solapamiento",
     },
     intro:
       "Tu posición directa más lo que llevas dentro de tus ETFs, mirando por transparencia lo que hay en cada fondo. El tramo sólido de la barra es lo que compraste tú. El apagado viaja dentro de un fondo.",
@@ -335,8 +386,8 @@ export const es = {
     note: "El peso es el de cada empresa dentro de su propio fondo, no el de tu cartera: el solapamiento es una propiedad de los dos fondos entre sí, no de cuánto tengas invertido en cada uno.",
     modes: {
       label: "Modo de vista",
-      lista: "Lista",
-      matriz: "Matriz",
+      list: "Lista",
+      matrix: "Matriz",
     },
     header: (funds: number, pairs: number): string =>
       `${funds} fondos · ${pairs} ${pairs === 1 ? "par" : "pares"}`,
@@ -850,8 +901,8 @@ export const es = {
     about: "Sobre el resultado realizado",
     views: {
       label: "Vista",
-      ventas: "Ventas",
-      fiscal: "Fiscal (Bizkaia)",
+      sales: "Ventas",
+      tax: "Fiscal (Bizkaia)",
     },
     intro:
       "Cada venta cerrada, con el coste que consumió en el momento de venderla. Las comisiones de compra ya van dentro del coste y las de venta se restan del bruto.",
@@ -933,6 +984,8 @@ export const es = {
         finalNet: "Neto final",
         pendingLossRemaining: "Pérdida pendiente",
       },
+      disallowedReason: (months: number): string =>
+        `Recompra de valores homogéneos dentro de los ${months} meses de la venta: pérdida no deducible este año.`,
     },
   },
   opportunity: {
@@ -1079,52 +1132,62 @@ export const es = {
       back: "Volver a la cartera",
     },
   },
-} as const;
-
-const THESIS_LABELS: Record<Thesis, string> = {
-  CORE: "Núcleo",
-  CONVICTION: "Convicción",
-  TACTICAL: "Táctica",
+  meta: {
+    summary: {
+      title: "Resumen · Quoin",
+      description: "Valor y evolución de tu cartera",
+    },
+    portfolio: {
+      title: "Cartera · Quoin",
+      description: "Tus posiciones actuales",
+    },
+    allocation: {
+      title: "Asignación · Quoin",
+      description: "Exposición real por transparencia",
+    },
+    movements: {
+      title: "Movimientos · Quoin",
+      description: "Tu registro completo de operaciones",
+    },
+    realized: {
+      title: "Realizado · Quoin",
+      description: "Resultado de tus ventas cerradas",
+    },
+    opportunity: {
+      title: "Coste de oportunidad · Quoin",
+      description: "Tus flujos reales, comprados en el índice",
+    },
+    ter: {
+      title: "Coste del TER · Quoin",
+      description: "Lo que cuesta la gestión de tus fondos",
+    },
+    target: {
+      title: "Objetivo · Quoin",
+      description: "Objetivo de aportación mensual",
+    },
+    projection: {
+      title: "Proyección · Quoin",
+      description: "Hacia dónde puede ir tu plan",
+    },
+    instruments: {
+      title: "Instrumentos · Quoin",
+      description: "Clasificación de instrumentos",
+    },
+    instrument: { title: "Detalle de activo · Quoin", description: "" },
+    settings: {
+      title: "Ajustes · Quoin",
+      description: "Cómo se muestra Quoin en este dispositivo",
+    },
+  },
+  a11y: {
+    mainNav: "Principal",
+    breadcrumb: "Ruta",
+  },
+  labels: {
+    thesis: THESIS_LABELS,
+    thesisDescription: THESIS_DESCRIPTIONS,
+    instrumentType: TYPE_LABELS,
+    exposureKind: EXPOSURE_KIND_LABELS,
+    exposureKindFallback: "Sin clasificar",
+  },
 };
-
-const THESIS_DESCRIPTIONS: Record<Thesis, string> = {
-  CORE: "Núcleo indexado: lo que sostiene la cartera y no se toca.",
-  CONVICTION:
-    "Apuesta individual que quiero mantener años, no un índice ni un trade.",
-  TACTICAL: "Posición tomada con la salida en mente.",
-};
-
-const TYPE_LABELS: Record<InstrumentType, string> = {
-  ETF: "ETF",
-  STOCK: "Acción",
-  CRYPTO: "Cripto",
-  BOND: "Bono",
-  COMMODITY: "Materia prima",
-  CASH: "Efectivo",
-};
-
-export function thesisLabel(thesis: Thesis): string {
-  return THESIS_LABELS[thesis];
-}
-
-export function thesisDescription(thesis: Thesis): string {
-  return THESIS_DESCRIPTIONS[thesis];
-}
-
-export function instrumentTypeLabel(type: InstrumentType): string {
-  return TYPE_LABELS[type];
-}
-
-const EXPOSURE_KIND_LABELS: Record<ExposureKind, string> = {
-  COMPANY: "Acción",
-  EQUITY_FUND: "Fondo de renta variable",
-  BOND_FUND: "Fondo de bonos",
-  COMMODITY: "Materias primas",
-  CRYPTO: "Cripto",
-};
-
-export function exposureKindLabel(kind: string): string {
-  return EXPOSURE_KIND_LABELS[kind as ExposureKind] ?? "Sin clasificar";
-}
-
-export const DASH = "—";
