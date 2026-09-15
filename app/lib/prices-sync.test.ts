@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { es } from "./i18n";
+
 import { MAX_QUOTE_AGE_MS } from "~/adapters/marketdata";
 import type { Quote } from "~/core/ports";
 
@@ -154,7 +156,7 @@ describe("planPriceSync", () => {
 describe("priceSyncToast", () => {
   it("reports a clean run without mentioning failures", () => {
     expect(
-      priceSyncToast({ mapped: 20, updated: 20, stale: 0, noQuote: 0 }),
+      priceSyncToast(es, { mapped: 20, updated: 20, stale: 0, noQuote: 0 }),
     ).toEqual({
       message: "20 de 20 precios actualizados",
     });
@@ -162,7 +164,7 @@ describe("priceSyncToast", () => {
 
   it("names the misses when only some prices came back", () => {
     expect(
-      priceSyncToast({ mapped: 20, updated: 18, stale: 1, noQuote: 1 }),
+      priceSyncToast(es, { mapped: 20, updated: 18, stale: 1, noQuote: 1 }),
     ).toEqual({
       message: "18 de 20 precios actualizados, 2 fallidos",
       description: "1 con cotización caducada · 1 sin respuesta",
@@ -171,7 +173,7 @@ describe("priceSyncToast", () => {
 
   it("describes only the failure kinds that actually happened", () => {
     expect(
-      priceSyncToast({ mapped: 5, updated: 3, stale: 0, noQuote: 2 }),
+      priceSyncToast(es, { mapped: 5, updated: 3, stale: 0, noQuote: 2 }),
     ).toEqual({
       message: "3 de 5 precios actualizados, 2 fallidos",
       description: "2 sin respuesta",
@@ -180,7 +182,7 @@ describe("priceSyncToast", () => {
 
   it("says nothing is mapped rather than reporting 0 of 0", () => {
     expect(
-      priceSyncToast({ mapped: 0, updated: 0, stale: 0, noQuote: 0 }),
+      priceSyncToast(es, { mapped: 0, updated: 0, stale: 0, noQuote: 0 }),
     ).toEqual({
       message: "Ningún instrumento tiene símbolo de cotización todavía.",
     });
@@ -188,12 +190,12 @@ describe("priceSyncToast", () => {
 
   it("keeps the singular when a single instrument is mapped", () => {
     expect(
-      priceSyncToast({ mapped: 1, updated: 1, stale: 0, noQuote: 0 }),
+      priceSyncToast(es, { mapped: 1, updated: 1, stale: 0, noQuote: 0 }),
     ).toEqual({
       message: "1 de 1 precio actualizado",
     });
     expect(
-      priceSyncToast({ mapped: 1, updated: 0, stale: 1, noQuote: 0 }),
+      priceSyncToast(es, { mapped: 1, updated: 0, stale: 1, noQuote: 0 }),
     ).toEqual({
       message: "0 de 1 precio actualizado, 1 fallido",
       description: "1 con cotización caducada",

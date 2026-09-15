@@ -58,7 +58,6 @@ function printSale(
   if (gain.disallowed) {
     const windowStart = addMonths(gain.ts, -WASH_SALE_WINDOW_MONTHS);
     const windowEnd = addMonths(gain.ts, WASH_SALE_WINDOW_MONTHS);
-    console.log(`      reason: ${gain.disallowedReason}`);
     console.log(
       `      window: [${day(windowStart)} .. ${day(windowEnd)}]  (sale ± ${WASH_SALE_WINDOW_MONTHS}m)`,
     );

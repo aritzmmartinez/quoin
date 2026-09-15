@@ -1,7 +1,7 @@
 import type { SeriesId } from "~/adapters/inflation";
 import type { InflationPoint, InflationRepository } from "~/core/ports";
 
-import { es } from "./i18n";
+import type { Copy } from "./i18n";
 
 export interface InflationSyncDeps {
   repository: Pick<InflationRepository, "list" | "saveMany" | "markChecked">;
@@ -93,8 +93,8 @@ export interface IpcSyncToast {
   description?: string;
 }
 
-export function ipcSyncToast(counts: IpcSyncCounts): IpcSyncToast {
-  const copy = es.basis.sync;
+export function ipcSyncToast(t: Copy, counts: IpcSyncCounts): IpcSyncToast {
+  const copy = t.basis.sync;
   const message = counts.added > 0 ? copy.added(counts.added) : copy.upToDate;
 
   if (counts.rebaseBlocked.length === 0) return { message };

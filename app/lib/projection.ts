@@ -13,9 +13,9 @@ import {
   type ProjectionSourceLine,
 } from "~/core/projections";
 
-export const HORIZON_PARAM = "anos";
-export const GOAL_PARAM = "objetivo";
-export const DETAIL_PARAM = "detalle";
+export const HORIZON_PARAM = "years";
+export const GOAL_PARAM = "goal";
+export const DETAIL_PARAM = "detail";
 
 export const DEFAULT_HORIZON_YEARS = 10;
 export const MAX_HORIZON_YEARS = 40;
