@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import {
+import { createFormat } from "./format";
+
+const {
   formatClock,
   formatDate,
   formatMoney,
@@ -8,7 +10,7 @@ import {
   formatQuantity,
   formatRelativeTime,
   formatSignedMoney,
-} from "./format";
+} = createFormat("es");
 
 const norm = (s: string) => s.replace(/[\s\u00a0\u202f]/g, " ");
 
