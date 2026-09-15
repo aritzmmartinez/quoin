@@ -36,6 +36,7 @@ export function toInstrumentListItems(
   positions: readonly Position[],
   marketValues: ReadonlyMap<string, MarketValue>,
   holdings: ReadonlyMap<string, EtfHolding[]> = new Map(),
+  tag = "es-ES",
 ): InstrumentListItem[] {
   const held = new Map<string, Decimal>();
   const valued = new Map<string, Decimal>();
@@ -84,7 +85,7 @@ export function toInstrumentListItems(
     const diff = new Decimal(b.value ?? 0).comparedTo(
       new Decimal(a.value ?? 0),
     );
-    return diff !== 0 ? diff : a.name.localeCompare(b.name, "es");
+    return diff !== 0 ? diff : a.name.localeCompare(b.name, tag);
   });
 }
 

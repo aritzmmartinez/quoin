@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { PendingMapping } from "~/lib/ingest";
 import type { SymbolCheck } from "~/lib/symbol-check";
 
-import { es, formatMoney, formatQuantity, formatRelativeTime } from "~/lib";
+import { useCopy, useFormat } from "~/lib";
 import { Button } from "../ui/Button";
 import { postIngest } from "./api";
 
@@ -16,7 +16,8 @@ export function MappingStep({
   mapped: Readonly<Record<string, string>>;
   onMapped: (instrumentId: string, symbol: string) => void;
 }) {
-  const copy = es.ingest.map;
+  const t = useCopy();
+  const copy = t.ingest.map;
   const done = Object.keys(mapped).length;
 
   return (
@@ -54,7 +55,9 @@ function MappingRow({
   saved: string | null;
   onMapped: (instrumentId: string, symbol: string) => void;
 }) {
-  const copy = es.ingest.map;
+  const { formatQuantity } = useFormat();
+  const t = useCopy();
+  const copy = t.ingest.map;
   const [symbol, setSymbol] = useState(saved ?? "");
   const [check, setCheck] = useState<SymbolCheck | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +71,7 @@ function MappingRow({
     if (trimmed === "") return;
     setBusy("check");
     setError(null);
-    const response = await postIngest({
+    const response = await postIngest(t, {
       intent: "check",
       instrumentId: item.instrumentId,
       symbol: trimmed,
@@ -86,7 +89,7 @@ function MappingRow({
     setBusy("save");
     setError(null);
     setNote(null);
-    const response = await postIngest({
+    const response = await postIngest(t, {
       intent: "map",
       instrumentId: item.instrumentId,
       symbol: trimmed,
@@ -160,7 +163,9 @@ function MappingRow({
 }
 
 function CheckDetail({ check }: { check: SymbolCheck }) {
-  const copy = es.ingest.map;
+  const { formatMoney, formatRelativeTime } = useFormat();
+  const t = useCopy();
+  const copy = t.ingest.map;
   const value =
     check.currency === "EUR"
       ? formatMoney(check.impliedValue)

@@ -1,4 +1,4 @@
-import { es, formatPeriod } from "~/lib";
+import type { Copy, Format } from "~/lib";
 
 export interface BasisNoticeProps {
   basis: "nominal" | "real";
@@ -8,21 +8,19 @@ export interface BasisNoticeProps {
   checkStale: boolean;
 }
 
-export function basisNotice({
-  basis,
-  active,
-  missing,
-  hasIndex,
-  checkStale,
-}: BasisNoticeProps): string | null {
+export function basisNotice(
+  t: Copy,
+  formatPeriod: Format["formatPeriod"],
+  { basis, active, missing, hasIndex, checkStale }: BasisNoticeProps,
+): string | null {
   if (basis === "nominal") return null;
 
-  if (!hasIndex) return es.basis.noIndex;
+  if (!hasIndex) return t.basis.noIndex;
 
   if (!active) {
     const periods = missing.map(formatPeriod).join(", ");
-    return `${es.basis.gaps(periods)} ${es.basis.showingNominal}`;
+    return `${t.basis.gaps(periods)} ${t.basis.showingNominal}`;
   }
 
-  return checkStale ? es.basis.maybeBehind : null;
+  return checkStale ? t.basis.maybeBehind : null;
 }

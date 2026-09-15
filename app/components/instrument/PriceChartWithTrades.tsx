@@ -11,7 +11,7 @@ import {
   YAxis,
 } from "recharts";
 
-import { es, filterByRange, formatDate, formatMoney, type Range } from "~/lib";
+import { filterByRange, type Range, useCopy, useFormat } from "~/lib";
 
 import { Card } from "../ui/Card";
 import { RangeSelector } from "../ui/RangeSelector";
@@ -24,11 +24,6 @@ export interface PriceChartDatum {
   sell: number | null;
 }
 
-const axisDate = (t: number) =>
-  new Intl.DateTimeFormat("es-ES", { month: "short", year: "2-digit" }).format(
-    new Date(t),
-  );
-const axisEur = (v: number) => formatMoney(String(v), 0);
 const TOOLTIP_STYLE = {
   background: "var(--color-surface)",
   border: "1px solid var(--color-border)",
@@ -37,11 +32,14 @@ const TOOLTIP_STYLE = {
 } as const;
 
 export function PriceChartWithTrades({ data }: { data: PriceChartDatum[] }) {
+  const { formatMoney, formatDate, formatTimeTick } = useFormat();
+  const axisEur = (v: number) => formatMoney(String(v), 0);
+  const axisDate = (t: number) => formatTimeTick(t, "month", true);
   const [mounted, setMounted] = useState(false);
   const [range, setRange] = useState<Range>("all");
   useEffect(() => setMounted(true), []);
 
-  const c = es.instrument.priceChart;
+  const c = useCopy().instrument.priceChart;
   const view = filterByRange(data, range);
   const hasPrice = data.some((d) => d.price !== null);
 

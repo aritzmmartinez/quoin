@@ -2,7 +2,7 @@ import Decimal from "decimal.js";
 
 import type { LedgerEvent, Revalue, TradeEvent } from "../domain";
 
-import { WASH_SALE_WINDOW_MONTHS, type Territory } from "./config";
+import type { Territory } from "./config";
 import { walkFifo, type FifoSale } from "./fifo";
 import { findWashSaleTrigger } from "./wash-sale";
 
@@ -37,7 +37,6 @@ export interface RealizedGainDetail {
   realizedPnL: string;
   lots: TaxLotConsumptionDetail[];
   disallowed: boolean;
-  disallowedReason: string | null;
   disallowedByBuyEventId: string | null;
 }
 
@@ -103,10 +102,6 @@ function toGainDetail(
       unitCost: lot.unitCost.toString(),
     })),
     disallowed: trigger !== null,
-    disallowedReason: trigger
-      ? `Recompra de valores homogéneos dentro de los ${WASH_SALE_WINDOW_MONTHS} meses de la venta ` +
-        `(regla antielusión simplificada — ver app/core/tax/wash-sale.ts): pérdida no deducible este año.`
-      : null,
     disallowedByBuyEventId: trigger?.buyEventId ?? null,
   };
 }

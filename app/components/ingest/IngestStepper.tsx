@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import type { Broker, ImportSummary } from "~/adapters/ingestion";
 import type { PendingMapping, PriceFillResult } from "~/lib/ingest";
 
-import { es } from "~/lib";
+import { useCopy } from "~/lib";
 import { postIngest } from "./api";
 import { DoneStep } from "./DoneStep";
 import { FileStep } from "./FileStep";
@@ -31,7 +31,8 @@ export function IngestStepper({
   onFinish: () => void;
   onStatusChange?: (status: IngestStatus) => void;
 }) {
-  const copy = es.ingest;
+  const t = useCopy();
+  const copy = t.ingest;
 
   const [stage, setStage] = useState<Stage>("file");
   const [reached, setReached] = useState<Stage>("file");
@@ -73,7 +74,7 @@ export function IngestStepper({
     }
 
     setFile({ name: dropped.name, csv });
-    const response = await postIngest({ intent: "preview", csv });
+    const response = await postIngest(t, { intent: "preview", csv });
     setBusy(null);
 
     if (!response.ok) {
@@ -89,7 +90,7 @@ export function IngestStepper({
     if (!file) return;
     setError(null);
     setBusy(copy.importing);
-    const response = await postIngest({ intent: "commit", csv: file.csv });
+    const response = await postIngest(t, { intent: "commit", csv: file.csv });
     setBusy(null);
 
     if (!response.ok) {

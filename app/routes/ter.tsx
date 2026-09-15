@@ -25,31 +25,36 @@ import {
   type TerLine,
 } from "~/core/projections";
 import {
+  type Copy,
   DASH,
-  es,
-  formatMoney,
-  formatPercent,
+  copyFromMatches,
+  createFormat,
   heldValuesByInstrument,
   MIN_WINDOW_MONTHS,
   namesOf,
   parseHorizonYears,
+  parseLocale,
   toTerRows,
+  useCopy,
+  useFormat,
 } from "~/lib";
 import { loadProjectionContext } from "~/lib/projection.server";
 
-export function meta(_: Route.MetaArgs) {
+export function meta({ matches }: Route.MetaArgs) {
+  const t = copyFromMatches(matches);
   return [
-    { title: "Coste del TER · Quoin" },
-    { name: "description", content: "Lo que cuesta la gestión de tus fondos" },
+    { title: t.meta.ter.title },
+    { name: "description", content: t.meta.ter.description },
   ];
 }
 
-export const handle = { title: es.ter.title, parent: "/" };
+export const handle = { title: (t: Copy) => t.ter.title, parent: "/" };
 
 type Unavailable = "no-target" | "no-history" | "no-window" | "thin-window";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const horizonYears = parseHorizonYears(new URL(request.url).searchParams);
+  const locale = parseLocale(request.headers.get("Cookie"));
 
   const [events, instruments, prices] = await Promise.all([
     new PrismaLedgerRepository().list(),
@@ -74,7 +79,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const empty = {
     horizonYears,
     weighted,
-    rows: toTerRows(lines, instruments),
+    rows: toTerRows(lines, instruments, createFormat(locale).tag),
     unknown: namesOf(weighted.unknownInstrumentIds, instruments),
     projected: null,
     contribution: "0.00",
@@ -116,7 +121,9 @@ export async function loader({ request }: Route.LoaderArgs) {
 const GRID = "grid-cols-[minmax(0,2fr)_120px_100px_140px]";
 
 export default function Ter({ loaderData }: Route.ComponentProps) {
-  const t = es.ter;
+  const { formatMoney, formatPercent } = useFormat();
+  const t = useCopy();
+  const copy = t.ter;
   const {
     horizonYears,
     weighted,
@@ -133,9 +140,9 @@ export default function Ter({ loaderData }: Route.ComponentProps) {
     return (
       <Card>
         <div className="px-6 py-16 text-center">
-          <div className="text-[15px] font-semibold">{t.none.title}</div>
+          <div className="text-[15px] font-semibold">{copy.none.title}</div>
           <p className="mx-auto mt-1.5 max-w-md text-[13px] text-muted">
-            {t.none.body}
+            {copy.none.body}
           </p>
         </div>
       </Card>
@@ -149,14 +156,14 @@ export default function Ter({ loaderData }: Route.ComponentProps) {
           <span className="font-mono text-text">
             {formatMoney(weighted.coveredValue)}
           </span>{" "}
-          {t.coverageOf}{" "}
+          {copy.coverageOf}{" "}
           <span className="font-mono">{formatMoney(weighted.totalValue)}</span>{" "}
-          {t.coverageSuffix}
+          {copy.coverageSuffix}
         </span>
         <span className="rounded border border-border px-1.5 py-1 font-mono text-[11px] font-medium leading-none">
           {formatPercent(weighted.coverage)}
         </span>
-        <InfoHint name={t.about} label={t.intro} />
+        <InfoHint name={copy.about} label={copy.intro} />
       </header>
 
       <div
@@ -164,20 +171,20 @@ export default function Ter({ loaderData }: Route.ComponentProps) {
         style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}
       >
         <StatTile
-          label={t.weighted.label}
-          sub={t.weighted.sub(formatPercent(weighted.coverage))}
+          label={copy.weighted.label}
+          sub={copy.weighted.sub(formatPercent(weighted.coverage))}
           value={formatPercent(weighted.weightedTer, 2)}
         />
         <StatTile
-          label={t.annual.label}
-          sub={t.annual.sub}
+          label={copy.annual.label}
+          sub={copy.annual.sub}
           value={formatMoney(weighted.annualCost)}
         />
       </div>
 
       {unknown.length > 0 && (
         <Explainer tone="notice" className="mt-2">
-          {t.unknown(unknown.join(", "))}
+          {copy.unknown(unknown.join(", "))}
         </Explainer>
       )}
 
@@ -185,28 +192,28 @@ export default function Ter({ loaderData }: Route.ComponentProps) {
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center gap-1.5">
             <h2 className="text-[14px] font-semibold">
-              {t.projected.title(horizonYears)}
+              {copy.projected.title(horizonYears)}
             </h2>
             <InfoHint
               size={18}
-              name={t.projected.noteTitle}
-              label={t.projected.note}
+              name={copy.projected.noteTitle}
+              label={copy.projected.note}
             />
           </div>
           <p className="text-[12px] leading-snug text-muted">
-            {t.projected.horizonPre(horizonYears)}{" "}
+            {copy.projected.horizonPre(horizonYears)}{" "}
             <span className="font-mono">{formatMoney(contribution)}</span>{" "}
-            {t.projected.horizonPost}
+            {copy.projected.horizonPost}
           </p>
         </div>
 
         {projected === null ? (
           <p className="text-[12px] text-muted">
             {unavailable === "thin-window"
-              ? t.unavailable["thin-window"](windowMonths, limitingName)
+              ? copy.unavailable["thin-window"](windowMonths, limitingName)
               : unavailable === "no-window" || unavailable === "no-history"
-                ? t.unavailable["no-window"]
-                : t.unavailable["no-target"]}
+                ? copy.unavailable["no-window"]
+                : copy.unavailable["no-target"]}
           </p>
         ) : (
           <div
@@ -218,22 +225,22 @@ export default function Ter({ loaderData }: Route.ComponentProps) {
             <StatTile
               tone="inset"
               subClass="font-mono text-faint"
-              label={t.projected.p10.label}
-              sub={t.projected.p10.sub}
+              label={copy.projected.p10.label}
+              sub={copy.projected.p10.sub}
               value={formatMoney(projected.p10)}
             />
             <StatTile
               tone="inset"
               subClass="font-mono text-faint"
-              label={t.projected.p50.label}
-              sub={t.projected.p50.sub}
+              label={copy.projected.p50.label}
+              sub={copy.projected.p50.sub}
               value={formatMoney(projected.p50)}
             />
             <StatTile
               tone="inset"
               subClass="font-mono text-faint"
-              label={t.projected.p90.label}
-              sub={t.projected.p90.sub}
+              label={copy.projected.p90.label}
+              sub={copy.projected.p90.sub}
               value={formatMoney(projected.p90)}
             />
           </div>
@@ -242,16 +249,16 @@ export default function Ter({ loaderData }: Route.ComponentProps) {
 
       <Card className="mt-4">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle px-gutter py-4">
-          <h2 className="text-[14px] font-semibold">{t.table.title}</h2>
-          <span className="text-[12px] text-muted">{t.table.only}</span>
+          <h2 className="text-[14px] font-semibold">{copy.table.title}</h2>
+          <span className="text-[12px] text-muted">{copy.table.only}</span>
         </div>
         <div className={TABLE_SCROLL}>
           <div className="min-w-140">
             <div className={`${TABLE_HEAD} ${GRID}`}>
-              <span>{t.table.instrument}</span>
-              <span className="text-right">{t.table.value}</span>
-              <span className="text-right">{t.table.ter}</span>
-              <span className="text-right">{t.table.annualCost}</span>
+              <span>{copy.table.instrument}</span>
+              <span className="text-right">{copy.table.value}</span>
+              <span className="text-right">{copy.table.ter}</span>
+              <span className="text-right">{copy.table.annualCost}</span>
             </div>
             <ul>
               {rows.map((row) => (
@@ -270,7 +277,7 @@ export default function Ter({ loaderData }: Route.ComponentProps) {
                   </span>
                   <span className={`${TABLE_NUM} text-right`}>
                     {row.annualCost === null ? (
-                      <span className="text-muted">{t.table.unknown}</span>
+                      <span className="text-muted">{copy.table.unknown}</span>
                     ) : (
                       formatMoney(row.annualCost)
                     )}

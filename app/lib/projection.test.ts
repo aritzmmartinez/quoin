@@ -63,9 +63,9 @@ describe("MIN_WINDOW_MONTHS", () => {
 describe("parseExtended", () => {
   it("keeps the default panel at three scenarios unless the checkbox asks", () => {
     expect(parseExtended(params(""))).toBe(false);
-    expect(parseExtended(params("detalle=0"))).toBe(false);
-    expect(parseExtended(params("detalle=si"))).toBe(false);
-    expect(parseExtended(params("detalle=1"))).toBe(true);
+    expect(parseExtended(params("detail=0"))).toBe(false);
+    expect(parseExtended(params("detail=si"))).toBe(false);
+    expect(parseExtended(params("detail=1"))).toBe(true);
   });
 });
 

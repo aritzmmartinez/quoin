@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { es, filterByRange, type Range } from "~/lib";
+import { filterByRange, type Range, useCopy } from "~/lib";
 
 import {
   InvestedVsValueChart,
@@ -12,8 +12,9 @@ import { RangeSelector } from "../ui/RangeSelector";
 export type { InvestedVsValueDatum };
 
 export function InvestedVsValue({ data }: { data: InvestedVsValueDatum[] }) {
+  const t = useCopy();
   const [range, setRange] = useState<Range>("all");
-  const c = es.instrument.ivvChart;
+  const c = t.instrument.ivvChart;
   const view = filterByRange(data, range);
 
   return (

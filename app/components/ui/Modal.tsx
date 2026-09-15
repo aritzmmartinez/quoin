@@ -1,7 +1,7 @@
 import { X } from "lucide-react";
 import { useId, type ReactNode, type Ref } from "react";
 
-import { es } from "~/lib";
+import { useCopy } from "~/lib";
 import { Button } from "./Button";
 import {
   attemptClose,
@@ -22,6 +22,7 @@ export function Modal({
   onClose?: () => void;
   onCloseAttempt?: () => boolean;
 }) {
+  const t = useCopy();
   const id = `modal-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
 
   return (
@@ -48,7 +49,7 @@ export function Modal({
         <Button
           variant="ghost"
           size="icon"
-          aria-label={es.common.close}
+          aria-label={t.common.close}
           onClick={(event) => {
             const dialog = event.currentTarget.closest("dialog");
             if (dialog) attemptClose(onCloseAttempt, () => dialog.close());

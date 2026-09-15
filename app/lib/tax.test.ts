@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Instrument, TradeEvent } from "~/core/domain";
+import { es } from "./i18n";
 
 import {
   buildTaxYearView,
@@ -96,7 +97,7 @@ describe("buildTaxYearView", () => {
       trade("SELL", "X", "10", "1200", { ts: "2026-06-01" }),
     ];
 
-    const view = buildTaxYearView(events, instruments, 2026);
+    const view = buildTaxYearView(events, instruments, 2026, es);
 
     expect(view.sales).toHaveLength(1);
     const sale = view.sales[0]!;
@@ -114,7 +115,7 @@ describe("buildTaxYearView", () => {
     const sell = trade("SELL", "X", "10", "700", { ts: "2025-06-01" });
     const rebuy = trade("BUY", "X", "10", "750", { ts: "2025-07-01" });
 
-    const view = buildTaxYearView([buy1, sell, rebuy], instruments, 2025);
+    const view = buildTaxYearView([buy1, sell, rebuy], instruments, 2025, es);
 
     const sale = view.sales[0]!;
     expect(sale.disallowed).toBe(true);
@@ -134,7 +135,7 @@ describe("buildTaxYearView", () => {
       trade("SELL", "X", "5", "550", { ts: "2025-03-01" }),
     ];
 
-    const view = buildTaxYearView(events, instruments, 2025);
+    const view = buildTaxYearView(events, instruments, 2025, es);
 
     expect(view.sales.map((s) => s.t)).toEqual([
       new Date("2025-03-01").toISOString(),
@@ -150,7 +151,7 @@ describe("buildTaxYearView", () => {
       trade("SELL", "X", "10", "1500", { ts: "2025-06-01" }), // +500
     ];
 
-    const view = buildTaxYearView(events, instruments, 2025);
+    const view = buildTaxYearView(events, instruments, 2025, es);
 
     expect(view.allowedNet).toBe("500");
     expect(view.netSavingsBase).toBe("200");
@@ -163,7 +164,7 @@ describe("buildTaxYearView", () => {
       trade("SELL", "Y", "10", "1200", { ts: "2025-06-01" }),
     ];
 
-    const view = buildTaxYearView(events, instruments, 2025);
+    const view = buildTaxYearView(events, instruments, 2025, es);
     expect(view.sales[0]!.name).toBe("Y");
   });
 });

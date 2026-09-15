@@ -1,12 +1,5 @@
 import type { InstrumentType, Thesis } from "~/core/domain";
-import {
-  DASH,
-  es,
-  formatMoney,
-  formatQuantity,
-  formatRelativeTime,
-  instrumentTypeLabel,
-} from "~/lib";
+import { DASH, useCopy, useFormat } from "~/lib";
 
 import { SignedMoney } from "../SignedMoney";
 import { ThesisChip } from "../ui/ThesisChip";
@@ -27,6 +20,8 @@ export function InstrumentHeader({
 }: {
   instrument: InstrumentHeaderData;
 }) {
+  const { formatMoney, formatQuantity, formatRelativeTime } = useFormat();
+  const t = useCopy();
   return (
     <header className="mb-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -40,9 +35,9 @@ export function InstrumentHeader({
           <div className="mt-0.5 text-[12.5px] text-muted">
             {instrument.id}
             {" · "}
-            {instrument.type ? instrumentTypeLabel(instrument.type) : DASH}
+            {instrument.type ? t.labels.instrumentType[instrument.type] : DASH}
             {" · "}
-            {es.instrument.units(formatQuantity(instrument.quantity))}
+            {t.instrument.units(formatQuantity(instrument.quantity))}
           </div>
         </div>
 
@@ -67,9 +62,7 @@ export function InstrumentHeader({
           </div>
           {instrument.price && (
             <div className="mt-0.5 text-[11.5px] text-muted">
-              {es.portfolio.updatedAt(
-                formatRelativeTime(instrument.price.asOf),
-              )}
+              {t.portfolio.updatedAt(formatRelativeTime(instrument.price.asOf))}
             </div>
           )}
         </div>

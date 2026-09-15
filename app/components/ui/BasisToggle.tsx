@@ -1,24 +1,23 @@
 import { useRevalidator, useRouteLoaderData } from "react-router";
 
-import { BASIS_COOKIE, BASIS_KEYS, es, type Basis } from "~/lib";
+import { type Basis, BASIS_COOKIE, BASIS_KEYS, useCopy } from "~/lib";
 
 import { SegmentedButtons } from "./Segmented";
 
 const ONE_YEAR = 60 * 60 * 24 * 365;
 
-const LABELS: Record<Basis, string> = {
-  nominal: es.basis.nominal,
-  real: es.basis.real,
-};
-
-const HINTS: Record<Basis, string> = {
-  nominal: es.basis.nominalHint,
-  real: es.basis.realHint,
-};
-
 type RootData = { basis?: Basis };
 
 export function BasisToggle() {
+  const t = useCopy();
+  const labels: Record<Basis, string> = {
+    nominal: t.basis.nominal,
+    real: t.basis.real,
+  };
+  const hints: Record<Basis, string> = {
+    nominal: t.basis.nominalHint,
+    real: t.basis.realHint,
+  };
   const root = useRouteLoaderData("root") as RootData | undefined;
   const value: Basis = root?.basis ?? "nominal";
   const revalidator = useRevalidator();
@@ -31,13 +30,13 @@ export function BasisToggle() {
 
   return (
     <SegmentedButtons
-      label={es.basis.label}
+      label={t.basis.label}
       value={value}
       onSelect={select}
       segments={BASIS_KEYS.map((key) => ({
         key,
-        label: LABELS[key],
-        hint: HINTS[key],
+        label: labels[key],
+        hint: hints[key],
       }))}
     />
   );

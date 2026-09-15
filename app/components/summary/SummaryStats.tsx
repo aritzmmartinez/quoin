@@ -1,4 +1,4 @@
-import { es, formatMoney, formatPercent, formatSignedMoney } from "~/lib";
+import { useCopy, useFormat } from "~/lib";
 
 import { signClass } from "../ui/signed";
 import { StatTile } from "../ui/StatTile";
@@ -20,7 +20,9 @@ export function SummaryStats({
   opportunity = null,
   ter = null,
 }: SummaryStatsProps) {
-  const s = es.summary.stats;
+  const { formatMoney, formatSignedMoney, formatPercent } = useFormat();
+  const t = useCopy();
+  const s = t.summary.stats;
   return (
     <div
       className="grid gap-3"
@@ -42,7 +44,7 @@ export function SummaryStats({
         sub={s.realized.sub}
         value={formatSignedMoney(realizedPnL).text}
         valueClass={signClass(realizedPnL)}
-        to="/realizado"
+        to="/realized"
       />
       <StatTile
         label={s.positions.label}
@@ -55,7 +57,7 @@ export function SummaryStats({
           sub={s.opportunity.sub(opportunity.symbol)}
           value={formatSignedMoney(opportunity.difference).text}
           valueClass={signClass(opportunity.difference)}
-          to="/coste-oportunidad"
+          to="/opportunity-cost"
         />
       )}
       {ter && (
@@ -63,7 +65,7 @@ export function SummaryStats({
           label={s.ter.label}
           sub={s.ter.sub(formatMoney(ter.annualCost))}
           value={formatPercent(ter.weightedTer, 2)}
-          to="/coste-ter"
+          to="/ter-cost"
         />
       )}
     </div>

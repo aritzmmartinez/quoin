@@ -1,7 +1,7 @@
 import { ArrowRight } from "lucide-react";
 import { Link } from "react-router";
 
-import { es, formatMoney, formatPercent } from "~/lib";
+import { useCopy, useFormat } from "~/lib";
 
 import { Card } from "../ui/Card";
 import { ThesisChip } from "../ui/ThesisChip";
@@ -26,14 +26,15 @@ export function TopPositionsCard({
 }: {
   rows: readonly TopPositionRow[];
 }) {
-  const t = es.summary.top;
+  const { formatMoney, formatPercent } = useFormat();
+  const t = useCopy().summary.top;
 
   return (
     <Card className="flex min-w-0 flex-col gap-3 p-4 md:p-6">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-[14px] font-semibold">{t.title}</h2>
         <Link
-          to="/cartera"
+          to="/portfolio"
           className="flex shrink-0 items-center gap-1.5 text-[12px] font-medium text-muted transition-colors hover:text-text"
         >
           {t.link}
@@ -66,7 +67,7 @@ export function TopPositionsCard({
                 <span
                   className={`text-right font-mono text-[12px] font-semibold ${signClass(row.unrealizedPnLPct)}`}
                 >
-                  {signedPercent(row.unrealizedPnLPct)}
+                  {signedPercent(formatPercent, row.unrealizedPnLPct)}
                 </span>
               </Link>
             </li>

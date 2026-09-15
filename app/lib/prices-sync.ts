@@ -2,7 +2,7 @@ import { isFreshQuote } from "~/adapters/marketdata";
 import type { Instrument } from "~/core/domain";
 import type { PriceSnapshot, Quote } from "~/core/ports";
 
-import { es } from "./i18n";
+import type { Copy } from "./i18n";
 
 export type SyncableInstrument = Pick<
   Instrument,
@@ -110,8 +110,11 @@ export interface PriceSyncToast {
   description?: string;
 }
 
-export function priceSyncToast(counts: PriceSyncCounts): PriceSyncToast {
-  const copy = es.instruments.sync;
+export function priceSyncToast(
+  t: Copy,
+  counts: PriceSyncCounts,
+): PriceSyncToast {
+  const copy = t.instruments.sync;
   if (counts.mapped === 0) return { message: copy.nothing };
 
   const failed = counts.stale + counts.noQuote;

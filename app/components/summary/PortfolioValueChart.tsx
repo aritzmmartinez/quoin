@@ -1,4 +1,4 @@
-import { es } from "~/lib";
+import { useCopy } from "~/lib";
 
 import {
   InvestedVsValueChart,
@@ -11,7 +11,8 @@ export function PortfolioValueChart({
 }: {
   data: readonly InvestedVsValueDatum[];
 }) {
-  const c = es.summary.chart;
+  const t = useCopy();
+  const c = t.summary.chart;
   return (
     <Card className="flex flex-col gap-4 p-4 md:p-6">
       <h2 className="text-[14px] font-semibold">{c.title}</h2>

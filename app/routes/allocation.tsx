@@ -35,10 +35,9 @@ import {
 } from "~/core/projections";
 import {
   buildRebalancePlan,
+  type Copy,
+  copyFromMatches,
   currencyByLeaf,
-  es,
-  formatMoney,
-  formatPercent,
   heldValuesByInstrument,
   isCashLine,
   parseAllocationView,
@@ -50,16 +49,19 @@ import {
   readingFor,
   tailOf,
   toExposureRows,
+  useCopy,
+  useFormat,
 } from "~/lib";
 
-export function meta(_: Route.MetaArgs) {
+export function meta({ matches }: Route.MetaArgs) {
+  const t = copyFromMatches(matches);
   return [
-    { title: "Asignación · Quoin" },
-    { name: "description", content: "Exposición real por transparencia" },
+    { title: t.meta.allocation.title },
+    { name: "description", content: t.meta.allocation.description },
   ];
 }
 
-export const handle = { title: es.nav.allocation };
+export const handle = { title: (t: Copy) => t.nav.allocation };
 
 export async function loader({ request }: Route.LoaderArgs) {
   const params = new URL(request.url).searchParams;
@@ -141,7 +143,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   return {
     overlap:
-      view !== "solapamiento"
+      view !== "overlap"
         ? null
         : {
             mode: overlapMode,
@@ -150,7 +152,7 @@ export async function loader({ request }: Route.LoaderArgs) {
             pairs: computeAllFundOverlaps(overlapFunds, isCashLine),
           },
     currency:
-      view !== "divisa"
+      view !== "currency"
         ? null
         : computeCurrencyExposure({
             exposures,
@@ -168,7 +170,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     driftThreshold,
     hasTarget: target !== null,
     plan:
-      view !== "rebalanceo" || target === null || contribution === null
+      view !== "rebalance" || target === null || contribution === null
         ? null
         : buildRebalancePlan(
             target,
@@ -182,6 +184,8 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export default function Allocation({ loaderData }: Route.ComponentProps) {
+  const { formatMoney, formatPercent } = useFormat();
+  const t = useCopy();
   const {
     rows,
     tail,
@@ -196,14 +200,14 @@ export default function Allocation({ loaderData }: Route.ComponentProps) {
     hedgedCount,
     overlap,
   } = loaderData;
-  const copy = es.allocation;
+  const copy = t.allocation;
 
   const unresolvedShare =
     Number(summary.total) === 0
       ? "0"
       : String(Number(summary.unresolved) / Number(summary.total));
 
-  if (view === "divisa" && currency !== null) {
+  if (view === "currency" && currency !== null) {
     return (
       <>
         <ViewTabs value={view} />
@@ -212,7 +216,7 @@ export default function Allocation({ loaderData }: Route.ComponentProps) {
     );
   }
 
-  if (view === "solapamiento" && overlap !== null) {
+  if (view === "overlap" && overlap !== null) {
     return (
       <>
         <ViewTabs value={view} />
@@ -226,7 +230,7 @@ export default function Allocation({ loaderData }: Route.ComponentProps) {
     );
   }
 
-  if (view === "rebalanceo") {
+  if (view === "rebalance") {
     return (
       <>
         <ViewTabs value={view} />

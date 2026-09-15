@@ -1,11 +1,12 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Link, useSearchParams } from "react-router";
 
-import { es, pageHref, type PageInfo } from "~/lib";
+import { pageHref, type PageInfo, useCopy } from "~/lib";
 
 export function Pagination({ info }: { info: PageInfo }) {
+  const t = useCopy();
   const [params] = useSearchParams();
-  const copy = es.pagination;
+  const copy = t.pagination;
 
   if (info.pageCount <= 1) return null;
 

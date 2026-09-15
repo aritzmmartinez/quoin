@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 
-import { es, formatMoney, type OpportunityRow } from "~/lib";
+import { type OpportunityRow, useCopy, useFormat } from "~/lib";
 
 import { SignedMoney } from "../SignedMoney";
 import { TABLE_HEAD, TABLE_NUM, TABLE_ROW, TABLE_SCROLL } from "../ui/table";
@@ -13,7 +13,8 @@ export function OpportunityTable({
 }: {
   rows: readonly OpportunityRow[];
 }) {
-  const t = es.opportunity.table;
+  const { formatMoney } = useFormat();
+  const t = useCopy().opportunity.table;
 
   return (
     <div className={TABLE_SCROLL}>

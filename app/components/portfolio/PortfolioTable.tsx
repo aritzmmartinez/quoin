@@ -1,11 +1,11 @@
 import { useSearchParams } from "react-router";
 
 import {
-  es,
   nextSort,
   type PortfolioRow,
   type Sort,
   type SortKey,
+  useCopy,
 } from "~/lib";
 
 import { TABLE_HEAD, TABLE_SCROLL } from "../ui/table";
@@ -23,6 +23,7 @@ export function PortfolioTable({
   sort: Sort;
   busy?: boolean;
 }) {
+  const t = useCopy();
   const [params] = useSearchParams();
 
   const hrefFor = (key: SortKey): string => {
@@ -44,7 +45,7 @@ export function PortfolioTable({
           {COLUMNS.map((col) => (
             <SortableHeader
               key={col.key}
-              label={es.portfolio.columns[col.key]}
+              label={t.portfolio.columns[col.key]}
               href={hrefFor(col.key)}
               align={col.align}
               active={sort.key === col.key}

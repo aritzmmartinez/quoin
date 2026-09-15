@@ -2,7 +2,7 @@ import { FileText } from "lucide-react";
 
 import type { Broker, ImportSummary } from "~/adapters/ingestion";
 
-import { es } from "~/lib";
+import { useCopy } from "~/lib";
 import { Button } from "../ui/Button";
 import { FileDropzone } from "../ui/FileDropzone";
 import { SummaryList } from "./SummaryList";
@@ -24,7 +24,8 @@ export function FileStep({
   onConfirm: () => void;
   onReset: () => void;
 }) {
-  const copy = es.ingest;
+  const t = useCopy();
+  const copy = t.ingest;
 
   if (preview === null) {
     return (

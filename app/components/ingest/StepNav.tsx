@@ -1,6 +1,6 @@
 import { Check } from "lucide-react";
 
-import { es } from "~/lib";
+import { useCopy } from "~/lib";
 
 export const STAGES = ["file", "mapping", "prices", "done"] as const;
 
@@ -17,7 +17,8 @@ export function StepNav({
   onGo: (stage: Stage) => void;
   disabled: boolean;
 }) {
-  const copy = es.ingest;
+  const t = useCopy();
+  const copy = t.ingest;
   const current = STAGES.indexOf(stage);
   const furthest = STAGES.indexOf(reached);
 
@@ -79,6 +80,7 @@ function Marker({
   onGo: (() => void) | null;
   disabled: boolean;
 }) {
+  const t = useCopy();
   const shape =
     "flex size-[26px] items-center justify-center rounded-full border font-mono text-[11px] font-semibold leading-none transition-colors";
   const tone = current
@@ -109,7 +111,7 @@ function Marker({
       type="button"
       disabled={disabled}
       onClick={onGo}
-      aria-label={es.ingest.goToStep(label)}
+      aria-label={t.ingest.goToStep(label)}
       className={`${shape} ${tone} hover:border-accent disabled:pointer-events-none disabled:opacity-30`}
     >
       {inner}

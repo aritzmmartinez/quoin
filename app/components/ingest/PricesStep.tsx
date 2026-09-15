@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { HistoryRange } from "~/core/ports";
 import type { PriceFillResult } from "~/lib/ingest";
 
-import { DEFAULT_HISTORY_RANGE, HISTORY_RANGES, es } from "~/lib";
+import { DEFAULT_HISTORY_RANGE, HISTORY_RANGES, useCopy } from "~/lib";
 import { Button } from "../ui/Button";
 import { Select } from "../ui/Select";
 import { postIngest } from "./api";
@@ -15,7 +15,8 @@ export function PricesStep({
   instrumentIds: readonly string[];
   onDone: (result: PriceFillResult | null) => void;
 }) {
-  const copy = es.ingest.prices;
+  const t = useCopy();
+  const copy = t.ingest.prices;
   const [range, setRange] = useState<HistoryRange>(DEFAULT_HISTORY_RANGE);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +28,7 @@ export function PricesStep({
   async function run() {
     setBusy(true);
     setError(null);
-    const response = await postIngest({
+    const response = await postIngest(t, {
       intent: "fill",
       instrumentIds: instrumentIds.join(","),
       range,

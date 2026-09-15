@@ -101,7 +101,6 @@ describe("computeTaxLots", () => {
     expect(gain.realizedPnL).toBe("-300");
     expect(gain.disallowed).toBe(true);
     expect(gain.disallowedByBuyEventId).toBe(rebuy.id);
-    expect(gain.disallowedReason).not.toBeNull();
     expect(result.allowedNet).toBe("0");
   });
 

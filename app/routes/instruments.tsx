@@ -23,18 +23,28 @@ import {
 } from "~/core/domain";
 import { computeMarketValues, computePositions } from "~/core/projections";
 
-import { es, needsMapping, toInstrumentListItems } from "~/lib";
+import {
+  type Copy,
+  copyFor,
+  copyFromMatches,
+  createFormat,
+  needsMapping,
+  parseLocale,
+  toInstrumentListItems,
+  useCopy,
+} from "~/lib";
 
-export function meta(_: Route.MetaArgs) {
+export function meta({ matches }: Route.MetaArgs) {
+  const t = copyFromMatches(matches);
   return [
-    { title: "Instrumentos · Quoin" },
-    { name: "description", content: "Clasificación de instrumentos" },
+    { title: t.meta.instruments.title },
+    { name: "description", content: t.meta.instruments.description },
   ];
 }
 
-export const handle = { title: es.instruments.title };
+export const handle = { title: (t: Copy) => t.instruments.title };
 
-export async function loader(_: Route.LoaderArgs) {
+export async function loader({ request }: Route.LoaderArgs) {
   const [events, instruments, prices, holdings] = await Promise.all([
     new PrismaLedgerRepository().list(),
     new PrismaInstrumentRepository().list(),
@@ -44,11 +54,13 @@ export async function loader(_: Route.LoaderArgs) {
 
   const positions = computePositions(events);
   const marketValues = computeMarketValues(positions, prices, BASE_CURRENCY);
+  const tag = createFormat(parseLocale(request.headers.get("Cookie"))).tag;
   const items = toInstrumentListItems(
     instruments,
     positions,
     marketValues,
     holdings,
+    tag,
   );
 
   return { items, unmapped: needsMapping(items).length };
@@ -73,26 +85,27 @@ const holdingsForm = z.object({
 });
 
 export async function action({ request }: Route.ActionArgs) {
+  const t = copyFor(parseLocale(request.headers.get("Cookie")));
   const form = Object.fromEntries(await request.formData());
-  if (form.intent === "holdings") return importHoldings(form);
+  if (form.intent === "holdings") return importHoldings(t, form);
 
   const parsed = exposureForm.safeParse(form);
   if (!parsed.success) {
-    return { ok: false as const, error: es.instruments.invalid };
+    return { ok: false as const, error: t.instruments.invalid };
   }
 
   const { id, exposureKind, exposureLeafId } = parsed.data;
   const kind = exposureKind === "" ? null : exposureKind;
 
   if (kind && KINDS_NEEDING_LEAF.includes(kind) && exposureLeafId === "") {
-    return { ok: false as const, error: es.instruments.leafRequired };
+    return { ok: false as const, error: t.instruments.leafRequired };
   }
 
   let ter: string | null = null;
   if (parsed.data.ter !== "") {
     const fee = terPercentSchema.safeParse(parsed.data.ter);
     if (!fee.success) {
-      return { ok: false as const, error: es.instruments.terInvalid };
+      return { ok: false as const, error: t.instruments.terInvalid };
     }
     ter = fee.data;
   }
@@ -109,19 +122,19 @@ export async function action({ request }: Route.ActionArgs) {
   return { ok: true as const };
 }
 
-async function importHoldings(form: Record<string, unknown>) {
+async function importHoldings(t: Copy, form: Record<string, unknown>) {
   const parsed = holdingsForm.safeParse(form);
   if (!parsed.success) {
-    return { ok: false as const, error: es.instruments.invalid };
+    return { ok: false as const, error: t.instruments.invalid };
   }
   const { id, csv, asOf, identity, name, weight } = parsed.data;
 
   const instrument = await new PrismaInstrumentRepository().get(id);
   if (!instrument) {
-    return { ok: false as const, error: es.instruments.invalid };
+    return { ok: false as const, error: t.instruments.invalid };
   }
   if (instrument.exposureKind !== "EQUITY_FUND") {
-    return { ok: false as const, error: es.holdings.notAFund };
+    return { ok: false as const, error: t.holdings.notAFund };
   }
 
   try {
@@ -150,23 +163,24 @@ async function importHoldings(form: Record<string, unknown>) {
       return { ok: false as const, error: e.message };
     }
     console.error("Holdings import failed for", id, e);
-    return { ok: false as const, error: es.holdings.saveFailed };
+    return { ok: false as const, error: t.holdings.saveFailed };
   }
 }
 
 export default function Instruments({ loaderData }: Route.ComponentProps) {
+  const t = useCopy();
   const { items, unmapped } = loaderData;
 
   return (
     <>
       <header className="mb-4">
         <div className="flex items-start justify-between gap-4">
-          <p className="text-[13px] text-muted">{es.instruments.intro}</p>
+          <p className="text-[13px] text-muted">{t.instruments.intro}</p>
           <SyncPricesButton />
         </div>
         {unmapped > 0 && (
           <p className="mt-2 text-[13px] text-muted">
-            {es.instruments.unmappedHint(unmapped)}
+            {t.instruments.unmappedHint(unmapped)}
           </p>
         )}
       </header>

@@ -122,10 +122,11 @@ function compareValues(
   a: RealizedRow,
   b: RealizedRow,
   key: RealizedSortKey,
+  tag: string,
 ): number {
   if (key === "date") return a.t.localeCompare(b.t);
   if (key === "name")
-    return a.name.localeCompare(b.name, "es", {
+    return a.name.localeCompare(b.name, tag, {
       sensitivity: "base",
     });
   if (key === "holdingDays") return (a.holdingDays ?? 0) - (b.holdingDays ?? 0);
@@ -140,6 +141,7 @@ function compareValues(
 export function sortRealizedRows(
   rows: readonly RealizedRow[],
   sort: RealizedSort,
+  tag = "es-ES",
 ): RealizedRow[] {
   const factor = sort.dir === "asc" ? 1 : -1;
   return [...rows].sort((a, b) => {
@@ -150,7 +152,7 @@ export function sortRealizedRows(
     if (aNull && bNull) return 0;
     if (aNull) return 1;
     if (bNull) return -1;
-    return factor * compareValues(a, b, sort.key);
+    return factor * compareValues(a, b, sort.key, tag);
   });
 }
 
@@ -186,10 +188,10 @@ export function realizedTotals(rows: readonly RealizedRow[]): RealizedTotals {
   };
 }
 
-export const REALIZED_VIEWS = ["ventas", "fiscal"] as const;
+export const REALIZED_VIEWS = ["sales", "tax"] as const;
 export type RealizedView = (typeof REALIZED_VIEWS)[number];
-export const DEFAULT_REALIZED_VIEW: RealizedView = "ventas";
-export const REALIZED_VIEW_PARAM = "vista";
+export const DEFAULT_REALIZED_VIEW: RealizedView = "sales";
+export const REALIZED_VIEW_PARAM = "view";
 
 export function parseRealizedView(params: URLSearchParams): RealizedView {
   const raw = params.get(REALIZED_VIEW_PARAM);
@@ -221,6 +223,7 @@ export interface RealizedYear {
 export function groupRealizedByYear(
   rows: readonly RealizedRow[],
   sort: RealizedSort,
+  tag = "es-ES",
 ): RealizedYear[] {
   const byYear = new Map<number, RealizedRow[]>();
   for (const row of rows) {
@@ -235,7 +238,7 @@ export function groupRealizedByYear(
     .sort(([a], [b]) => (ascending ? a - b : b - a))
     .map(([year, yearRows]) => ({
       year,
-      rows: sortRealizedRows(yearRows, sort),
+      rows: sortRealizedRows(yearRows, sort, tag),
       totals: realizedTotals(yearRows),
     }));
 }

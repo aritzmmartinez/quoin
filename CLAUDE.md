@@ -21,16 +21,25 @@ License: AGPL-3.0-only.
 ## Language policy
 
 - Code, comments, identifiers, commit messages, docs and this file: **English**.
-- UI: **Spanish**, and only via `app/lib/i18n.ts` (a typed `es` object `as const`).
-  Never hardcode a user-facing string in a component.
-- Formatting: es-ES, and only via `app/lib/format.ts` (`formatMoney`, `formatQuantity`,
-  `formatSignedMoney`, `formatPercent`, `formatDate`, `formatPeriod`, `formatTimeTick`,
-  `formatRelativeTime`, `formatClock`, `todayInMadrid`).
-  Never call `toLocaleString` from a component. The last three are the only ones that
-  read the clock: `formatClock` and `todayInMadrid` resolve through `Europe/Madrid`, the
-  same rule as `periodOf` and `fiscalYearOf`.
+- UI: **Spanish by default, English as a full second locale.** `Locale` is `es | en`
+  (`app/lib/locale.ts`), stored in the `quoin-locale` cookie, parsed once in the `root`
+  loader. Never hardcode a user-facing string in a component.
+- **Copy lives in `app/lib/i18n/`** — `es.ts`, `en.ts`, `index.ts`. Components read it
+  with `useCopy()`; everything else (pure helpers, loaders, actions, `*.server.ts`)
+  takes a `Copy` argument. Route `meta` uses `copyFromMatches(matches)`.
+- Formatting goes through `useFormat()` in a component, `createFormat(locale)` anywhere
+  else (`formatMoney`, `formatQuantity`, `formatSignedMoney`, `formatPercent`,
+  `formatDate`, `formatPeriod`, `formatTimeTick`, `formatRelativeTime`, `formatClock`).
+  **Never call `Intl` or `toLocaleString` from a component**, and never reintroduce a
+  free `formatMoney`: the whole point of the factory is that no code path can format
+  without saying which locale it means.
+- `todayInMadrid` stays a free function: it returns an ISO calendar date, not a display
+  string. It and `formatClock` are the only two that read the clock, and both resolve
+  through `Europe/Madrid`, the same rule as `periodOf` and `fiscalYearOf`.
 - Note on es-ES: CLDR `min2` means 4-digit numbers carry **no** thousands separator
-  (`1234,56 €`). This is correct output, not a bug.
+  (`1234,56 €`). This is correct output, not a bug. English is **en-GB**, not en-US:
+  the app is euro-denominated and day-first, so `€1,234.56` and `14/09/2026` are the
+  pair that matches what the Spanish side shows.
 
 ## Commands
 
@@ -49,9 +58,6 @@ pnpm db:migrate                   # prisma migrate dev
 pnpm db:studio
 pnpm db:backup                    # VACUUM INTO data/backups/, keeps the last 30
 pnpm db:seed [--anchor=YYYY-MM-DD]   # synthetic portfolio into the scratch database
-pnpm db:seed:showcase [--months=N] [--range=…]   # real instruments, invented quantities,
-                                                 # into data/showcase.sqlite — for screenshots
-pnpm showcase <command>               # run any command against data/showcase.sqlite
 pnpm ingest --broker=<tr|kraken> <file>
 pnpm prices:sync                  # quote every mapped instrument
 pnpm prices:map <ISIN> <SYMBOL>   # set / show / --clear a Yahoo symbol
@@ -70,7 +76,7 @@ pnpm tax:explain [YYYY|--year=YYYY]   # replay the Bizkaia foral FIFO, lot by lo
 ```
 
 Fund compositions have **no command**: the CSV is dropped onto the fund's row in
-`/instrumentos`. That was a deliberate product decision — one more command is one more
+`/instruments`. That was a deliberate product decision — one more command is one more
 thing only the author can use.
 
 TypeScript is `strict` with `noUncheckedIndexedAccess`. Indexed access returns
@@ -186,9 +192,9 @@ Three defences, and it is worth knowing which one actually carries the weight:
    having to remember. Everything that reads `DATABASE_URL` is pointed away from the
    ledger by default rather than by discipline.
 2. **`assertScratchDatabase` in `scripts/lib/db-target.ts`** — the programmatic barrier
-   for code in this repo. It is an **allow-list** of exact paths, `SCRATCH_DATABASE_FILES`:
-   `data/dev.sqlite` (development, `db:seed`) and `data/showcase.sqlite`
-   (`db:seed:showcase`). "Not the ledger" would wave through `data/quoin.sqlite.bak`, a
+   for code in this repo. It is an **allow-list of exactly one path**,
+   `SCRATCH_DATABASE_FILE` = `data/dev.sqlite`. Any other target is refused, including
+   `data/showcase.sqlite`. "Not the ledger" would wave through `data/quoin.sqlite.bak`, a
    mistyped path, or a snapshot under `data/backups/` — every one a file nobody chose to
    destroy. It also **fails closed**: unset, in-memory or non-`file:` refuses too,
    because a guard that passes when it cannot tell what it is guarding is not a guard.
@@ -216,15 +222,17 @@ ledger while that rule is in force. Useful, but do not mistake it for a sandbox.
 - The seed is **synthetic and stays synthetic** — same reason fixtures are (see *Privacy*).
   It encodes the shapes that have caused bugs: `fees ≠ 0`, an unpriced position, a fund
   with no holdings, two funds sharing constituents, a partial sell.
-- **`db:seed:showcase` is the one deliberate exception, and it buys its realism with a
-  separate file.** Real instruments, real Yahoo history, invented quantities, for README
-  screenshots. It writes `data/showcase.sqlite` and never `data/dev.sqlite`, because
-  `db:seed` would wipe twenty thousand candles that cost a network round trip each, and
-  because a screenshot session must not be one stale `DATABASE_URL` away from the ledger:
-  the script **sets** the variable from a constant before the guard runs. `pnpm showcase
-  <command>` aims anything else at the same file. Nothing in it is chosen by the author —
-  it is the most common European index lines, so it discloses nothing, but check it still
-  holds nothing you hold before publishing a picture of it.
+- **`db:seed:showcase` does not exist, and `data/showcase.sqlite` is what it left behind.**
+  The command was written locally, documented in the v0.8.0 docs pass, and deleted without
+  ever being committed — git has no trace of it, there is no `package.json` entry, and the
+  guard above refuses that path anyway. The `.sqlite` file survives, gitignored, carrying a
+  full schema. Treat it as an artefact with no producer: nothing regenerates it, so
+  whatever it holds cannot be rebuilt from this repo.
+- **If the command is rebuilt, it needs four things in the same change** — the script, a
+  `showcase` wrapper, `SCRATCH_DATABASE_FILE` widened to a list (it is a single path
+  today), and a test pinning that the new file passes the guard while every other path is
+  still refused. It must set `DATABASE_URL` from a constant before the guard runs, so a
+  screenshot session is never one stale variable away from the ledger.
 
 ## Privacy and the no-clobber rule
 
@@ -493,7 +501,7 @@ manual aliasing was abandoned — 726 confirmations is not a system.
 - **The tails converge later than the median**, so all three percentiles are reported
   separately and the median looking settled is not evidence that p10/p90 are.
 - **p25/p75 are two more reads of an already-sorted array**, so `computeProjection` always
-  returns them and `?detalle=1` only decides whether the screen draws them. They are
+  returns them and `?detail=1` only decides whether the screen draws them. They are
   inserted between the three scenarios, never in place of them: the default panel is
   exactly what it was before the toggle existed.
 - **Below `MIN_WINDOW_MONTHS` (60) the screen prints no number at all.** Same rule as a
@@ -513,7 +521,7 @@ manual aliasing was abandoned — 726 confirmations is not a system.
   anywhere that reports what actually happened.
 - **`computePortfolioReturns` is nominal even when the basis switch says real.** Its flows
   are the euros that left the bank, so deflating the value series without them would quote
-  a real return against nominal money. The Resumen loader builds a second, un-deflated
+  a real return against nominal money. The Summary loader builds a second, un-deflated
   series for it. Portfolio TWR is **not** an average of the per-instrument TWRs — a return
   is not additive.
 - Valuation is **EUR-base only, no FX**. Every mapped instrument quotes in EUR. A fund
@@ -617,9 +625,9 @@ manual aliasing was abandoned — 726 confirmations is not a system.
   none of those runs has anything to say about fees, so `computeProjection` builds the twin
   only when asked and only when some line actually carries a TER.
 - The weighted TER is by **current market value** — "what you pay today", not what the plan
-  would pay once it is met. `/coste-ter` reads `?anos` with the projection's own parser and
+  would pay once it is met. `/ter-cost` reads `?years` with the projection's own parser and
   has no form of its own: it is a report derived from the ledger plus the manual fee, like
-  `/realizado` and `/coste-oportunidad`, so it has no sidebar entry either.
+  `/realized` and `/opportunity-cost`, so it has no sidebar entry either.
 
 ## Portfolio target (the savings plan)
 
@@ -733,10 +741,15 @@ Append is idempotent: dedup by `source` + `externalId`.
 
 ## URL as state
 
-Sort order (Cartera), chart range (Resumen), page (Movimientos), concentration threshold
-(Asignación, `?umbral=20`), the rebalance inputs (Asignación, `?aportacion=500`,
-`?desvio=2`) and the projection's extended percentiles (Proyección, `?detalle=1`) live in
+Sort order (`/portfolio`), chart range (`/`), page (`/movements`), concentration threshold
+(`/allocation`, `?threshold=20`), the rebalance inputs (`/allocation`, `?contribution=500`,
+`?drift=2`) and the projection's extended percentiles (`/projection`, `?detail=1`) live in
 **URL search params**, written by the UI and read by the **loader**.
+
+**Routes, params and param values are all English, and they do not follow the UI locale.**
+One route tree, no `/en/` prefix: a URL is an address, not copy, and localising it would
+make a shared link mean different things to two people. `?view=exposure|rebalance|currency|
+overlap`, `?mode=list|matrix`, `?view=sales|tax`.
 
 A `<Form method="get">` **rewrites the whole query string** from its own fields, so any
 param already in the URL that is not a field of that form is dropped on submit. A GET
@@ -746,7 +759,7 @@ a smaller version of this: it works until someone adds a param elsewhere on the 
 never thinks about that form, which is exactly how submitting the rebalance split started
 throwing the user back to the exposure tab. No context, no state lifting, and the view stays
 shareable. A route opts into the header's range selector with `handle = { range: true }`;
-`handle.title` sets the header title.
+`handle.title` sets the header title and is a `(t: Copy, data) => string`, not a string.
 
 ## Route modules
 
@@ -754,7 +767,7 @@ shareable. A route opts into the header's range selector with `handle = { range:
   fragment, not a landmark. A second `<main>` is invalid HTML and breaks landmark
   navigation in a screen reader, and repeating `px-4 py-8 md:px-6` inside it double-insets
   that screen against every other one — both passed typecheck, lint and build for months
-  on `/instrumentos` and `/objetivo`. `root.tsx` keeps its own `<main>` and is **not** the
+  on `/instruments` and `/target`. `root.tsx` keeps its own `<main>` and is **not** the
   same bug: its `ErrorBoundary` replaces the whole subtree below root, so it never
   coexists with the shell's.
 - **A route does not write its own `ErrorBoundary`.** It re-exports the shared one:
@@ -798,7 +811,7 @@ of one row a different width from the row above it. Prose stays `--font-sans`.
 ## Theme — the server cannot know what "system" resolves to
 
 `Theme` is `dark | light | system` (`app/lib/theme.ts`), stored in the `quoin-theme`
-cookie and written by `/ajustes`. The third value is what makes this awkward: the OS
+cookie and written by `/settings`. The third value is what makes this awkward: the OS
 preference lives in the browser, and the cookie does not carry it.
 
 - **The server always renders `resolveTheme(theme, false)`**, so `system` arrives as
@@ -813,6 +826,37 @@ preference lives in the browser, and the cookie does not carry it.
 - The setting writes the cookie and the class **from the client**, with no revalidation:
   nothing on screen depends on the theme server-side, so a round trip would only cost a
   flash. Do not turn it into an action.
+
+## Locale — the mirror image of the theme
+
+Both are a cookie written by `/settings`, and the resemblance stops there. The theme is a
+class name the browser can apply alone; the locale decides what the **server** renders, so
+the two controls sitting side by side behave differently on purpose.
+
+- **`LocaleSetting` revalidates, `ThemeSetting` does not.** Loaders resolve copy and
+  formatters from the cookie, so a client-only write would leave every server-rendered
+  string stale until the next navigation. Measured: `/settings` has no loader of its own
+  and its revalidation touches no database (~3 ms), so the round trip is not a cost worth
+  optimising away.
+- **`Copy` is `typeof es`, and `es` is deliberately NOT `as const`.** Literal types there
+  would force every other locale to repeat the Spanish strings verbatim. Widened to
+  `string`, `en: Copy` makes a missing or misspelled key a **compile error** — that type
+  is the only thing standing between a 1,100-key object and a string that silently stays
+  Spanish forever. Do not "tighten" it back.
+- **A formatter has no default locale; a collator does.** `createFormat(locale)` exports
+  no free `formatMoney`, because a Spanish figure under an English label is unfalsifiable
+  on screen — `1.234,56` is a valid English number too. The collator tag defaults to
+  `es-ES` (`toInstrumentListItems`, `sortRealizedRows`, `groupRealizedByYear`,
+  `toTerRows`) because a name list in the wrong collation is a **different order, not a
+  wrong number**. That asymmetry is the rule, not an oversight.
+- **In `meta`, the match key is `loaderData`, not `data`.** `copyFromMatches` finds the
+  match whose loader data carries a `locale`. Reading `data` fails **silently**: every
+  visible string is still English because components use the hook, and only `<title>`
+  falls back to Spanish. Cost a runtime check to find; pinned by a test now.
+- **`handle.title` is `(t: Copy, data: unknown) => string`**, never a bare string — the
+  header title is copy, and a module-level constant is evaluated before any locale exists.
+- The `es` export is for **tests only**. A component importing `es` instead of `useCopy()`
+  is hardcoded Spanish that typechecks, lints and builds.
 
 ## Spacing
 
@@ -869,6 +913,12 @@ default (it silently did, on Windows, before that was set).
 
 A regression only counts as fixed when a test covers it. The fee-treatment bug survived
 for months because **no test used `fees ≠ 0`**.
+
+**Nothing here renders a component**, so anything that only breaks in the browser needs a
+real request to find. The `meta` locale bug (`data` vs `loaderData`) passed lint, typecheck,
+build and 904 green tests; it took `curl` against `pnpm dev` to see the `<title>`. After a
+change to copy, formatting or the shell, hit the routes and read the output — a green suite
+is not evidence that a screen renders.
 
 CI (GitHub Actions) runs lint + typecheck + build + test + test:integration on every push
 and PR — the same five `pnpm verify:full` runs locally. All five must pass. `pnpm verify`

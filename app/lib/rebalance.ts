@@ -15,8 +15,8 @@ import {
 import { heldValuesByInstrument } from "./portfolio";
 
 export const DEFAULT_DRIFT_THRESHOLD = "0.02";
-export const CONTRIBUTION_PARAM = "aportacion";
-export const DRIFT_THRESHOLD_PARAM = "desvio";
+export const CONTRIBUTION_PARAM = "contribution";
+export const DRIFT_THRESHOLD_PARAM = "drift";
 
 const FORM_OWNED: readonly string[] = [
   CONTRIBUTION_PARAM,

@@ -7,10 +7,10 @@ import { Glossary } from "../ui/Glossary";
 import { CollapsedTip } from "./CollapsedTip";
 import { useParentNavItem } from "./use-parent-nav-item";
 import { NavItemLink } from "./NavItemLink";
-import { NAV_GROUPS, SUMMARY_SUBVIEWS, SYSTEM_ITEMS } from "./nav-items";
+import { navGroups, summarySubviews, systemItems } from "./nav-items";
 import { FOLD, sidebarRow } from "./sidebar-row";
 
-import { es } from "~/lib";
+import { useCopy } from "~/lib";
 
 function BrandMark() {
   return (
@@ -25,10 +25,11 @@ function BrandMark() {
 }
 
 function SubViews({ collapsed }: { collapsed: boolean }) {
+  const t = useCopy();
   if (collapsed) {
     return (
       <div className="flex flex-col items-center gap-1">
-        {SUMMARY_SUBVIEWS.map((sub) => (
+        {summarySubviews(t).map((sub) => (
           <CollapsedTip key={sub.to} label={sub.label} enabled>
             <NavLink
               to={sub.to}
@@ -60,7 +61,7 @@ function SubViews({ collapsed }: { collapsed: boolean }) {
         aria-hidden
         className="absolute inset-y-1 left-4.25 w-px bg-border"
       />
-      {SUMMARY_SUBVIEWS.map((sub) => (
+      {summarySubviews(t).map((sub) => (
         <NavLink
           key={sub.to}
           to={sub.to}
@@ -108,6 +109,7 @@ function GroupTitle({
 }
 
 export function AppSidebar({ version }: { version: string }) {
+  const t = useCopy();
   const [collapsed, setCollapsed] = useState(false);
   const inSubView = useParentNavItem()?.to === "/";
 
@@ -122,12 +124,12 @@ export function AppSidebar({ version }: { version: string }) {
       <div className="mb-3 flex h-10 items-center gap-3 px-1">
         <BrandMark />
         <span className="min-w-0 flex-1 truncate text-[15px] font-bold tracking-tight">
-          {es.nav.brand}
+          {t.nav.brand}
         </span>
         <button
           type="button"
           onClick={toggle}
-          aria-label={es.nav.collapse}
+          aria-label={t.nav.collapse}
           tabIndex={collapsed ? -1 : undefined}
           aria-hidden={collapsed || undefined}
           className="flex size-7 shrink-0 items-center justify-center rounded-md border border-border text-muted transition-colors hover:bg-surface hover:text-text"
@@ -141,11 +143,11 @@ export function AppSidebar({ version }: { version: string }) {
           collapsed ? "h-10" : "h-0"
         }`}
       >
-        <CollapsedTip label={es.nav.expand} enabled={collapsed}>
+        <CollapsedTip label={t.nav.expand} enabled={collapsed}>
           <button
             type="button"
             onClick={toggle}
-            aria-label={es.nav.expand}
+            aria-label={t.nav.expand}
             tabIndex={collapsed ? undefined : -1}
             aria-hidden={!collapsed || undefined}
             className="flex h-8 w-full items-center justify-center rounded-md text-muted transition-colors hover:bg-surface hover:text-text"
@@ -156,10 +158,10 @@ export function AppSidebar({ version }: { version: string }) {
       </div>
 
       <nav
-        aria-label="Principal"
+        aria-label={t.a11y.mainNav}
         className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overflow-x-hidden"
       >
-        {NAV_GROUPS.map((group) => (
+        {navGroups(t).map((group) => (
           <div key={group.title} className="flex flex-col gap-0.5">
             <GroupTitle collapsed={collapsed} title={group.title} />
             {group.items.map((item) => (
@@ -180,8 +182,8 @@ export function AppSidebar({ version }: { version: string }) {
         ))}
 
         <div className="mt-auto flex flex-col gap-0.5">
-          <GroupTitle collapsed={collapsed} title={es.nav.groups.system} />
-          {SYSTEM_ITEMS.map((item) => (
+          <GroupTitle collapsed={collapsed} title={t.nav.groups.system} />
+          {systemItems(t).map((item) => (
             <CollapsedTip
               key={item.label}
               label={item.label}
@@ -194,7 +196,7 @@ export function AppSidebar({ version }: { version: string }) {
               />
             </CollapsedTip>
           ))}
-          <CollapsedTip label={es.glossary.title} enabled={collapsed}>
+          <CollapsedTip label={t.glossary.title} enabled={collapsed}>
             <Glossary variant="nav" className={sidebarRow(collapsed)} />
           </CollapsedTip>
         </div>
@@ -202,7 +204,7 @@ export function AppSidebar({ version }: { version: string }) {
 
       {!collapsed && (
         <span className="mt-4 px-2 font-mono text-[10px] text-faint">
-          {es.nav.version(version)}
+          {t.nav.version(version)}
         </span>
       )}
     </aside>

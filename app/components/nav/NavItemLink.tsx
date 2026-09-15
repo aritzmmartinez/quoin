@@ -2,7 +2,7 @@ import { NavLink } from "react-router";
 
 import type { NavItem } from "./nav-items";
 
-import { es } from "~/lib";
+import { useCopy } from "~/lib";
 
 import { sidebarRow } from "./sidebar-row";
 import { useParentNavItem } from "./use-parent-nav-item";
@@ -29,6 +29,7 @@ export function NavItemLink({
   variant: Variant;
   collapsed?: boolean;
 }) {
+  const t = useCopy();
   const Icon = item.icon;
   const isBottom = variant === "bottom";
   const size = isBottom ? 20 : 18;
@@ -48,7 +49,7 @@ export function NavItemLink({
         <span>{item.label}</span>
         {!isBottom && (
           <span className="ml-auto rounded-full border border-border px-1.5 py-0.5 text-[10px] tracking-wide">
-            {es.nav.soon}
+            {t.nav.soon}
           </span>
         )}
       </span>

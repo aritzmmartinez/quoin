@@ -16,7 +16,7 @@ import {
 import type { HistoryRange } from "~/core/ports";
 import { computePositions } from "~/core/projections";
 
-import { es } from "./i18n";
+import type { Copy } from "./i18n";
 import type {
   IngestPreview,
   IngestResult,
@@ -33,10 +33,11 @@ export type * from "./ingest";
 export class IngestError extends Error {}
 
 async function plan(
+  t: Copy,
   csv: string,
 ): Promise<{ broker: Broker; batch: MappedBatch }> {
   const broker = detectBroker(csv);
-  if (!broker) throw new IngestError(es.ingest.unknownBroker);
+  if (!broker) throw new IngestError(t.ingest.unknownBroker);
 
   const instruments = new PrismaInstrumentRepository();
   const ledger = new PrismaLedgerRepository();
@@ -53,14 +54,20 @@ async function plan(
   return { broker, batch };
 }
 
-export async function previewIngest(csv: string): Promise<IngestPreview> {
-  const { broker, batch } = await plan(csv);
+export async function previewIngest(
+  t: Copy,
+  csv: string,
+): Promise<IngestPreview> {
+  const { broker, batch } = await plan(t, csv);
   const summary = await previewBatch(new PrismaLedgerRepository(), batch);
   return { broker, summary };
 }
 
-export async function commitIngest(csv: string): Promise<IngestResult> {
-  const { broker, batch } = await plan(csv);
+export async function commitIngest(
+  t: Copy,
+  csv: string,
+): Promise<IngestResult> {
+  const { broker, batch } = await plan(t, csv);
   const instruments = new PrismaInstrumentRepository();
   const ledger = new PrismaLedgerRepository();
 
@@ -89,11 +96,12 @@ async function pendingMappings(batch: MappedBatch): Promise<PendingMapping[]> {
 }
 
 export async function checkQuoteSymbol(
+  t: Copy,
   instrumentId: string,
   symbol: string,
 ): Promise<SymbolCheck> {
   const [quote] = await new YahooMarketDataProvider().getQuotes([symbol]);
-  if (!quote) throw new IngestError(es.ingest.map.noQuote(symbol));
+  if (!quote) throw new IngestError(t.ingest.map.noQuote(symbol));
 
   const events = await new PrismaLedgerRepository().list();
   return checkSymbol(

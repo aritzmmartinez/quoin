@@ -1,4 +1,4 @@
-import { es, formatPeriod, formatRelativeTime } from "~/lib";
+import { useCopy, useFormat } from "~/lib";
 
 import { InfoHint } from "./Hint";
 
@@ -13,22 +13,24 @@ export function BasisReference({
   reference,
   syncedAt,
 }: BasisReferenceProps) {
+  const { formatPeriod, formatRelativeTime } = useFormat();
+  const t = useCopy();
   if (!active || !reference) return null;
 
   return (
     <span className="flex items-center gap-1 text-[12px] text-muted">
-      {es.basis.reference(formatPeriod(reference))}
+      {t.basis.reference(formatPeriod(reference))}
       <InfoHint
-        name={es.basis.about}
+        name={t.basis.about}
         size={18}
         label={
           <>
-            <span>{es.basis.perFlow}</span>
-            <span className="text-muted">{es.basis.lag}</span>
+            <span>{t.basis.perFlow}</span>
+            <span className="text-muted">{t.basis.lag}</span>
             <span className="text-muted">
               {syncedAt
-                ? es.basis.synced(formatRelativeTime(syncedAt))
-                : es.basis.neverSynced}
+                ? t.basis.synced(formatRelativeTime(syncedAt))
+                : t.basis.neverSynced}
             </span>
           </>
         }

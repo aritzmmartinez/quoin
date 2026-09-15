@@ -19,6 +19,7 @@ import {
   type Territory,
 } from "~/core/tax";
 
+import type { Copy } from "./i18n";
 import { REALIZED_VIEW_PARAM } from "./realized";
 
 function isSellTrade(event: LedgerEvent): event is TradeEvent {
@@ -56,7 +57,7 @@ export function parseTaxYear(
 
 export function taxYearHref(params: URLSearchParams, year: number): string {
   const next = new URLSearchParams(params);
-  next.set(REALIZED_VIEW_PARAM, "fiscal");
+  next.set(REALIZED_VIEW_PARAM, "tax");
   next.set(TAX_YEAR_PARAM, String(year));
   return `?${next.toString()}`;
 }
@@ -107,17 +108,11 @@ export interface TaxYearView {
   quota: string | null;
 }
 
-function uiDisallowedReason(): string {
-  return (
-    `Recompra de valores homogéneos dentro de los ${WASH_SALE_WINDOW_MONTHS} ` +
-    "meses de la venta: pérdida no deducible este año."
-  );
-}
-
 export function buildTaxYearView(
   events: readonly LedgerEvent[],
   instruments: readonly Instrument[],
   year: number,
+  t: Copy,
 ): TaxYearView {
   const byId = new Map(instruments.map((i) => [i.id, i]));
   const result = computeTaxLots(events, year);
@@ -135,7 +130,9 @@ export function buildTaxYearView(
       costBasis: gain.costBasis,
       realizedPnL: gain.realizedPnL,
       disallowed: gain.disallowed,
-      disallowedReason: gain.disallowed ? uiDisallowedReason() : null,
+      disallowedReason: gain.disallowed
+        ? t.realized.fiscal.disallowedReason(WASH_SALE_WINDOW_MONTHS)
+        : null,
       disallowedByBuyEventId: gain.disallowedByBuyEventId,
       lots: gain.lots.map((lot) => ({
         buyEventId: lot.buyEventId,

@@ -1,4 +1,4 @@
-import { DASH, formatPercent } from "~/lib";
+import { DASH, type Format } from "~/lib";
 
 export function signClass(fraction: string | null): string {
   if (fraction === null) return "";
@@ -6,7 +6,10 @@ export function signClass(fraction: string | null): string {
   return n > 0 ? "text-positive" : n < 0 ? "text-negative" : "";
 }
 
-export function signedPercent(fraction: string | null): string {
+export function signedPercent(
+  formatPercent: Format["formatPercent"],
+  fraction: string | null,
+): string {
   if (fraction === null) return DASH;
   const n = Number(fraction);
   const body = formatPercent(String(Math.abs(n)));
