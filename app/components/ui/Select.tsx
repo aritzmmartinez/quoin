@@ -18,7 +18,7 @@ const PANEL =
   "m-0 inset-auto max-w-[min(280px,calc(100vw-32px))] rounded-xl border border-border bg-surface-2 p-1.5 shadow-lg [&:popover-open]:flex [&:popover-open]:flex-col [&:popover-open]:gap-0.5";
 
 const OPTION =
-  "flex min-h-9 w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left transition-colors";
+  "flex min-h-9 w-full shrink-0 items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left transition-colors";
 
 export function Select({
   value,

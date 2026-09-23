@@ -1,3 +1,5 @@
+import { Link } from "react-router";
+
 import type { Route } from "./+types/allocation";
 
 import {
@@ -15,7 +17,6 @@ import {
   OverlapPanel,
   ReadingCard,
   RebalancePanel,
-  ThresholdSlider,
   ViewTabs,
 } from "~/components";
 import {
@@ -66,7 +67,7 @@ export const handle = { title: (t: Copy) => t.nav.allocation };
 export async function loader({ request }: Route.LoaderArgs) {
   const params = new URL(request.url).searchParams;
   const view = parseAllocationView(params);
-  const threshold = parseThreshold(params);
+  const threshold = parseThreshold(request.headers.get("Cookie"));
   const contribution = parseContribution(params);
   const driftThreshold = parseDriftThreshold(params);
   const overlapMode = parseOverlapMode(params);
@@ -283,7 +284,14 @@ export default function Allocation({ loaderData }: Route.ComponentProps) {
         <Card className="min-w-0 p-6">
           <div className="mb-1 flex flex-wrap items-baseline justify-between gap-3">
             <h2 className="text-[14px] font-semibold">{copy.title}</h2>
-            <ThresholdSlider key={threshold} threshold={threshold} />
+            <Link
+              to="/settings"
+              title={copy.thresholdEdit}
+              className="flex items-center gap-2 text-[11.5px] text-muted transition-colors hover:text-text"
+            >
+              <span>{copy.thresholdMark}</span>
+              <span className="font-mono">{formatPercent(threshold, 0)}</span>
+            </Link>
           </div>
           <p className="mb-4 text-[12.5px] text-muted">{copy.intro}</p>
           <ExposureBars rows={rows} threshold={threshold} />

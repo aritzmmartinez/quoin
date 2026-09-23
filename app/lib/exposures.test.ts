@@ -22,7 +22,7 @@ import {
   parseThreshold,
   THRESHOLD_MAX_PERCENT,
   THRESHOLD_MIN_PERCENT,
-  THRESHOLD_PARAM,
+  THRESHOLD_COOKIE,
   thresholdPercent,
   toExposureRows,
 } from "./exposures";
@@ -368,24 +368,36 @@ describe("currencyByLeaf", () => {
 });
 
 describe("parseThreshold", () => {
-  const of = (query: string) => parseThreshold(new URLSearchParams(query));
+  const of = (value: string) => parseThreshold(`${THRESHOLD_COOKIE}=${value}`);
 
-  it("reads the slider's percent from the URL as a fraction", () => {
-    expect(of(`${THRESHOLD_PARAM}=20`)).toBe("0.2");
-    expect(of(`${THRESHOLD_PARAM}=${THRESHOLD_MIN_PERCENT}`)).toBe("0.05");
-    expect(of(`${THRESHOLD_PARAM}=${THRESHOLD_MAX_PERCENT}`)).toBe("0.3");
+  it("reads the whole percent from its cookie as a fraction", () => {
+    expect(of("20")).toBe("0.2");
+    expect(of(String(THRESHOLD_MIN_PERCENT))).toBe("0.05");
+    expect(of(String(THRESHOLD_MAX_PERCENT))).toBe("0.3");
   });
 
-  it("falls back to the default outside the slider's own range", () => {
-    expect(of(`${THRESHOLD_PARAM}=4`)).toBe(CONCENTRATION_THRESHOLD);
-    expect(of(`${THRESHOLD_PARAM}=31`)).toBe(CONCENTRATION_THRESHOLD);
-    expect(of(`${THRESHOLD_PARAM}=abc`)).toBe(CONCENTRATION_THRESHOLD);
-    expect(of(`${THRESHOLD_PARAM}=`)).toBe(CONCENTRATION_THRESHOLD);
+  it("finds its cookie among others and ignores a name it only ends with", () => {
+    expect(parseThreshold(`quoin-theme=light; ${THRESHOLD_COOKIE}=22`)).toBe(
+      "0.22",
+    );
+    expect(parseThreshold(`x${THRESHOLD_COOKIE}=22`)).toBe(
+      CONCENTRATION_THRESHOLD,
+    );
+  });
+
+  it("falls back to the default, never a clamp, for anything not chosen in settings", () => {
+    expect(of("4")).toBe(CONCENTRATION_THRESHOLD);
+    expect(of("31")).toBe(CONCENTRATION_THRESHOLD);
+    expect(of("12.5")).toBe(CONCENTRATION_THRESHOLD);
+    expect(of("-10")).toBe(CONCENTRATION_THRESHOLD);
+    expect(of("abc")).toBe(CONCENTRATION_THRESHOLD);
     expect(of("")).toBe(CONCENTRATION_THRESHOLD);
+    expect(of("%E0%A4%A")).toBe(CONCENTRATION_THRESHOLD);
+    expect(parseThreshold(null)).toBe(CONCENTRATION_THRESHOLD);
   });
 
-  it("round-trips the slider's value through the percent helper", () => {
-    expect(thresholdPercent(of(`${THRESHOLD_PARAM}=22`))).toBe(22);
+  it("round-trips the stored value through the percent helper", () => {
+    expect(thresholdPercent(of("22"))).toBe(22);
     expect(thresholdPercent(CONCENTRATION_THRESHOLD)).toBe(15);
   });
 });

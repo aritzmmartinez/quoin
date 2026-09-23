@@ -1,10 +1,14 @@
 import { useRevalidator, useRouteLoaderData } from "react-router";
 
-import { type Basis, BASIS_COOKIE, BASIS_KEYS, useCopy } from "~/lib";
+import {
+  type Basis,
+  BASIS_COOKIE,
+  BASIS_KEYS,
+  useCopy,
+  writePreferenceCookie,
+} from "~/lib";
 
 import { SegmentedButtons } from "./Segmented";
-
-const ONE_YEAR = 60 * 60 * 24 * 365;
 
 type RootData = { basis?: Basis };
 
@@ -24,7 +28,7 @@ export function BasisToggle() {
 
   function select(next: Basis) {
     if (next === value) return;
-    document.cookie = `${BASIS_COOKIE}=${next};path=/;max-age=${ONE_YEAR};samesite=lax`;
+    writePreferenceCookie(BASIS_COOKIE, next);
     void revalidator.revalidate();
   }
 

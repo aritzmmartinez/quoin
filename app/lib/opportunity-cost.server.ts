@@ -10,9 +10,7 @@ import {
   type PriceLike,
 } from "~/core/projections";
 
-import { findBenchmark, resolveBenchmarkSymbol } from "./opportunity-cost";
-
-const BENCHMARK_SYMBOL = resolveBenchmarkSymbol(process.env.BENCHMARK_SYMBOL);
+import { findBenchmark } from "./opportunity-cost";
 
 export type OpportunityView =
   | { ok: false; symbol: string; reason: "unmapped" | "no-history" }
@@ -28,7 +26,7 @@ export async function loadOpportunityCost(
   events: readonly LedgerEvent[],
   instruments: readonly Instrument[],
   prices: ReadonlyMap<string, PriceLike>,
-  symbol: string = BENCHMARK_SYMBOL,
+  symbol: string,
   now: Date = new Date(),
 ): Promise<OpportunityView> {
   const benchmark = findBenchmark(instruments, symbol);

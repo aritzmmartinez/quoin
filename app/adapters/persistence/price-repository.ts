@@ -64,4 +64,22 @@ export class PrismaPriceRepository implements PriceRepository {
       source: r.source,
     }));
   }
+
+  /**
+   * First close on file per instrument, in one currency. Instruments with no
+   * close in that currency are absent. One grouped query, so a screen can say
+   * which instruments have history without loading every candle of each.
+   */
+  async historyStarts(currency: string): Promise<Map<string, Date>> {
+    const rows = await prisma.priceSnapshot.groupBy({
+      by: ["instrumentId"],
+      where: { currency },
+      _min: { asOf: true },
+    });
+    const starts = new Map<string, Date>();
+    for (const row of rows) {
+      if (row._min.asOf) starts.set(row.instrumentId, row._min.asOf);
+    }
+    return starts;
+  }
 }

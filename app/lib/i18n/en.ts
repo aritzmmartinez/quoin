@@ -108,11 +108,17 @@ export const en: Copy = {
       threshold: {
         label: "Concentration threshold",
         hint: "A position above this is marked as concentrated",
+        decrease: "Lower the threshold",
+        increase: "Raise the threshold",
       },
       benchmark: {
         label: "Benchmark index",
-        hint: "Used in Opportunity cost",
+        hint: "Used in Opportunity cost and the Summary. You can only compare against instruments you hold or have held, with a mapped symbol and euro history",
         search: "Search ticker or name",
+        since: (date: string): string => `history since ${date}`,
+        unusable:
+          "Unavailable: no instrument with euro history carries this symbol",
+        none: "No instrument has a symbol and euro history yet. Map one in Instruments and download its history.",
       },
     },
   },
@@ -321,7 +327,7 @@ export const en: Copy = {
       "Your direct positions plus what you carry inside your ETFs, looking through to what each fund holds. The solid part of the bar is what you bought yourself. The muted part travels inside a fund.",
     title: "Look-through exposure by value",
     thresholdMark: "┊ threshold",
-    thresholdLabel: "Concentration threshold (%)",
+    thresholdEdit: "Change the threshold in Settings",
     stats: {
       total: "Total resolved",
       leaves: "Resolved leaves",
@@ -1045,6 +1051,7 @@ export const en: Copy = {
       `No instrument is mapped to ${symbol}, so there is no index to compare against. Run pnpm prices:map <ISIN> ${symbol}.`,
     noHistory: (symbol: string): string =>
       `${symbol} has no price history in euros. Run pnpm prices:backfill <ISIN> max to download it.`,
+    chooseBenchmark: "Choose another index in Settings",
     empty: {
       title: "No purchases yet",
       body: "Import your movements so they can be replayed against the index.",

@@ -104,11 +104,17 @@ export const es = {
       threshold: {
         label: "Umbral de concentración",
         hint: "Una posición por encima se marca como concentrada",
+        decrease: "Bajar el umbral",
+        increase: "Subir el umbral",
       },
       benchmark: {
         label: "Índice de referencia",
-        hint: "Usado en Coste de oportunidad",
+        hint: "Usado en Coste de oportunidad y en el Resumen. Solo puedes comparar con instrumentos que tienes o has tenido en cartera, con símbolo mapeado e histórico en euros",
         search: "Buscar ticker o nombre",
+        since: (date: string): string => `histórico desde ${date}`,
+        unusable:
+          "No disponible: ningún instrumento con histórico en euros lleva este símbolo",
+        none: "Ningún instrumento tiene todavía símbolo e histórico en euros. Mapéalo en Instrumentos y descarga su histórico.",
       },
     },
   },
@@ -317,7 +323,7 @@ export const es = {
       "Tu posición directa más lo que llevas dentro de tus ETFs, mirando por transparencia lo que hay en cada fondo. El tramo sólido de la barra es lo que compraste tú. El apagado viaja dentro de un fondo.",
     title: "Exposición real por valor",
     thresholdMark: "\u250a umbral",
-    thresholdLabel: "Umbral de concentraci\u00f3n (%)",
+    thresholdEdit: "Cambiar el umbral en Ajustes",
     stats: {
       total: "Total resuelto",
       leaves: "Hojas resueltas",
@@ -1039,6 +1045,7 @@ export const es = {
       `Ningún instrumento está mapeado a ${symbol}, así que no hay índice contra el que comparar. Ejecuta pnpm prices:map <ISIN> ${symbol}.`,
     noHistory: (symbol: string): string =>
       `${symbol} no tiene histórico de precios en euros. Ejecuta pnpm prices:backfill <ISIN> max para descargarlo.`,
+    chooseBenchmark: "Elegir otro índice en Ajustes",
     empty: {
       title: "Sin compras todavía",
       body: "Importa tus movimientos para poder reproducirlos contra el índice.",
