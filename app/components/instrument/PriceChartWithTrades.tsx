@@ -13,6 +13,7 @@ import {
 
 import { filterByRange, type Range, useCopy, useFormat } from "~/lib";
 
+import { legendOrder } from "../charts/legend-order";
 import { Card } from "../ui/Card";
 import { RangeSelector } from "../ui/RangeSelector";
 
@@ -23,6 +24,8 @@ export interface PriceChartDatum {
   buy: number | null;
   sell: number | null;
 }
+
+const LEGEND_ORDER = legendOrder(["price", "avgCost", "buy", "sell"]);
 
 const TOOLTIP_STYLE = {
   background: "var(--color-surface)",
@@ -87,11 +90,17 @@ export function PriceChartWithTrades({ data }: { data: PriceChartDatum[] }) {
             <Tooltip
               contentStyle={TOOLTIP_STYLE}
               labelFormatter={(t) =>
-                formatDate(new Date(t as number).toISOString())
+                typeof t === "number"
+                  ? formatDate(new Date(t).toISOString())
+                  : ""
               }
-              formatter={(value, name) => [formatMoney(String(value)), name]}
+              formatter={(value, name, item) =>
+                item.dataKey === "t" || value == null
+                  ? null
+                  : [formatMoney(String(value)), name]
+              }
             />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Legend wrapperStyle={{ fontSize: 12 }} itemSorter={LEGEND_ORDER} />
             <Line
               name={c.price}
               dataKey="price"

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Dependencies updated. Minor and patch: react and react-dom 19.3, react-router and its three @react-router packages 8.4 (kept in lockstep), vite 8.3, zod 4.6, eslint 10.11, typescript-eslint 8.70, lucide-react 1.47, isbot, tsx and the React type packages. Majors, one commit each: recharts 3, vitest 5, dotenv 18 and TypeScript 6.
+- pnpm pinned to 12.6.0, up from 12.3.4.
+
+### Fixed
+- Chart legends keep their order under recharts 3, which otherwise sorts them alphabetically, so the order would change with the interface language. A tooltip label that recharts 3 can now pass as undefined no longer crashes the chart.
+
 ## [0.10.0] - 2026-09-23
 
 ### Added
