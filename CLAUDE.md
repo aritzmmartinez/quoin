@@ -976,6 +976,10 @@ The image is **public**. Everything below was found by running it, not by readin
   and the image builds fine and fails at start.
 - **`*.sh` is forced to LF by `.gitattributes`.** With `core.autocrlf=true` a Windows
   checkout hands `sh` a `\r` on every line.
+- **arm64 builds on a native runner (`ubuntu-24.04-arm`), never under QEMU.** Emulated on
+  an amd64 runner it took over 25 minutes, nearly all of it `vite build`. Each platform
+  pushes by digest and a `merge` job joins them; do not fold the matrix back into one
+  `platforms: linux/amd64,linux/arm64` build to "simplify" it.
 - **Only `db:backup` ships as a CLI** (`docker exec quoin npm run db:backup`; the image
   has no pnpm). Every other command has a screen. Adding one means copying its script and
   every file it imports, and `~/` imports need the tsconfig and `app/` too.

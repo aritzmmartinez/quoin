@@ -54,7 +54,8 @@ ENV NODE_ENV=production \
     PORT=3000 \
     DATABASE_URL=file:./data/quoin.sqlite \
     CHECKPOINT_DISABLE=1 \
-    PRISMA_HIDE_UPDATE_MESSAGE=1
+    PRISMA_HIDE_UPDATE_MESSAGE=1 \
+    DOTENV_QUIET=true
 
 WORKDIR /app
 COPY --from=prod-deps /app/node_modules ./node_modules
