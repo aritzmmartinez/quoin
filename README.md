@@ -32,7 +32,7 @@ learning project.
 
 ![Quoin — Summary screen](docs/summary_dark_en.png)
 
-> **Status: v0.9.0, actively built.** A broker CSV goes from file to valued,
+> **Status: v0.10.0, actively built.** A broker CSV goes from file to valued,
 > look-through position inside the app: fund compositions are matched by
 > canonical identity, not by name, so a holding counts once whether you bought
 > it directly or it arrived inside an index. Returns are time-weighted and
@@ -104,8 +104,8 @@ the repo), so a public clone never discloses your holdings. Prefer EUR venues (`
 `.AS`, `.MC`) to avoid FX for now.
 
 The opportunity-cost screen replays every contribution into a benchmark ETF, `VWCE.DE`
-by default. Set `BENCHMARK_SYMBOL` in `.env` to use another — it must be an instrument
-you have mapped with `prices:map` and given EUR price history.
+by default. Pick another under *Benchmark index* in `/settings` — the list offers
+only instruments you have mapped with `prices:map` and given EUR price history.
 
 Two databases, on purpose. `data/quoin.sqlite` is the ledger — real trades, and the only
 thing here that cannot be regenerated. `data/dev.sqlite` is scratch: point `DATABASE_URL`

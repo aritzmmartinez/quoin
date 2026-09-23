@@ -741,10 +741,16 @@ Append is idempotent: dedup by `source` + `externalId`.
 
 ## URL as state
 
-Sort order (`/portfolio`), chart range (`/`), page (`/movements`), concentration threshold
-(`/allocation`, `?threshold=20`), the rebalance inputs (`/allocation`, `?contribution=500`,
-`?drift=2`) and the projection's extended percentiles (`/projection`, `?detail=1`) live in
-**URL search params**, written by the UI and read by the **loader**.
+Sort order (`/portfolio`), chart range (`/`), page (`/movements`), the rebalance inputs
+(`/allocation`, `?contribution=500`, `?drift=2`) and the projection's extended percentiles
+(`/projection`, `?detail=1`) live in **URL search params**, written by the UI and read by
+the **loader**.
+
+**A preference is not view state.** The concentration threshold and the benchmark are
+cookies set only from `/settings` (`quoin-threshold`, `quoin-benchmark`), parsed by the
+loaders that use them. The threshold used to be `?threshold=` plus a slider on
+`/allocation`; that was removed so it has one home. Do not re-add a URL override: two
+sources for one setting is the thing this replaced.
 
 **Routes, params and param values are all English, and they do not follow the UI locale.**
 One route tree, no `/en/` prefix: a URL is an address, not copy, and localising it would
@@ -835,9 +841,14 @@ the two controls sitting side by side behave differently on purpose.
 
 - **`LocaleSetting` revalidates, `ThemeSetting` does not.** Loaders resolve copy and
   formatters from the cookie, so a client-only write would leave every server-rendered
-  string stale until the next navigation. Measured: `/settings` has no loader of its own
-  and its revalidation touches no database (~3 ms), so the round trip is not a cost worth
-  optimising away.
+  string stale until the next navigation. `/settings` now has a loader (the benchmark
+  list: instruments plus one grouped `PriceSnapshot` query), so a language change costs
+  that round trip too — still not worth optimising away.
+- **The benchmark setting is a list of eligible instruments, never free text.** Eligible
+  is exactly what `loadOpportunityCost` refuses without: a `quoteSymbol` plus at least
+  one EUR close (`benchmarkCandidates`). A stored symbol that stops qualifying stays
+  selected and flagged; substituting the first valid option would compare against an
+  index nobody chose.
 - **`Copy` is `typeof es`, and `es` is deliberately NOT `as const`.** Literal types there
   would force every other locale to repeat the Spanish strings verbatim. Widened to
   `string`, `en: Copy` makes a missing or misspelled key a **compile error** — that type
@@ -932,10 +943,13 @@ a release.
   `main` is untouched until a release.
 - Conventional Commits (`feat:`, `fix:`, `chore:`, `refactor:`).
 - `CHANGELOG.md` follows Keep a Changelog, with an `[Unreleased]` section.
-- **The version lives in `package.json`.** Bump it with `pnpm version <patch|minor|major>`,
-  which writes the field, commits and tags. It is stated in **three** places — that field,
-  the `CHANGELOG.md` heading and the README status line — and nothing links them, so a
-  release edits all three or the repo starts disagreeing with itself.
+- **The version is stated in three places and bumped by hand in all three:** the
+  `package.json` field, the `CHANGELOG.md` heading (`[Unreleased]` → `[x.y.z] - date`, plus
+  the compare links at the foot of the file) and the README status line. Nothing links
+  them, so a release edits all three in one commit or the repo starts disagreeing with
+  itself. **Do not use `pnpm version`**: it commits and tags `package.json` alone, so the
+  tag lands on a commit where the changelog and README still name the old version. Tag
+  after the release commit, never before.
 - No "Known limitations" sections in docs — open a GitHub issue instead.
 
 ## Working agreement

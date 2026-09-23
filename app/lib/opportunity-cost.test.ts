@@ -4,10 +4,12 @@ import type { Instrument } from "~/core/domain";
 import type { OpportunityCostLine } from "~/core/projections";
 
 import {
+  BENCHMARK_COOKIE,
+  benchmarkCandidates,
   DEFAULT_BENCHMARK_SYMBOL,
   findBenchmark,
   namesOf,
-  resolveBenchmarkSymbol,
+  parseBenchmark,
   toOpportunityRows,
 } from "./opportunity-cost";
 
@@ -54,17 +56,70 @@ describe("findBenchmark", () => {
   });
 });
 
-describe("resolveBenchmarkSymbol", () => {
-  it("uses the configured symbol when the env var is set", () => {
-    expect(resolveBenchmarkSymbol("IWDA.AS")).toBe("IWDA.AS");
-    expect(resolveBenchmarkSymbol("  SWRD.MI  ")).toBe("SWRD.MI");
+describe("parseBenchmark", () => {
+  const of = (value: string) => parseBenchmark(`${BENCHMARK_COOKIE}=${value}`);
+
+  it("reads the chosen symbol, percent-decoded, from its cookie", () => {
+    expect(of("IWDA.AS")).toBe("IWDA.AS");
+    expect(of(encodeURIComponent("EURUSD=X"))).toBe("EURUSD=X");
+    expect(of(encodeURIComponent("^STOXX50E"))).toBe("^STOXX50E");
+    expect(parseBenchmark(`quoin-theme=dark; ${BENCHMARK_COOKIE}=SWRD.MI`)).toBe(
+      "SWRD.MI",
+    );
   });
 
-  it("falls back to the default when unset, empty or whitespace", () => {
-    expect(resolveBenchmarkSymbol(undefined)).toBe(DEFAULT_BENCHMARK_SYMBOL);
-    expect(resolveBenchmarkSymbol("")).toBe(DEFAULT_BENCHMARK_SYMBOL);
-    expect(resolveBenchmarkSymbol("   ")).toBe(DEFAULT_BENCHMARK_SYMBOL);
+  it("falls back to the default when absent, empty, blank or malformed", () => {
+    expect(parseBenchmark(null)).toBe(DEFAULT_BENCHMARK_SYMBOL);
+    expect(parseBenchmark("quoin-theme=dark")).toBe(DEFAULT_BENCHMARK_SYMBOL);
+    expect(of("")).toBe(DEFAULT_BENCHMARK_SYMBOL);
+    expect(of("%20%20")).toBe(DEFAULT_BENCHMARK_SYMBOL);
+    expect(of("%E0%A4%A")).toBe(DEFAULT_BENCHMARK_SYMBOL);
     expect(DEFAULT_BENCHMARK_SYMBOL).toBe("VWCE.DE");
+  });
+});
+
+describe("benchmarkCandidates", () => {
+  const start = new Date("2021-03-01T00:00:00Z");
+
+  it("offers only instruments with both a quote symbol and EUR history", () => {
+    const candidates = benchmarkCandidates(
+      [
+        instrument("A", "Mapped with history", "AAA.DE"),
+        instrument("B", "Mapped, no EUR history", "BBB.DE"),
+        instrument("C", "History but unmapped"),
+      ],
+      new Map([
+        ["A", start],
+        ["C", start],
+      ]),
+    );
+
+    expect(candidates).toEqual([
+      {
+        symbol: "AAA.DE",
+        instrumentId: "A",
+        name: "Mapped with history",
+        since: "2021-03-01T00:00:00.000Z",
+      },
+    ]);
+  });
+
+  it("sorts by name, not by symbol or id", () => {
+    const candidates = benchmarkCandidates(
+      [instrument("1", "Zeta", "AAA"), instrument("2", "Alfa", "ZZZ")],
+      new Map([
+        ["1", start],
+        ["2", start],
+      ]),
+    );
+
+    expect(candidates.map((c) => c.name)).toEqual(["Alfa", "Zeta"]);
+  });
+
+  it("offers nothing when nothing qualifies, rather than a default", () => {
+    expect(benchmarkCandidates([instrument("A", "Alpha")], new Map())).toEqual(
+      [],
+    );
   });
 });
 

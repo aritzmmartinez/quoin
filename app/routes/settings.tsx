@@ -4,9 +4,26 @@ import type { LucideIcon } from "lucide-react";
 
 import type { Route } from "./+types/settings";
 
-import { LocaleSetting, ThemeSetting } from "~/components";
+import {
+  PrismaInstrumentRepository,
+  PrismaPriceRepository,
+} from "~/adapters/persistence";
+import {
+  BenchmarkSetting,
+  LocaleSetting,
+  ThemeSetting,
+  ThresholdSetting,
+} from "~/components";
 import { Select } from "~/components/ui/Select";
-import { type Copy, copyFromMatches, useCopy } from "~/lib";
+import { BASE_CURRENCY } from "~/core/domain";
+import {
+  benchmarkCandidates,
+  type Copy,
+  copyFromMatches,
+  parseBenchmark,
+  parseThreshold,
+  useCopy,
+} from "~/lib";
 
 export function meta({ matches }: Route.MetaArgs) {
   const t = copyFromMatches(matches);
@@ -18,6 +35,19 @@ export function meta({ matches }: Route.MetaArgs) {
 
 export const handle = { title: (t: Copy) => t.settings.title };
 
+export async function loader({ request }: Route.LoaderArgs) {
+  const cookie = request.headers.get("Cookie");
+  const [instruments, historyStarts] = await Promise.all([
+    new PrismaInstrumentRepository().list(),
+    new PrismaPriceRepository().historyStarts(BASE_CURRENCY),
+  ]);
+  return {
+    threshold: parseThreshold(cookie),
+    benchmark: parseBenchmark(cookie),
+    candidates: benchmarkCandidates(instruments, historyStarts),
+  };
+}
+
 const CURRENCIES = [
   { value: "EUR", label: "EUR", desc: "Euro" },
   { value: "USD", label: "USD", desc: "Dólar estadounidense" },
@@ -25,41 +55,8 @@ const CURRENCIES = [
   { value: "CHF", label: "CHF", desc: "Franco suizo" },
 ] as const;
 
-const BENCHMARKS = [
-  {
-    value: "VWCE.DE",
-    label: "VWCE.DE",
-    desc: "Vanguard FTSE All-World UCITS ETF (Acc)",
-  },
-  {
-    value: "IWDA.AS",
-    label: "IWDA.AS",
-    desc: "iShares Core MSCI World UCITS ETF",
-  },
-  {
-    value: "CSPX.L",
-    label: "CSPX.L",
-    desc: "iShares Core S&P 500 UCITS ETF (Acc)",
-  },
-  {
-    value: "VUAA.L",
-    label: "VUAA.L",
-    desc: "Vanguard S&P 500 UCITS ETF (Acc)",
-  },
-  {
-    value: "EUNL.DE",
-    label: "EUNL.DE",
-    desc: "iShares Core MSCI World (Xetra)",
-  },
-  { value: "SSAC.L", label: "SSAC.L", desc: "iShares MSCI ACWI UCITS ETF" },
-  {
-    value: "EMIM.AS",
-    label: "EMIM.AS",
-    desc: "iShares Core MSCI EM IMI UCITS ETF",
-  },
-] as const;
-
-export default function Settings() {
+export default function Settings({ loaderData }: Route.ComponentProps) {
+  const { threshold, benchmark, candidates } = loaderData;
   const t = useCopy();
   const s = t.settings;
 
@@ -100,24 +97,15 @@ export default function Settings() {
           icon={Gauge}
           label={s.portfolio.threshold.label}
           hint={s.portfolio.threshold.hint}
-          soon={s.soon}
         >
-          <Stepper value="15 %" />
+          <ThresholdSetting threshold={threshold} />
         </Row>
         <Row
           icon={TrendingUp}
           label={s.portfolio.benchmark.label}
           hint={s.portfolio.benchmark.hint}
-          soon={s.soon}
         >
-          <Select
-            label={s.portfolio.benchmark.label}
-            value="VWCE.DE"
-            options={BENCHMARKS}
-            searchPlaceholder={s.portfolio.benchmark.search}
-            onChange={() => undefined}
-            disabled
-          />
+          <BenchmarkSetting benchmark={benchmark} candidates={candidates} />
         </Row>
       </Section>
     </div>
@@ -187,46 +175,6 @@ function Row({
         {hint && <span className="text-[11px] text-muted">{hint}</span>}
       </div>
       {children}
-    </div>
-  );
-}
-
-function Stepper({ value }: { value: string }) {
-  return (
-    <div className="flex h-8 items-center overflow-hidden rounded-md border border-border bg-bg opacity-40">
-      <span
-        className="flex size-8 items-center justify-center text-muted"
-        aria-hidden
-      >
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 14 14"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-        >
-          <path d="M3 7h8" />
-        </svg>
-      </span>
-      <span className="flex h-full min-w-14 items-center justify-center border-x border-border font-mono text-[12px] font-medium">
-        {value}
-      </span>
-      <span
-        className="flex size-8 items-center justify-center text-muted"
-        aria-hidden
-      >
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 14 14"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-        >
-          <path d="M3 7h8M7 3v8" />
-        </svg>
-      </span>
     </div>
   );
 }

@@ -7,11 +7,10 @@ import {
   THEME_COOKIE,
   THEME_KEYS,
   useCopy,
+  writePreferenceCookie,
 } from "~/lib";
 
 import { SegmentedButtons } from "./Segmented";
-
-const ONE_YEAR = 60 * 60 * 24 * 365;
 
 type RootData = { theme?: Theme };
 
@@ -31,7 +30,7 @@ export function ThemeSetting() {
     ).matches;
     const resolved = resolveTheme(next, prefersLight);
     document.documentElement.className = resolved;
-    document.cookie = `${THEME_COOKIE}=${next};path=/;max-age=${ONE_YEAR};samesite=lax`;
+    writePreferenceCookie(THEME_COOKIE, next);
     setTheme(next);
   }
 

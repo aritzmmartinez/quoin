@@ -8,11 +8,11 @@ import {
   LOCALE_COOKIE,
   LOCALE_KEYS,
   useCopy,
+  writePreferenceCookie,
 } from "~/lib";
 
 import { Select } from "./Select";
 
-const ONE_YEAR = 60 * 60 * 24 * 365;
 const ENDONYM: Record<Locale, string> = { es: "Español", en: "English" };
 
 type RootData = { locale?: Locale };
@@ -24,7 +24,7 @@ export function LocaleSetting() {
   const revalidator = useRevalidator();
 
   function select(next: string) {
-    document.cookie = `${LOCALE_COOKIE}=${next};path=/;max-age=${ONE_YEAR};samesite=lax`;
+    writePreferenceCookie(LOCALE_COOKIE, next);
     setLocale(next as Locale);
     void revalidator.revalidate();
   }

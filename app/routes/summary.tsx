@@ -37,6 +37,7 @@ import {
   exposureKindLabel,
   filterByRange,
   heldValuesByInstrument,
+  parseBenchmark,
   parseLocale,
   parseRange,
 } from "~/lib";
@@ -145,7 +146,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     events,
     instruments,
     prices,
-    undefined,
+    parseBenchmark(request.headers.get("Cookie")),
     now,
   );
 
