@@ -4,6 +4,8 @@ on:
   push:
     branches: [main, develop]
   pull_request:
+  # docker.yml runs this first, so no image is published from a tag that fails it.
+  workflow_call:
 
 jobs:
   check:

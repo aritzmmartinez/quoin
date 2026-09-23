@@ -1,0 +1,66 @@
+name: Docker
+
+# Publishes aritzmmartinez/quoin on a version tag (v0.11.0 → 0.11.0, 0.11, latest).
+# Nothing else publishes: a release is a tag, and the tag comes after the release
+# commit, so the image always matches a version the changelog describes.
+#
+# A pull request touching anything the image is built from runs the same job without
+# pushing: both platforms under QEMU, and the Docker Hub login, so a broken pipeline
+# shows up on the PR and not on the tag. That includes package.json: moving `prisma`
+# or `tsx` back to devDependencies still builds, and breaks the image only at start.
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  pull_request:
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - docker-entrypoint.sh
+      - package.json
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+      - prisma/**
+      - .github/workflows/docker.yml
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      # arm64 is built under emulation on an amd64 runner.
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: aritzmmartinez/quoin
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Read by Docker Scout.
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
