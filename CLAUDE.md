@@ -741,10 +741,16 @@ Append is idempotent: dedup by `source` + `externalId`.
 
 ## URL as state
 
-Sort order (`/portfolio`), chart range (`/`), page (`/movements`), concentration threshold
-(`/allocation`, `?threshold=20`), the rebalance inputs (`/allocation`, `?contribution=500`,
-`?drift=2`) and the projection's extended percentiles (`/projection`, `?detail=1`) live in
-**URL search params**, written by the UI and read by the **loader**.
+Sort order (`/portfolio`), chart range (`/`), page (`/movements`), the rebalance inputs
+(`/allocation`, `?contribution=500`, `?drift=2`) and the projection's extended percentiles
+(`/projection`, `?detail=1`) live in **URL search params**, written by the UI and read by
+the **loader**.
+
+**A preference is not view state.** The concentration threshold and the benchmark are
+cookies set only from `/settings` (`quoin-threshold`, `quoin-benchmark`), parsed by the
+loaders that use them. The threshold used to be `?threshold=` plus a slider on
+`/allocation`; that was removed so it has one home. Do not re-add a URL override: two
+sources for one setting is the thing this replaced.
 
 **Routes, params and param values are all English, and they do not follow the UI locale.**
 One route tree, no `/en/` prefix: a URL is an address, not copy, and localising it would
@@ -835,9 +841,14 @@ the two controls sitting side by side behave differently on purpose.
 
 - **`LocaleSetting` revalidates, `ThemeSetting` does not.** Loaders resolve copy and
   formatters from the cookie, so a client-only write would leave every server-rendered
-  string stale until the next navigation. Measured: `/settings` has no loader of its own
-  and its revalidation touches no database (~3 ms), so the round trip is not a cost worth
-  optimising away.
+  string stale until the next navigation. `/settings` now has a loader (the benchmark
+  list: instruments plus one grouped `PriceSnapshot` query), so a language change costs
+  that round trip too — still not worth optimising away.
+- **The benchmark setting is a list of eligible instruments, never free text.** Eligible
+  is exactly what `loadOpportunityCost` refuses without: a `quoteSymbol` plus at least
+  one EUR close (`benchmarkCandidates`). A stored symbol that stops qualifying stays
+  selected and flagged; substituting the first valid option would compare against an
+  index nobody chose.
 - **`Copy` is `typeof es`, and `es` is deliberately NOT `as const`.** Literal types there
   would force every other locale to repeat the Spanish strings verbatim. Widened to
   `string`, `en: Copy` makes a missing or misspelled key a **compile error** — that type

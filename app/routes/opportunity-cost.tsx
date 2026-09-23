@@ -1,3 +1,5 @@
+import { Link } from "react-router";
+
 import type { Route } from "./+types/opportunity-cost";
 
 import {
@@ -15,10 +17,12 @@ import {
   signedPercent,
   InfoHint,
 } from "~/components";
+import { buttonClass } from "~/components/ui/Button";
 import {
   type Copy,
   copyFromMatches,
   namesOf,
+  parseBenchmark,
   toOpportunityRows,
   useCopy,
   useFormat,
@@ -35,14 +39,19 @@ export function meta({ matches }: Route.MetaArgs) {
 
 export const handle = { title: (t: Copy) => t.opportunity.title, parent: "/" };
 
-export async function loader(_: Route.LoaderArgs) {
+export async function loader({ request }: Route.LoaderArgs) {
   const [events, instruments, prices] = await Promise.all([
     new PrismaLedgerRepository().list(),
     new PrismaInstrumentRepository().list(),
     new PrismaPriceRepository().latest(),
   ]);
 
-  const view = await loadOpportunityCost(events, instruments, prices);
+  const view = await loadOpportunityCost(
+    events,
+    instruments,
+    prices,
+    parseBenchmark(request.headers.get("Cookie")),
+  );
   if (!view.ok) {
     return { ok: false as const, symbol: view.symbol, reason: view.reason };
   }
@@ -83,6 +92,9 @@ export default function OpportunityCost({ loaderData }: Route.ComponentProps) {
               ? o.unmapped(loaderData.symbol)
               : o.noHistory(loaderData.symbol)}
           </p>
+          <Link to="/settings" className={`${buttonClass()} mt-4`}>
+            {o.chooseBenchmark}
+          </Link>
         </div>
       </Card>
     );

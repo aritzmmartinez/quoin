@@ -7,6 +7,8 @@ import type { CachedIdentity } from "~/core/ports";
 import type { Contribution, LeafExposure } from "~/core/projections";
 import { leafTotal, leafWeight } from "~/core/projections";
 
+import { readCookie } from "./cookie";
+
 export interface ExposureRow {
   key: string;
   kind: LeafExposure["leaf"]["kind"];
@@ -253,20 +255,18 @@ export function modeHref(params: URLSearchParams, mode: OverlapMode): string {
   return `?${next.toString()}`;
 }
 
-export const THRESHOLD_PARAM = "threshold";
+export const THRESHOLD_COOKIE = "quoin-threshold";
 export const THRESHOLD_MIN_PERCENT = 5;
 export const THRESHOLD_MAX_PERCENT = 30;
 
-export function parseThreshold(params: URLSearchParams): string {
-  const raw = Number(params.get(THRESHOLD_PARAM));
-  if (
-    !Number.isFinite(raw) ||
-    raw < THRESHOLD_MIN_PERCENT ||
-    raw > THRESHOLD_MAX_PERCENT
-  ) {
+export function parseThreshold(cookieHeader: string | null): string {
+  const raw = readCookie(cookieHeader, THRESHOLD_COOKIE);
+  if (raw === null || !/^\d+$/.test(raw)) return CONCENTRATION_THRESHOLD;
+  const percent = Number(raw);
+  if (percent < THRESHOLD_MIN_PERCENT || percent > THRESHOLD_MAX_PERCENT) {
     return CONCENTRATION_THRESHOLD;
   }
-  return new Decimal(raw).div(100).toString();
+  return new Decimal(percent).div(100).toString();
 }
 
 export function thresholdPercent(threshold: string): number {

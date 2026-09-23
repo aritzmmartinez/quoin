@@ -1,11 +1,48 @@
 import type { Instrument } from "~/core/domain";
 import type { OpportunityCostLine } from "~/core/projections";
 
-export const DEFAULT_BENCHMARK_SYMBOL = "VWCE.DE";
+import { readCookie } from "./cookie";
 
-export function resolveBenchmarkSymbol(configured: string | undefined): string {
-  const trimmed = configured?.trim();
-  return trimmed ? trimmed : DEFAULT_BENCHMARK_SYMBOL;
+export const DEFAULT_BENCHMARK_SYMBOL = "VWCE.DE";
+export const BENCHMARK_COOKIE = "quoin-benchmark";
+
+export function parseBenchmark(cookieHeader: string | null): string {
+  const value = readCookie(cookieHeader, BENCHMARK_COOKIE)?.trim();
+  return value ? value : DEFAULT_BENCHMARK_SYMBOL;
+}
+
+export interface BenchmarkCandidate {
+  symbol: string;
+  instrumentId: string;
+  name: string;
+  since: string;
+}
+
+/**
+ * What the benchmark setting may offer: an instrument with a quote symbol and
+ * at least one EUR close — exactly what `loadOpportunityCost` refuses without.
+ * `historyStarts` maps instrumentId to its first EUR close; an instrument
+ * missing from it has no EUR history and is left out, not offered with a
+ * warning. Sorted by name, like every other instrument list.
+ */
+export function benchmarkCandidates(
+  instruments: readonly Instrument[],
+  historyStarts: ReadonlyMap<string, Date>,
+  tag = "es-ES",
+): BenchmarkCandidate[] {
+  const candidates: BenchmarkCandidate[] = [];
+  for (const instrument of instruments) {
+    const symbol = instrument.quoteSymbol;
+    const since = historyStarts.get(instrument.id);
+    if (!symbol || !since) continue;
+    candidates.push({
+      symbol,
+      instrumentId: instrument.id,
+      name: instrument.name,
+      since: since.toISOString(),
+    });
+  }
+  return candidates.sort((a, b) => a.name.localeCompare(b.name, tag));
 }
 
 export interface OpportunityRow {
