@@ -1,0 +1,4 @@
+# Executed by /bin/sh inside a Linux container. A Windows checkout with
+# core.autocrlf=true would otherwise hand it CRLF, and `sh` reads the \r as part
+# of each command.
+*.sh text eol=lf

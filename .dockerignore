@@ -1,4 +1,29 @@
-.react-router
-build
-node_modules
-README.md
+# The image is published on a public registry. Anything that reaches the build
+# context can end up in a layer, so user data is excluded here even though the
+# Dockerfile never copies it by name: one careless `COPY . .` must not be enough to
+# publish the portfolio. Same list as .gitignore's user-data block, plus secrets.
+data/
+*.sqlite
+*.sqlite-*
+*.db
+*.csv
+*.xlsx
+.env
+.env.*
+!.env.example
+**/credentials*
+
+# Regenerated inside the build
+node_modules/
+build/
+.react-router/
+app/adapters/persistence/generated/
+
+# Not needed to build or run
+.git/
+.github/
+.claude/
+.vscode/
+Dockerfile
+.dockerignore
+*.md
