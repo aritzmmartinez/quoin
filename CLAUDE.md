@@ -943,10 +943,13 @@ a release.
   `main` is untouched until a release.
 - Conventional Commits (`feat:`, `fix:`, `chore:`, `refactor:`).
 - `CHANGELOG.md` follows Keep a Changelog, with an `[Unreleased]` section.
-- **The version lives in `package.json`.** Bump it with `pnpm version <patch|minor|major>`,
-  which writes the field, commits and tags. It is stated in **three** places — that field,
-  the `CHANGELOG.md` heading and the README status line — and nothing links them, so a
-  release edits all three or the repo starts disagreeing with itself.
+- **The version is stated in three places and bumped by hand in all three:** the
+  `package.json` field, the `CHANGELOG.md` heading (`[Unreleased]` → `[x.y.z] - date`, plus
+  the compare links at the foot of the file) and the README status line. Nothing links
+  them, so a release edits all three in one commit or the repo starts disagreeing with
+  itself. **Do not use `pnpm version`**: it commits and tags `package.json` alone, so the
+  tag lands on a commit where the changelog and README still name the old version. Tag
+  after the release commit, never before.
 - No "Known limitations" sections in docs — open a GitHub issue instead.
 
 ## Working agreement

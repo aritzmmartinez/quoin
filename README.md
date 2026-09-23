@@ -32,7 +32,7 @@ learning project.
 
 ![Quoin — Summary screen](docs/summary_dark_en.png)
 
-> **Status: v0.9.0, actively built.** A broker CSV goes from file to valued,
+> **Status: v0.10.0, actively built.** A broker CSV goes from file to valued,
 > look-through position inside the app: fund compositions are matched by
 > canonical identity, not by name, so a holding counts once whether you bought
 > it directly or it arrived inside an index. Returns are time-weighted and

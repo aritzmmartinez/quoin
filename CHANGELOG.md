@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-23
+
 ### Added
 - Concentration threshold can now be changed in Settings, from 5% to 30%. Allocation uses whatever you set there.
 - Benchmark index can now be changed in Settings. It's a list, not a text field: only instruments with price history in euros appear, each showing how far back that history goes. Since Quoin has no way to add an instrument outside an import, you can only compare against something you hold or have held, and the setting says so. If the chosen index stops being usable, it stays selected and is flagged, instead of being quietly swapped for another one.
@@ -270,7 +272,8 @@ fund holdings must be supplied as CSV rather than the Excel most issuers publish
 Design rationale lives beside the code it explains, in `docs/ARCHITECTURE.md` and in the
 commit history — not here.
 
-[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/aritzmmartinez/quoin/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/aritzmmartinez/quoin/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/aritzmmartinez/quoin/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/aritzmmartinez/quoin/compare/v0.6.0...v0.7.0
