@@ -7,9 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Docker image, published on Docker Hub as aritzmmartinez/quoin for linux/amd64 and linux/arm64. The database lives in a volume at /app/data, never in the image. The README has the docker run line.
+- Every container start applies pending migrations. When a new image brings migrations and a ledger already exists, it's backed up first with the same checks as db:backup. If the backup fails, the container doesn't start, so a ledger that can't be backed up is never migrated.
+- db:backup runs inside the container: docker exec quoin npm run db:backup.
+- Pushing a version tag publishes the image, and only after CI passes on that tag.
+
 ### Changed
-- Dependencies updated. Minor and patch: react and react-dom 19.3, react-router and its three @react-router packages 8.4 (kept in lockstep), vite 8.3, zod 4.6, eslint 10.11, typescript-eslint 8.70, lucide-react 1.47, isbot, tsx and the React type packages. Majors, one commit each: recharts 3, vitest 5, dotenv 18 and TypeScript 6.
+- Dependencies updated. Minor and patch: react and react-dom 19.3, react-router and its three @react-router packages 8.4 (kept in lockstep), vite 8.3, zod 4.6, eslint 10.11, typescript-eslint 8.70, lucide-react 1.47, isbot, tsx and the React type packages. Majors: recharts 3, vitest 5, dotenv 18 and TypeScript 6.
 - pnpm pinned to 12.6.0, up from 12.3.4.
+- prisma and tsx moved from devDependencies to dependencies, since the container runs them in production: migrations on start, and the backup script.
+- The Dockerfile left over from the React Router template is gone. It used npm and a package-lock.json this project never had, so it couldn't build.
 
 ### Fixed
 - Chart legends keep their order under recharts 3, which otherwise sorts them alphabetically, so the order would change with the interface language. A tooltip label that recharts 3 can now pass as undefined no longer crashes the chart.

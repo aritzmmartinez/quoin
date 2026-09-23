@@ -63,6 +63,40 @@ Prisma 7 + SQLite (better-sqlite3 driver adapter) · decimal.js · Vitest.
 
 ## Getting started
 
+### With Docker
+
+Images for `linux/amd64` and `linux/arm64` are published on Docker Hub as
+[`aritzmmartinez/quoin`](https://hub.docker.com/r/aritzmmartinez/quoin), one per release.
+
+```bash
+docker run -d --name quoin \
+  -p 127.0.0.1:3000:3000 \
+  -v quoin-data:/app/data \
+  --restart unless-stopped \
+  aritzmmartinez/quoin:latest
+```
+
+Then open http://localhost:3000.
+
+- **Keep the `127.0.0.1:` in `-p`.** Quoin has no login. Publishing the port on every
+  interface puts your portfolio on your network, or on the internet if the machine is
+  exposed.
+- **The ledger lives in the `quoin-data` volume**, never in the image. Removing the
+  container keeps it. Removing the volume deletes it.
+- **Every start applies pending migrations.** When a new image brings migrations and a
+  ledger already exists, it is backed up first.
+- **Back up by hand** with `docker exec quoin npm run db:backup`. Snapshots go to
+  `data/backups/` inside the same volume, so copy them off it to protect against losing
+  the volume: `docker cp quoin:/app/data/backups ./quoin-backups`.
+- **OpenFIGI key:** pass `-e OPENFIGI_API_KEY=…` to `docker run` if you have one.
+
+Everything else runs from the app's screens. The CLI commands below are not in the image.
+
+To update: `docker pull aritzmmartinez/quoin:latest`, then `docker rm -f quoin` and run
+the same `docker run` again. The volume carries over.
+
+### From source
+
 Requirements: Node.js 24+ and pnpm.
 
 ```bash
