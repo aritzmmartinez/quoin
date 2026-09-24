@@ -32,7 +32,7 @@ learning project.
 
 ![Quoin — Summary screen](docs/summary_dark_en.png)
 
-> **Status: v0.10.0, actively built.** A broker CSV goes from file to valued,
+> **Status: v0.11.0, actively built.** A broker CSV goes from file to valued,
 > look-through position inside the app: fund compositions are matched by
 > canonical identity, not by name, so a holding counts once whether you bought
 > it directly or it arrived inside an index. Returns are time-weighted and
@@ -59,7 +59,7 @@ cost basis, P&L, allocation and look-through are all pure projections derived fr
 
 React Router 8 (SSR) · React 19 · TypeScript (strict, with noUncheckedIndexedAccess) ·
 Tailwind v4 · Lucide · Zod · Recharts · Papa Parse ·
-Prisma 7 + SQLite (better-sqlite3 driver adapter) · decimal.js · Vitest.
+Prisma 7 + SQLite (better-sqlite3 driver adapter) · decimal.js · Vitest · Docker.
 
 ## Getting started
 
@@ -68,12 +68,8 @@ Prisma 7 + SQLite (better-sqlite3 driver adapter) · decimal.js · Vitest.
 Images for `linux/amd64` and `linux/arm64` are published on Docker Hub as
 [`aritzmmartinez/quoin`](https://hub.docker.com/r/aritzmmartinez/quoin), one per release.
 
-```bash
-docker run -d --name quoin \
-  -p 127.0.0.1:3000:3000 \
-  -v quoin-data:/app/data \
-  --restart unless-stopped \
-  aritzmmartinez/quoin:latest
+```powershell
+docker run -d --name quoin -p 127.0.0.1:3000:3000 -v quoin-data:/app/data --restart unless-stopped aritzmmartinez/quoin:latest
 ```
 
 Then open http://localhost:3000.
@@ -221,6 +217,7 @@ on with decimal.js; data and secrets are never committed.
 - [x] Guided import: broker CSV to valued position from the app, no CLI
 - [x] Interface redesign: new palette, mono figures, grouped sidebar, theme setting
 - [x] English interface alongside Spanish, with figures and dates formatted per locale
+- [x] Docker image for amd64 and arm64, published on every release
 - [ ] Display currency: show every amount converted, with historical rates
 - [ ] Watchlist and trade journal
 - [ ] DCF valuation module

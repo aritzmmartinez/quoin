@@ -308,6 +308,15 @@ pnpm run db:migrate     # creates the database and the first migration
 pnpm run db:studio      # (optional) GUI to inspect the data
 ```
 
+### In the Docker image
+
+The container never uses `db:migrate`. Its entrypoint runs `prisma migrate deploy` on every
+start against the ledger in the `/app/data` volume, so a new image migrates the live ledger
+with nobody watching. That is why it backs up first when a migration is pending and a ledger
+exists, and refuses to start if the backup fails: a ledger that cannot be backed up is never
+migrated. It does not back up on a start with nothing pending, because each backup rotates
+the 30-file window and a restart loop would push every good snapshot out.
+
 ## Non-negotiable principles
 
 - **Ledger as the source of truth.** Immutable transactions; everything else is derived.
@@ -336,11 +345,16 @@ The code is public; data and credentials, NEVER. `data/`, `*.sqlite`, `*.csv`, `
 `credentials*` are gitignored. `.env.example` documents the variables without values.
 Quote symbols (which reveal holdings) live only in the local DB, never in the repo.
 
+The Docker image is public too, so `.dockerignore` excludes the same user data from the build
+context, `*.xlsx` included, even though no `COPY` names it. The database is a volume, never a
+layer.
+
 ## Stack
 
 React Router 8 (SSR) · React 19 · strict TypeScript (`noUncheckedIndexedAccess`) ·
 Tailwind v4 · Lucide · Zod · Recharts · Papa Parse ·
-SQLite + Prisma 7 (better-sqlite3 adapter) · decimal.js · Vitest.
+SQLite + Prisma 7 (better-sqlite3 adapter) · decimal.js · Vitest ·
+Docker (`node:24-slim`, amd64 + arm64).
 
 No form library, and no component library either. Every mutation is a native React Router
 `action` — five of them: the savings plan, the instruments screen, and the three endpoints

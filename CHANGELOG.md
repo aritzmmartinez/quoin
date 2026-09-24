@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-09-24
+
 ### Added
 - Docker image, published on Docker Hub as aritzmmartinez/quoin for linux/amd64 and linux/arm64. The database lives in a volume at /app/data, never in the image. The README has the docker run line.
 - Every container start applies pending migrations. When a new image brings migrations and a ledger already exists, it's backed up first with the same checks as db:backup. If the backup fails, the container doesn't start, so a ledger that can't be backed up is never migrated.
@@ -21,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Chart legends keep their order under recharts 3, which otherwise sorts them alphabetically, so the order would change with the interface language. A tooltip label that recharts 3 can now pass as undefined no longer crashes the chart.
+- The instrument chart's tooltip no longer lists a raw timestamp as "t: …" under each buy and sell series, which recharts 3 started adding. The summary chart's tooltip rows get their spacing back.
 
 ## [0.10.0] - 2026-09-23
 
@@ -287,7 +290,8 @@ fund holdings must be supplied as CSV rather than the Excel most issuers publish
 Design rationale lives beside the code it explains, in `docs/ARCHITECTURE.md` and in the
 commit history — not here.
 
-[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/aritzmmartinez/quoin/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/aritzmmartinez/quoin/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/aritzmmartinez/quoin/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/aritzmmartinez/quoin/compare/v0.7.0...v0.8.0
