@@ -951,6 +951,38 @@ a release.
   tag lands on a commit where the changelog and README still name the old version. Tag
   after the release commit, never before.
 - No "Known limitations" sections in docs — open a GitHub issue instead.
+- **A `v*.*.*` tag publishes `aritzmmartinez/quoin` to Docker Hub** (`docker.yml`, after
+  `ci.yml` passes on the tag). The tag is a release to the public, not only a marker.
+
+## Docker image
+
+The image is **public**. Everything below was found by running it, not by reading it.
+
+- **`.dockerignore` is a privacy boundary.** It excludes `data/`, `*.sqlite`, `*.csv`,
+  `*.xlsx` and `.env*` even though no `COPY` names them, because one `COPY . .` would
+  otherwise publish the portfolio. Keep it in step with `.gitignore`'s user-data block.
+- **`openssl` must be in both the toolchain and runtime stages.** `node:24-slim` has none,
+  and Prisma picks its schema-engine binary by the OpenSSL it detects. Without it, install
+  downloads the `openssl-1.1.x` engine, `migrate deploy` then tries to fetch the right one
+  into a root-owned `node_modules`, and the container never starts.
+- **`CHECKPOINT_DISABLE=1` stays.** The Prisma CLI otherwise calls home (update check plus
+  telemetry) on every `migrate`, which the entrypoint runs on every start.
+- **The entrypoint backs up before it migrates, and only when something is pending.**
+  `prisma migrate status` exits 1 on pending migrations and 0 when current (measured).
+  Backing up on every start would rotate the 30-file window out during a restart loop.
+  A failed backup stops the start: an unbackupable ledger is never migrated.
+- **`prisma` and `tsx` are `dependencies`, not `devDependencies`.** The runtime stage installs
+  `--prod`, and it needs `prisma migrate deploy` and `tsx` for `db:backup`. Move either back
+  and the image builds fine and fails at start.
+- **`*.sh` is forced to LF by `.gitattributes`.** With `core.autocrlf=true` a Windows
+  checkout hands `sh` a `\r` on every line.
+- **arm64 builds on a native runner (`ubuntu-24.04-arm`), never under QEMU.** Emulated on
+  an amd64 runner it took over 25 minutes, nearly all of it `vite build`. Each platform
+  pushes by digest and a `merge` job joins them; do not fold the matrix back into one
+  `platforms: linux/amd64,linux/arm64` build to "simplify" it.
+- **Only `db:backup` ships as a CLI** (`docker exec quoin npm run db:backup`; the image
+  has no pnpm). Every other command has a screen. Adding one means copying its script and
+  every file it imports, and `~/` imports need the tsconfig and `app/` too.
 
 ## Working agreement
 

@@ -32,7 +32,7 @@ learning project.
 
 ![Quoin — Summary screen](docs/summary_dark_en.png)
 
-> **Status: v0.10.0, actively built.** A broker CSV goes from file to valued,
+> **Status: v0.11.0, actively built.** A broker CSV goes from file to valued,
 > look-through position inside the app: fund compositions are matched by
 > canonical identity, not by name, so a holding counts once whether you bought
 > it directly or it arrived inside an index. Returns are time-weighted and
@@ -59,9 +59,39 @@ cost basis, P&L, allocation and look-through are all pure projections derived fr
 
 React Router 8 (SSR) · React 19 · TypeScript (strict, with noUncheckedIndexedAccess) ·
 Tailwind v4 · Lucide · Zod · Recharts · Papa Parse ·
-Prisma 7 + SQLite (better-sqlite3 driver adapter) · decimal.js · Vitest.
+Prisma 7 + SQLite (better-sqlite3 driver adapter) · decimal.js · Vitest · Docker.
 
 ## Getting started
+
+### With Docker
+
+Images for `linux/amd64` and `linux/arm64` are published on Docker Hub as
+[`aritzmmartinez/quoin`](https://hub.docker.com/r/aritzmmartinez/quoin), one per release.
+
+```powershell
+docker run -d --name quoin -p 127.0.0.1:3000:3000 -v quoin-data:/app/data --restart unless-stopped aritzmmartinez/quoin:latest
+```
+
+Then open http://localhost:3000.
+
+- **Keep the `127.0.0.1:` in `-p`.** Quoin has no login. Publishing the port on every
+  interface puts your portfolio on your network, or on the internet if the machine is
+  exposed.
+- **The ledger lives in the `quoin-data` volume**, never in the image. Removing the
+  container keeps it. Removing the volume deletes it.
+- **Every start applies pending migrations.** When a new image brings migrations and a
+  ledger already exists, it is backed up first.
+- **Back up by hand** with `docker exec quoin npm run db:backup`. Snapshots go to
+  `data/backups/` inside the same volume, so copy them off it to protect against losing
+  the volume: `docker cp quoin:/app/data/backups ./quoin-backups`.
+- **OpenFIGI key:** pass `-e OPENFIGI_API_KEY=…` to `docker run` if you have one.
+
+Everything else runs from the app's screens. The CLI commands below are not in the image.
+
+To update: `docker pull aritzmmartinez/quoin:latest`, then `docker rm -f quoin` and run
+the same `docker run` again. The volume carries over.
+
+### From source
 
 Requirements: Node.js 24+ and pnpm.
 
@@ -187,6 +217,7 @@ on with decimal.js; data and secrets are never committed.
 - [x] Guided import: broker CSV to valued position from the app, no CLI
 - [x] Interface redesign: new palette, mono figures, grouped sidebar, theme setting
 - [x] English interface alongside Spanish, with figures and dates formatted per locale
+- [x] Docker image for amd64 and arm64, published on every release
 - [ ] Display currency: show every amount converted, with historical rates
 - [ ] Watchlist and trade journal
 - [ ] DCF valuation module
