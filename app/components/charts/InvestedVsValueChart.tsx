@@ -13,6 +13,7 @@ import {
 
 import { useFormat } from "~/lib";
 
+import { legendOrder } from "./legend-order";
 import { timeTicks } from "./time-ticks";
 
 export interface InvestedVsValueDatum {
@@ -20,6 +21,8 @@ export interface InvestedVsValueDatum {
   invested: number;
   value: number;
 }
+
+const LEGEND_ORDER = legendOrder(["value", "invested"]);
 
 const TOOLTIP_STYLE = {
   background: "var(--color-surface)",
@@ -36,7 +39,7 @@ const TOOLTIP_LABEL_STYLE = {
   marginBottom: 4,
 } as const;
 
-const TOOLTIP_ITEM_STYLE = { padding: 0 } as const;
+const TOOLTIP_ITEM_STYLE = { paddingTop: 3, paddingBottom: 3 } as const;
 
 const CURSOR = {
   stroke: "var(--color-border)",
@@ -129,7 +132,7 @@ export function InvestedVsValueChart({
           labelStyle={TOOLTIP_LABEL_STYLE}
           itemStyle={TOOLTIP_ITEM_STYLE}
           labelFormatter={(t) =>
-            formatDate(new Date(t as number).toISOString())
+            typeof t === "number" ? formatDate(new Date(t).toISOString()) : ""
           }
           formatter={(value, name) => [formatMoney(String(value)), name]}
         />
@@ -138,6 +141,7 @@ export function InvestedVsValueChart({
           align="left"
           height={48}
           iconType="plainline"
+          itemSorter={LEGEND_ORDER}
           iconSize={14}
           wrapperStyle={{ fontSize: 12, color: "var(--color-muted)" }}
         />
