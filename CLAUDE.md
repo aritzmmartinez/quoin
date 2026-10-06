@@ -58,7 +58,7 @@ pnpm db:migrate                   # prisma migrate dev
 pnpm db:studio
 pnpm db:backup                    # VACUUM INTO data/backups/, keeps the last 30
 pnpm db:seed [--anchor=YYYY-MM-DD]   # synthetic portfolio into the scratch database
-pnpm ingest --broker=<tr|kraken> <file>
+pnpm ingest --broker=<trade-republic|kraken> <file>
 pnpm prices:sync                  # quote every mapped instrument
 pnpm prices:map <ISIN> <SYMBOL>   # set / show / --clear a Yahoo symbol
 pnpm prices:backfill [ISIN] [1y|2y|5y|10y|max]   # daily history, default 5y
@@ -943,13 +943,14 @@ a release.
   `main` is untouched until a release.
 - Conventional Commits (`feat:`, `fix:`, `chore:`, `refactor:`).
 - `CHANGELOG.md` follows Keep a Changelog, with an `[Unreleased]` section.
-- **The version is stated in three places and bumped by hand in all three:** the
-  `package.json` field, the `CHANGELOG.md` heading (`[Unreleased]` → `[x.y.z] - date`, plus
-  the compare links at the foot of the file) and the README status line. Nothing links
-  them, so a release edits all three in one commit or the repo starts disagreeing with
-  itself. **Do not use `pnpm version`**: it commits and tags `package.json` alone, so the
-  tag lands on a commit where the changelog and README still name the old version. Tag
-  after the release commit, never before.
+- **The version is stated in two places and bumped by hand in both:** the
+  `package.json` field and the `CHANGELOG.md` heading (`[Unreleased]` → `[x.y.z] - date`,
+  plus the compare links at the foot of the file). The README status line carries no
+  version on purpose; the badge reads it from `package.json`. Nothing links the two, so a
+  release edits both in one commit or the repo starts disagreeing with itself. **Do not
+  use `pnpm version`**: it commits and tags `package.json` alone, so the tag lands on a
+  commit where the changelog still names the old version. Tag after the release commit,
+  never before.
 - No "Known limitations" sections in docs — open a GitHub issue instead.
 - **A `v*.*.*` tag publishes `aritzmmartinez/quoin` to Docker Hub** (`docker.yml`, after
   `ci.yml` passes on the tag). The tag is a release to the public, not only a marker.
