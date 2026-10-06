@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The two-month repurchase window for losses (Art. 43) now counts date to date on Madrid's calendar. A sale at the end of a month used to reach the wrong day: 30 April looked back to 2 March instead of 28 February, and 31 December reached forward to 3 March instead of 28 February. Trades late in the evening were placed on the UTC day instead of Madrid's. Both boundary days are inside the window. This can change which losses are excluded in a tax year.
 - The realized gains page groups sales by year on Madrid's calendar, so a sale late on 31 December appears under the same year as in the tax panel, also when Quoin runs in UTC, as the Docker image does.
 - tax:explain prints dates and the repurchase window on Madrid's calendar, and the window it prints is the one the tax calculation uses.
+- Selecting text in a field and releasing the mouse outside a dialog no longer closes it.
+- In the import wizard, the confirmation shown when closing early is centred on screen, takes keyboard focus, and pressing Escape no longer closes the wizard by accident.
 
 ## [0.11.0] - 2026-09-24
 
