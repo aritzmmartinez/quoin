@@ -1,12 +1,14 @@
 import { Upload } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useRevalidator } from "react-router";
 
 import { useCopy } from "~/lib";
 import { Button } from "../ui/Button";
+import { asFocusable, returnFocus, type Focusable } from "../ui/focus-return";
 import { Modal } from "../ui/Modal";
 import { ingestRequestPending } from "./api";
 import {
+  focusAfterBounce,
   ingestCloseIntent,
   resolveClose,
   shouldBounceForcedClose,
@@ -22,17 +24,37 @@ export function IngestModal() {
   const [run, setRun] = useState(0);
   const [status, setStatus] = useState<IngestStatus>(IDLE);
   const [confirmingClose, setConfirmingClose] = useState(false);
+  const confirmId = `ingest-close-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  const keepButton = useRef<HTMLButtonElement>(null);
+  const returnTo = useRef<Focusable | null>(null);
+  const closeConfirmed = useRef(false);
 
   const copy = t.ingest;
 
+  useEffect(() => {
+    if (confirmingClose) keepButton.current?.focus();
+  }, [confirmingClose]);
+
+  const keep = useCallback(() => {
+    returnFocus(returnTo.current);
+    setConfirmingClose(false);
+  }, []);
+
   const onCloseAttempt = useCallback(() => {
+    if (!confirmingClose) {
+      returnTo.current = asFocusable(document.activeElement);
+    }
     const intent = ingestCloseIntent({
       inFlight: ingestRequestPending(),
       imported: status.imported,
       atDone: status.atDone,
+      confirming: confirmingClose,
     });
-    return resolveClose(intent, () => setConfirmingClose(true));
-  }, [status.imported, status.atDone]);
+    return resolveClose(intent, {
+      confirm: () => setConfirmingClose(true),
+      keep,
+    });
+  }, [status.imported, status.atDone, confirmingClose, keep]);
 
   return (
     <>
@@ -50,43 +72,66 @@ export function IngestModal() {
         title={copy.title}
         onCloseAttempt={onCloseAttempt}
         onClose={() => {
-          if (shouldBounceForcedClose(ingestRequestPending())) {
+          if (
+            shouldBounceForcedClose({
+              inFlight: ingestRequestPending(),
+              imported: status.imported,
+              atDone: status.atDone,
+              closeConfirmed: closeConfirmed.current,
+            })
+          ) {
             dialog.current?.showModal();
+            returnFocus(
+              focusAfterBounce<Focusable>(
+                confirmingClose,
+                keepButton.current,
+                returnTo.current,
+              ),
+            );
             return;
           }
+          closeConfirmed.current = false;
+          returnTo.current = null;
           setStatus(IDLE);
           setConfirmingClose(false);
           setRun((current) => current + 1);
           void revalidator.revalidate();
         }}
       >
-        <div className="relative">
-          <IngestStepper
-            key={run}
-            onStatusChange={setStatus}
-            onFinish={() => dialog.current?.close()}
-          />
+        <IngestStepper
+          key={run}
+          onStatusChange={setStatus}
+          onFinish={() => dialog.current?.close()}
+        />
 
-          {confirmingClose && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-surface/95 px-6 py-4 text-center">
-              <p className="text-[13px]">
+        {confirmingClose && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black/40 p-4">
+            <div
+              role="alertdialog"
+              aria-modal="true"
+              aria-describedby={confirmId}
+              className="flex w-full max-w-sm flex-col items-center gap-3 rounded-card border border-border bg-surface px-6 py-4 text-center"
+            >
+              <p id={confirmId} className="text-[13px]">
                 {copy.closeConfirm.body(status.importedCount)}
               </p>
               <p className="text-[12px] text-muted">{copy.closeConfirm.hint}</p>
               <div className="mt-1 flex gap-2">
-                <Button
-                  variant="ghost"
-                  onClick={() => setConfirmingClose(false)}
-                >
+                <Button ref={keepButton} variant="ghost" onClick={keep}>
                   {copy.closeConfirm.keep}
                 </Button>
-                <Button onClick={() => dialog.current?.close()}>
+                <Button
+                  onClick={() => {
+                    closeConfirmed.current = true;
+                    dialog.current?.close();
+                  }}
+                >
                   {copy.closeConfirm.close}
                 </Button>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </Modal>
     </>
   );

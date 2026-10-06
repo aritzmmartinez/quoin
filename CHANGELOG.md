@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Selecting text in a field and releasing the mouse outside a dialog no longer closes it.
+- In the import wizard, the confirmation shown when closing early is centred on screen, takes keyboard focus, and pressing Escape no longer closes the wizard by accident.
+
 ## [0.11.0] - 2026-09-24
 
 ### Added
