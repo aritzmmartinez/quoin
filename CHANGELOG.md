@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-10-06
+
 ### Changed
 - Losses on a sale with a repurchase within two months (Art. 43) are now held back only in proportion to the units bought back, and computed when those units are sold instead of being dropped. Crypto is no longer subject to this rule. This can change the taxable base of the current and past years.
 - The tax view and tax:explain show how the repurchase rule was applied to each affected sale, and any losses carried to later sales.
@@ -302,7 +304,8 @@ fund holdings must be supplied as CSV rather than the Excel most issuers publish
 Design rationale lives beside the code it explains, in `docs/ARCHITECTURE.md` and in the
 commit history — not here.
 
-[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.11.1...HEAD
+[0.11.1]: https://github.com/aritzmmartinez/quoin/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/aritzmmartinez/quoin/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/aritzmmartinez/quoin/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/aritzmmartinez/quoin/compare/v0.8.0...v0.9.0
