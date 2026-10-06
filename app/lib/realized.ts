@@ -2,6 +2,7 @@ import Decimal from "decimal.js";
 
 import type { Instrument, Thesis } from "~/core/domain";
 import type { RealizedSale } from "~/core/projections";
+import { fiscalYearOf } from "~/core/tax";
 
 export interface RealizedRow {
   id: string;
@@ -93,7 +94,7 @@ export function toRealizedRows(
   return sales.map((sale) => ({
     id: sale.eventId,
     t: sale.ts.toISOString(),
-    year: sale.ts.getFullYear(),
+    year: fiscalYearOf(sale.ts),
     instrumentId: sale.instrumentId,
     name: byId.get(sale.instrumentId)?.name ?? sale.instrumentId,
     thesis: byId.get(sale.instrumentId)?.thesis ?? "CORE",

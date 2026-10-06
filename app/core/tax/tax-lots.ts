@@ -2,12 +2,12 @@ import Decimal from "decimal.js";
 
 import type { LedgerEvent, Revalue, TradeEvent } from "../domain";
 
-import type { Territory } from "./config";
+import { FISCAL_TIME_ZONE, type Territory } from "./config";
 import { walkFifo, type FifoSale } from "./fifo";
 import { findWashSaleTrigger } from "./wash-sale";
 
 const YEAR_IN_MADRID = new Intl.DateTimeFormat("en-CA", {
-  timeZone: "Europe/Madrid",
+  timeZone: FISCAL_TIME_ZONE,
   year: "numeric",
 });
 

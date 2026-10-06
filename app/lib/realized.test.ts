@@ -53,12 +53,14 @@ describe("toRealizedRows", () => {
     expect(rows[1]!.name).toBe("Y");
   });
 
-  it("derives the calendar year from the sale date", () => {
+  it("derives the fiscal year on Madrid's calendar, not the machine's", () => {
+    // 23:00Z on 31 December is midnight in Madrid: already the next year, and the
+    // year the tax panel files it under. getFullYear() said 2024 on a UTC host.
     const rows = toRealizedRows(
-      [sale({ ts: new Date("2024-12-31T23:00:00") })],
+      [sale({ ts: new Date("2024-12-31T23:00:00Z") })],
       [],
     );
-    expect(rows[0]!.year).toBe(2024);
+    expect(rows[0]!.year).toBe(2025);
   });
 });
 
