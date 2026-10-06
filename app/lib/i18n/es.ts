@@ -940,7 +940,7 @@ export const es = {
     fiscal: {
       about: "Sobre el criterio fiscal",
       intro:
-        "Mismas ventas, con criterio FIFO en vez de AVCO, que es el que exige la declaración foral de Bizkaia y no el de la pestaña de Ventas. Cálculo puro: computeTaxLots y computeNetWithCarryforward, sin cifras nuevas.",
+        "Mismas ventas, con criterio FIFO en vez de AVCO, que es el que exige la declaración foral de Bizkaia (NF 13/2013) y no el de la pestaña de Ventas. Las pérdidas con recompra de valores homogéneos en los dos meses anteriores o posteriores se difieren según el Art. 43, en la proporción recomprada, y se integran cuando se transmiten los títulos recomprados; la compensación con años anteriores sigue el Art. 66. La aritmética de la recompra sigue las consultas de la DGT V1403-21, V1117-21 y V3282-18 sobre la norma estatal paralela, que no vinculan a la Hacienda Foral.",
       yearLabel: "Año fiscal",
       noYears: "No hay ventas registradas todavía en ningún año.",
       summary: {
@@ -951,13 +951,13 @@ export const es = {
           "Sin escala fiscal cargada para este año. No se puede calcular la cuota.",
       },
       net: {
-        before: "Neto propio antes de la exclusión por recompra",
-        after: "Neto propio después de la exclusión por recompra",
-        counts: (allowed: number, disallowed: number): string =>
-          `${allowed} ${allowed === 1 ? "venta permitida" : "ventas permitidas"}` +
-          (disallowed > 0
-            ? `, ${disallowed} ${disallowed === 1 ? "descartada por recompra" : "descartadas por recompra"}`
-            : ""),
+        own: "Resultado propio de las ventas del año",
+        nonComputable: "No computable por recompra (Art. 43)",
+        integrated: "Pérdidas diferidas que se integran este año",
+        computable: "Neto computable del año",
+        counts: (sales: number, affected: number): string =>
+          `${sales} ${sales === 1 ? "venta" : "ventas"}` +
+          (affected > 0 ? `, ${affected} con recompra` : ""),
       },
       salesTitle: "Ventas del año, orden FIFO",
       columns: {
@@ -969,20 +969,68 @@ export const es = {
         costBasis: "Coste",
         realizedPnL: "Resultado",
       },
-      disallowedBadge: "Recompra",
-      expand: "Ver lotes",
-      collapse: "Ocultar lotes",
+      washSaleBadge: "Recompra",
+      unlistedBadge: "Aviso",
+      expand: "Ver detalle",
+      collapse: "Ocultar detalle",
       lotsTitle: "Lotes FIFO consumidos",
       lotsColumns: {
         acquiredAt: "Adquirido",
         quantity: "Uds",
         unitCost: "Coste unitario",
       },
+      washSaleReason: (repurchased: string, sold: string): string =>
+        `Art. 43: se recompraron ${repurchased} de las ${sold} uds vendidas.`,
+      ownDeferredReason: (share: string, amount: string): string =>
+        `El ${share} de la pérdida (${amount}) no computa este año: queda diferida en las uds recompradas y se integrará cuando se vendan.`,
+      carriedOverReason: (amount: string): string =>
+        `Las uds vendidas traían pérdida diferida de ventas anteriores; ${amount} pasa a las nuevas uds recompradas, aunque esta venta sea con ganancia. La ganancia propia no se bloquea.`,
+      unlistedReason: (date: string): string =>
+        `Criptomoneda: la regla de los dos meses no se aplica y la pérdida computa entera. Hay una nueva compra el ${date}; parte de la doctrina aplicaría la regla de recompra en el año siguiente. No está resuelto y no cambia ninguna cifra.`,
+      breakdown: {
+        title: "Recompra de valores homogéneos (Art. 43)",
+        before: (months: number): string =>
+          `Adquiridas en los ${months} meses anteriores`,
+        remainingAfter: "Posición que queda tras la venta",
+        repurchaseBefore:
+          "Cuentan como recompra (anteriores que siguen en cartera)",
+        repurchaseAfter: (months: number): string =>
+          `Adquiridas en los ${months} meses posteriores`,
+        repurchased: "Uds recompradas",
+        share: "Parte no computable",
+        nonComputable: "Pérdida no computable",
+        carriedOver: "Pérdida diferida heredada que pasa",
+        recipientsTitle: "Uds que reciben la pérdida diferida",
+        recipientsColumns: {
+          acquiredAt: "Adquiridas",
+          quantity: "Uds",
+          deferredLoss: "Pérdida diferida",
+        },
+      },
+      integrationsTitle: "Pérdidas diferidas que se integran este año",
+      integrationsBody:
+        "Se vendieron las uds recompradas sin nueva recompra en su ventana, así que la pérdida diferida computa ahora, como línea aparte del resultado de la venta (Art. 43).",
+      integrationsColumns: {
+        t: "Venta",
+        name: "Instrumento",
+        origin: "Pérdida de la venta del",
+        amount: "Importe",
+      },
+      pendingTitle: (year: number): string =>
+        `Pérdidas diferidas pendientes a 31 de diciembre de ${year}`,
+      pendingBody:
+        "Siguen ligadas a uds en cartera. No cuentan en ningún año hasta que esas uds se vendan sin nueva recompra (Art. 43).",
+      pendingColumns: {
+        t: "Uds adquiridas",
+        name: "Instrumento",
+        origin: "Pérdida de la venta del",
+        amount: "Importe",
+      },
       empty: {
         title: "Sin ventas en este año",
         body: "Elige otro año fiscal en el desplegable.",
       },
-      carryforwardTitle: "Arrastre de pérdidas, últimos 4 años",
+      carryforwardTitle: "Arrastre de pérdidas, últimos 4 años (Art. 66)",
       carryforwardColumns: {
         year: "Año",
         ownNet: "Neto propio",
@@ -990,8 +1038,6 @@ export const es = {
         finalNet: "Neto final",
         pendingLossRemaining: "Pérdida pendiente",
       },
-      disallowedReason: (months: number): string =>
-        `Recompra de valores homogéneos dentro de los ${months} meses de la venta: pérdida no deducible este año.`,
     },
   },
   opportunity: {

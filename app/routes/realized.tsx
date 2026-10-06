@@ -19,7 +19,6 @@ import { computeRealizedGains } from "~/core/projections";
 import {
   buildTaxYearView,
   type Copy,
-  copyFor,
   copyFromMatches,
   createFormat,
   groupRealizedByYear,
@@ -90,7 +89,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       view:
         view !== "tax" || taxYear === null
           ? null
-          : buildTaxYearView(events, instruments, taxYear, copyFor(locale)),
+          : buildTaxYearView(events, instruments, taxYear),
     },
   };
 }

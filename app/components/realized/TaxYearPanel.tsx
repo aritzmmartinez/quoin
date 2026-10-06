@@ -1,3 +1,4 @@
+import Decimal from "decimal.js";
 import { useNavigate, useSearchParams } from "react-router";
 
 import { DASH, taxYearHref, type TaxYearView, useCopy, useFormat } from "~/lib";
@@ -7,7 +8,11 @@ import { InfoHint } from "../ui/Hint";
 import { Select } from "../ui/Select";
 import { SignedMoney } from "../SignedMoney";
 import { TaxSaleItem } from "./TaxSaleItem";
-import { TAX_SALE_GRID, TAX_SALE_MIN_WIDTH } from "./tax-columns";
+import {
+  TAX_DEFERRED_GRID,
+  TAX_SALE_GRID,
+  TAX_SALE_MIN_WIDTH,
+} from "./tax-columns";
 
 function TaxYearSelect({ years, year }: { years: number[]; year: number }) {
   const t = useCopy();
@@ -91,21 +96,27 @@ export function TaxYearPanel({
               <div className="mb-1 flex flex-wrap items-baseline justify-between gap-3">
                 <h2 className="text-[14px] font-semibold">{copy.salesTitle}</h2>
                 <span className="text-[11.5px] text-muted">
-                  {copy.net.counts(view.allowedCount, view.disallowedCount)}
+                  {copy.net.counts(view.sales.length, view.affectedCount)}
                 </span>
               </div>
-              <div className="mt-3 flex justify-between text-[12.5px] text-muted">
-                <span>{copy.net.before}</span>
-                <span className="tabular-nums">
-                  <SignedMoney value={view.ownNetBeforeExclusion} />
-                </span>
-              </div>
-              <div className="flex justify-between text-[12.5px] font-medium">
-                <span>{copy.net.after}</span>
-                <span className="tabular-nums">
-                  <SignedMoney value={view.allowedNet} />
-                </span>
-              </div>
+              <NetLine label={copy.net.own} value={view.ownNet} />
+              {view.nonComputableSum !== "0.00" && (
+                <NetLine
+                  label={copy.net.nonComputable}
+                  value={negate(view.nonComputableSum)}
+                />
+              )}
+              {view.integratedSum !== "0.00" && (
+                <NetLine
+                  label={copy.net.integrated}
+                  value={view.integratedSum}
+                />
+              )}
+              <NetLine
+                label={copy.net.computable}
+                value={view.computableNet}
+                strong
+              />
             </div>
 
             {view.sales.length === 0 ? (
@@ -139,13 +150,49 @@ export function TaxYearPanel({
                   </div>
                   <ul>
                     {view.sales.map((sale) => (
-                      <TaxSaleItem key={sale.id} sale={sale} />
+                      <TaxSaleItem
+                        key={sale.id}
+                        sale={sale}
+                        windowMonths={view.washSaleWindowMonths}
+                      />
                     ))}
                   </ul>
                 </div>
               </div>
             )}
           </Card>
+
+          {view.integrations.length > 0 && (
+            <DeferredCard
+              title={copy.integrationsTitle}
+              body={copy.integrationsBody}
+              columns={copy.integrationsColumns}
+              rows={view.integrations.map((i) => ({
+                key: `${i.integratedByEventId}:${i.originEventId}`,
+                t: i.t,
+                name: i.name,
+                originT: i.originT,
+                amount: i.amount,
+              }))}
+            />
+          )}
+
+          {view.pending.length > 0 && (
+            <DeferredCard
+              title={copy.pendingTitle(view.year)}
+              body={copy.pendingBody}
+              columns={copy.pendingColumns}
+              rows={view.pending.flatMap((p) =>
+                p.origins.map((o) => ({
+                  key: `${p.buyEventId}:${o.originEventId}`,
+                  t: p.acquiredAt,
+                  name: p.name,
+                  originT: o.originT,
+                  amount: o.amount,
+                })),
+              )}
+            />
+          )}
 
           <Card className="p-6">
             <h2 className="mb-3 text-[14px] font-semibold">
@@ -202,5 +249,84 @@ export function TaxYearPanel({
         </>
       )}
     </div>
+  );
+}
+
+function negate(value: string): string {
+  return new Decimal(value).negated().toFixed(2);
+}
+
+function NetLine({
+  label,
+  value,
+  strong = false,
+}: {
+  label: string;
+  value: string;
+  strong?: boolean;
+}) {
+  return (
+    <div
+      className={`flex justify-between text-[12.5px] ${strong ? "font-medium" : "text-muted"}`}
+    >
+      <span>{label}</span>
+      <span className="font-mono tabular-nums">
+        <SignedMoney value={value} />
+      </span>
+    </div>
+  );
+}
+
+function DeferredCard({
+  title,
+  body,
+  columns,
+  rows,
+}: {
+  title: string;
+  body: string;
+  columns: { t: string; name: string; origin: string; amount: string };
+  rows: {
+    key: string;
+    t: string;
+    name: string;
+    originT: string;
+    amount: string;
+  }[];
+}) {
+  const { formatDate } = useFormat();
+
+  return (
+    <Card className="p-6">
+      <h2 className="text-[14px] font-semibold">{title}</h2>
+      <p className="mt-1 mb-3 text-[11.5px] text-muted">{body}</p>
+      <div className="overflow-x-auto">
+        <div className="min-w-140">
+          <div
+            role="row"
+            className={`grid ${TAX_DEFERRED_GRID} gap-2 border-b border-border py-2 text-[11px] font-medium tracking-wide text-muted`}
+          >
+            <span>{columns.t}</span>
+            <span>{columns.name}</span>
+            <span>{columns.origin}</span>
+            <span className="text-right">{columns.amount}</span>
+          </div>
+          {rows.map((row) => (
+            <div
+              key={row.key}
+              role="row"
+              className={`grid ${TAX_DEFERRED_GRID} gap-2 border-b border-border py-2 text-[12.5px] last:border-b-0`}
+            >
+              <span className="font-mono">{formatDate(row.t)}</span>
+              <span className="truncate">{row.name}</span>
+              <span className="font-mono">{formatDate(row.originT)}</span>
+              <span className="text-right font-mono tabular-nums">
+                <SignedMoney value={row.amount} />
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Card>
   );
 }
