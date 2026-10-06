@@ -32,7 +32,7 @@ learning project.
 
 ![Quoin — Summary screen](docs/summary_dark_en.png)
 
-> **Status: v0.11.0, actively built.** A broker CSV goes from file to valued,
+> **Status: actively built.** A broker CSV goes from file to valued,
 > look-through position inside the app: fund compositions are matched by
 > canonical identity, not by name, so a holding counts once whether you bought
 > it directly or it arrived inside an index. Returns are time-weighted and
@@ -72,7 +72,10 @@ Images for `linux/amd64` and `linux/arm64` are published on Docker Hub as
 docker run -d --name quoin -p 127.0.0.1:3000:3000 -v quoin-data:/app/data --restart unless-stopped aritzmmartinez/quoin:latest
 ```
 
-Then open http://localhost:3000.
+Then open http://localhost:3000 and bring in your trades with **Import trades** on the
+Portfolio screen: drop the CSV export from Trade Republic or Kraken, exactly as you
+downloaded it, and the wizard takes it through symbols, prices and a summary. The broker
+is detected from the file's columns. Importing the same file again adds nothing.
 
 - **Keep the `127.0.0.1:` in `-p`.** Quoin has no login. Publishing the port on every
   interface puts your portfolio on your network, or on the internet if the machine is
@@ -86,7 +89,8 @@ Then open http://localhost:3000.
   the volume: `docker cp quoin:/app/data/backups ./quoin-backups`.
 - **OpenFIGI key:** pass `-e OPENFIGI_API_KEY=…` to `docker run` if you have one.
 
-Everything else runs from the app's screens. The CLI commands below are not in the image.
+Everything else runs from the app's screens. Apart from `db:backup`, the CLI commands
+below are not in the image: with Docker, the wizard is the way to import.
 
 To update: `docker pull aritzmmartinez/quoin:latest`, then `docker rm -f quoin` and run
 the same `docker run` again. The volume carries over.
@@ -102,7 +106,11 @@ pnpm run db:migrate     # creates the database and the first migration
 pnpm run dev            # http://localhost:5173
 ```
 
-Import your data and fetch prices:
+Then open the app and import your trades with **Import trades** on the Portfolio screen,
+as in the Docker section above: the wizard reads the broker export, maps symbols and
+fetches prices without the terminal.
+
+The same work, and everything around it, is also available from the command line:
 
 ```bash
 pnpm ingest --broker=trade-republic path/to/export.csv   # CSV -> ledger (idempotent)
@@ -118,10 +126,8 @@ pnpm ipc:sync                     # INE consumer price index (national + Bizkaia
 pnpm target:set [<file>]          # show, or record a version of, the savings plan
 ```
 
-`ingest`, `prices:map`, `prices:sync` and `prices:backfill` also have a screen:
-**Import transactions** on /portfolio walks a broker export through all four without the
-terminal, and the IPC notice on Summary syncs the price index with a button. The
-commands stay, and do the same work.
+`ingest`, `prices:map`, `prices:sync` and `prices:backfill` do the same work as the
+import wizard, and `ipc:sync` the same as the button in the IPC notice on Summary.
 
 Fund compositions are imported from the **Instruments** screen: drop the issuer's
 holdings CSV onto the fund's row. One parser handles every issuer — the weight column
@@ -135,7 +141,8 @@ the repo), so a public clone never discloses your holdings. Prefer EUR venues (`
 
 The opportunity-cost screen replays every contribution into a benchmark ETF, `VWCE.DE`
 by default. Pick another under *Benchmark index* in `/settings` — the list offers
-only instruments you have mapped with `prices:map` and given EUR price history.
+only instruments you have mapped to a symbol, in the import wizard or with `prices:map`,
+and given EUR price history.
 
 Two databases, on purpose. `data/quoin.sqlite` is the ledger — real trades, and the only
 thing here that cannot be regenerated. `data/dev.sqlite` is scratch: point `DATABASE_URL`

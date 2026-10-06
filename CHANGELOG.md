@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - tax:explain prints dates and the repurchase window on Madrid's calendar, and the window it prints is the one the tax calculation uses.
 - Selecting text in a field and releasing the mouse outside a dialog no longer closes it.
 - In the import wizard, the confirmation shown when closing early is centred on screen, takes keyboard focus, and pressing Escape no longer closes the wizard by accident.
+- First-import instructions now point to the import wizard, with the command line as the alternative when running from source.
 
 ## [0.11.0] - 2026-09-24
 
