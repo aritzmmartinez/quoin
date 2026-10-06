@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Losses on a sale with a repurchase within two months (Art. 43) are now held back only in proportion to the units bought back, and computed when those units are sold instead of being dropped. Crypto is no longer subject to this rule. This can change the taxable base of the current and past years.
+- The tax view and tax:explain show how the repurchase rule was applied to each affected sale, and any losses carried to later sales.
+
 ### Fixed
 - The two-month repurchase window for losses (Art. 43) now counts date to date on Madrid's calendar. A sale at the end of a month used to reach the wrong day: 30 April looked back to 2 March instead of 28 February, and 31 December reached forward to 3 March instead of 28 February. Trades late in the evening were placed on the UTC day instead of Madrid's. Both boundary days are inside the window. This can change which losses are excluded in a tax year.
 - The realized gains page groups sales by year on Madrid's calendar, so a sale late on 31 December appears under the same year as in the tax panel, also when Quoin runs in UTC, as the Docker image does.
