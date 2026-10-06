@@ -23,6 +23,12 @@ export interface FifoLotConsumption {
   costRemoved: Money;
 }
 
+export interface FifoLotBalance {
+  lotId: string;
+  acquiredAt: Date;
+  quantity: Decimal;
+}
+
 export interface FifoSale {
   trade: TradeEvent;
   quantity: Decimal;
@@ -31,6 +37,7 @@ export interface FifoSale {
   costRemoved: Money;
   realizedPnL: Money;
   lots: FifoLotConsumption[];
+  lotsAfter: FifoLotBalance[];
 }
 
 export interface FifoWalk {
@@ -42,14 +49,28 @@ function isTrade(event: LedgerEvent): event is TradeEvent {
   return event.type === "BUY" || event.type === "SELL";
 }
 
+export function compareTrades(a: TradeEvent, b: TradeEvent): number {
+  const byTs = a.ts.getTime() - b.ts.getTime();
+  if (byTs !== 0) return byTs;
+  if (a.type !== b.type) return a.type === "BUY" ? -1 : 1;
+  const byExternal = compareText(a.externalId ?? "", b.externalId ?? "");
+  return byExternal !== 0 ? byExternal : compareText(a.id, b.id);
+}
+
+function compareText(a: string, b: string): number {
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
+}
+
+export function sortTrades(events: readonly LedgerEvent[]): TradeEvent[] {
+  return events.filter(isTrade).sort(compareTrades);
+}
+
 export function walkFifo(
   events: readonly LedgerEvent[],
   revalue?: Revalue,
 ): FifoWalk {
-  const trades = events
-    .filter(isTrade)
-    .slice()
-    .sort((a, b) => a.ts.getTime() - b.ts.getTime());
+  const trades = sortTrades(events);
 
   const restate: Revalue = revalue ?? ((money) => money);
   const queues = new Map<string, FifoLot[]>();
@@ -121,6 +142,11 @@ export function walkFifo(
       costRemoved,
       realizedPnL,
       lots: consumed,
+      lotsAfter: queue.map((lot) => ({
+        lotId: lot.id,
+        acquiredAt: lot.acquiredAt,
+        quantity: lot.quantity,
+      })),
     });
   }
 
