@@ -940,7 +940,7 @@ export const en: Copy = {
     fiscal: {
       about: "About the tax basis",
       intro:
-        "The same sales, on a FIFO basis instead of AVCO, which is what the Bizkaia foral tax return requires and not what the Sales tab uses. Pure calculation: computeTaxLots and computeNetWithCarryforward, no new figures.",
+        "The same sales, on a FIFO basis instead of AVCO, which is what the Bizkaia foral tax return (NF 13/2013) requires and not what the Sales tab uses. A loss with a repurchase of homogeneous securities in the two months before or after is deferred under Art. 43, in the proportion repurchased, and computes when the repurchased securities are transmitted; offsetting against earlier years follows Art. 66. The repurchase arithmetic follows the DGT rulings V1403-21, V1117-21 and V3282-18 on the parallel state rule, which do not bind the Hacienda Foral.",
       yearLabel: "Tax year",
       noYears: "There are no sales recorded in any year yet.",
       summary: {
@@ -951,13 +951,13 @@ export const en: Copy = {
           "No tax scale on file for this year. The tax cannot be computed.",
       },
       net: {
-        before: "Own net before the repurchase exclusion",
-        after: "Own net after the repurchase exclusion",
-        counts: (allowed: number, disallowed: number): string =>
-          `${allowed} ${allowed === 1 ? "allowed sale" : "allowed sales"}` +
-          (disallowed > 0
-            ? `, ${disallowed} ${disallowed === 1 ? "excluded for repurchase" : "excluded for repurchase"}`
-            : ""),
+        own: "Own result of the year's sales",
+        nonComputable: "Not computable for repurchase (Art. 43)",
+        integrated: "Deferred losses that compute this year",
+        computable: "Computable net for the year",
+        counts: (sales: number, affected: number): string =>
+          `${sales} ${sales === 1 ? "sale" : "sales"}` +
+          (affected > 0 ? `, ${affected} with a repurchase` : ""),
       },
       salesTitle: "Sales of the year, FIFO order",
       columns: {
@@ -969,20 +969,67 @@ export const en: Copy = {
         costBasis: "Cost",
         realizedPnL: "Result",
       },
-      disallowedBadge: "Repurchase",
-      expand: "View lots",
-      collapse: "Hide lots",
+      washSaleBadge: "Repurchase",
+      unlistedBadge: "Note",
+      expand: "View detail",
+      collapse: "Hide detail",
       lotsTitle: "FIFO lots consumed",
       lotsColumns: {
         acquiredAt: "Acquired",
         quantity: "Units",
         unitCost: "Unit cost",
       },
+      washSaleReason: (repurchased: string, sold: string): string =>
+        `Art. 43: ${repurchased} of the ${sold} units sold were repurchased.`,
+      ownDeferredReason: (share: string, amount: string): string =>
+        `${share} of the loss (${amount}) does not compute this year: it stays deferred on the repurchased units and computes when they are sold.`,
+      carriedOverReason: (amount: string): string =>
+        `The units sold carried deferred loss from earlier sales; ${amount} moves on to the new repurchased units, even when this sale is at a gain. Its own gain is never held back.`,
+      unlistedReason: (date: string): string =>
+        `Crypto: the two-month rule doesn't apply and the loss counts in full. There is a new purchase on ${date}; some doctrine would apply the one-year repurchase rule. This is unsettled and changes no figures.`,
+      breakdown: {
+        title: "Repurchase of homogeneous securities (Art. 43)",
+        before: (months: number): string =>
+          `Acquired in the ${months} months before`,
+        remainingAfter: "Position left after the sale",
+        repurchaseBefore: "Count as repurchase (earlier, still held)",
+        repurchaseAfter: (months: number): string =>
+          `Acquired in the ${months} months after`,
+        repurchased: "Units repurchased",
+        share: "Non-computable share",
+        nonComputable: "Non-computable loss",
+        carriedOver: "Inherited deferred loss moved on",
+        recipientsTitle: "Units receiving the deferred loss",
+        recipientsColumns: {
+          acquiredAt: "Acquired",
+          quantity: "Units",
+          deferredLoss: "Deferred loss",
+        },
+      },
+      integrationsTitle: "Deferred losses that compute this year",
+      integrationsBody:
+        "The repurchased units were sold with no new repurchase in their window, so the deferred loss computes now, as a line apart from the sale's own result (Art. 43).",
+      integrationsColumns: {
+        t: "Sale",
+        name: "Instrument",
+        origin: "Loss from the sale of",
+        amount: "Amount",
+      },
+      pendingTitle: (year: number): string =>
+        `Deferred losses pending at 31 December ${year}`,
+      pendingBody:
+        "Still attached to units held. They count in no year until those units are sold with no new repurchase (Art. 43).",
+      pendingColumns: {
+        t: "Units acquired",
+        name: "Instrument",
+        origin: "Loss from the sale of",
+        amount: "Amount",
+      },
       empty: {
         title: "No sales in this year",
         body: "Pick another tax year from the dropdown.",
       },
-      carryforwardTitle: "Loss carryforward, last 4 years",
+      carryforwardTitle: "Loss carryforward, last 4 years (Art. 66)",
       carryforwardColumns: {
         year: "Year",
         ownNet: "Own net",
@@ -990,8 +1037,6 @@ export const en: Copy = {
         finalNet: "Final net",
         pendingLossRemaining: "Pending loss",
       },
-      disallowedReason: (months: number): string =>
-        `Repurchase of homogeneous securities within ${months} months of the sale: loss not deductible this year.`,
     },
   },
   opportunity: {

@@ -7,6 +7,17 @@ export type Territory = "bizkaia";
 
 /** Art. 43 NF 13/2013 de Bizkaia — pérdidas patrimoniales no computables (recompra de valores homogéneos). */
 export const WASH_SALE_WINDOW_MONTHS = 2;
+/**
+ * How far after a crypto loss sale a new acquisition of the same asset is
+ * pointed out. Informative only: crypto is outside the two-month rule, and
+ * whether a one-year repurchase rule reaches it is unsettled.
+ */
+export const UNLISTED_NOTICE_WINDOW_MONTHS = 12;
+/**
+ * The zone every fiscal date is read in. Bizkaia files on Madrid's calendar, so a
+ * trade at 23:30Z on 31 December belongs to the next day — and the next year.
+ */
+export const FISCAL_TIME_ZONE = "Europe/Madrid";
 /** Art. 66 NF 13/2013 de Bizkaia — integración y compensación de rentas en la base imponible del ahorro (límite de cuatro años). */
 export const LOSS_CARRYFORWARD_YEARS = 4;
 

@@ -7,16 +7,19 @@ import {
   PrismaLedgerRepository,
   prisma,
 } from "~/adapters/persistence";
+import { toCalendarDate, toIsoDate } from "~/core/calendar";
 import { Money } from "~/core/domain";
-import type { LedgerEvent, TradeEvent } from "~/core/domain";
 import {
+  FISCAL_TIME_ZONE,
   WASH_SALE_WINDOW_MONTHS,
-  computeNetWithCarryforward,
+  carryforwardFrom,
   computeSavingsQuota,
-  computeTaxLots,
+  computeTaxHistory,
   getTaxScale,
+  taxYearOf,
   type RealizedGainDetail,
 } from "~/core/tax";
+import { unlistedInstrumentIds } from "~/lib/tax";
 import { databasePath } from "./lib/db-target";
 
 const YEAR = Number(
@@ -34,41 +37,49 @@ function eur(value: string): string {
 }
 
 function day(t: Date): string {
-  return t.toISOString().slice(0, 10);
+  return toIsoDate(toCalendarDate(t, FISCAL_TIME_ZONE));
 }
 
-function addMonths(date: Date, months: number): Date {
-  const d = new Date(date.getTime());
-  d.setUTCMonth(d.getUTCMonth() + months);
-  return d;
-}
-
-function printSale(
-  gain: RealizedGainDetail,
-  names: Map<string, string>,
-  tradesById: Map<string, TradeEvent>,
-): void {
+function printSale(gain: RealizedGainDetail, names: Map<string, string>): void {
   const name = names.get(gain.instrumentId) ?? gain.instrumentId;
-  const flag = gain.disallowed ? "  <-- WASH-SALE DISALLOWED" : "";
+  const flag = gain.washSale
+    ? "  <-- ART. 43 REPURCHASE"
+    : gain.unlistedNotice
+      ? "  <-- NOTE (unlisted)"
+      : "";
   console.log(
     `  ${day(gain.ts)}  ${gain.instrumentId.padEnd(14)} qty ${gain.quantity.padStart(12)}` +
       `  gross ${eur(gain.grossAmount)}  fees ${eur(gain.fees)}  cost ${eur(gain.costBasis)}` +
       `  pnl ${eur(gain.realizedPnL)}  ${name}${flag}`,
   );
-  if (gain.disallowed) {
-    const windowStart = addMonths(gain.ts, -WASH_SALE_WINDOW_MONTHS);
-    const windowEnd = addMonths(gain.ts, WASH_SALE_WINDOW_MONTHS);
+
+  const ws = gain.washSale;
+  if (ws) {
     console.log(
-      `      window: [${day(windowStart)} .. ${day(windowEnd)}]  (sale ± ${WASH_SALE_WINDOW_MONTHS}m)`,
+      `      window: [${toIsoDate(ws.window.start)} .. ${toIsoDate(ws.window.end)}]  (sale ± ${WASH_SALE_WINDOW_MONTHS}m, Madrid)`,
     );
-    const trigger = gain.disallowedByBuyEventId
-      ? tradesById.get(gain.disallowedByBuyEventId)
-      : undefined;
     console.log(
-      `      repurchase event: ${gain.disallowedByBuyEventId ?? "?"}` +
-        (trigger
-          ? `  on ${day(trigger.ts)}`
-          : "  (ts not found in ledger dump)"),
+      `      before ${ws.before}  R ${ws.remainingAfter}  repurchase_before ${ws.repurchaseBefore}` +
+        `  repurchase_after ${ws.repurchaseAfter}  repurchased ${ws.repurchased} of ${gain.quantity}`,
+    );
+    console.log(
+      `      non-computable fraction ${new Decimal(ws.fraction).toFixed(6)}` +
+        `  own non-computable ${eur(gain.nonComputable)}  computable ${eur(gain.computablePnL)}` +
+        (gain.carriedOver !== "0"
+          ? `  inherited deferral moved on ${eur(gain.carriedOver)}`
+          : ""),
+    );
+    for (const r of ws.recipients) {
+      console.log(
+        `      -> recipient ${r.buyEventId.padEnd(14)} acquired ${day(r.acquiredAt)}` +
+          `  qty ${r.quantity.padStart(12)}  deferred ${eur(r.deferredLoss)}`,
+      );
+    }
+  }
+  if (gain.unlistedNotice) {
+    console.log(
+      `      outside Art. 43 (not admitted to trading); acquired again ${day(gain.unlistedNotice.buyTs)}` +
+        ` (${gain.unlistedNotice.buyEventId}) — informative only, nothing changes`,
     );
   }
   for (const lot of gain.lots) {
@@ -87,16 +98,12 @@ async function main(): Promise<void> {
     new PrismaInstrumentRepository().list(),
   ]);
   const names = new Map(instruments.map((i) => [i.id, i.name]));
-  const tradesById = new Map(
-    events
-      .filter(
-        (e: LedgerEvent): e is TradeEvent =>
-          e.type === "BUY" || e.type === "SELL",
-      )
-      .map((t) => [t.id, t]),
-  );
 
-  const result = computeTaxLots(events, YEAR);
+  const history = computeTaxHistory(events, {
+    unlistedInstrumentIds: unlistedInstrumentIds(instruments),
+  });
+  const saleDays = new Map(history.gains.map((g) => [g.eventId, day(g.ts)]));
+  const result = taxYearOf(history, YEAR);
 
   console.log(`Fiscal year ${result.year} — territory: ${result.territory}\n`);
 
@@ -104,30 +111,50 @@ async function main(): Promise<void> {
     console.log("No sales fell in this fiscal year.");
   } else {
     console.log(`Sales (${result.gains.length}), FIFO:\n`);
-    for (const gain of result.gains) printSale(gain, names, tradesById);
+    for (const gain of result.gains) printSale(gain, names);
   }
 
-  const allowed = result.gains.filter((g) => !g.disallowed);
-  const disallowed = result.gains.filter((g) => g.disallowed);
-  const grossNet = result.gains.reduce(
-    (sum, g) => sum.plus(g.realizedPnL),
-    new Decimal(0),
-  );
-  const disallowedLoss = disallowed.reduce(
-    (sum, g) => sum.plus(g.realizedPnL),
-    new Decimal(0),
-  );
+  if (result.integrations.length > 0) {
+    console.log(`\nDeferred losses that compute in ${YEAR}:\n`);
+    for (const i of result.integrations) {
+      console.log(
+        `  ${day(i.ts)}  ${i.instrumentId.padEnd(14)} sale ${i.integratedByEventId.padEnd(14)}` +
+          `  from loss of ${day(i.originTs)} (${i.originEventId})  ${eur(i.amount)}`,
+      );
+    }
+  }
+
+  const sum = (values: string[]): string =>
+    values.reduce((acc, v) => acc.plus(v), new Decimal(0)).toFixed();
+  const ownNet = sum(result.gains.map((g) => g.realizedPnL));
+  const nonComputable = sum(result.gains.map((g) => g.nonComputable));
+  const integrated = sum(result.integrations.map((i) => i.amount));
+  const affected = result.gains.filter((g) => g.washSale).length;
 
   console.log(
-    `\nOwn-year net before wash-sale exclusion: ${eur(grossNet.toFixed())}` +
-      `  (${allowed.length} allowed, ${disallowed.length} disallowed, ` +
-      `disallowed sum ${eur(disallowedLoss.toFixed())})`,
+    `\nOwn-year result of the sales:            ${eur(ownNet)}` +
+      `  (${result.gains.length} sales, ${affected} with an Art. 43 repurchase)`,
   );
+  console.log(`Non-computable, deferred (Art. 43):      ${eur(nonComputable)}`);
+  console.log(`Deferred losses computing this year:     ${eur(integrated)}`);
   console.log(
-    `Own-year net after wash-sale exclusion:  ${eur(result.allowedNet)}\n`,
+    `Computable net for the year:             ${eur(result.computableNet)}\n`,
   );
 
-  const carry = computeNetWithCarryforward(events, YEAR);
+  if (result.pending.length > 0) {
+    console.log(`Deferred losses still pending at 31-12-${YEAR}:\n`);
+    for (const p of result.pending) {
+      for (const piece of p.pieces) {
+        console.log(
+          `  units ${p.buyEventId.padEnd(14)} acquired ${day(p.acquiredAt)}  ${p.instrumentId.padEnd(14)}` +
+            `  from loss of ${saleDays.get(piece.originEventId) ?? "?"} (${piece.originEventId})  ${eur(piece.amount)}`,
+        );
+      }
+    }
+    console.log("");
+  }
+
+  const carry = carryforwardFrom(history, YEAR);
   console.log(
     `Carryforward chain, ${carry.steps[0]!.year}..${YEAR} (max 4 prior years):\n`,
   );

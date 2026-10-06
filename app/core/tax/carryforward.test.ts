@@ -42,11 +42,13 @@ function yearRoundTrip(
   ];
 }
 
+const LISTED = { unlistedInstrumentIds: new Set<string>() };
+
 describe("computeNetWithCarryforward", () => {
   it("passes a year through unchanged when nothing was ever negative", () => {
     const events = yearRoundTrip("X", 2026, 2026, "1000", "1300");
 
-    const result = computeNetWithCarryforward(events, 2026);
+    const result = computeNetWithCarryforward(events, 2026, LISTED);
 
     expect(result.netSavingsBase).toBe("300");
     expect(result.steps.every((s) => s.consumedFromCarryforward === "0")).toBe(
@@ -63,7 +65,7 @@ describe("computeNetWithCarryforward", () => {
       ...yearRoundTrip("E", 2026, 2026, "1000", "2000"), // +1000
     ];
 
-    const result = computeNetWithCarryforward(events, 2026);
+    const result = computeNetWithCarryforward(events, 2026, LISTED);
 
     expect(result.steps.map((s) => [s.year, s.ownNet, s.finalNet])).toEqual([
       [2022, "-1000", "-1000"],
@@ -82,7 +84,7 @@ describe("computeNetWithCarryforward", () => {
       ...yearRoundTrip("B", 2026, 2026, "1000", "1500"), // +500 in the target year
     ];
 
-    const result = computeNetWithCarryforward(events, 2026);
+    const result = computeNetWithCarryforward(events, 2026, LISTED);
 
     expect(result.steps[0]!.year).toBe(2022);
     expect(result.netSavingsBase).toBe("500");
@@ -94,11 +96,45 @@ describe("computeNetWithCarryforward", () => {
       ...yearRoundTrip("B", 2026, 2026, "1000", "1100"), // +100, less than the loss
     ];
 
-    const result = computeNetWithCarryforward(events, 2026);
+    const result = computeNetWithCarryforward(events, 2026, LISTED);
 
     const finalStep = result.steps[result.steps.length - 1]!;
     expect(finalStep.consumedFromCarryforward).toBe("100");
     expect(finalStep.finalNet).toBe("0");
     expect(finalStep.pendingLossRemaining).toBe("200"); // 300 - 100, still available for 2027
+  });
+  it("a deferred loss integrated in a later year joins that year's net and carries from there", () => {
+    const events = [
+      trade("BUY", "X", "10", "1000", { ts: "2024-01-01" }),
+      trade("SELL", "X", "10", "700", { ts: "2024-06-01" }), // -300, deferred
+      trade("BUY", "X", "10", "750", { ts: "2024-07-01" }),
+      trade("SELL", "X", "10", "800", { ts: "2026-06-01" }), // +50, integrates -300
+      ...yearRoundTrip("Y", 2027, 2027, "1000", "1400"), // +400
+    ];
+
+    const result = computeNetWithCarryforward(events, 2027, LISTED);
+
+    expect(result.steps.map((s) => [s.year, s.ownNet, s.finalNet])).toEqual([
+      [2023, "0", "0"],
+      [2024, "0", "0"], // nothing computes in the year of the deferral
+      [2025, "0", "0"],
+      [2026, "-250", "-250"],
+      [2027, "400", "150"],
+    ]);
+    expect(result.netSavingsBase).toBe("150");
+  });
+  it("the four years run from the year a deferred loss computes, not from the sale that deferred it", () => {
+    const events = [
+      trade("BUY", "X", "10", "1000", { ts: "2020-01-01" }),
+      trade("SELL", "X", "10", "700", { ts: "2021-06-01" }), // -300, deferred
+      trade("BUY", "X", "10", "750", { ts: "2021-07-01" }),
+      trade("SELL", "X", "10", "800", { ts: "2025-06-01" }), // +50, integrates -300
+      ...yearRoundTrip("Y", 2029, 2029, "1000", "1400"), // +400
+    ];
+
+    const result = computeNetWithCarryforward(events, 2029, LISTED);
+
+    expect(result.steps[0]).toMatchObject({ year: 2025, ownNet: "-250" });
+    expect(result.netSavingsBase).toBe("150");
   });
 });

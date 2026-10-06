@@ -11,7 +11,12 @@ function trade(
   instrumentId: string,
   quantity: string,
   grossAmount: string,
-  opts: { fees?: string; ts?: string; fxToBase?: string } = {},
+  opts: {
+    fees?: string;
+    ts?: string;
+    fxToBase?: string;
+    externalId?: string;
+  } = {},
 ): TradeEvent {
   return {
     id: `evt-${seq++}`,
@@ -26,6 +31,7 @@ function trade(
     fxToBase: opts.fxToBase ?? "1",
     account: "test",
     source: "TEST",
+    externalId: opts.externalId,
   };
 }
 
@@ -100,6 +106,28 @@ describe("walkFifo", () => {
     const remaining = walk.lots.get("X")!;
     expect(remaining).toHaveLength(1);
     expect(remaining[0]!.unitCost.toString()).toBe("120");
+  });
+
+  it("orders a tie on ts as BUY before SELL, then by externalId, whatever the input order", () => {
+    const sell = trade("SELL", "X", "5", "600", {
+      ts: "2025-03-01T10:00:00Z",
+      externalId: "a",
+    });
+    const buyB = trade("BUY", "X", "5", "550", {
+      ts: "2025-03-01T10:00:00Z",
+      externalId: "b",
+    });
+    const buyA = trade("BUY", "X", "5", "500", {
+      ts: "2025-03-01T10:00:00Z",
+      externalId: "a",
+    });
+
+    const sale = walkFifo([sell, buyB, buyA]).sales[0]!;
+    expect(sale.lots.map((l) => l.lotId)).toEqual([buyA.id]);
+    expect(sale.realizedPnL.toString()).toBe("100");
+    expect(sale.lotsAfter.map((l) => [l.lotId, l.quantity.toFixed()])).toEqual([
+      [buyB.id, "5"],
+    ]);
   });
 
   it("bakes fees into the acquisition cost, same as AVCO", () => {

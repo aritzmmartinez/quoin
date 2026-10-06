@@ -1,12 +1,15 @@
 import { X } from "lucide-react";
-import { useId, type ReactNode, type Ref } from "react";
+import { useId, useRef, type ReactNode, type Ref } from "react";
 
 import { useCopy } from "~/lib";
 import { Button } from "./Button";
 import {
+  NO_PRESS,
   attemptClose,
   handleBackdropClick,
   handleDialogCancel,
+  pressEnded,
+  pressStarted,
 } from "./modal-close";
 
 export function Modal({
@@ -24,6 +27,7 @@ export function Modal({
 }) {
   const t = useCopy();
   const id = `modal-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  const press = useRef(NO_PRESS);
 
   return (
     <dialog
@@ -34,11 +38,19 @@ export function Modal({
           event.currentTarget.close(),
         )
       }
-      onClick={(event) =>
-        handleBackdropClick(event, onCloseAttempt, () =>
+      onPointerDown={(event) => {
+        press.current = pressStarted(event);
+      }}
+      onPointerUp={(event) => {
+        press.current = pressEnded(press.current, event);
+      }}
+      onClick={(event) => {
+        const ended = press.current;
+        press.current = NO_PRESS;
+        handleBackdropClick(event, ended, onCloseAttempt, () =>
           event.currentTarget.close(),
-        )
-      }
+        );
+      }}
       aria-labelledby={id}
       className="m-auto w-[min(34rem,calc(100vw-2rem))] rounded-card border border-border bg-surface p-0 text-text backdrop:bg-black/60"
     >

@@ -58,7 +58,7 @@ pnpm db:migrate                   # prisma migrate dev
 pnpm db:studio
 pnpm db:backup                    # VACUUM INTO data/backups/, keeps the last 30
 pnpm db:seed [--anchor=YYYY-MM-DD]   # synthetic portfolio into the scratch database
-pnpm ingest --broker=<tr|kraken> <file>
+pnpm ingest --broker=<trade-republic|kraken> <file>
 pnpm prices:sync                  # quote every mapped instrument
 pnpm prices:map <ISIN> <SYMBOL>   # set / show / --clear a Yahoo symbol
 pnpm prices:backfill [ISIN] [1y|2y|5y|10y|max]   # daily history, default 5y
@@ -415,7 +415,7 @@ manual aliasing was abandoned — 726 confirmations is not a system.
 ## Projections
 
 - `computePositions` uses **AVCO** (weighted average cost) for the portfolio view.
-  **FIFO** exists only for foral tax (`computeTaxLots`, over the `walkFifo` fold in
+  **FIFO** exists only for foral tax (`computeTaxHistory`, over the `walkFifo` fold in
   `core/tax/`) and is a **separate** projection. Do not merge them.
 - **Contributed ("aportado") = what left the bank, fees included.** One definition, shared
   by `computePositions.costBasis`, `computeCostBasisTimeline`, `computeReturns.totalInvested`
@@ -665,17 +665,44 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
   trust nobody checked. If the article cannot be confirmed against the actual text, write
   the comment without a number ("regla de recompra a corto plazo, Bizkaia — ver nota de
   Aritz") rather than inventing one that reads as authoritative.
-- **The wash-sale rule is a deliberate simplification: it EXCLUDES the loss from the
-  year's deductible net and FLAGS it, it does not model the deferral.** Art. 43 defers a
-  loss on securities repurchased within two months until the repurchased position is
-  finally transmitted; Quoin drops it from the year and shows the exclusion on screen so
-  whoever files sees it. Do not "fix" it into a deferral without checking that is what
-  Aritz wants — the exclusion is the design, not a bug. The trades that make up the sold
-  lot are excluded from the repurchase search, or every quick loss trips on its own buy.
-- **Nothing FIFO is persisted.** `computeTaxLots` and `computeNetWithCarryforward`
-  recompute from the ledger on every read — no lot table, no carryforward countdown.
-  Restricting the carryforward walk to `[targetYear − 4, targetYear]` is what enforces
-  the four-year expiry; do not add a stored balance.
+- **Art. 43 defers a loss in proportion to the repurchase; it never deletes it.** The
+  non-computable part is `loss × repurchased / sold` and stays on the units that acted as
+  the repurchase until they are transmitted with no new repurchase in their window — then
+  it computes in that year, as its own line, never netted into that sale's result. That
+  sale is assessed **whether it is at a gain or at a loss** (V1403-21: the later
+  transmissions must be definitive "con independencia de que determinen ganancias o
+  pérdidas patrimoniales"): a repurchase in its window moves the carried deferral on to the
+  new units, same quantities, same one-sale-per-unit rule. Its own gain is never held
+  back, and a gain carrying nothing is not assessed and claims no units. An earlier version
+  integrated everything on a gain sale; that contradicted the ruling. The arithmetic follows
+  the DGT on the parallel art. 33.5.f LIRPF — **V1403-21** (purchases before the sale count
+  only if still held: `min(before, R)`), **V1117-21** (purchases after: proportional),
+  **V3282-18** (the chain). They do not bind the Hacienda Foral; comments and UI say so.
+  This replaced an earlier whole-row exclusion that dropped the loss for good.
+- **Two allocation rules are Quoin's own, not the DGT's, and are labelled so.** A unit
+  repurchases one sale only, oldest sale first (a unit already claimed is out of `before`
+  and out of the held units a later sale can use); the held units that receive a deferral
+  are taken oldest acquisition first, then purchases after the sale. Within one lot a
+  deferral is spread pro rata over the units still held. Do not present any of these as
+  doctrine.
+- **Crypto is outside Art. 43** (the DGT: not a security admitted to trading). Core takes
+  `unlistedInstrumentIds`, built in the app from `Instrument.type === "CRYPTO"` — a field
+  ingestion writes from the broker's asset class, unlike the hand-set `exposureKind`. It
+  is a **required** option so no caller can forget it and silently apply the rule to BTC.
+  An ETN that trades on an exchange is a listed security and stays inside. A crypto loss
+  rebought within a year gets a notice — some doctrine would apply a one-year repurchase
+  rule, and it is unsettled — and changes no figure. Do not tie that rule to securities
+  not admitted to trading: an earlier wording did, and it misattributed the doctrine.
+- **Core fixes the trade order: `ts`, then BUY before SELL, then `externalId`.** The same
+  `compareTrades` drives `walkFifo` and the rule; the repository's `orderBy` sorts by `ts`
+  alone and SQLite breaks ties however it likes. Before/after a sale is by instant, never by
+  calendar day — the window itself is Madrid calendar days (`washSaleWindow`).
+- **Nothing FIFO is persisted, and it is one pass.** `computeTaxHistory` walks the whole
+  ledger once — a deferred loss can compute years after the sale that created it — and
+  `taxYearOf` / `carryforwardFrom` are views over it. No lot table, no stored deferral, no
+  carryforward countdown. A deferred loss counts in the year it computes, so the four-year
+  window of Art. 66 starts there; restricting the walk to `[targetYear − 4, targetYear]` is
+  still what enforces expiry.
 - **`TAX_SCALES` is keyed by `(territory, year)`.** A year not on file returns `null` from
   `getTaxScale` and the screen states the absence — never fall back to the nearest year's
   brackets. A rate is data; a superseded scale is a wrong number that looks right.
@@ -943,13 +970,14 @@ a release.
   `main` is untouched until a release.
 - Conventional Commits (`feat:`, `fix:`, `chore:`, `refactor:`).
 - `CHANGELOG.md` follows Keep a Changelog, with an `[Unreleased]` section.
-- **The version is stated in three places and bumped by hand in all three:** the
-  `package.json` field, the `CHANGELOG.md` heading (`[Unreleased]` → `[x.y.z] - date`, plus
-  the compare links at the foot of the file) and the README status line. Nothing links
-  them, so a release edits all three in one commit or the repo starts disagreeing with
-  itself. **Do not use `pnpm version`**: it commits and tags `package.json` alone, so the
-  tag lands on a commit where the changelog and README still name the old version. Tag
-  after the release commit, never before.
+- **The version is stated in two places and bumped by hand in both:** the
+  `package.json` field and the `CHANGELOG.md` heading (`[Unreleased]` → `[x.y.z] - date`,
+  plus the compare links at the foot of the file). The README status line carries no
+  version on purpose; the badge reads it from `package.json`. Nothing links the two, so a
+  release edits both in one commit or the repo starts disagreeing with itself. **Do not
+  use `pnpm version`**: it commits and tags `package.json` alone, so the tag lands on a
+  commit where the changelog still names the old version. Tag after the release commit,
+  never before.
 - No "Known limitations" sections in docs — open a GitHub issue instead.
 - **A `v*.*.*` tag publishes `aritzmmartinez/quoin` to Docker Hub** (`docker.yml`, after
   `ci.yml` passes on the tag). The tag is a release to the public, not only a marker.

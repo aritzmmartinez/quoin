@@ -9,9 +9,15 @@ on:
 
 jobs:
   check:
+    strategy:
+      fail-fast: false
+      matrix:
+        tz: [UTC, Europe/Madrid]
+    name: check (TZ=${{ matrix.tz }})
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: "file:./data/quoin.sqlite"
+      TZ: ${{ matrix.tz }}
     steps:
       - uses: actions/checkout@v4
 
