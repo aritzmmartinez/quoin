@@ -1,6 +1,12 @@
+import {
+  addCalendarMonths,
+  isWithin,
+  toCalendarDate,
+  type CalendarDate,
+} from "../calendar";
 import type { TradeEvent } from "../domain";
 
-import { WASH_SALE_WINDOW_MONTHS } from "./config";
+import { FISCAL_TIME_ZONE, WASH_SALE_WINDOW_MONTHS } from "./config";
 import type { FifoSale } from "./fifo";
 
 export interface WashSaleTrigger {
@@ -8,10 +14,17 @@ export interface WashSaleTrigger {
   buyTs: Date;
 }
 
-function addMonths(date: Date, months: number): Date {
-  const d = new Date(date.getTime());
-  d.setUTCMonth(d.getUTCMonth() + months);
-  return d;
+export interface WashSaleWindow {
+  start: CalendarDate;
+  end: CalendarDate;
+}
+
+export function washSaleWindow(saleTs: Date): WashSaleWindow {
+  const sale = toCalendarDate(saleTs, FISCAL_TIME_ZONE);
+  return {
+    start: addCalendarMonths(sale, -WASH_SALE_WINDOW_MONTHS),
+    end: addCalendarMonths(sale, WASH_SALE_WINDOW_MONTHS),
+  };
 }
 
 /**
@@ -33,11 +46,7 @@ export function findWashSaleTrigger(
   trades: readonly TradeEvent[],
 ): WashSaleTrigger | null {
   const consumedBuyIds = new Set(sale.lots.map((lot) => lot.lotId));
-  const windowStart = addMonths(
-    sale.trade.ts,
-    -WASH_SALE_WINDOW_MONTHS,
-  ).getTime();
-  const windowEnd = addMonths(sale.trade.ts, WASH_SALE_WINDOW_MONTHS).getTime();
+  const { start, end } = washSaleWindow(sale.trade.ts);
 
   const candidates = trades
     .filter(
@@ -45,8 +54,7 @@ export function findWashSaleTrigger(
         t.type === "BUY" &&
         t.instrumentId === sale.trade.instrumentId &&
         !consumedBuyIds.has(t.id) &&
-        t.ts.getTime() >= windowStart &&
-        t.ts.getTime() <= windowEnd,
+        isWithin(toCalendarDate(t.ts, FISCAL_TIME_ZONE), start, end),
     )
     .sort((a, b) => a.ts.getTime() - b.ts.getTime());
 

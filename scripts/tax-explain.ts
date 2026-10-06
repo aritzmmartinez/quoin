@@ -7,14 +7,17 @@ import {
   PrismaLedgerRepository,
   prisma,
 } from "~/adapters/persistence";
+import { toCalendarDate, toIsoDate } from "~/core/calendar";
 import { Money } from "~/core/domain";
 import type { LedgerEvent, TradeEvent } from "~/core/domain";
 import {
+  FISCAL_TIME_ZONE,
   WASH_SALE_WINDOW_MONTHS,
   computeNetWithCarryforward,
   computeSavingsQuota,
   computeTaxLots,
   getTaxScale,
+  washSaleWindow,
   type RealizedGainDetail,
 } from "~/core/tax";
 import { databasePath } from "./lib/db-target";
@@ -34,13 +37,7 @@ function eur(value: string): string {
 }
 
 function day(t: Date): string {
-  return t.toISOString().slice(0, 10);
-}
-
-function addMonths(date: Date, months: number): Date {
-  const d = new Date(date.getTime());
-  d.setUTCMonth(d.getUTCMonth() + months);
-  return d;
+  return toIsoDate(toCalendarDate(t, FISCAL_TIME_ZONE));
 }
 
 function printSale(
@@ -56,10 +53,9 @@ function printSale(
       `  pnl ${eur(gain.realizedPnL)}  ${name}${flag}`,
   );
   if (gain.disallowed) {
-    const windowStart = addMonths(gain.ts, -WASH_SALE_WINDOW_MONTHS);
-    const windowEnd = addMonths(gain.ts, WASH_SALE_WINDOW_MONTHS);
+    const window = washSaleWindow(gain.ts);
     console.log(
-      `      window: [${day(windowStart)} .. ${day(windowEnd)}]  (sale ± ${WASH_SALE_WINDOW_MONTHS}m)`,
+      `      window: [${toIsoDate(window.start)} .. ${toIsoDate(window.end)}]  (sale ± ${WASH_SALE_WINDOW_MONTHS}m, Madrid)`,
     );
     const trigger = gain.disallowedByBuyEventId
       ? tradesById.get(gain.disallowedByBuyEventId)
