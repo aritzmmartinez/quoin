@@ -120,6 +120,7 @@ describe("mapRow", () => {
       detail: {
         date: "2025-01-01T10:00:00.000Z",
         type: "BENEFITS_SAVEBACK",
+        subtype: null,
         instrument: "Test ETF",
       },
     });
@@ -138,6 +139,7 @@ describe("mapRow", () => {
       detail: {
         date: "2025-01-01T10:00:00.000Z",
         type: "LIQUIDATION_DIVIDEND",
+        subtype: null,
         instrument: null,
       },
     });

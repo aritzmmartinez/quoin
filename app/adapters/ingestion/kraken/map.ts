@@ -10,19 +10,28 @@ import {
 } from "~/core/domain";
 import type { PriceSnapshot } from "~/core/ports";
 
-import type { MappedItem } from "../ingest";
+import type { DiscardReason, MappedItem } from "../ingest";
 import type { KrakenRow } from "./row";
 
-function unsupported(row: KrakenRow): MappedItem {
+function discard(
+  reason: DiscardReason,
+  row: KrakenRow,
+  instrument: string | null = row.asset || null,
+): MappedItem {
   return {
     kind: "discard",
-    reason: "unsupported",
+    reason,
     detail: {
       date: parseTime(row.time).toISOString(),
       type: row.type,
-      instrument: row.asset || null,
+      subtype: row.subtype || null,
+      instrument,
     },
   };
+}
+
+function unsupported(row: KrakenRow): MappedItem {
+  return discard("unsupported", row);
 }
 
 export type PriceAt = (instrumentId: string, ts: Date) => string | null;
@@ -104,25 +113,33 @@ export function mapGroup(
       return [trade(refid, "BUY", spend, receive)];
     if (isBtc(spend) && isFiat(receive))
       return [trade(refid, "SELL", receive, spend)];
-    return [{ kind: "discard", reason: "non-btc" }];
+    const pair = `${spend.asset} → ${receive.asset}`;
+    return [
+      discard(
+        isBtc(spend) || isBtc(receive) ? "crypto-swap" : "unmodelled-asset",
+        receive,
+        pair,
+      ),
+    ];
   }
 
   if (rows.length === 1) {
     const row = rows[0]!;
     switch (row.type) {
       case "deposit":
-        return isFiat(row)
-          ? [cash(refid, row, "DEPOSIT")]
-          : [{ kind: "discard", reason: "non-btc" }];
       case "withdrawal":
-        return isFiat(row)
-          ? [cash(refid, row, "WITHDRAWAL")]
-          : [{ kind: "discard", reason: "non-btc" }];
+        if (isFiat(row))
+          return [
+            cash(refid, row, row.type === "deposit" ? "DEPOSIT" : "WITHDRAWAL"),
+          ];
+        return [
+          discard(isBtc(row) ? "crypto-transfer" : "unmodelled-asset", row),
+        ];
       case "reward":
       case "earn":
         return isBtc(row)
           ? reward(refid, row, priceAt)
-          : [{ kind: "discard", reason: "non-btc" }];
+          : [discard("unmodelled-asset", row)];
       default:
         return [unsupported(row)];
     }
@@ -174,7 +191,7 @@ function trade(
 function reward(refid: string, row: KrakenRow, priceAt: PriceAt): MappedItem[] {
   const ts = parseTime(row.time);
   const price = priceAt("BTC", ts);
-  if (price === null) return [{ kind: "discard", reason: "reward-unpriced" }];
+  if (price === null) return [discard("reward-unpriced", row)];
 
   const quantity = abs(row.amount);
   const grossAmount = Money.fromString(price).scaleBy(quantity).toString();

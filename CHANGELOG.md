@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - On an instrument's page, a range with no data in it showed the chart's axes around nothing. It now says the range has no data.
+- Importing a Kraken file showed discarded rows as an internal code ("non-btc: 41"). Each reason is now named, listed row by row with asset and date, and BTC swaps, BTC transfers and BTC rewards without a price come with a warning that the BTC position does not include them. ingest prints the same breakdown.
 
 ## [0.11.1] - 2026-10-06
 

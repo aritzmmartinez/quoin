@@ -2,23 +2,70 @@ import { ChevronDown } from "lucide-react";
 
 import type { ImportSummary } from "~/adapters/ingestion";
 
-import { useCopy, useFormat } from "~/lib";
+import {
+  type DiscardGroup as Group,
+  discardGroups,
+  useCopy,
+  useFormat,
+} from "~/lib";
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-4 py-row">
       <dt className="text-[12px] text-muted">{label}</dt>
-      <dd className="text-[13px] tabular-nums">{value}</dd>
+      <dd className="text-right text-[13px] tabular-nums">{value}</dd>
     </div>
   );
 }
 
-export function SummaryList({ summary }: { summary: ImportSummary }) {
+function DiscardGroup({ group }: { group: Group }) {
   const { formatDate } = useFormat();
+  const copy = useCopy().ingest.summary;
+  const { reason, details, affectsPosition: warn } = group;
+  const help = copy.reasonHelp[reason];
+
+  return (
+    <details open={warn} className="group mt-3 border-t border-border pt-3">
+      <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[12px] text-muted marker:content-[''] [&::-webkit-details-marker]:hidden">
+        <ChevronDown
+          size={12}
+          strokeWidth={1.75}
+          aria-hidden
+          className="shrink-0 transition-transform group-open:rotate-0 -rotate-90"
+        />
+        <span className={warn ? "font-medium text-negative" : undefined}>
+          {copy.reasons[reason]}
+        </span>
+        <span>· {copy.details(details.length)}</span>
+      </summary>
+      {warn && (
+        <p className="mt-2 text-[12px] text-negative">{copy.positionWarning}</p>
+      )}
+      {help && <p className="mt-1 text-[12px] text-body">{help}</p>}
+      <ul className="mt-2">
+        {details.map((row, i) => (
+          <li
+            key={i}
+            className="flex justify-between gap-3 border-b border-border py-1.5 text-[12px] last:border-b-0"
+          >
+            <span className="min-w-0 truncate">
+              {row.instrument ?? copy.noInstrument} · {row.type}
+              {row.subtype ? ` / ${row.subtype}` : ""}
+            </span>
+            <span className="shrink-0 tabular-nums text-muted">
+              {formatDate(row.date)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
+export function SummaryList({ summary }: { summary: ImportSummary }) {
   const t = useCopy();
   const copy = t.ingest.summary;
-  const discarded = Object.entries(summary.discarded);
-  const unsupported = summary.discardedDetails.unsupported ?? [];
+  const discarded = discardGroups(summary);
 
   return (
     <>
@@ -33,7 +80,9 @@ export function SummaryList({ summary }: { summary: ImportSummary }) {
             discarded.length === 0
               ? copy.none
               : discarded
-                  .map(([reason, count]) => `${reason}: ${count}`)
+                  .map(
+                    ({ reason, count }) => `${copy.reasons[reason]}: ${count}`,
+                  )
                   .join(" · ")
           }
         />
@@ -42,33 +91,10 @@ export function SummaryList({ summary }: { summary: ImportSummary }) {
         )}
       </dl>
 
-      {unsupported.length > 0 && (
-        <details className="group mt-3 border-t border-border pt-3">
-          <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[12px] text-muted marker:content-[''] [&::-webkit-details-marker]:hidden">
-            <ChevronDown
-              size={12}
-              strokeWidth={1.75}
-              aria-hidden
-              className="shrink-0 transition-transform group-open:rotate-0 -rotate-90"
-            />
-            {copy.unsupportedDetails(unsupported.length)}
-          </summary>
-          <ul className="mt-2">
-            {unsupported.map((row, i) => (
-              <li
-                key={i}
-                className="flex justify-between gap-3 border-b border-border py-1.5 text-[12px] last:border-b-0"
-              >
-                <span className="min-w-0 truncate">
-                  {row.instrument ?? copy.noInstrument} · {row.type}
-                </span>
-                <span className="shrink-0 tabular-nums text-muted">
-                  {formatDate(row.date)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </details>
+      {discarded.map((group) =>
+        group.details.length > 0 ? (
+          <DiscardGroup key={group.reason} group={group} />
+        ) : null,
       )}
     </>
   );

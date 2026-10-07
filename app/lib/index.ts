@@ -1,5 +1,6 @@
 export * from "./basis";
 export * from "./cookie";
+export * from "./discards";
 export * from "./exposures";
 export * from "./format";
 export * from "./use-format";

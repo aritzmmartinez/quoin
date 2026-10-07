@@ -134,6 +134,7 @@ export function mapRow(row: TradeRepublicRow): MappedItem {
         detail: {
           date: row.datetime,
           type: row.type,
+          subtype: null,
           instrument: row.name || null,
         },
       };

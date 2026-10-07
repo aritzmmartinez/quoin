@@ -725,9 +725,15 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
 - **The lookup never reaches forward.** `priceLookupFrom` takes the last close at or before
   the timestamp, within 7 days; a later candle is information that did not exist yet.
 - Scope is still BTC-only by choice (`isBtc` in `map.ts`). Measured on a real export:
-  87% of refid groups are discarded as `non-btc` — SOL and ETH `earn`, plus `welcomebonus`
-  in five assets. `pnpm ingest` prints the count under one label, so the breakdown by asset
-  is not visible from the summary.
+  87% of refid groups are set aside — SOL and ETH `earn`, plus `welcomebonus` in five
+  assets. **A discard is classified by what it does to a modelled position, not by asset.**
+  `unmodelled-asset` is noise (rewards, transfers and trades of assets Quoin does not
+  track); `crypto-swap` (BTC ↔ another crypto, in either direction), `crypto-transfer`
+  (BTC on-chain in or out) and `reward-unpriced` each leave the BTC position wrong, and
+  `AFFECTS_POSITION` flags them so the wizard and `pnpm ingest` warn. Every Kraken discard
+  carries a per-group detail (date, type, subtype, asset or pair — never amounts).
+  `DiscardReason` is a union and its labels are `Record<DiscardReason, string>` in both
+  locales, so a new reason without a label or a position decision does not compile.
 - **A reward's income leg is a `DIVIDEND` event, not a dedicated type.** The shape already
   fits — instrument plus gross amount, no quantity needed — and a new type would touch the
   SQLite `LedgerEntry` CHECK migration for no functional gain. `mapGroup` emits it alongside

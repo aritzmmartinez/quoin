@@ -139,7 +139,18 @@ describe("Kraken mapGroup", () => {
   it("discards a reward it cannot price rather than recording a zero cost", () => {
     const result = mapGroup([rewardRow()], () => null);
 
-    expect(result).toEqual([{ kind: "discard", reason: "reward-unpriced" }]);
+    expect(result).toEqual([
+      {
+        kind: "discard",
+        reason: "reward-unpriced",
+        detail: {
+          date: "2025-11-25T23:25:20.000Z",
+          type: "reward",
+          subtype: null,
+          instrument: "BTC",
+        },
+      },
+    ]);
   });
 
   it("prices an earn the same way as a reward", () => {
@@ -152,7 +163,7 @@ describe("Kraken mapGroup", () => {
     );
   });
 
-  it("discards non-BTC crypto rewards", () => {
+  it("sets aside non-BTC crypto rewards as an asset it does not model", () => {
     const sol = mapGroup([
       row({
         refid: "RW2",
@@ -162,10 +173,21 @@ describe("Kraken mapGroup", () => {
         amount: "0.5",
       }),
     ]);
-    expect(sol).toEqual([{ kind: "discard", reason: "non-btc" }]);
+    expect(sol).toEqual([
+      {
+        kind: "discard",
+        reason: "unmodelled-asset",
+        detail: {
+          date: "2025-11-13T18:04:48.000Z",
+          type: "reward",
+          subtype: null,
+          instrument: "SOL",
+        },
+      },
+    ]);
   });
 
-  it("discards crypto-to-crypto swaps as non-BTC", () => {
+  it("sets aside a swap between two assets it does not model", () => {
     const swap = mapGroup([
       row({
         refid: "S1",
@@ -182,7 +204,18 @@ describe("Kraken mapGroup", () => {
         amount: "0.02",
       }),
     ]);
-    expect(swap).toEqual([{ kind: "discard", reason: "non-btc" }]);
+    expect(swap).toEqual([
+      {
+        kind: "discard",
+        reason: "unmodelled-asset",
+        detail: {
+          date: "2025-11-13T18:04:48.000Z",
+          type: "receive",
+          subtype: null,
+          instrument: "PEPE → SOL",
+        },
+      },
+    ]);
   });
 
   it("discards an unrecognized row type as unsupported, keeping the row", () => {
@@ -203,6 +236,7 @@ describe("Kraken mapGroup", () => {
         detail: {
           date: "2025-11-13T18:04:48.000Z",
           type: "staking",
+          subtype: null,
           instrument: "ETH",
         },
       },

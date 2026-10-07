@@ -5,6 +5,7 @@ export const krakenRowSchema = z.object({
   refid: z.string(),
   time: z.string(),
   type: z.string(),
+  subtype: z.string().optional(),
   subclass: z.string(),
   asset: z.string(),
   amount: z.string(),
