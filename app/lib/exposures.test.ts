@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { CachedIdentity } from "~/core/ports";
-import type { LeafExposure } from "~/core/projections";
+import { type LeafExposureInput, withLeafTotals } from "~/core/projections";
 
 import {
   CONCENTRATION_THRESHOLD,
@@ -30,9 +30,9 @@ import {
 const leaf = (
   id: string,
   value: string,
-  kind: LeafExposure["leaf"]["kind"] = "COMPANY",
+  kind: LeafExposureInput["leaf"]["kind"] = "COMPANY",
   contributions = 1,
-): LeafExposure => ({
+): LeafExposureInput => ({
   leaf: { kind, id },
   name: id,
   contributions: Array.from({ length: contributions }, (_, i) => ({
@@ -42,6 +42,12 @@ const leaf = (
     weightInParent: i === 0 ? null : "0.045",
   })),
 });
+
+const rowsOf = (leaves: LeafExposureInput[], total: string) =>
+  toExposureRows(withLeafTotals(leaves, total), total);
+
+const tailOfLeaves = (leaves: LeafExposureInput[], total: string) =>
+  tailOf(withLeafTotals(leaves, total), total);
 
 describe("the two thresholds are different axes", () => {
   it("keeps them apart: presentation is far below concentration", () => {
@@ -63,7 +69,7 @@ describe("the two thresholds are different axes", () => {
 
 describe("toExposureRows", () => {
   it("leaves the long tail out of the rows entirely", () => {
-    const rows = toExposureRows(
+    const rows = rowsOf(
       [leaf("BIG", "5000"), leaf("SMALL", "10"), leaf("TINY", "5")],
       "10000",
     );
@@ -71,7 +77,7 @@ describe("toExposureRows", () => {
   });
 
   it("never folds the unresolved leaf, however small", () => {
-    const rows = toExposureRows(
+    const rows = rowsOf(
       [leaf("BIG", "9999"), leaf("FUND", "1", "UNRESOLVED")],
       "10000",
     );
@@ -79,13 +85,13 @@ describe("toExposureRows", () => {
   });
 
   it("keeps attribution on a real leaf", () => {
-    const rows = toExposureRows([leaf("NVDA", "1400", "COMPANY", 3)], "12000");
+    const rows = rowsOf([leaf("NVDA", "1400", "COMPANY", 3)], "12000");
     expect(rows[0]?.contributions).toHaveLength(3);
     expect(rows[0]?.contributions[0]?.weightInParent).toBeNull();
   });
 
   it("computes weight against the given total", () => {
-    const rows = toExposureRows([leaf("A", "1200")], "12000");
+    const rows = rowsOf([leaf("A", "1200")], "12000");
     expect(rows[0]?.weight).toBe("0.100000");
   });
 
@@ -97,27 +103,27 @@ describe("toExposureRows", () => {
       leaf("D", "8"),
       leaf("FUND", "1980", "UNRESOLVED"),
     ];
-    const rows = toExposureRows(exposures, "10000");
+    const rows = rowsOf(exposures, "10000");
     const sum = rows.reduce((acc, r) => acc + Number(r.value), 0);
-    expect(sum + Number(tailOf(exposures, "10000").value)).toBeCloseTo(
+    expect(sum + Number(tailOfLeaves(exposures, "10000").value)).toBeCloseTo(
       10000,
       2,
     );
   });
 
   it("survives a zero total without dividing by it", () => {
-    const rows = toExposureRows([leaf("A", "0")], "0");
+    const rows = rowsOf([leaf("A", "0")], "0");
     expect(rows[0]?.weight).toBeNull();
   });
 
   it("is empty for no exposures", () => {
-    expect(toExposureRows([], "0")).toEqual([]);
+    expect(rowsOf([], "0")).toEqual([]);
   });
 });
 
 describe("tailOf", () => {
   it("reports the tail as a fact: how many, how much, what share", () => {
-    const tail = tailOf(
+    const tail = tailOfLeaves(
       [leaf("BIG", "5000"), leaf("A", "1"), leaf("B", "2")],
       "10000",
     );
@@ -125,16 +131,22 @@ describe("tailOf", () => {
   });
 
   it("does not count the unresolved leaf, which never folds", () => {
-    expect(tailOf([leaf("FUND", "1", "UNRESOLVED")], "10000").count).toBe(0);
+    expect(tailOfLeaves([leaf("FUND", "1", "UNRESOLVED")], "10000").count).toBe(
+      0,
+    );
   });
 
   it("is empty-safe", () => {
-    expect(tailOf([], "0")).toEqual({ count: 0, value: "0.00", weight: null });
+    expect(tailOfLeaves([], "0")).toEqual({
+      count: 0,
+      value: "0.00",
+      weight: null,
+    });
   });
 });
 
 describe("readingFor", () => {
-  const rows = (...leaves: LeafExposure[]) => toExposureRows(leaves, "10000");
+  const rows = (...leaves: LeafExposureInput[]) => rowsOf(leaves, "10000");
 
   it("reports every leaf analysed, not the handful that fit on screen", () => {
     const reading = readingFor(
