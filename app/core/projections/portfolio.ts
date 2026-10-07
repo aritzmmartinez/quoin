@@ -163,12 +163,17 @@ export function computePortfolioInvestedVsValueSeries(
   if (timestamps.size === 0) return [];
 
   const sorted = [...seriesByInstrument].map((series) =>
-    [...series].sort((a, b) => a.t - b.t),
+    [...series]
+      .sort((a, b) => a.t - b.t)
+      .map((point) => ({
+        t: point.t,
+        invested: Money.fromString(point.invested),
+        value: Money.fromString(point.value),
+      })),
   );
   const cursors = sorted.map(() => 0);
-  const carried: (InvestedVsValuePoint | undefined)[] = sorted.map(
-    () => undefined,
-  );
+  const carried: ({ invested: Money; value: Money } | undefined)[] =
+    sorted.map(() => undefined);
 
   return [...timestamps]
     .sort((a, b) => a - b)
@@ -187,8 +192,8 @@ export function computePortfolioInvestedVsValueSeries(
 
         const point = carried[i];
         if (!point) continue;
-        invested = invested.add(Money.fromString(point.invested));
-        value = value.add(Money.fromString(point.value));
+        invested = invested.add(point.invested);
+        value = value.add(point.value);
       }
 
       return { t, invested: invested.toString(), value: value.toString() };
