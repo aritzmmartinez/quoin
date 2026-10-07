@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { data, Link } from "react-router";
 
 import type { Route } from "./+types/allocation";
 
@@ -53,6 +53,7 @@ import {
   useCopy,
   useFormat,
 } from "~/lib";
+import { createServerTiming } from "~/lib/server-timing";
 
 export function meta({ matches }: Route.MetaArgs) {
   const t = copyFromMatches(matches);
@@ -64,6 +65,10 @@ export function meta({ matches }: Route.MetaArgs) {
 
 export const handle = { title: (t: Copy) => t.nav.allocation };
 
+export function headers({ loaderHeaders }: Route.HeadersArgs) {
+  return loaderHeaders;
+}
+
 export async function loader({ request }: Route.LoaderArgs) {
   const params = new URL(request.url).searchParams;
   const view = parseAllocationView(params);
@@ -73,51 +78,83 @@ export async function loader({ request }: Route.LoaderArgs) {
   const overlapMode = parseOverlapMode(params);
   const includeSold = parseIncludeSold(params);
 
-  const [events, instruments, prices, holdings, identities, targets] =
-    await Promise.all([
-      new PrismaLedgerRepository().list(),
-      new PrismaInstrumentRepository().list(),
-      new PrismaPriceRepository().latest(),
-      new PrismaHoldingsRepository().all(),
-      new PrismaSecurityIdentityRepository().all(),
-      new PrismaTargetRepository().list(),
-    ]);
+  const timing = createServerTiming();
+  // One after another, not Promise.all: better-sqlite3 is synchronous on a
+  // single connection, so the reads never overlapped anyway, and awaited in
+  // parallel each step's time would include the steps queued before it.
+  const events = await timing.time("db-ledger", () =>
+    new PrismaLedgerRepository().list(),
+  );
+  const instruments = await timing.time("db-instruments", () =>
+    new PrismaInstrumentRepository().list(),
+  );
+  const prices = await timing.time("db-prices-latest", () =>
+    new PrismaPriceRepository().latest(),
+  );
+  const holdings = await timing.time("db-holdings", () =>
+    new PrismaHoldingsRepository().all(),
+  );
+  const identities = await timing.time("db-identities", () =>
+    new PrismaSecurityIdentityRepository().all(),
+  );
+  const targets = await timing.time("db-targets", () =>
+    new PrismaTargetRepository().list(),
+  );
 
-  const canonical = new Map<string, string>();
-  for (const entry of identities.values()) {
-    if (entry.resolution.status === "resolved") {
-      canonical.set(entry.value, entry.resolution.canonicalId);
+  const canonical = timing.time("identity-map", () => {
+    const map = new Map<string, string>();
+    for (const entry of identities.values()) {
+      if (entry.resolution.status === "resolved") {
+        map.set(entry.value, entry.resolution.canonicalId);
+      }
     }
-  }
+    return map;
+  });
 
-  const positions = computePositions(events);
-  const marketValues = computeMarketValues(positions, prices, BASE_CURRENCY);
+  const positions = timing.time("positions", () => computePositions(events));
+  const marketValues = timing.time("valuation", () =>
+    computeMarketValues(positions, prices, BASE_CURRENCY),
+  );
 
-  const resolutions = new Map<string, WeightedLeaf[]>(
-    instruments.map((instrument) => [
-      instrument.id,
-      canonicaliseLeaves(
-        resolveWithHoldings(
-          instrument,
-          (holdings.get(instrument.id) ?? []).map((h) => ({
-            identity: h.identity,
-            name: h.name,
-            weight: h.weight,
-          })),
-        ),
-        canonical,
+  const resolutions = timing.time(
+    "look-through",
+    () =>
+      new Map<string, WeightedLeaf[]>(
+        instruments.map((instrument) => [
+          instrument.id,
+          canonicaliseLeaves(
+            resolveWithHoldings(
+              instrument,
+              (holdings.get(instrument.id) ?? []).map((h) => ({
+                identity: h.identity,
+                name: h.name,
+                weight: h.weight,
+              })),
+            ),
+            canonical,
+          ),
+        ]),
       ),
-    ]),
   );
 
-  const exposures = computeExposures(
-    positions,
-    marketValues,
-    resolutions,
-    new Map(instruments.map((i) => [i.id, i.name])),
+  const exposures = timing.time("exposures", () =>
+    computeExposures(
+      positions,
+      marketValues,
+      resolutions,
+      new Map(instruments.map((i) => [i.id, i.name])),
+    ),
   );
-  const summary = summarizeExposures(exposures);
-  const rows = toExposureRows(exposures, summary.total);
+  const summary = timing.time("summarize", () =>
+    summarizeExposures(exposures),
+  );
+  const rows = timing.time("rows", () =>
+    toExposureRows(exposures, summary.total),
+  );
+  const tail = timing.time("tail", () => tailOf(exposures, summary.total));
+  const reading = timing.time("reading", () =>
+    readingFor(rows, summary.resolvedLeafCount, threshold),
+  );
 
   const target = getActiveTarget(targets, new Date());
 
@@ -142,38 +179,34 @@ export async function loader({ request }: Route.LoaderArgs) {
     ]),
   );
 
-  return {
-    overlap:
-      view !== "overlap"
-        ? null
-        : {
-            mode: overlapMode,
-            includeSold,
-            funds: overlapInstruments.map(({ id, name }) => ({ id, name })),
-            pairs: computeAllFundOverlaps(overlapFunds, isCashLine),
-          },
-    currency:
-      view !== "currency"
-        ? null
-        : computeCurrencyExposure({
+  const overlap =
+    view !== "overlap"
+      ? null
+      : {
+          mode: overlapMode,
+          includeSold,
+          funds: overlapInstruments.map(({ id, name }) => ({ id, name })),
+          pairs: timing.time("overlap", () =>
+            computeAllFundOverlaps(overlapFunds, isCashLine),
+          ),
+        };
+  const currency =
+    view !== "currency"
+      ? null
+      : timing.time("currency", () =>
+          computeCurrencyExposure({
             exposures,
             currencyByLeaf: currencyByLeaf(identities),
             hedgedInstruments: hedged,
             base: BASE_CURRENCY,
           }),
-    hedgedCount: hedged.size,
-    rows,
-    tail: tailOf(exposures, summary.total),
-    reading: readingFor(rows, summary.resolvedLeafCount, threshold),
-    summary,
-    threshold,
-    view,
-    driftThreshold,
-    hasTarget: target !== null,
-    plan:
-      view !== "rebalance" || target === null || contribution === null
-        ? null
-        : buildRebalancePlan(
+        );
+
+  const plan =
+    view !== "rebalance" || target === null || contribution === null
+      ? null
+      : timing.time("rebalance", () =>
+          buildRebalancePlan(
             target,
             positions,
             marketValues,
@@ -181,7 +214,25 @@ export async function loader({ request }: Route.LoaderArgs) {
             contribution,
             driftThreshold,
           ),
-  };
+        );
+
+  return data(
+    {
+      overlap,
+      currency,
+      hedgedCount: hedged.size,
+      rows,
+      tail,
+      reading,
+      summary,
+      threshold,
+      view,
+      driftThreshold,
+      hasTarget: target !== null,
+      plan,
+    },
+    { headers: timing.headers() },
+  );
 }
 
 export default function Allocation({ loaderData }: Route.ComponentProps) {

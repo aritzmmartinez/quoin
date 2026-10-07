@@ -11,6 +11,7 @@ import {
   leafTotal,
   leafWeight,
   summarizeExposures,
+  withLeafTotals,
 } from "./exposures";
 import { computeMarketValues, type MarketValue } from "./market-value";
 import { computePositions, type Position } from "./positions";
@@ -289,6 +290,92 @@ describe("summarizeExposures", () => {
       unresolved: "0",
       resolvedLeafCount: 0,
     });
+  });
+});
+
+describe("total and weight carried on each leaf", () => {
+  const exposures = computeExposures(
+    [position("NVDA"), position("FTSE"), position("GOLD"), position("FUND")],
+    new Map([
+      priced("NVDA", "1250.00"),
+      priced("FTSE", "3900.00"),
+      priced("GOLD", "800.00"),
+      priced("FUND", "333.33"),
+    ]),
+    new Map<string, WeightedLeaf[]>([
+      ["NVDA", direct("US67066G1040", "NVIDIA", "COMPANY")],
+      [
+        "FTSE",
+        [
+          {
+            leaf: { kind: "COMPANY", id: "US67066G1040" },
+            name: "NVIDIA",
+            weight: "0.045",
+          },
+          {
+            leaf: { kind: "COMPANY", id: "US0378331005" },
+            name: "Apple",
+            weight: "0.955",
+          },
+        ],
+      ],
+      ["GOLD", direct("XAU", "Gold", "COMMODITY")],
+      ["FUND", direct("FUND", "Unmapped fund", "UNRESOLVED")],
+    ]),
+  );
+  const { total } = summarizeExposures(exposures);
+
+  it("are exactly what leafTotal and leafWeight derive, for every leaf", () => {
+    for (const exposure of exposures) {
+      expect(exposure.total).toBe(leafTotal(exposure));
+      expect(exposure.weight).toBe(leafWeight(exposure, total));
+    }
+  });
+
+  it("weigh against the sum of every leaf, unresolved included", () => {
+    expect(total).toBe("6283.33");
+    expect(exposures.find((e) => e.leaf.kind === "UNRESOLVED")?.weight).toBe(
+      leafWeight(exposures.find((e) => e.leaf.kind === "UNRESOLVED")!, "6283.33"),
+    );
+  });
+
+  it("weigh against an explicit total when one is given", () => {
+    const [leaf] = withLeafTotals(
+      [{ ...exposures[0]!, contributions: exposures[0]!.contributions }],
+      "10000",
+    );
+    expect(leaf?.weight).toBe(leafWeight(exposures[0]!, "10000"));
+  });
+
+  it("have no weight when everything is worth zero", () => {
+    const [leaf] = withLeafTotals([
+      {
+        leaf: { kind: "COMPANY", id: "a" },
+        name: "A",
+        contributions: [
+          {
+            instrumentId: "A",
+            instrumentName: "A",
+            value: "0.00",
+            weightInParent: null,
+          },
+        ],
+      },
+    ]);
+    expect(leaf).toMatchObject({ total: "0", weight: null });
+  });
+
+  it("keep insertion order between leaves of equal total", () => {
+    const tied = computeExposures(
+      [position("A"), position("B"), position("C")],
+      new Map([priced("A", "500"), priced("B", "900"), priced("C", "500")]),
+      new Map([
+        ["A", direct("a", "A", "COMPANY")],
+        ["B", direct("b", "B", "COMPANY")],
+        ["C", direct("c", "C", "COMPANY")],
+      ]),
+    );
+    expect(tied.map((e) => e.leaf.id)).toEqual(["b", "a", "c"]);
   });
 });
 

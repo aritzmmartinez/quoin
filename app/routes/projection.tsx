@@ -1,3 +1,5 @@
+import { data } from "react-router";
+
 import type { Route } from "./+types/projection";
 
 import { ProjectionPanel } from "~/components";
@@ -19,6 +21,7 @@ import {
   type ProjectionView,
 } from "~/lib";
 import { loadProjectionContext } from "~/lib/projection.server";
+import { createServerTiming, type ServerTiming } from "~/lib/server-timing";
 
 export function meta({ matches }: Route.MetaArgs) {
   const t = copyFromMatches(matches);
@@ -30,14 +33,26 @@ export function meta({ matches }: Route.MetaArgs) {
 
 export const handle = { title: (t: Copy) => t.projection.title };
 
+export function headers({ loaderHeaders }: Route.HeadersArgs) {
+  return loaderHeaders;
+}
+
 export async function loader({ request }: Route.LoaderArgs) {
-  const params = new URL(request.url).searchParams;
+  const timing = createServerTiming();
+  const view = await projectionView(new URL(request.url).searchParams, timing);
+  return data(view, { headers: timing.headers() });
+}
+
+async function projectionView(params: URLSearchParams, timing: ServerTiming) {
   const horizonYears = parseHorizonYears(params);
   const horizonMonths = horizonYears * 12;
   const goal = parseGoal(params);
   const extended = parseExtended(params);
 
-  const { annualInflation, plan } = await loadProjectionContext();
+  const { annualInflation, plan } = await loadProjectionContext(
+    new Date(),
+    timing,
+  );
 
   const empty = {
     horizonYears,
@@ -100,11 +115,13 @@ export async function loader({ request }: Route.LoaderArgs) {
     } satisfies ProjectionView;
   }
 
-  const result = computeProjection({
-    ...input,
-    horizonMonths,
-    monthlyContribution: contribution,
-  });
+  const result = timing.time("simulate", () =>
+    computeProjection({
+      ...input,
+      horizonMonths,
+      monthlyContribution: contribution,
+    }),
+  );
 
   const unsimulated: NamedValue[] = result.unsimulatedInstrumentIds.map(
     (id) => ({
@@ -124,13 +141,14 @@ export async function loader({ request }: Route.LoaderArgs) {
         ? null
         : {
             amount: goal,
-            monthlyContribution: solveContribution(
-              { ...input, horizonMonths },
-              goal,
+            monthlyContribution: timing.time("goal-contribution", () =>
+              solveContribution({ ...input, horizonMonths }, goal),
             ),
-            horizonMonths: solveHorizon(
-              { ...input, monthlyContribution: contribution },
-              goal,
+            horizonMonths: timing.time("goal-horizon", () =>
+              solveHorizon(
+                { ...input, monthlyContribution: contribution },
+                goal,
+              ),
             ),
           },
   } satisfies ProjectionView;

@@ -302,8 +302,11 @@ ISIN itself, and always sanity-check the price magnitude.
 - **Contributions are kept, not summed.** "NVIDIA is 11.6%" is not actionable; "9.9% direct,
   1.4% via FTSE" is. The provenance is lost in the fold, so the fold keeps it.
   `weightInParent: null` marks a direct holding, distinct from a 100% constituent.
-- **Leaf totals are derived (`leafTotal`), never stored.** Storing both invites the day they
-  disagree — which is exactly how the fee bug happened.
+- A leaf's total and weight are computed once, in withLeafTotals, and carried
+  on the leaf; computeExposures is the only producer. The sort,
+  summarizeExposures, toExposureRows and tailOf read total/weight and never
+  call leafTotal/leafWeight. Those two remain the definition, and a test pins
+  the carried fields to them. Do not add a second place that computes either.
 
 ## Holdings import — one parser, no issuer branches
 

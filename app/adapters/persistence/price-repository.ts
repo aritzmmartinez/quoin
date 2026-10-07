@@ -26,13 +26,21 @@ export class PrismaPriceRepository implements PriceRepository {
   }
 
   async latest(): Promise<Map<string, PriceSnapshot>> {
-    const rows = await prisma.priceSnapshot.findMany({
-      orderBy: [{ instrumentId: "asc" }, { asOf: "desc" }],
+    const instruments = await prisma.priceSnapshot.groupBy({
+      by: ["instrumentId"],
     });
+    const rows = await Promise.all(
+      instruments.map(({ instrumentId }) =>
+        prisma.priceSnapshot.findFirst({
+          where: { instrumentId },
+          orderBy: { asOf: "desc" },
+        }),
+      ),
+    );
 
     const latest = new Map<string, PriceSnapshot>();
     for (const r of rows) {
-      if (latest.has(r.instrumentId)) continue;
+      if (!r) continue;
       latest.set(r.instrumentId, {
         instrumentId: r.instrumentId,
         price: r.price,
@@ -51,9 +59,20 @@ export class PrismaPriceRepository implements PriceRepository {
     return count;
   }
 
-  async historyFor(instrumentId: string): Promise<PriceSnapshot[]> {
+  async historyFor(
+    instrumentId: string,
+    from?: Date,
+  ): Promise<PriceSnapshot[]> {
+    const anchor = from
+      ? await prisma.priceSnapshot.findFirst({
+          where: { instrumentId, asOf: { lte: from } },
+          orderBy: { asOf: "desc" },
+          select: { asOf: true },
+        })
+      : null;
+    const start = anchor?.asOf ?? from;
     const rows = await prisma.priceSnapshot.findMany({
-      where: { instrumentId },
+      where: start ? { instrumentId, asOf: { gte: start } } : { instrumentId },
       orderBy: { asOf: "asc" },
     });
     return rows.map((r) => ({

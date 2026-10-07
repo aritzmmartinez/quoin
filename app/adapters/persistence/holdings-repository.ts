@@ -46,7 +46,17 @@ export class PrismaHoldingsRepository implements HoldingsRepository {
   }
 
   async all(): Promise<Map<string, EtfHolding[]>> {
-    const rows = await prisma.etfHolding.findMany({ orderBy: { weight: "desc" } });
+    const rows = await prisma.etfHolding.findMany({
+      orderBy: { weight: "desc" },
+      select: {
+        instrumentId: true,
+        identity: true,
+        identityKind: true,
+        name: true,
+        weight: true,
+        asOf: true,
+      },
+    });
     const byInstrument = new Map<string, EtfHolding[]>();
     for (const row of rows) {
       const holding = rowToHolding(row);

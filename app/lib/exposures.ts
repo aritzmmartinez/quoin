@@ -5,7 +5,6 @@ import { looksLikeCashRow } from "~/adapters/ingestion/holdings/numbers";
 import { toExchangeCode, venueOf } from "~/adapters/identity/openfigi/venues";
 import type { CachedIdentity } from "~/core/ports";
 import type { Contribution, LeafExposure } from "~/core/projections";
-import { leafTotal, leafWeight } from "~/core/projections";
 
 import { readCookie } from "./cookie";
 
@@ -45,8 +44,8 @@ export function toExposureRows(
   const rows: ExposureRow[] = [];
 
   for (const exposure of exposures) {
-    const value = leafTotal(exposure);
-    const weight = leafWeight(exposure, total);
+    const value = exposure.total;
+    const weight = exposure.weight;
 
     const alwaysShow = exposure.leaf.kind === "UNRESOLVED";
     if (!alwaysShow && weight !== null && new Decimal(weight).lt(threshold)) {
@@ -79,9 +78,9 @@ export function tailOf(
 
   for (const exposure of exposures) {
     if (exposure.leaf.kind === "UNRESOLVED") continue;
-    const weight = leafWeight(exposure, total);
+    const weight = exposure.weight;
     if (weight === null || new Decimal(weight).gte(threshold)) continue;
-    value = value.plus(new Decimal(leafTotal(exposure)));
+    value = value.plus(new Decimal(exposure.total));
     count += 1;
   }
 

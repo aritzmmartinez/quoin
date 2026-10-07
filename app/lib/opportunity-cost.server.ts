@@ -10,6 +10,7 @@ import {
   type PriceLike,
 } from "~/core/projections";
 
+import { firstTradeAt } from "./history-start";
 import { findBenchmark } from "./opportunity-cost";
 
 export type OpportunityView =
@@ -32,7 +33,10 @@ export async function loadOpportunityCost(
   const benchmark = findBenchmark(instruments, symbol);
   if (!benchmark) return { ok: false, symbol, reason: "unmapped" };
 
-  const history = await new PrismaPriceRepository().historyFor(benchmark.id);
+  const history = await new PrismaPriceRepository().historyFor(
+    benchmark.id,
+    firstTradeAt(events),
+  );
   if (!history.some((snapshot) => snapshot.currency === BASE_CURRENCY)) {
     return { ok: false, symbol, reason: "no-history" };
   }

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Summary, Allocation and Projection open noticeably faster, especially with years of price history.
 - Charts show a placeholder with hinted axes while the page loads, instead of an empty box. It is announced to screen readers and does not pulse when reduced motion is on.
 - When the range or basis on Summary takes a moment to reload, the portfolio value chart stays on screen dimmed instead of looking frozen.
 - Screens without charts load about a third less JavaScript: the charting library is now downloaded only by the screens that draw charts.

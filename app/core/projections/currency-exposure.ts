@@ -1,7 +1,7 @@
 import Decimal from "decimal.js";
 
 import { Money, leafKey } from "../domain";
-import type { LeafExposure } from "./exposures";
+import type { LeafExposureInput } from "./exposures";
 
 export interface CurrencyBucket {
   currency: string | null;
@@ -18,7 +18,7 @@ export interface CurrencyExposure {
 }
 
 export interface CurrencyExposureInput {
-  exposures: readonly LeafExposure[];
+  exposures: readonly LeafExposureInput[];
   currencyByLeaf: ReadonlyMap<string, string>;
   hedgedInstruments: ReadonlySet<string>;
   base?: string;
