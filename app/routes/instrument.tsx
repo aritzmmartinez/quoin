@@ -12,10 +12,10 @@ import {
   Card,
   InstrumentHeader,
   InstrumentStats,
-  InvestedVsValue,
   MovementsTable,
-  PriceChartWithTrades,
 } from "~/components";
+import { InstrumentPriceChart } from "~/components/instrument/InstrumentPriceChart";
+import { InstrumentValueChart } from "~/components/instrument/InstrumentValueChart";
 import {
   PrismaInstrumentRepository,
   PrismaLedgerRepository,
@@ -168,8 +168,8 @@ export default function Instrument({ loaderData }: Route.ComponentProps) {
     <>
       <InstrumentHeader instrument={instrument} />
       <InstrumentStats kpis={kpis} />
-      <PriceChartWithTrades data={priceChartData} />
-      <InvestedVsValue data={ivvData} />
+      <InstrumentPriceChart data={priceChartData} />
+      <InstrumentValueChart data={ivvData} />
       <Card className="overflow-hidden">
         <div className="px-gutter pb-3 pt-4 text-[14px] font-semibold">
           {t.instrument.movements.title}

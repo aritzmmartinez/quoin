@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   CartesianGrid,
   ComposedChart,
@@ -11,10 +11,12 @@ import {
   YAxis,
 } from "recharts";
 
-import { filterByRange, type Range, useCopy, useFormat } from "~/lib";
+import { type Range, rangedSeries, useCopy, useFormat } from "~/lib";
 
 import { legendOrder } from "../charts/legend-order";
+import { useHydrated } from "../charts/use-hydrated";
 import { Card } from "../ui/Card";
+import { ChartSkeleton } from "../ui/ChartSkeleton";
 import { RangeSelector } from "../ui/RangeSelector";
 
 export interface PriceChartDatum {
@@ -34,16 +36,17 @@ const TOOLTIP_STYLE = {
   fontSize: 12,
 } as const;
 
-export function PriceChartWithTrades({ data }: { data: PriceChartDatum[] }) {
+export function InstrumentPriceChart({ data }: { data: PriceChartDatum[] }) {
   const { formatMoney, formatDate, formatTimeTick } = useFormat();
   const axisEur = (v: number) => formatMoney(String(v), 0);
   const axisDate = (t: number) => formatTimeTick(t, "month", true);
-  const [mounted, setMounted] = useState(false);
+  const hydrated = useHydrated();
   const [range, setRange] = useState<Range>("all");
-  useEffect(() => setMounted(true), []);
 
-  const c = useCopy().instrument.priceChart;
-  const view = filterByRange(data, range);
+  const t = useCopy();
+  const c = t.instrument.priceChart;
+  // One point is drawable here: a lone trade is a scatter mark.
+  const series = rangedSeries(data, range, 1);
   const hasPrice = data.some((d) => d.price !== null);
 
   return (
@@ -53,14 +56,18 @@ export function PriceChartWithTrades({ data }: { data: PriceChartDatum[] }) {
         <RangeSelector value={range} onChange={setRange} />
       </div>
       {!hasPrice && <p className="mb-2 text-[12px] text-muted">{c.noPrice}</p>}
-      {data.length === 0 ? (
+      {series.kind === "empty" ? (
         <p className="py-10 text-center text-[13px] text-muted">{c.empty}</p>
-      ) : !mounted ? (
-        <div style={{ height: 280 }} />
+      ) : series.kind === "outOfRange" ? (
+        <p className="py-10 text-center text-[13px] text-muted">
+          {t.range.empty}
+        </p>
+      ) : !hydrated ? (
+        <ChartSkeleton height={280} />
       ) : (
         <ResponsiveContainer width="100%" height={280}>
           <ComposedChart
-            data={view}
+            data={series.points}
             margin={{ top: 8, right: 8, bottom: 0, left: 8 }}
           >
             <CartesianGrid

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_RANGE, filterByRange, parseRange } from "./range";
+import {
+  DEFAULT_RANGE,
+  filterByRange,
+  parseRange,
+  rangedSeries,
+} from "./range";
 
 describe("parseRange", () => {
   it("reads a valid range from the URL", () => {
@@ -38,5 +43,42 @@ describe("filterByRange", () => {
     const input = [...data];
     filterByRange(input, "1m", now);
     expect(input).toHaveLength(3);
+  });
+});
+
+describe("rangedSeries", () => {
+  const now = new Date("2026-07-15T00:00:00Z");
+  const day = 24 * 60 * 60 * 1000;
+  const stale = [
+    { t: now.getTime() - 300 * day },
+    { t: now.getTime() - 200 * day },
+    { t: now.getTime() - 90 * day },
+  ];
+
+  it("judges the filtered view, not the whole series", () => {
+    expect(rangedSeries(stale, "1m", 1, now)).toEqual({ kind: "outOfRange" });
+    expect(rangedSeries(stale, "1m", 2, now)).toEqual({ kind: "outOfRange" });
+  });
+
+  it("refuses a view with fewer points than the chart needs", () => {
+    expect(rangedSeries(stale, "6m", 1, now)).toEqual({
+      kind: "ready",
+      points: [stale[2]],
+    });
+    expect(rangedSeries(stale, "6m", 2, now)).toEqual({ kind: "outOfRange" });
+  });
+
+  it("reports a series too short to draw as empty, whatever the range", () => {
+    expect(rangedSeries([], "all", 1, now)).toEqual({ kind: "empty" });
+    expect(rangedSeries(stale.slice(0, 1), "1m", 2, now)).toEqual({
+      kind: "empty",
+    });
+  });
+
+  it("returns the filtered points when the view is drawable", () => {
+    expect(rangedSeries(stale, "1y", 2, now)).toEqual({
+      kind: "ready",
+      points: stale,
+    });
   });
 });
