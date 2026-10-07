@@ -5,22 +5,23 @@ import {
   type LedgerRepository,
 } from "~/core/ports";
 
-export interface DiscardDetail {
-  date: string;
-  type: string;
-  instrument: string | null;
-}
+import type { DiscardDetail, DiscardReason } from "./discard";
+
+export type { DiscardDetail, DiscardReason } from "./discard";
+
+export type DiscardCounts = Partial<Record<DiscardReason, number>>;
+export type DiscardDetails = Partial<Record<DiscardReason, DiscardDetail[]>>;
 
 export type MappedItem =
   | { kind: "domain"; instrument: Instrument | null; event: LedgerEvent }
-  | { kind: "discard"; reason: string; detail?: DiscardDetail };
+  | { kind: "discard"; reason: DiscardReason; detail?: DiscardDetail };
 
 export interface MappedBatch {
   total: number;
   instruments: Instrument[];
   events: LedgerEvent[];
-  discarded: Record<string, number>;
-  discardedDetails: Record<string, DiscardDetail[]>;
+  discarded: DiscardCounts;
+  discardedDetails: DiscardDetails;
   errors: number;
 }
 
@@ -28,8 +29,8 @@ export interface ImportSummary {
   total: number;
   imported: number;
   duplicates: number;
-  discarded: Record<string, number>;
-  discardedDetails: Record<string, DiscardDetail[]>;
+  discarded: DiscardCounts;
+  discardedDetails: DiscardDetails;
   errors: number;
   instruments: number;
 }
@@ -37,8 +38,8 @@ export interface ImportSummary {
 export class BatchBuilder {
   private readonly events: LedgerEvent[] = [];
   private readonly instruments = new Map<string, Instrument>();
-  private readonly discarded: Record<string, number> = {};
-  private readonly discardedDetails: Record<string, DiscardDetail[]> = {};
+  private readonly discarded: DiscardCounts = {};
+  private readonly discardedDetails: DiscardDetails = {};
   private errors = 0;
 
   add(item: MappedItem): void {

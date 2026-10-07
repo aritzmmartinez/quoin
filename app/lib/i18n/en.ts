@@ -1,6 +1,26 @@
+import type { DiscardReason } from "~/adapters/ingestion/discard";
 import type { ExposureKind, InstrumentType, Thesis } from "~/core/domain";
 
 import type { Copy } from "./types";
+
+const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
+  "crypto-swap": "Swaps involving BTC",
+  "crypto-transfer": "BTC transfers",
+  "reward-unpriced": "BTC rewards without a price",
+  "unmodelled-asset": "Assets Quoin does not model",
+  "card-spending": "Card payments",
+  unsupported: "Unsupported",
+};
+
+const DISCARD_REASON_HELP: Record<DiscardReason, string | null> = {
+  "crypto-swap": null,
+  "crypto-transfer": null,
+  "reward-unpriced":
+    "Update BTC prices with a history that reaches those dates and import the file again: the rewards will be valued then, and nothing will be duplicated.",
+  "unmodelled-asset": null,
+  "card-spending": null,
+  unsupported: null,
+};
 
 const THESIS_LABELS: Record<Thesis, string> = {
   CORE: "Core",
@@ -500,10 +520,12 @@ export const en: Copy = {
       discarded: "Discarded",
       errors: "With errors",
       none: "none",
-      unsupportedDetails: (count: number): string =>
-        count === 1
-          ? "View 1 unsupported row"
-          : `View ${count} unsupported rows`,
+      reasons: DISCARD_REASON_LABELS,
+      reasonHelp: DISCARD_REASON_HELP,
+      details: (count: number): string =>
+        count === 1 ? "1 transaction" : `${count} transactions`,
+      positionWarning:
+        "These change your BTC balance and Quoin does not record them, so your BTC position does not reflect them and may not match the broker's.",
       noInstrument: "No instrument",
     },
     nothingNew:

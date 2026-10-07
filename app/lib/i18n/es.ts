@@ -1,4 +1,24 @@
+import type { DiscardReason } from "~/adapters/ingestion/discard";
 import type { ExposureKind, InstrumentType, Thesis } from "~/core/domain";
+
+const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
+  "crypto-swap": "Intercambios con BTC",
+  "crypto-transfer": "Transferencias de BTC",
+  "reward-unpriced": "Recompensas de BTC sin precio",
+  "unmodelled-asset": "Activos que Quoin no modela",
+  "card-spending": "Pagos con tarjeta",
+  unsupported: "Sin soporte",
+};
+
+const DISCARD_REASON_HELP: Record<DiscardReason, string | null> = {
+  "crypto-swap": null,
+  "crypto-transfer": null,
+  "reward-unpriced":
+    "Actualiza los precios de BTC con un histórico que llegue a esas fechas y vuelve a importar el fichero: las recompensas se valorarán entonces y no se duplicará nada.",
+  "unmodelled-asset": null,
+  "card-spending": null,
+  unsupported: null,
+};
 
 const THESIS_LABELS: Record<Thesis, string> = {
   CORE: "Núcleo",
@@ -496,10 +516,12 @@ export const es = {
       discarded: "Descartadas",
       errors: "Con error",
       none: "ninguna",
-      unsupportedDetails: (count: number): string =>
-        count === 1
-          ? "Ver 1 fila sin soporte"
-          : `Ver ${count} filas sin soporte`,
+      reasons: DISCARD_REASON_LABELS,
+      reasonHelp: DISCARD_REASON_HELP,
+      details: (count: number): string =>
+        count === 1 ? "1 operación" : `${count} operaciones`,
+      positionWarning:
+        "Estas operaciones cambian tu saldo de BTC y Quoin no las registra, así que la posición de BTC no las refleja y puede no cuadrar con la del bróker.",
       noInstrument: "Sin instrumento",
     },
     nothingNew:

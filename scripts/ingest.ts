@@ -21,18 +21,38 @@ import {
   PrismaPriceRepository,
   prisma,
 } from "~/adapters/persistence";
+import { copyFor, discardGroups } from "~/lib";
 
 const USAGE = `Usage: pnpm ingest --broker=<${BROKERS.join("|")}> <file.csv> [--yes]`;
 
+const copy = copyFor("en").ingest.summary;
+
 function printSummary(title: string, summary: ImportSummary): void {
-  const discarded = Object.entries(summary.discarded)
-    .map(([reason, count]) => `${reason}: ${count}`)
-    .join(", ");
+  const groups = discardGroups(summary);
+  const discarded = groups.reduce((sum, group) => sum + group.count, 0);
   console.log(`\n${title}`);
   console.log(`  total transactions : ${summary.total}`);
   console.log(`  to import (new)    : ${summary.imported}`);
   console.log(`  duplicates (skip)  : ${summary.duplicates}`);
   console.log(`  discarded          : ${discarded || "none"}`);
+  for (const group of groups) {
+    const flag = group.affectsPosition ? "  ! " : "    ";
+    console.log(`${flag}  ${copy.reasons[group.reason]}: ${group.count}`);
+    if (group.byInstrument.length > 0) {
+      const assets = group.byInstrument
+        .map(
+          ({ instrument, count }) =>
+            `${instrument ?? copy.noInstrument} ${count}`,
+        )
+        .join(", ");
+      console.log(`        ${assets}`);
+    }
+    const help = copy.reasonHelp[group.reason];
+    if (help) console.log(`        ${help}`);
+  }
+  if (groups.some((group) => group.affectsPosition)) {
+    console.log(`  ! ${copy.positionWarning}`);
+  }
   console.log(`  errors             : ${summary.errors}`);
   console.log(`  instruments        : ${summary.instruments}`);
 }
