@@ -59,9 +59,20 @@ export class PrismaPriceRepository implements PriceRepository {
     return count;
   }
 
-  async historyFor(instrumentId: string): Promise<PriceSnapshot[]> {
+  async historyFor(
+    instrumentId: string,
+    from?: Date,
+  ): Promise<PriceSnapshot[]> {
+    const anchor = from
+      ? await prisma.priceSnapshot.findFirst({
+          where: { instrumentId, asOf: { lte: from } },
+          orderBy: { asOf: "desc" },
+          select: { asOf: true },
+        })
+      : null;
+    const start = anchor?.asOf ?? from;
     const rows = await prisma.priceSnapshot.findMany({
-      where: { instrumentId },
+      where: start ? { instrumentId, asOf: { gte: start } } : { instrumentId },
       orderBy: { asOf: "asc" },
     });
     return rows.map((r) => ({

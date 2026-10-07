@@ -45,6 +45,7 @@ import {
 } from "~/lib";
 
 import { BASE_CURRENCY, type Revalue } from "~/core/domain";
+import { firstEventByInstrument } from "~/lib/history-start";
 import { loadOpportunityCost } from "~/lib/opportunity-cost.server";
 import { resolveRealView } from "~/lib/real.server";
 import { createServerTiming } from "~/lib/server-timing";
@@ -126,8 +127,11 @@ export async function loader({ request }: Route.LoaderArgs) {
   }));
 
   const heldIds = [...new Set(positions.map((p) => p.instrumentId))];
+  const firstEvents = firstEventByInstrument(events);
   const histories = await timing.time("db-history", () =>
-    Promise.all(heldIds.map((id) => priceRepository.historyFor(id))),
+    Promise.all(
+      heldIds.map((id) => priceRepository.historyFor(id, firstEvents.get(id))),
+    ),
   );
 
   const now = new Date();

@@ -191,3 +191,105 @@ describe("PrismaPriceRepository.latest (integration)", () => {
     expect((await priceRepo.latest()).get("XS00TEST0002")?.price).toBe("7");
   });
 });
+
+describe("PrismaPriceRepository.historyFor (integration)", () => {
+  const seedHistory = async () => {
+    await snapshot(
+      "XS00TEST0001",
+      "2026-01-02T17:30:00Z",
+      "10",
+      "2026-01-02T18:00:00Z",
+    );
+    await snapshot(
+      "XS00TEST0001",
+      "2026-01-05T17:30:00Z",
+      "11",
+      "2026-01-05T18:00:00Z",
+    );
+    await snapshot(
+      "XS00TEST0001",
+      "2026-01-09T17:30:00Z",
+      "12",
+      "2026-01-09T18:00:00Z",
+    );
+    await snapshot(
+      "XS00TEST0001",
+      "2026-01-12T17:30:00Z",
+      "13",
+      "2026-01-12T18:00:00Z",
+    );
+    await snapshot(
+      "XS00TEST0002",
+      "2026-01-07T17:30:00Z",
+      "99",
+      "2026-01-07T18:00:00Z",
+    );
+  };
+  const prices = (rows: { price: string }[]) => rows.map((r) => r.price);
+
+  it("returns the whole history, oldest first, when no start is given", async () => {
+    await seedHistory();
+    expect(prices(await priceRepo.historyFor("XS00TEST0001"))).toEqual([
+      "10",
+      "11",
+      "12",
+      "13",
+    ]);
+  });
+
+  it("starts at the last snapshot at or before the start, then everything after", async () => {
+    await seedHistory();
+    const rows = await priceRepo.historyFor(
+      "XS00TEST0001",
+      new Date("2026-01-08T10:00:00Z"),
+    );
+    expect(prices(rows)).toEqual(["11", "12", "13"]);
+    expect(rows.every((r) => r.instrumentId === "XS00TEST0001")).toBe(true);
+  });
+
+  it("keeps a snapshot that falls exactly on the start as the anchor", async () => {
+    await seedHistory();
+    expect(
+      prices(
+        await priceRepo.historyFor(
+          "XS00TEST0001",
+          new Date("2026-01-09T17:30:00Z"),
+        ),
+      ),
+    ).toEqual(["12", "13"]);
+  });
+
+  it("starts at the first snapshot available when none is at or before the start", async () => {
+    await seedHistory();
+    expect(
+      prices(
+        await priceRepo.historyFor(
+          "XS00TEST0001",
+          new Date("2025-06-01T00:00:00Z"),
+        ),
+      ),
+    ).toEqual(["10", "11", "12", "13"]);
+  });
+
+  it("keeps the newest snapshot when the start is after the whole history", async () => {
+    await seedHistory();
+    expect(
+      prices(
+        await priceRepo.historyFor(
+          "XS00TEST0001",
+          new Date("2027-01-01T00:00:00Z"),
+        ),
+      ),
+    ).toEqual(["13"]);
+  });
+
+  it("returns nothing for an instrument without snapshots", async () => {
+    await seedHistory();
+    expect(
+      await priceRepo.historyFor(
+        "XS00TEST0003",
+        new Date("2026-01-08T00:00:00Z"),
+      ),
+    ).toEqual([]);
+  });
+});
