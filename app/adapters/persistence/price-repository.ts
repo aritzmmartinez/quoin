@@ -26,13 +26,21 @@ export class PrismaPriceRepository implements PriceRepository {
   }
 
   async latest(): Promise<Map<string, PriceSnapshot>> {
-    const rows = await prisma.priceSnapshot.findMany({
-      orderBy: [{ instrumentId: "asc" }, { asOf: "desc" }],
+    const instruments = await prisma.priceSnapshot.groupBy({
+      by: ["instrumentId"],
     });
+    const rows = await Promise.all(
+      instruments.map(({ instrumentId }) =>
+        prisma.priceSnapshot.findFirst({
+          where: { instrumentId },
+          orderBy: { asOf: "desc" },
+        }),
+      ),
+    );
 
     const latest = new Map<string, PriceSnapshot>();
     for (const r of rows) {
-      if (latest.has(r.instrumentId)) continue;
+      if (!r) continue;
       latest.set(r.instrumentId, {
         instrumentId: r.instrumentId,
         price: r.price,
