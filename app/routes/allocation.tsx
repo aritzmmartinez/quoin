@@ -145,8 +145,16 @@ export async function loader({ request }: Route.LoaderArgs) {
       new Map(instruments.map((i) => [i.id, i.name])),
     ),
   );
-  const summary = summarizeExposures(exposures);
-  const rows = toExposureRows(exposures, summary.total);
+  const summary = timing.time("summarize", () =>
+    summarizeExposures(exposures),
+  );
+  const rows = timing.time("rows", () =>
+    toExposureRows(exposures, summary.total),
+  );
+  const tail = timing.time("tail", () => tailOf(exposures, summary.total));
+  const reading = timing.time("reading", () =>
+    readingFor(rows, summary.resolvedLeafCount, threshold),
+  );
 
   const target = getActiveTarget(targets, new Date());
 
@@ -214,8 +222,8 @@ export async function loader({ request }: Route.LoaderArgs) {
       currency,
       hedgedCount: hedged.size,
       rows,
-      tail: tailOf(exposures, summary.total),
-      reading: readingFor(rows, summary.resolvedLeafCount, threshold),
+      tail,
+      reading,
       summary,
       threshold,
       view,
