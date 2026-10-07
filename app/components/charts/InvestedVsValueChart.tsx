@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Area,
   CartesianGrid,
@@ -13,8 +13,10 @@ import {
 
 import { useFormat } from "~/lib";
 
+import { ChartSkeleton } from "../ui/ChartSkeleton";
 import { legendOrder } from "./legend-order";
 import { timeTicks } from "./time-ticks";
+import { useHydrated } from "./use-hydrated";
 
 export interface InvestedVsValueDatum {
   t: number;
@@ -60,8 +62,7 @@ export function InvestedVsValueChart({
 }) {
   const { formatMoney, formatDate, formatTimeTick } = useFormat();
   const axisEur = (v: number) => formatMoney(String(v), 0);
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const hydrated = useHydrated();
 
   const [gradientId] = useState(() => `ivvValueFill-${(gradientSeq += 1)}`);
 
@@ -70,7 +71,7 @@ export function InvestedVsValueChart({
     [data],
   );
 
-  if (!mounted) return <div style={{ height }} />;
+  if (!hydrated) return <ChartSkeleton height={height} />;
 
   return (
     <ResponsiveContainer width="100%" height={height}>

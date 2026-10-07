@@ -214,6 +214,10 @@ export const es = {
     m6: "6M",
     y1: "1A",
     all: "Todo",
+    empty: "Sin datos en este rango.",
+  },
+  chart: {
+    loading: "Cargando gráfico",
   },
   basis: {
     label: "Base de cálculo",

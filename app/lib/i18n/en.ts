@@ -215,6 +215,10 @@ export const en: Copy = {
     m6: "6M",
     y1: "1Y",
     all: "All",
+    empty: "No data in this range.",
+  },
+  chart: {
+    loading: "Loading chart",
   },
   basis: {
     label: "Calculation basis",

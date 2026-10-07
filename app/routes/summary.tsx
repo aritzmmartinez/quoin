@@ -12,7 +12,6 @@ import {
   BasisNotice,
   Card,
   PortfolioEmpty,
-  PortfolioValueChart,
   SummaryHero,
   SummaryReturns,
   SummaryStats,
@@ -20,6 +19,7 @@ import {
   type AllocationRow,
   type TopPositionRow,
 } from "~/components";
+import { PortfolioValueChart } from "~/components/summary/PortfolioValueChart";
 import {
   computeAllocation,
   computeInvestedVsValueSeries,
