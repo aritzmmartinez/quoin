@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Charts show a placeholder with hinted axes while the page loads, instead of an empty box. It is announced to screen readers and does not pulse when reduced motion is on.
+- When the range or basis on Summary takes a moment to reload, the portfolio value chart stays on screen dimmed instead of looking frozen.
+- Screens without charts load about a third less JavaScript: the charting library is now downloaded only by the screens that draw charts.
+
+### Fixed
+- On an instrument's page, a range with no data in it showed the chart's axes around nothing. It now says the range has no data.
+
 ## [0.11.1] - 2026-10-06
 
 ### Changed
