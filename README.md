@@ -108,16 +108,19 @@ pnpm run dev            # http://localhost:5173
 
 Then open the app and import your trades with **Import trades** on the Portfolio screen,
 as in the Docker section above: the wizard reads the broker export, maps symbols and
-fetches prices without the terminal.
+fetches prices without the terminal. Symbols can be assigned or changed later in the
+Symbol column of **Instruments**, which also downloads an instrument's history again or
+rebuilds every history at once.
 
 The same work, and everything around it, is also available from the command line:
 
 ```bash
 pnpm ingest --broker=trade-republic path/to/export.csv   # CSV -> ledger (idempotent)
 pnpm ingest --broker=kraken path/to/ledgers.csv
-pnpm prices:map <ISIN> <SYMBOL>   # map an instrument to a Yahoo symbol, e.g. VWCE.DE
+pnpm prices:map <ISIN> <SYMBOL> [range]   # set a Yahoo symbol (e.g. VWCE.DE) and replace the history
 pnpm prices:sync                  # fetch quotes for mapped instruments -> price snapshots
 pnpm prices:backfill [ISIN] [1y|2y|5y|10y|max]   # daily price history (default 5y)
+pnpm prices:rebuild [ISIN]        # download every mapped history again, daily
 pnpm exposure:map                 # list how every instrument resolves for look-through
 pnpm exposure:map <ISIN> <KIND> [LEAF]           # e.g. XS00TEST0003 COMMODITY XAU
 pnpm identity:resolve             # give holdings a canonical id so duplicates merge
@@ -126,8 +129,10 @@ pnpm ipc:sync                     # INE consumer price index (national + Bizkaia
 pnpm target:set [<file>]          # show, or record a version of, the savings plan
 ```
 
-`ingest`, `prices:map`, `prices:sync` and `prices:backfill` do the same work as the
-import wizard, and `ipc:sync` the same as the button in the IPC notice on Summary.
+`ingest`, `prices:sync` and `prices:backfill` do the same work as the import wizard,
+`prices:map` and `prices:rebuild` the same as the Symbol column and **Rebuild all
+histories** on Instruments, and `ipc:sync` the same as the button in the IPC notice on
+Summary. Only `prices:map --clear` has no button.
 
 Fund compositions are imported from the **Instruments** screen: drop the issuer's
 holdings CSV onto the fund's row. One parser handles every issuer — the weight column
@@ -141,7 +146,7 @@ the repo), so a public clone never discloses your holdings. Prefer EUR venues (`
 
 The opportunity-cost screen replays every contribution into a benchmark ETF, `VWCE.DE`
 by default. Pick another under *Benchmark index* in `/settings` — the list offers
-only instruments you have mapped to a symbol, in the import wizard or with `prices:map`,
+only instruments you have mapped to a symbol, in the import wizard or on Instruments,
 and given EUR price history.
 
 Two databases, on purpose. `data/quoin.sqlite` is the ledger — real trades, and the only

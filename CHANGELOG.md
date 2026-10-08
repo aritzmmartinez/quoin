@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Empty screens offer an Import trades button when importing is the next step.
 - Summary, Allocation and Projection list what they still need, with a button for each pending step.
+- Instruments has a Symbol column: assign or change an instrument's Yahoo symbol there, with the same check as the import wizard. Saving downloads its daily history.
+- Download the history of an instrument again from its row, or rebuild every history at once. Old prices are replaced only if new ones arrive, and trades are never touched.
+- Instruments warns when an instrument still has weekly or monthly prices from old downloads.
+- prices:rebuild downloads every mapped history again from the command line.
 
 ### Changed
 - Summary, Allocation and Projection open noticeably faster, especially with years of price history.
@@ -19,6 +23,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Empty screens share the look of the error screens.
 - Target explains what it is for when none is set.
 - Messages that pointed to a command now point to the button that does the same, when there is one.
+- Refresh prices counts the open and closed positions that still have no symbol.
+- Messages that send you to Instruments say what to do there.
+- The Composition column on Instruments reads "Company", "Crypto · BTC" or "Not broken down" instead of internal codes.
+- The TER field is shown only for ETFs, ETCs and funds, without a sample value.
+- prices:map downloads the new symbol's history before replacing the old one, and refuses a history that is not in euros.
+- Checking a symbol, in the import wizard or on Instruments, says when it does not quote in euros, and such a symbol cannot be saved.
+- Checking a symbol shows its name on Yahoo and compares your last three trades with the symbol's close on those days, with a warning when they do not match. It works for closed positions too.
 
 ### Fixed
 - The value total on Portfolio showed in Spanish in the English interface.
@@ -26,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Importing a Kraken file showed discarded rows as an internal code ("non-btc: 41"). Each reason is now named, listed row by row with asset and date, and BTC swaps, BTC transfers and BTC rewards without a price come with a warning that the BTC position does not include them. ingest prints the same breakdown.
 - The first import of a Kraken file into an empty Quoin left out every BTC reward, because there were no BTC prices yet to value them. The import now values them once its price step has run and says how many it recovered; ingest offers to download the prices and import again. A file with nothing but rewards can now be imported too.
 - Long price histories were downloaded as monthly or weekly prices. They are now daily.
+- The price step of the import wizard stored histories in other currencies, which Quoin cannot value. It now leaves them out and says which symbols to change. prices:backfill does the same.
 
 ## [0.11.1] - 2026-10-06
 

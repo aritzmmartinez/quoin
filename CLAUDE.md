@@ -60,8 +60,9 @@ pnpm db:backup                    # VACUUM INTO data/backups/, keeps the last 30
 pnpm db:seed [--anchor=YYYY-MM-DD]   # synthetic portfolio into the scratch database
 pnpm ingest --broker=<trade-republic|kraken> <file>
 pnpm prices:sync                  # quote every mapped instrument
-pnpm prices:map <ISIN> <SYMBOL>   # set / show / --clear a Yahoo symbol
+pnpm prices:map <ISIN> <SYMBOL> [range]   # set a Yahoo symbol and replace the history; show / --clear
 pnpm prices:backfill [ISIN] [1y|2y|5y|10y|max]   # daily history, default 5y
+pnpm prices:rebuild [ISIN]        # replace every mapped history, one at a time
 pnpm exposure:map                 # list how every instrument resolves
 pnpm exposure:map <ISIN> <KIND> [LEAF]           # e.g. XS00TEST0003 COMMODITY XAU
 pnpm identity:resolve [--limit N] [--all] [--retry-ambiguous] [--refresh] [--report]
@@ -112,7 +113,7 @@ duplicating logic across screens.
 Every CLI action that also has a button in the app lives in `app/lib/<name>.ts`, and the
 script under `scripts/` only parses argv and formats what the function returns:
 `syncPrices`, `syncInflation`, `backfillInstrument` / `backfillInstruments`,
-`remapQuoteSymbol`. Adding behaviour to the script gives it to the CLI and silently
+`replaceQuoteHistory` / `replaceQuoteHistories`. Adding behaviour to the script gives it to the CLI and silently
 **not** to the route (`api/prices/sync`, `api/ipc/sync`), and the two then disagree about
 what a sync did — the counts on screen are the ones the function returns, not the ones the
 script printed. `api/ingest` is the exception and is allowed to be: `scripts/ingest.ts`
@@ -130,6 +131,10 @@ file at once vs. a preview, a commit and two follow-up steps).
   wholesale, so `scripts/ipc-sync.ts` owns the flag and `syncInflation` cannot rebase at
   all: it *reports* `rebaseBlocked`, and the endpoint names the affected series without
   acting. A button is one click; a flag is a decision. Same reasoning as `db-guard`.
+  Replacing an instrument's price history **is** on a button, and that is not an
+  exception: it downloads before it deletes, refuses when nothing arrives, and can be
+  repeated to the same result. What is gone is a re-downloadable cache, never the ledger.
+  `prices:map --clear`, which drops prices with nothing to replace them, stays CLI-only.
 
 ## Money rules
 
@@ -180,10 +185,43 @@ This has caused misdirected generation more than once:
   sync's. Run backfill first and sync second — the requirement is that **both** run;
   ending on the sync just means the last row written is also the newest in time.
 - `PriceSnapshot` is append-only and idempotent via `@@unique([instrumentId, asOf])`.
-- Remapping an `Instrument.quoteSymbol` **deletes** that instrument's existing snapshots.
-  Two symbols' prices must never share a series. That deletion lives in exactly one place,
-  `remapQuoteSymbol` — `prices:map` and the instruments screen both go through it, and a
-  test pins that the delete precedes the write.
+- **Deleting an instrument's snapshots happens in exactly one place:
+  `PriceRepository.replaceHistory`, and it is atomic.** One transaction deletes the
+  instrument's rows (all of them, or only those at or before `keepAfter`), writes the new
+  ones and, if asked, sets `quoteSymbol`. A failed write rolls back the delete and the
+  symbol together — an integration test pins that. Two symbols' prices must never share
+  a series, so a symbol change only ever goes through it.
+- **`replaceQuoteHistory` fetches everything before it writes anything.** Daily candles
+  first; none, or any not in EUR, returns a failure and touches nothing — a failed Yahoo
+  call must leave the old series intact. Then today's quote, kept only if fresh, in EUR
+  and newer than the last candle, because the newest daily candle can arrive without a
+  close. If that quote is missing and the symbol is unchanged, rows newer than the last
+  candle are kept (`keepAfter`), so `latest()` never moves back. On a symbol change it
+  may: the old rows belong to another security.
+- **"Only EUR is valued" is one function: `foreignCurrency` in `core/domain/money.ts`.**
+  `replaceQuoteHistory` refuses with it, `backfillInstrument` stores nothing and reports
+  `foreignCurrency` (so the wizard's `fill` skips that instrument's sync too),
+  `checkSymbol` carries it so the symbol check warns and `canSave` refuses, and
+  `assignQuoteSymbol` asks the provider for a quote and refuses on the server too, so the
+  `map` endpoint holds when called without the screen. Only `planPriceSync` does **not**
+  apply it yet: a live quote in another currency is still written by `prices:sync`. Write
+  any new check through this function, never as a literal `"EUR"`.
+- **The wizard's `map` only assigns; it cannot replace.** `assignQuoteSymbol` refuses an
+  instrument that already has prices and the endpoint sends the user to Instruments.
+  Changing a symbol is the `replace` intent, which carries the range and goes through
+  `replaceQuoteHistory` — the same function as "Download the history again", "Rebuild all
+  histories", `prices:map` and `prices:rebuild`.
+- **The default range never shortens what is stored.** `rangeSince(earliest, now)` is the
+  wider of `DEFAULT_HISTORY_RANGE` and the range covering the oldest stored row;
+  `lostHistoryBefore` names the date a narrower choice would drop, and the screen says it
+  before confirming.
+- **Coarse candles are detected by gaps only** (`isCoarseSeries`): more than half the gaps
+  ≥6 days, or three ≥6-day gaps in a row. Two rows on one Madrid day is **not** a signal:
+  a live quote beside that day's candle produces exactly that, and Yahoo's weekly candle
+  (Monday 00:00 exchange time, measured on VWCE.DE) looks the same. Undetectable cases
+  exist — a monthly BTC candle that overwrote the day-1 daily one leaves a perfectly daily
+  series — so "Rebuild all histories" is always offered and no text claims a history is
+  clean.
 
 ## The live ledger — never the agent's target
 
@@ -279,6 +317,12 @@ ISIN itself, and always sanity-check the price magnitude.
   fund with a different entitlement per certificate — observed at 5.5x, 0.5x and 0.4x the
   correct line. Check the candidate price against the broker's own `amount / quantity` for
   a real trade before committing the mapping.
+- **The symbol check does that comparison itself** (`checkQuoteAgainstLedger`): the last
+  three EUR trades of the instrument, `grossAmount / quantity` against the last close at
+  or before each trade, within a week, never a later one. It downloads only that date
+  span. The warning is on the **median** deviation above 10%, so one odd fill does not
+  trip it while a 0.4x or 5.5x line always does. Kraken reward buys are excluded: they
+  were valued from a price history, so comparing them with one proves nothing.
 
 ## Exposure and look-through
 
@@ -1030,7 +1074,8 @@ The image is **public**. Everything below was found by running it, not by readin
   pushes by digest and a `merge` job joins them; do not fold the matrix back into one
   `platforms: linux/amd64,linux/arm64` build to "simplify" it.
 - **Only `db:backup` ships as a CLI** (`docker exec quoin npm run db:backup`; the image
-  has no pnpm). Every other command has a screen. Adding one means copying its script and
+  has no pnpm). Every other command has a screen, except the CLI-only destructive options
+  above (`ipc:sync --force-rebase`, `prices:map --clear`). Adding one means copying its script and
   every file it imports, and `~/` imports need the tsconfig and `app/` too.
 
 ## Working agreement
