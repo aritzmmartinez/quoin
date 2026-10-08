@@ -97,3 +97,11 @@ export function rewardsNeedMapping(
   );
   return rewardRetryIds(summary).some((id) => waiting.has(id));
 }
+
+export type ImportAction = "import" | "value-rewards" | "nothing";
+
+export function importAction(summary: ImportSummary): ImportAction {
+  if (summary.imported > 0) return "import";
+  if (unpricedRewards(summary) > 0) return "value-rewards";
+  return "nothing";
+}

@@ -4,6 +4,7 @@ import type { ImportSummary } from "~/adapters/ingestion";
 
 import {
   earliestUnpricedReward,
+  importAction,
   mergeRewardRetry,
   rewardRetryIds,
   retryAfterFill,
@@ -142,5 +143,54 @@ describe("rewardsNeedMapping", () => {
     expect(rewardsNeedMapping(first, [btc], { BTC: "BTC-EUR" })).toBe(false);
     expect(rewardsNeedMapping(first, [], {})).toBe(false);
     expect(rewardsNeedMapping(summary(), [btc], {})).toBe(false);
+  });
+});
+
+describe("mergeRewardRetry keeps every other reason's rows", () => {
+  it("still lists an unsupported row in the final summary", () => {
+    const transfer = {
+      date: "2025-11-20T10:00:00.000Z",
+      type: "transfer",
+      subtype: "useraccounttransfer",
+      instrument: "EUR",
+    };
+    const withUnsupported = summary({
+      discarded: { "reward-unpriced": 1, unsupported: 1 },
+      discardedDetails: {
+        "reward-unpriced": [reward("2026-03-01T05:52:00.000Z")],
+        unsupported: [transfer],
+      },
+    });
+    const retry = summary({
+      imported: 1,
+      discarded: { unsupported: 1 },
+      discardedDetails: { unsupported: [transfer] },
+    });
+
+    const merged = mergeRewardRetry(withUnsupported, retry).summary;
+
+    expect(merged.discarded).toEqual({ unsupported: 1 });
+    expect(merged.discardedDetails).toEqual({ unsupported: [transfer] });
+  });
+});
+
+describe("importAction", () => {
+  it("imports when something new is in the file, whatever else is pending", () => {
+    expect(importAction(summary({ imported: 2 }))).toBe("import");
+    expect(importAction({ ...first, imported: 2 })).toBe("import");
+  });
+
+  it("offers to value the rewards when nothing is new but some still lack a price", () => {
+    expect(
+      importAction({ ...first, imported: 0, duplicates: 8 }),
+    ).toBe("value-rewards");
+  });
+
+  it("has nothing to do when nothing is new and no reward is pending", () => {
+    expect(
+      importAction(
+        summary({ imported: 0, duplicates: 13, discarded: { unsupported: 1 } }),
+      ),
+    ).toBe("nothing");
   });
 });
