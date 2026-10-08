@@ -504,6 +504,7 @@ export const es = {
     failed: "La importación ha fallado.",
     analysing: "Analizando el fichero…",
     importing: "Importando…",
+    retrying: "Valorando las recompensas…",
     brokerLabel: (broker: string): string =>
       broker === "kraken" ? "Kraken" : "Trade Republic",
     detected: (broker: string): string => `${broker} detectado`,
@@ -520,12 +521,16 @@ export const es = {
       reasonHelp: DISCARD_REASON_HELP,
       details: (count: number): string =>
         count === 1 ? "1 operación" : `${count} operaciones`,
+      pendingPrice: "Recompensas de BTC pendientes de precio",
+      pendingPriceNote:
+        "Se valorarán después del paso de precios, volviendo a importar el fichero.",
       positionWarning:
         "Estas operaciones cambian tu saldo de BTC y Quoin no las registra, así que la posición de BTC no las refleja y puede no cuadrar con la del bróker.",
       noInstrument: "Sin instrumento",
     },
     nothingNew:
       "Nada nuevo que importar: todas las operaciones de este fichero ya estaban en el registro.",
+    confirmPending: "Continuar para valorar las recompensas",
     confirmCount: (count: number): string =>
       count === 1 ? "Importar 1 operación" : `Importar ${count} operaciones`,
     appliesNow:
@@ -589,6 +594,12 @@ export const es = {
     },
     done: {
       title: "Resumen de la importación",
+      rewardsNeedMapping:
+        "Las recompensas de BTC siguen sin valorar porque BTC no tiene símbolo. Vuelve al paso de mapeo, asígnale uno y continúa: el asistente descargará sus precios y volverá a importar el fichero.",
+      recovered: (count: number): string =>
+        count === 1
+          ? "1 recompensa recuperada al valorarla con los precios descargados"
+          : `${count} recompensas recuperadas al valorarlas con los precios descargados`,
       imported: (count: number): string =>
         count === 1
           ? "1 operación importada"

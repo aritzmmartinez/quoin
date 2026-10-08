@@ -8,10 +8,14 @@ export function DoneStep({
   summary,
   fill,
   unmapped,
+  recovered,
+  needsMapping,
 }: {
   summary: ImportSummary;
   fill: PriceFillResult | null;
   unmapped: number;
+  recovered: number;
+  needsMapping: boolean;
 }) {
   const t = useCopy();
   const copy = t.ingest.done;
@@ -28,6 +32,10 @@ export function DoneStep({
 
       <ul className="mt-3 space-y-1 text-[12px] text-muted">
         <li>{copy.imported(summary.imported)}</li>
+        {recovered > 0 && <li>{copy.recovered(recovered)}</li>}
+        {needsMapping && (
+          <li className="text-negative">{copy.rewardsNeedMapping}</li>
+        )}
         {summary.duplicates > 0 && (
           <li>{copy.duplicates(summary.duplicates)}</li>
         )}

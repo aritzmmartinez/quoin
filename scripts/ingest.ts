@@ -21,7 +21,16 @@ import {
   PrismaPriceRepository,
   prisma,
 } from "~/adapters/persistence";
-import { copyFor, discardGroups } from "~/lib";
+import {
+  copyFor,
+  discardGroups,
+  earliestUnpricedReward,
+  mergeRewardRetry,
+  rewardBackfillRange,
+  rewardRetryIds,
+  unpricedRewards,
+} from "~/lib";
+import { fillPrices } from "~/lib/ingest.server";
 
 const USAGE = `Usage: pnpm ingest --broker=<${BROKERS.join("|")}> <file.csv> [--yes]`;
 
@@ -57,13 +66,46 @@ function printSummary(title: string, summary: ImportSummary): void {
   console.log(`  instruments        : ${summary.instruments}`);
 }
 
-async function confirm(): Promise<boolean> {
+async function ask(question: string): Promise<boolean> {
   const rl = createInterface({ input: stdin, output: stdout });
-  const answer = await rl.question(
-    "\nProceed and write to the database? (y/N) ",
-  );
+  const answer = await rl.question(`\n${question} (y/N) `);
   rl.close();
   return answer.trim().toLowerCase() === "y";
+}
+
+async function retryRewards(
+  adapter: KrakenCsvAdapter | TradeRepublicCsvAdapter,
+  instruments: PrismaInstrumentRepository,
+  csv: string,
+  first: ImportSummary,
+  yes: boolean,
+): Promise<void> {
+  const unpriced = unpricedRewards(first);
+  const earliest = earliestUnpricedReward(first);
+  if (unpriced === 0 || earliest === null) return;
+
+  const ids = rewardRetryIds(first);
+  const stored = await instruments.list();
+  const unmapped = ids.filter(
+    (id) => !stored.find((instrument) => instrument.id === id)?.quoteSymbol,
+  );
+  if (unmapped.length > 0) {
+    console.log(
+      `\n${unpriced} reward(s) could not be valued. Map ${unmapped.join(", ")} first ` +
+        "(pnpm prices:map <ID> <SYMBOL>), then run this import again.",
+    );
+    return;
+  }
+
+  const range = rewardBackfillRange(earliest, new Date());
+  const question = `${unpriced} reward(s) have no price yet. Backfill ${ids.join(", ")} (${range}) and re-import?`;
+  if (!yes && !(await ask(question))) return;
+
+  const fill = await fillPrices(ids, range);
+  console.log(`\n  candles written    : ${fill.candles}`);
+  const merged = mergeRewardRetry(first, await adapter.import(csv));
+  console.log(`  rewards recovered  : ${merged.recovered}`);
+  printSummary("After re-import", merged.summary);
 }
 
 async function main(): Promise<void> {
@@ -97,18 +139,19 @@ async function main(): Promise<void> {
   const preview = await previewBatch(ledger, batch);
   printSummary(`Preview (${broker})`, preview);
 
-  if (preview.imported === 0) {
+  if (preview.imported === 0 && unpricedRewards(preview) === 0) {
     console.log("\nNothing new to import.");
     return;
   }
 
-  if (!values.yes && !(await confirm())) {
+  if (!values.yes && !(await ask("Proceed and write to the database?"))) {
     console.log("Aborted. Nothing written.");
     return;
   }
 
   const result = await persistBatch(instruments, ledger, batch);
   printSummary("Imported", result);
+  await retryRewards(adapter, instruments, csv, result, values.yes);
 }
 
 main()

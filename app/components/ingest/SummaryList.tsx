@@ -18,11 +18,12 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-function DiscardGroup({ group }: { group: Group }) {
+function DiscardGroup({ group, pending }: { group: Group; pending: boolean }) {
   const { formatDate } = useFormat();
   const copy = useCopy().ingest.summary;
-  const { reason, details, affectsPosition: warn } = group;
-  const help = copy.reasonHelp[reason];
+  const { reason, details } = group;
+  const warn = group.affectsPosition && !pending;
+  const help = pending ? copy.pendingPriceNote : copy.reasonHelp[reason];
 
   return (
     <details open={warn} className="group mt-3 border-t border-border pt-3">
@@ -34,7 +35,7 @@ function DiscardGroup({ group }: { group: Group }) {
           className="shrink-0 transition-transform group-open:rotate-0 -rotate-90"
         />
         <span className={warn ? "font-medium text-negative" : undefined}>
-          {copy.reasons[reason]}
+          {pending ? copy.pendingPrice : copy.reasons[reason]}
         </span>
         <span>· {copy.details(details.length)}</span>
       </summary>
@@ -62,10 +63,18 @@ function DiscardGroup({ group }: { group: Group }) {
   );
 }
 
-export function SummaryList({ summary }: { summary: ImportSummary }) {
+export function SummaryList({
+  summary,
+  pendingRewards = false,
+}: {
+  summary: ImportSummary;
+  pendingRewards?: boolean;
+}) {
   const t = useCopy();
   const copy = t.ingest.summary;
   const discarded = discardGroups(summary);
+  const isPending = (reason: Group["reason"]) =>
+    pendingRewards && reason === "reward-unpriced";
 
   return (
     <>
@@ -81,7 +90,8 @@ export function SummaryList({ summary }: { summary: ImportSummary }) {
               ? copy.none
               : discarded
                   .map(
-                    ({ reason, count }) => `${copy.reasons[reason]}: ${count}`,
+                    ({ reason, count }) =>
+                      `${isPending(reason) ? copy.pendingPrice : copy.reasons[reason]}: ${count}`,
                   )
                   .join(" · ")
           }
@@ -93,7 +103,11 @@ export function SummaryList({ summary }: { summary: ImportSummary }) {
 
       {discarded.map((group) =>
         group.details.length > 0 ? (
-          <DiscardGroup key={group.reason} group={group} />
+          <DiscardGroup
+            key={group.reason}
+            group={group}
+            pending={isPending(group.reason)}
+          />
         ) : null,
       )}
     </>

@@ -16,6 +16,38 @@ export const HISTORY_RANGES: readonly HistoryRange[] = [
 
 export const DEFAULT_HISTORY_RANGE: HistoryRange = "5y";
 
+const RANGE_SPAN_DAYS: Record<Exclude<HistoryRange, "max">, number> = {
+  "1y": 365,
+  "2y": 730,
+  "5y": 1826,
+  "10y": 3652,
+};
+
+export function rangeCovering(
+  from: Date,
+  now: Date,
+  marginDays = 7,
+): HistoryRange {
+  const needed = (now.getTime() - from.getTime()) / 86_400_000 + marginDays;
+  for (const range of HISTORY_RANGES) {
+    if (range !== "max" && RANGE_SPAN_DAYS[range] >= needed) return range;
+  }
+  return "max";
+}
+
+export function widerRange(a: HistoryRange, b: HistoryRange): HistoryRange {
+  return HISTORY_RANGES.indexOf(a) >= HISTORY_RANGES.indexOf(b) ? a : b;
+}
+
+export function rewardBackfillRange(
+  earliest: Date | null,
+  now: Date,
+): HistoryRange {
+  return earliest === null
+    ? DEFAULT_HISTORY_RANGE
+    : widerRange(DEFAULT_HISTORY_RANGE, rangeCovering(earliest, now));
+}
+
 export function isHistoryRange(value: string): value is HistoryRange {
   return (HISTORY_RANGES as readonly string[]).includes(value);
 }

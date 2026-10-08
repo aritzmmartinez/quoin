@@ -35,6 +35,7 @@ export type IngestResponse =
       broker: Broker;
       summary: ImportSummary;
       pending: PendingMapping[];
+      retryIds: string[];
     }
   | { ok: true; step: "check"; check: SymbolCheck }
   | { ok: true; step: "map"; instrumentId: string; removed: number }

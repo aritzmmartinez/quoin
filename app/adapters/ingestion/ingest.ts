@@ -14,7 +14,12 @@ export type DiscardDetails = Partial<Record<DiscardReason, DiscardDetail[]>>;
 
 export type MappedItem =
   | { kind: "domain"; instrument: Instrument | null; event: LedgerEvent }
-  | { kind: "discard"; reason: DiscardReason; detail?: DiscardDetail };
+  | {
+      kind: "discard";
+      reason: DiscardReason;
+      detail?: DiscardDetail;
+      instrument?: Instrument;
+    };
 
 export interface MappedBatch {
   total: number;
@@ -49,6 +54,9 @@ export class BatchBuilder {
         const list = this.discardedDetails[item.reason] ?? [];
         list.push(item.detail);
         this.discardedDetails[item.reason] = list;
+      }
+      if (item.instrument) {
+        this.instruments.set(item.instrument.id, item.instrument);
       }
       return;
     }

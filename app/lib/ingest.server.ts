@@ -17,11 +17,12 @@ import type { HistoryRange } from "~/core/ports";
 import { computePositions } from "~/core/projections";
 
 import type { Copy } from "./i18n";
-import type {
-  IngestPreview,
-  IngestResult,
-  PendingMapping,
-  PriceFillResult,
+import {
+  rewardRetryIds,
+  type IngestPreview,
+  type IngestResult,
+  type PendingMapping,
+  type PriceFillResult,
 } from "./ingest";
 import { backfillInstruments } from "./prices-backfill";
 import { syncPrices } from "./prices-sync.server";
@@ -73,7 +74,12 @@ export async function commitIngest(
 
   const summary = await persistBatch(instruments, ledger, batch);
 
-  return { broker, summary, pending: await pendingMappings(batch) };
+  return {
+    broker,
+    summary,
+    pending: await pendingMappings(batch),
+    retryIds: rewardRetryIds(summary),
+  };
 }
 
 async function pendingMappings(batch: MappedBatch): Promise<PendingMapping[]> {

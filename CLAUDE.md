@@ -721,7 +721,12 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
   value of the units.
 - **No price for that day means discard (`reward-unpriced`), never zero.** A discard is
   counted and printed; a zero is a wrong number that looks like data. Fix by running
-  `prices:backfill` and importing again — dedup by `refid` makes re-import safe.
+  `prices:backfill` and importing again — dedup by `refid` makes re-import safe. The
+  plan reads BTC prices **before** anything is written, so a first import into an empty
+  database sets every reward aside; the wizard re-imports the same file after its price
+  step and `pnpm ingest` offers to, both merging the two writes with `mergeRewardRetry`.
+  An unpriced reward still carries the BTC instrument, so a file of nothing but rewards
+  creates BTC and the mapping step can reach it.
 - **The lookup never reaches forward.** `priceLookupFrom` takes the last close at or before
   the timestamp, within 7 days; a later candle is information that did not exist yet.
 - Scope is still BTC-only by choice (`isBtc` in `map.ts`). Measured on a real export:

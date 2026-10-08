@@ -2,7 +2,7 @@ import { FileText } from "lucide-react";
 
 import type { Broker, ImportSummary } from "~/adapters/ingestion";
 
-import { useCopy } from "~/lib";
+import { unpricedRewards, useCopy } from "~/lib";
 import { Button } from "../ui/Button";
 import { FileDropzone } from "../ui/FileDropzone";
 import { SummaryList } from "./SummaryList";
@@ -26,6 +26,9 @@ export function FileStep({
 }) {
   const t = useCopy();
   const copy = t.ingest;
+  const newCount = preview?.summary.imported ?? 0;
+  const canImport =
+    newCount > 0 || (preview !== null && unpricedRewards(preview.summary) > 0);
 
   if (preview === null) {
     return (
@@ -62,9 +65,9 @@ export function FileStep({
         </Button>
       </div>
 
-      <SummaryList summary={preview.summary} />
+      <SummaryList summary={preview.summary} pendingRewards />
 
-      {preview.summary.imported === 0 ? (
+      {!canImport ? (
         <p className="mt-3 text-[12px] text-muted">{copy.nothingNew}</p>
       ) : (
         <p className="mt-3 text-[12px] text-muted">{copy.appliesNow}</p>
@@ -73,9 +76,13 @@ export function FileStep({
       <div className="mt-4">
         <Button
           onClick={onConfirm}
-          disabled={busy || imported || preview.summary.imported === 0}
+          disabled={busy || imported || !canImport}
         >
-          {busy ? copy.importing : copy.confirmCount(preview.summary.imported)}
+          {busy
+            ? copy.importing
+            : newCount > 0
+              ? copy.confirmCount(newCount)
+              : copy.confirmPending}
         </Button>
       </div>
     </>
