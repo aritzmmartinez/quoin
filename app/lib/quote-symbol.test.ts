@@ -1,16 +1,22 @@
 import { describe, expect, it } from "vitest";
 
 import type { Instrument } from "~/core/domain";
-import type { InstrumentRepository, PriceRepository } from "~/core/ports";
+import type {
+  InstrumentRepository,
+  MarketDataProvider,
+  PriceRepository,
+  PriceSnapshot,
+  ReplaceHistoryOptions,
+} from "~/core/ports";
 
-import { remapQuoteSymbol } from "./quote-symbol";
+import { assignQuoteSymbol, clearQuoteSymbol } from "./quote-symbol";
 
 const INSTRUMENT: Instrument = {
   id: "XS00TEST0003",
   name: "Test Instrument",
   type: "ETF",
   currency: "EUR",
-  quoteSymbol: "OLD.DE",
+  quoteSymbol: null,
   exposureKind: null,
   exposureLeafId: null,
   ter: null,
@@ -18,7 +24,33 @@ const INSTRUMENT: Instrument = {
   thesis: "CORE",
 };
 
-function fakes(stored: Instrument | null = INSTRUMENT) {
+const SNAPSHOT: PriceSnapshot = {
+  instrumentId: INSTRUMENT.id,
+  price: "10",
+  currency: "EUR",
+  asOf: new Date("2026-10-01T07:00:00Z"),
+  source: "YAHOO",
+};
+
+function quoting(currency: string | null): MarketDataProvider {
+  return {
+    source: "FAKE",
+    getQuotes: async (symbols) =>
+      currency === null
+        ? []
+        : symbols.map((symbol) => ({
+            symbol,
+            price: "100",
+            currency,
+            asOf: new Date("2026-10-08T14:00:00Z"),
+          })),
+    getHistory: async () => [],
+  };
+}
+
+const EUR = quoting("EUR");
+
+function fakes(stored: Instrument | null, history: PriceSnapshot[] = []) {
   const calls: string[] = [];
   const instruments = {
     get: async (id: string) =>
@@ -28,68 +60,141 @@ function fakes(stored: Instrument | null = INSTRUMENT) {
     },
   } as unknown as InstrumentRepository;
   const prices = {
-    deleteForInstrument: async (_id: string) => {
-      calls.push("delete");
-      return 412;
+    latest: async () =>
+      new Map(history.map((s) => [s.instrumentId, s] as const)),
+    replaceHistory: async (
+      _id: string,
+      snapshots: readonly PriceSnapshot[],
+      options: ReplaceHistoryOptions = {},
+    ) => {
+      calls.push(
+        `replace:${snapshots.length}:${String(options.quoteSymbol)}`,
+      );
+      return history.length;
     },
   } as unknown as PriceRepository;
   return { calls, instruments, prices };
 }
 
-describe("remapQuoteSymbol", () => {
-  it("deletes the old snapshots BEFORE storing the new symbol", async () => {
-    const { calls, instruments, prices } = fakes();
+describe("assignQuoteSymbol", () => {
+  it("stores a first symbol on an instrument with no prices", async () => {
+    const { calls, instruments, prices } = fakes(INSTRUMENT);
 
-    const result = await remapQuoteSymbol(
+    const result = await assignQuoteSymbol(
       instruments,
       prices,
+      EUR,
       INSTRUMENT.id,
       "NEW.DE",
     );
 
-    expect(calls).toEqual(["delete", "set:NEW.DE"]);
-    expect(result).toEqual({ symbol: "NEW.DE", removed: 412 });
+    expect(result).toEqual({ ok: true });
+    expect(calls).toEqual(["set:NEW.DE"]);
   });
 
-  it("keeps the series when the symbol is unchanged", async () => {
-    const { calls, instruments, prices } = fakes();
+  it("lets the wizard correct a symbol saved a moment ago, before any price exists", async () => {
+    const { calls, instruments, prices } = fakes({
+      ...INSTRUMENT,
+      quoteSymbol: "WRONG.DE",
+    });
 
-    const result = await remapQuoteSymbol(
+    await assignQuoteSymbol(
       instruments,
       prices,
+      EUR,
+      INSTRUMENT.id,
+      "NEW.DE",
+    );
+
+    expect(calls).toEqual(["set:NEW.DE"]);
+  });
+
+  it("refuses to drop an existing history: that goes through the replacement", async () => {
+    const { calls, instruments, prices } = fakes(
+      { ...INSTRUMENT, quoteSymbol: "OLD.DE" },
+      [SNAPSHOT],
+    );
+
+    const result = await assignQuoteSymbol(
+      instruments,
+      prices,
+      EUR,
+      INSTRUMENT.id,
+      "NEW.DE",
+    );
+
+    expect(result).toEqual({ ok: false, reason: "has-history" });
+    expect(calls).toEqual([]);
+  });
+
+  it("accepts the symbol already stored without touching anything", async () => {
+    const { calls, instruments, prices } = fakes(
+      { ...INSTRUMENT, quoteSymbol: "OLD.DE" },
+      [SNAPSHOT],
+    );
+
+    const result = await assignQuoteSymbol(
+      instruments,
+      prices,
+      EUR,
       INSTRUMENT.id,
       "OLD.DE",
     );
 
-    expect(calls).toEqual(["set:OLD.DE"]);
-    expect(result.removed).toBe(0);
+    expect(result).toEqual({ ok: true });
+    expect(calls).toEqual([]);
   });
 
-  it("clears the symbol and its snapshots together", async () => {
-    const { calls, instruments, prices } = fakes();
+  it("refuses a symbol that does not quote in euros, whoever calls it", async () => {
+    const { calls, instruments, prices } = fakes(INSTRUMENT);
 
-    await remapQuoteSymbol(instruments, prices, INSTRUMENT.id, null);
+    const result = await assignQuoteSymbol(
+      instruments,
+      prices,
+      quoting("USD"),
+      INSTRUMENT.id,
+      "AAA",
+    );
 
-    expect(calls).toEqual(["delete", "set:null"]);
+    expect(result).toEqual({ ok: false, reason: "not-eur", currency: "USD" });
+    expect(calls).toEqual([]);
   });
 
-  it("deletes on a first mapping only if there was something to delete", async () => {
-    const { calls, instruments, prices } = fakes({
-      ...INSTRUMENT,
-      quoteSymbol: null,
-    });
+  it("refuses a symbol the provider does not quote at all", async () => {
+    const { calls, instruments, prices } = fakes(INSTRUMENT);
 
-    await remapQuoteSymbol(instruments, prices, INSTRUMENT.id, "NEW.DE");
+    const result = await assignQuoteSymbol(
+      instruments,
+      prices,
+      quoting(null),
+      INSTRUMENT.id,
+      "NOPE.DE",
+    );
 
-    expect(calls).toEqual(["delete", "set:NEW.DE"]);
+    expect(result).toEqual({ ok: false, reason: "no-quote" });
+    expect(calls).toEqual([]);
   });
 
   it("refuses an unknown instrument without touching anything", async () => {
     const { calls, instruments, prices } = fakes(null);
 
     await expect(
-      remapQuoteSymbol(instruments, prices, "NOPE", "NEW.DE"),
+      assignQuoteSymbol(instruments, prices, EUR, "NOPE", "NEW.DE"),
     ).rejects.toThrow(/NOPE/);
     expect(calls).toEqual([]);
+  });
+});
+
+describe("clearQuoteSymbol", () => {
+  it("clears the symbol and its prices in one replacement", async () => {
+    const { calls, instruments, prices } = fakes(
+      { ...INSTRUMENT, quoteSymbol: "OLD.DE" },
+      [SNAPSHOT],
+    );
+
+    const removed = await clearQuoteSymbol(instruments, prices, INSTRUMENT.id);
+
+    expect(removed).toBe(1);
+    expect(calls).toEqual(["replace:0:null"]);
   });
 });

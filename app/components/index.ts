@@ -40,6 +40,7 @@ export * from "./ui/signed";
 export * from "./SignedMoney";
 export * from "./instruments/HoldingsUpload";
 export * from "./instruments/InstrumentsTable";
+export * from "./instruments/RebuildHistories";
 export * from "./instruments/SyncPricesButton";
 export * from "./movements/MovementsTable";
 export * from "./movements/columns";

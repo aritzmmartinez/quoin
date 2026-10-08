@@ -1,11 +1,8 @@
-import { useState } from "react";
-
 import type { PendingMapping } from "~/lib/ingest";
-import type { SymbolCheck } from "~/lib/symbol-check";
 
 import { useCopy, useFormat } from "~/lib";
-import { Button } from "../ui/Button";
 import { postIngest } from "./api";
+import { SymbolMapper } from "./SymbolMapper";
 
 export function MappingStep({
   pending,
@@ -58,51 +55,16 @@ function MappingRow({
   const { formatQuantity } = useFormat();
   const t = useCopy();
   const copy = t.ingest.map;
-  const [symbol, setSymbol] = useState(saved ?? "");
-  const [check, setCheck] = useState<SymbolCheck | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [note, setNote] = useState<string | null>(null);
-  const [busy, setBusy] = useState<"check" | "save" | null>(null);
 
-  const trimmed = symbol.trim();
-  const verified = check !== null && check.symbol === trimmed;
-
-  async function verify() {
-    if (trimmed === "") return;
-    setBusy("check");
-    setError(null);
-    const response = await postIngest(t, {
-      intent: "check",
-      instrumentId: item.instrumentId,
-      symbol: trimmed,
-    });
-    setBusy(null);
-    if (!response.ok) {
-      setCheck(null);
-      setError(response.error);
-      return;
-    }
-    if (response.step === "check") setCheck(response.check);
-  }
-
-  async function save() {
-    setBusy("save");
-    setError(null);
-    setNote(null);
+  async function save(symbol: string): Promise<string | null> {
     const response = await postIngest(t, {
       intent: "map",
       instrumentId: item.instrumentId,
-      symbol: trimmed,
+      symbol,
     });
-    setBusy(null);
-    if (!response.ok) {
-      setError(response.error);
-      return;
-    }
-    if (response.step === "map") {
-      setNote(response.removed > 0 ? copy.removed(response.removed) : null);
-      onMapped(item.instrumentId, trimmed);
-    }
+    if (!response.ok) return response.error;
+    if (response.step === "map") onMapped(item.instrumentId, symbol);
+    return null;
   }
 
   return (
@@ -115,79 +77,12 @@ function MappingRow({
         </p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <input
-          value={symbol}
-          onChange={(event) => {
-            setSymbol(event.target.value);
-            setCheck(null);
-            setError(null);
-            setNote(null);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              void verify();
-            }
-          }}
-          placeholder={copy.placeholder}
-          aria-label={copy.placeholder}
-          spellCheck={false}
-          className="w-44 rounded-md border border-border bg-surface px-2 py-1.5 font-mono text-[12px]"
-        />
-        <Button
-          size="sm"
-          onClick={() => void verify()}
-          disabled={trimmed === "" || busy !== null}
-        >
-          {busy === "check" ? copy.verifying : copy.verify}
-        </Button>
-        <Button
-          size="sm"
-          onClick={() => void save()}
-          disabled={!verified || busy !== null}
-        >
-          {busy === "save" ? copy.saving : copy.save}
-        </Button>
-        {saved === trimmed && trimmed !== "" && (
-          <span className="text-[12px] text-positive">{copy.saved}</span>
-        )}
-      </div>
-
-      {verified && check && <CheckDetail check={check} />}
-
-      {note && <p className="mt-2 text-[12px] text-muted">{note}</p>}
-      {error && <p className="mt-2 text-[12px] text-negative">{error}</p>}
+      <SymbolMapper
+        instrumentId={item.instrumentId}
+        stored={saved}
+        saveLabel={copy.save}
+        onSave={save}
+      />
     </li>
-  );
-}
-
-function CheckDetail({ check }: { check: SymbolCheck }) {
-  const { formatMoney, formatRelativeTime } = useFormat();
-  const t = useCopy();
-  const copy = t.ingest.map;
-  const value =
-    check.currency === "EUR"
-      ? formatMoney(check.impliedValue)
-      : `${check.impliedValue} ${check.currency}`;
-
-  return (
-    <div className="mt-2 rounded-md border border-border bg-surface-2 px-3 py-2 text-[12px]">
-      <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
-        <span className="text-muted">
-          {copy.price}{" "}
-          <span className="tabular-nums text-text">
-            {check.price} {check.currency}
-          </span>
-        </span>
-        <span className="text-muted">
-          {copy.impliedValue}{" "}
-          <span className="tabular-nums text-text">{value}</span>
-        </span>
-        <span className="text-muted">{formatRelativeTime(check.asOf)}</span>
-      </div>
-      {!check.fresh && <p className="mt-1 text-negative">{copy.stale}</p>}
-      {check.closed && <p className="mt-1 text-muted">{copy.closed}</p>}
-    </div>
   );
 }

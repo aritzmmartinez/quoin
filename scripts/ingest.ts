@@ -26,7 +26,7 @@ import {
   discardGroups,
   earliestUnpricedReward,
   mergeRewardRetry,
-  rewardBackfillRange,
+  rangeSince,
   rewardRetryIds,
   unpricedRewards,
 } from "~/lib";
@@ -101,12 +101,17 @@ async function retryRewards(
     return;
   }
 
-  const range = rewardBackfillRange(earliest, new Date());
+  const range = rangeSince(earliest, new Date());
   const question = `${unpriced} reward(s) have no price yet. Backfill ${ids.join(", ")} (${range}) and re-import?`;
   if (!yes && !(await ask(question))) return;
 
   const fill = await fillPrices(ids, range);
   console.log(`\n  candles written    : ${fill.candles}`);
+  if (fill.notEur > 0) {
+    console.log(
+      `  not in EUR         : ${fill.notEur} (history refused; only EUR histories are valued)`,
+    );
+  }
   const merged = mergeRewardRetry(first, await adapter.import(csv));
   console.log(`  rewards recovered  : ${merged.recovered}`);
   printSummary("After re-import", merged.summary);

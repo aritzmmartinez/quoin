@@ -28,6 +28,16 @@ describe("historyUrl", () => {
     }
   });
 
+  it("asks only for the dates of an explicit span", () => {
+    const from = new Date("2025-07-24T10:00:00.000Z");
+    const to = new Date("2025-08-01T10:00:00.000Z");
+    const params = paramsOf(historyUrl("BTC-EUR", { from, to }, now));
+
+    expect(params.get("interval")).toBe("1d");
+    expect(Number(params.get("period1"))).toBe(from.getTime() / 1000);
+    expect(Number(params.get("period2"))).toBe(to.getTime() / 1000);
+  });
+
   it("starts the whole history at the epoch rather than asking for range=max", () => {
     expect(paramsOf(historyUrl("BTC-EUR", "max", now)).get("period1")).toBe("0");
   });

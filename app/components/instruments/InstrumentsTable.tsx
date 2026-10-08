@@ -21,6 +21,7 @@ import { IngestModal } from "../ingest/IngestModal";
 import { Checkbox } from "../ui/Checkbox";
 import { EmptyState } from "../ui/EmptyState";
 import { HoldingsUpload } from "./HoldingsUpload";
+import { SymbolPanel } from "./SymbolPanel";
 import { Button } from "../ui/Button";
 import { Select } from "../ui/Select";
 import {
@@ -33,7 +34,7 @@ import {
 const KINDS = exposureKindSchema.options;
 const THESES = thesisSchema.options;
 const GRID =
-  "grid-cols-[minmax(0,1.4fr)_150px_120px_78px_136px_168px_minmax(0,160px)_112px] items-center gap-2";
+  "grid-cols-[minmax(0,1.4fr)_124px_150px_120px_78px_136px_168px_minmax(0,160px)_112px] items-center gap-2";
 
 export function InstrumentsTable({ items }: { items: InstrumentListItem[] }) {
   const copy = useCopy().instruments;
@@ -51,6 +52,7 @@ export function InstrumentsTable({ items }: { items: InstrumentListItem[] }) {
       <div className="min-w-7xl">
         <div className={`${TABLE_HEAD} ${GRID}`}>
           <span>{copy.columns.instrument}</span>
+          <span>{copy.columns.symbol}</span>
           <span>{copy.columns.exposure}</span>
           <span>{copy.columns.leaf}</span>
           <span>{copy.columns.ter}</span>
@@ -80,6 +82,7 @@ function InstrumentRow({ item }: { item: InstrumentListItem }) {
   const [hedged, setHedged] = useState<boolean>(item.hedgedToBase);
   const [thesis, setThesis] = useState<Thesis>(item.thesis);
   const [uploading, setUploading] = useState(false);
+  const [mapping, setMapping] = useState(false);
 
   const needsLeaf = KINDS_NEEDING_LEAF.some((k) => k === kind);
   const dirty =
@@ -92,6 +95,7 @@ function InstrumentRow({ item }: { item: InstrumentListItem }) {
   const saved = fetcher.data?.ok === true && !dirty;
   const error = fetcher.data?.ok === false ? fetcher.data.error : undefined;
   const canImport = item.exposureKind === "EQUITY_FUND";
+  const hasTer = item.type === "ETF";
 
   return (
     <li className={TABLE_DIVIDER}>
@@ -107,6 +111,25 @@ function InstrumentRow({ item }: { item: InstrumentListItem }) {
             )}
           </div>
         </div>
+
+        <button
+          type="button"
+          onClick={() => setMapping((v) => !v)}
+          aria-expanded={mapping}
+          className="flex min-w-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-left text-[12px] transition-colors hover:bg-surface-2"
+        >
+          <ChevronDown
+            size={13}
+            strokeWidth={1.75}
+            aria-hidden
+            className={`shrink-0 text-muted transition-transform ${mapping ? "" : "-rotate-90"}`}
+          />
+          {item.quoteSymbol ? (
+            <span className="truncate font-mono">{item.quoteSymbol}</span>
+          ) : (
+            <span className="truncate text-muted">{copy.noSymbol}</span>
+          )}
+        </button>
 
         <fetcher.Form method="post" className="contents">
           <input type="hidden" name="id" value={item.id} />
@@ -135,15 +158,21 @@ function InstrumentRow({ item }: { item: InstrumentListItem }) {
             className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-[12px] disabled:opacity-40"
           />
 
-          <input
-            name="ter"
-            value={ter}
-            onChange={(e) => setTer(e.target.value)}
-            inputMode="decimal"
-            aria-label={copy.columns.ter}
-            placeholder={copy.terPlaceholder}
-            className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-right text-[12px] tabular-nums"
-          />
+          {hasTer ? (
+            <input
+              name="ter"
+              value={ter}
+              onChange={(e) => setTer(e.target.value)}
+              inputMode="decimal"
+              aria-label={copy.columns.ter}
+              className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-right font-mono text-[12px] tabular-nums"
+            />
+          ) : (
+            <span className="text-right text-[12px] text-faint">
+              <input type="hidden" name="ter" value={ter} />
+              {DASH}
+            </span>
+          )}
 
           <input type="hidden" name="thesis" value={thesis} />
           <Select
@@ -184,9 +213,13 @@ function InstrumentRow({ item }: { item: InstrumentListItem }) {
             />
           ) : (
             <span
-              className={`font-mono text-[11px] ${item.resolvesTo.startsWith("UNRESOLVED") ? "text-muted" : ""}`}
+              className={
+                item.resolvesTo?.kind === "UNRESOLVED" ? "text-muted" : ""
+              }
             >
-              {item.resolvesTo}
+              {item.resolvesTo
+                ? copy.resolves[item.resolvesTo.kind](item.resolvesTo.id)
+                : DASH}
             </span>
           )}
         </div>
@@ -195,6 +228,8 @@ function InstrumentRow({ item }: { item: InstrumentListItem }) {
           {item.value === null ? DASH : formatMoney(item.value)}
         </span>
       </div>
+
+      {mapping && <SymbolPanel item={item} />}
 
       {uploading && (
         <HoldingsUpload

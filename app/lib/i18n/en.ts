@@ -1,5 +1,10 @@
 import type { DiscardReason } from "~/adapters/ingestion/discard";
-import type { ExposureKind, InstrumentType, Thesis } from "~/core/domain";
+import type {
+  ExposureKind,
+  InstrumentType,
+  LeafKind,
+  Thesis,
+} from "~/core/domain";
 
 import type { Copy } from "./types";
 
@@ -16,7 +21,7 @@ const DISCARD_REASON_HELP: Record<DiscardReason, string | null> = {
   "crypto-swap": null,
   "crypto-transfer": null,
   "reward-unpriced":
-    "There is no BTC price for those dates, so these rewards were not recorded and your BTC position does not include them. They can be valued from Instruments once BTC's history can be extended there.",
+    "There is no BTC price for those dates, so these rewards were not recorded and your BTC position does not include them. In Instruments, open BTC's symbol and use “Download the history again” with a range that reaches those dates. Then import this same file again: what is already recorded is not duplicated.",
   "unmodelled-asset": null,
   "card-spending": null,
   unsupported: null,
@@ -42,6 +47,13 @@ const TYPE_LABELS: Record<InstrumentType, string> = {
   BOND: "Bond",
   COMMODITY: "Commodity",
   CASH: "Cash",
+};
+
+const RESOLVES_LABELS: Record<LeafKind, (id: string) => string> = {
+  COMPANY: () => "Company",
+  COMMODITY: (id) => `Commodity · ${id}`,
+  CRYPTO: (id) => `Crypto · ${id}`,
+  UNRESOLVED: () => "Not broken down",
 };
 
 const EXPOSURE_KIND_LABELS: Record<ExposureKind, string> = {
@@ -138,7 +150,7 @@ export const en: Copy = {
         since: (date: string): string => `history since ${date}`,
         unusable:
           "Unavailable: no instrument with euro history carries this symbol",
-        none: "No instrument has a symbol and euro history yet. Map one in Instruments and download its history.",
+        none: "No instrument has a symbol and euro history yet. Give one a symbol in the Symbol column of Instruments: saving it downloads its history.",
       },
     },
   },
@@ -472,7 +484,7 @@ export const en: Copy = {
     worseningHint:
       "This line receives a contribution and still drifts further from its target, because another position in the plan is overweight and is not being sold: the extra room it takes up cannot be filled with new money, only diluted. Larger contributions correct it, and selling it would be taxed.",
     unpriced: (names: string): string =>
-      `No usable price, so these are left out of the split: ${names}. A missing price is not a value of zero. Refresh prices from Instruments before trusting the split.`,
+      `No usable price, so these are left out of the split: ${names}. A missing price is not a value of zero. In Instruments, give them a symbol or press “Refresh prices” before trusting the split.`,
     offPlan: (count: number): string =>
       count === 1
         ? "1 position held, outside the plan"
@@ -587,7 +599,7 @@ export const en: Copy = {
         count === 1
           ? "1 trade has already been imported and stays in the ledger even if you close now."
           : `${count} trades have already been imported and stay in the ledger even if you close now.`,
-      hint: "Any symbols left unmapped can be finished in Instruments.",
+      hint: "Any missing symbols can be assigned later in the Symbol column of Instruments.",
       keep: "Carry on with the import",
       close: "Close anyway",
     },
@@ -611,12 +623,22 @@ export const en: Copy = {
       quantity: "Units",
       stale:
         "The timestamp is old: almost always it means the wrong venue, or a very illiquid one.",
-      closed:
-        "You hold no units of this instrument, so the implied value verifies nothing. Check the venue by hand.",
-      removed: (count: number): string =>
-        count === 1
-          ? "1 price from the previous symbol has been deleted."
-          : `${count} prices from the previous symbol have been deleted.`,
+      trades: "Your latest trades against the symbol's close",
+      tradeLine: (
+        date: string,
+        traded: string,
+        close: string,
+        deviation: string,
+      ): string =>
+        `${date}: you traded at ${traded}, the symbol closed at ${close} (${deviation})`,
+      tradesOff:
+        "Your trades and this symbol's closes do not match: it is almost always another venue or another class of the fund. Try another quote before saving.",
+      noTrades:
+        "This symbol has no closes on the dates of your trades, so they cannot be compared.",
+      notEur: (currency: string): string =>
+        `This symbol quotes in ${currency}. Quoin only values euro histories today: choose the euro line of the same fund on another venue (.DE, .MI, .PA, .AS).`,
+      hasHistory:
+        "This instrument already has stored prices. Change its symbol in the Symbol column of Instruments: the new history is downloaded there before the old one is removed.",
       pending: (count: number): string =>
         count === 1
           ? "1 instrument without a symbol"
@@ -625,7 +647,7 @@ export const en: Copy = {
       mapped: (done: number, total: number): string =>
         `${done} of ${total} mapped`,
       canContinue:
-        "You can continue without mapping them all: any missing symbols can be finished in Instruments.",
+        "You can continue without mapping them all: any missing ones can be assigned later in the Symbol column of Instruments, which also downloads their history.",
     },
     prices: {
       title: "Prices",
@@ -661,6 +683,10 @@ export const en: Copy = {
         count === 1
           ? "1 instrument still has no symbol and cannot be valued."
           : `${count} instruments still have no symbol and cannot be valued.`,
+      notEurWarning: (count: number): string =>
+        count === 1
+          ? "1 symbol does not quote in euros and its history was not downloaded: only euro histories are valued today. Change it in the Symbol column of Instruments."
+          : `${count} symbols do not quote in euros and their history was not downloaded: only euro histories are valued today. Change them in the Symbol column of Instruments.`,
       staleWarning: (count: number): string =>
         count === 1
           ? "1 symbol returned an old quote: check the venue."
@@ -723,6 +749,7 @@ export const en: Copy = {
       leaf: "Leaf",
       resolvesTo: "Resolves as",
       composition: "Composition",
+      symbol: "Symbol",
       ter: "TER %",
       hedged: "Currency",
       thesis: "Thesis",
@@ -734,7 +761,6 @@ export const en: Copy = {
     defaultOption: "(default for the type)",
     leafPlaceholder: "XAU, BTC…",
     leafRequired: "This kind needs a leaf (e.g. XAU).",
-    terPlaceholder: "0.22",
     terInvalid:
       "The TER goes in annual percent, between 0 and 5. A 0.22% is written 0.22.",
     invalid: "Invalid data.",
@@ -742,6 +768,45 @@ export const en: Copy = {
     saving: "…",
     saved: "Saved",
     closed: "Closed",
+    noSymbol: "No symbol",
+    resolves: RESOLVES_LABELS,
+    history: {
+      title: "Symbol and history",
+      assign: "Use this symbol",
+      change: "Switch to this symbol",
+      redownload: (symbol: string): string =>
+        `Download the history of ${symbol} again`,
+      range: "History",
+      confirmReplace: (symbol: string): string =>
+        `The daily history of ${symbol} and today's quote will be downloaded. If candles arrive, they replace every price stored for this instrument; if none arrive, nothing is touched. Trades do not change.`,
+      lost: (cutoff: string, earliest: string): string =>
+        `This range starts on ${cutoff} and your current history on ${earliest}: prices before ${cutoff} will be lost.`,
+      confirm: "Confirm",
+      cancel: "Cancel",
+      running: "Downloading…",
+      done: (count: number, first: string): string =>
+        count === 1
+          ? `1 price saved from ${first}.`
+          : `${count} prices saved from ${first}.`,
+      noLive: "Yahoo returned no quote for today: press “Refresh prices” later.",
+      noHistory: (symbol: string): string =>
+        `Yahoo returned no history for ${symbol}. Nothing was changed.`,
+      notEur: (symbol: string, currency: string): string =>
+        `The history of ${symbol} is in ${currency}. Quoin only values euro histories today, so nothing was changed.`,
+      failed: "The download failed. Nothing was changed.",
+      rebuild: "Rebuild all histories",
+      rebuildConfirm: (count: number): string =>
+        `The daily history of ${count === 1 ? "1 instrument" : `${count} instruments`} with a symbol will be downloaded again, one after another. Each one is replaced only if Yahoo returns candles, and trades are not touched. Leaving this screen stops it; whatever was already rebuilt stays.`,
+      rebuilding: (done: number, total: number): string =>
+        `Rebuilding ${done} of ${total}…`,
+      rebuilt: (done: number, total: number): string =>
+        `${done} of ${total} histories rebuilt.`,
+      rebuildFailed: "Could not rebuild:",
+      coarse: (count: number, names: string): string =>
+        count === 1
+          ? `${names} has weekly or monthly candles from old downloads. Rebuild its history to get daily prices.`
+          : `${count} instruments have weekly or monthly candles from old downloads: ${names}. Rebuild their histories to get daily prices.`,
+    },
     empty: {
       title: "No instruments yet",
       body: "Each instrument shows up here once its trades are imported. Import your broker's CSV to get started.",
@@ -758,6 +823,15 @@ export const en: Copy = {
         count === 1 ? "1 with a stale quote" : `${count} with stale quotes`,
       noQuoteDetail: (count: number): string =>
         count === 1 ? "1 with no answer" : `${count} with no answer`,
+      unmappedOpen: (count: number): string =>
+        count === 1
+          ? "1 open position without a symbol"
+          : `${count} open positions without a symbol`,
+      unmappedClosed: (count: number): string =>
+        count === 1
+          ? "1 closed without a symbol"
+          : `${count} closed without a symbol`,
+      unmappedAction: "Assign one in the Symbol column.",
       error: "Prices could not be synced.",
     },
   },
@@ -973,7 +1047,8 @@ export const en: Copy = {
       tradeCount: "Number of trades",
     },
     updatedAt: (relative: string): string => `Updated ${relative}`,
-    noPrices: "No prices. Refresh them from Instruments.",
+    noPrices:
+      "No prices. In Instruments, assign the missing symbols or press “Refresh prices”.",
     value: (amount: string): string => `${amount} value`,
     empty: {
       title: "No positions yet",
@@ -1263,7 +1338,7 @@ export const en: Copy = {
       sell: "Sell",
       empty: "No trades recorded.",
       noPrice:
-        "No price history yet. It builds up every time you refresh prices from Instruments.",
+        "No price history yet. In Instruments, give it a symbol or download its history again.",
     },
     ivvChart: {
       title: "Contributed against value",

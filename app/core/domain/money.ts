@@ -4,6 +4,12 @@
  */
 export const BASE_CURRENCY = "EUR";
 
+export function foreignCurrency(
+  quotes: readonly { currency: string }[],
+): string | null {
+  return quotes.find((q) => q.currency !== BASE_CURRENCY)?.currency ?? null;
+}
+
 import Decimal from "decimal.js";
 
 Decimal.set({ precision: 40, toExpNeg: -30, toExpPos: 40 });

@@ -8,7 +8,7 @@ import {
   earliestUnpricedReward,
   mergeRewardRetry,
   retryAfterFill,
-  rewardBackfillRange,
+  rangeSince,
   rewardsNeedMapping,
   useCopy,
 } from "~/lib";
@@ -198,7 +198,7 @@ export function IngestStepper({
         {stage === "prices" && (
           <PricesStep
             instrumentIds={priceIds}
-            initialRange={rewardBackfillRange(
+            initialRange={rangeSince(
               summary ? earliestUnpricedReward(summary) : null,
               new Date(),
             )}

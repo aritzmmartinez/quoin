@@ -24,6 +24,7 @@ export interface PriceFillResult {
   synced: number;
   stale: number;
   noQuote: number;
+  notEur: number;
 }
 
 export function unpricedRewards(summary: ImportSummary): number {

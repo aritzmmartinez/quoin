@@ -3,10 +3,10 @@ import { useState } from "react";
 import type { HistoryRange } from "~/core/ports";
 import type { PriceFillResult } from "~/lib/ingest";
 
-import { DEFAULT_HISTORY_RANGE, HISTORY_RANGES, useCopy } from "~/lib";
+import { DEFAULT_HISTORY_RANGE, useCopy } from "~/lib";
 import { Button } from "../ui/Button";
-import { Select } from "../ui/Select";
 import { postIngest } from "./api";
+import { HistoryRangeSelect } from "./HistoryRangeSelect";
 
 export function PricesStep({
   instrumentIds,
@@ -49,20 +49,7 @@ export function PricesStep({
       <p className="mb-4 text-[12px] text-muted">{copy.rangeHint}</p>
 
       <div className="mb-4">
-        <span aria-hidden className="mb-1 block text-[11px] text-muted">
-          {copy.range}
-        </span>
-        <Select
-          label={copy.range}
-          value={range}
-          onChange={(value) => setRange(value as HistoryRange)}
-          options={HISTORY_RANGES.map((option) => ({
-            value: option,
-            label: option,
-          }))}
-          disabled={busy}
-          className="w-40"
-        />
+        <HistoryRangeSelect value={range} onChange={setRange} disabled={busy} />
       </div>
 
       <Button onClick={() => void run()} disabled={busy}>
