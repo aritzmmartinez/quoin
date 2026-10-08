@@ -16,7 +16,7 @@ const DISCARD_REASON_HELP: Record<DiscardReason, string | null> = {
   "crypto-swap": null,
   "crypto-transfer": null,
   "reward-unpriced":
-    "Update BTC prices with a history that reaches those dates and import the file again: the rewards will be valued then, and nothing will be duplicated.",
+    "There is no BTC price for those dates, so these rewards were not recorded and your BTC position does not include them. They can be valued from Instruments once BTC's history can be extended there.",
   "unmodelled-asset": null,
   "card-spending": null,
   unsupported: null,
@@ -551,6 +551,7 @@ export const en: Copy = {
     failed: "The import failed.",
     analysing: "Analysing the file…",
     importing: "Importing…",
+    retrying: "Valuing the rewards…",
     brokerLabel: (broker: string): string =>
       broker === "kraken" ? "Kraken" : "Trade Republic",
     detected: (broker: string): string => `${broker} detected`,
@@ -567,12 +568,16 @@ export const en: Copy = {
       reasonHelp: DISCARD_REASON_HELP,
       details: (count: number): string =>
         count === 1 ? "1 transaction" : `${count} transactions`,
+      pendingPrice: "BTC rewards awaiting a price",
+      pendingPriceNote:
+        "They will be valued after the price step, by importing the file again.",
       positionWarning:
         "These change your BTC balance and Quoin does not record them, so your BTC position does not reflect them and may not match the broker's.",
       noInstrument: "No instrument",
     },
     nothingNew:
       "Nothing new to import: every trade in this file was already in the ledger.",
+    confirmPending: "Continue to value the rewards",
     confirmCount: (count: number): string =>
       count === 1 ? "Import 1 trade" : `Import ${count} trades`,
     appliesNow:
@@ -636,12 +641,18 @@ export const en: Copy = {
     },
     done: {
       title: "Import summary",
+      rewardsNeedMapping:
+        "The BTC rewards are still unvalued because BTC has no symbol. Go back to the mapping step, give it one and carry on: the wizard will download its prices and import the file again.",
+      recovered: (count: number): string =>
+        count === 1
+          ? "1 reward recovered by valuing it with the downloaded prices"
+          : `${count} rewards recovered by valuing them with the downloaded prices`,
       imported: (count: number): string =>
         count === 1 ? "1 trade imported" : `${count} trades imported`,
       duplicates: (count: number): string =>
         count === 1 ? "1 duplicate skipped" : `${count} duplicates skipped`,
       discarded: (count: number): string =>
-        count === 1 ? "1 row discarded" : `${count} rows discarded`,
+        count === 1 ? "1 operation discarded" : `${count} operations discarded`,
       candles: (count: number): string =>
         count === 1 ? "1 historical price" : `${count} historical prices`,
       synced: (count: number): string =>

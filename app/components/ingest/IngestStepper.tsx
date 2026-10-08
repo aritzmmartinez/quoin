@@ -4,7 +4,14 @@ import { useEffect, useState } from "react";
 import type { Broker, ImportSummary } from "~/adapters/ingestion";
 import type { PendingMapping, PriceFillResult } from "~/lib/ingest";
 
-import { useCopy } from "~/lib";
+import {
+  earliestUnpricedReward,
+  mergeRewardRetry,
+  retryAfterFill,
+  rewardBackfillRange,
+  rewardsNeedMapping,
+  useCopy,
+} from "~/lib";
 import { postIngest } from "./api";
 import { DoneStep } from "./DoneStep";
 import { FileStep } from "./FileStep";
@@ -45,6 +52,8 @@ export function IngestStepper({
   const [pending, setPending] = useState<PendingMapping[]>([]);
   const [mapped, setMapped] = useState<Record<string, string>>({});
   const [fill, setFill] = useState<PriceFillResult | null>(null);
+  const [retryIds, setRetryIds] = useState<string[]>([]);
+  const [recovered, setRecovered] = useState(0);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -101,7 +110,25 @@ export function IngestStepper({
 
     setSummary(response.summary);
     setPending(response.pending);
+    setRetryIds(response.retryIds);
     go(response.pending.length === 0 ? "prices" : "mapping");
+  }
+
+  async function retryRewards(first: ImportSummary): Promise<void> {
+    if (!file) return;
+    setBusy(copy.retrying);
+    const response = await postIngest(t, { intent: "commit", csv: file.csv });
+    setBusy(null);
+
+    if (!response.ok) {
+      setError(response.error);
+      return;
+    }
+    if (response.step !== "commit") return;
+
+    const merged = mergeRewardRetry(first, response.summary);
+    setSummary(merged.summary);
+    setRecovered((count) => count + merged.recovered);
   }
 
   function reset(): void {
@@ -111,6 +138,7 @@ export function IngestStepper({
   }
 
   const mappedIds = Object.keys(mapped);
+  const priceIds = [...new Set([...mappedIds, ...retryIds])];
   const unmapped = pending.length - mappedIds.length;
   const index = STAGES.indexOf(stage);
 
@@ -169,16 +197,29 @@ export function IngestStepper({
 
         {stage === "prices" && (
           <PricesStep
-            instrumentIds={mappedIds}
-            onDone={(result) => {
+            instrumentIds={priceIds}
+            initialRange={rewardBackfillRange(
+              summary ? earliestUnpricedReward(summary) : null,
+              new Date(),
+            )}
+            onDone={async (result) => {
               setFill(result);
+              if (summary && retryAfterFill(summary, result)) {
+                await retryRewards(summary);
+              }
               go("done");
             }}
           />
         )}
 
         {stage === "done" && summary && (
-          <DoneStep summary={summary} fill={fill} unmapped={unmapped} />
+          <DoneStep
+            summary={summary}
+            fill={fill}
+            unmapped={unmapped}
+            recovered={recovered}
+            needsMapping={rewardsNeedMapping(summary, pending, mapped)}
+          />
         )}
 
         {busy && (

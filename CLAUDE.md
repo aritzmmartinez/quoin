@@ -157,6 +157,13 @@ This has caused misdirected generation more than once:
 - Stale-quote protection lives at the **write** boundary, not the read: `isFreshQuote`
   discards quotes whose market timestamp is older than 7 days, and it applies **only** to
   `prices:sync`. Yahoo serves stale candles on illiquid venues.
+- **`range=max` is not daily, whatever `interval` says.** Measured 2026-10-08: Yahoo
+  answers `interval=1d&range=max` with monthly candles for BTC-EUR and weekly ones for
+  VWCE.DE, each dated at the start of its period but carrying the period's last close — a
+  price from weeks later, which the 7-day reward lookup and every chart then read as that
+  day's. `1y`…`10y` came back daily. `historyUrl` therefore never sends `range=`: it
+  converts every range into `period1`/`period2` (`max` from the epoch) with `interval=1d`,
+  which returns daily candles for the whole history. Do not reintroduce `range=`.
 - `prices:backfill` deliberately does **not** apply that filter. Discarding old quotes is
   correct for "what is this worth now" and wrong for "what was this worth then".
 - `backfill` issues **sequential** requests (the chart endpoint is unofficial and
@@ -721,7 +728,12 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
   value of the units.
 - **No price for that day means discard (`reward-unpriced`), never zero.** A discard is
   counted and printed; a zero is a wrong number that looks like data. Fix by running
-  `prices:backfill` and importing again — dedup by `refid` makes re-import safe.
+  `prices:backfill` and importing again — dedup by `refid` makes re-import safe. The
+  plan reads BTC prices **before** anything is written, so a first import into an empty
+  database sets every reward aside; the wizard re-imports the same file after its price
+  step and `pnpm ingest` offers to, both merging the two writes with `mergeRewardRetry`.
+  An unpriced reward still carries the BTC instrument, so a file of nothing but rewards
+  creates BTC and the mapping step can reach it.
 - **The lookup never reaches forward.** `priceLookupFrom` takes the last close at or before
   the timestamp, within 7 days; a later candle is information that did not exist yet.
 - Scope is still BTC-only by choice (`isBtc` in `map.ts`). Measured on a real export:

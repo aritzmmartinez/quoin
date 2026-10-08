@@ -1,9 +1,10 @@
-import type {
-  HistoryRange,
-  MarketDataProvider,
-  PriceRepository,
-  PriceSnapshot,
-  Quote,
+import {
+  HISTORY_RANGE_DAYS,
+  type HistoryRange,
+  type MarketDataProvider,
+  type PriceRepository,
+  type PriceSnapshot,
+  type Quote,
 } from "~/core/ports";
 
 export const HISTORY_RANGES: readonly HistoryRange[] = [
@@ -15,6 +16,31 @@ export const HISTORY_RANGES: readonly HistoryRange[] = [
 ];
 
 export const DEFAULT_HISTORY_RANGE: HistoryRange = "5y";
+
+export function rangeCovering(
+  from: Date,
+  now: Date,
+  marginDays = 7,
+): HistoryRange {
+  const needed = (now.getTime() - from.getTime()) / 86_400_000 + marginDays;
+  for (const range of HISTORY_RANGES) {
+    if (range !== "max" && HISTORY_RANGE_DAYS[range] >= needed) return range;
+  }
+  return "max";
+}
+
+export function widerRange(a: HistoryRange, b: HistoryRange): HistoryRange {
+  return HISTORY_RANGES.indexOf(a) >= HISTORY_RANGES.indexOf(b) ? a : b;
+}
+
+export function rewardBackfillRange(
+  earliest: Date | null,
+  now: Date,
+): HistoryRange {
+  return earliest === null
+    ? DEFAULT_HISTORY_RANGE
+    : widerRange(DEFAULT_HISTORY_RANGE, rangeCovering(earliest, now));
+}
 
 export function isHistoryRange(value: string): value is HistoryRange {
   return (HISTORY_RANGES as readonly string[]).includes(value);

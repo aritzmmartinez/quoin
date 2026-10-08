@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The value total on Portfolio showed in Spanish in the English interface.
 - On an instrument's page, a range with no data in it showed the chart's axes around nothing. It now says the range has no data.
 - Importing a Kraken file showed discarded rows as an internal code ("non-btc: 41"). Each reason is now named, listed row by row with asset and date, and BTC swaps, BTC transfers and BTC rewards without a price come with a warning that the BTC position does not include them. ingest prints the same breakdown.
+- The first import of a Kraken file into an empty Quoin left out every BTC reward, because there were no BTC prices yet to value them. The import now values them once its price step has run and says how many it recovered; ingest offers to download the prices and import again. A file with nothing but rewards can now be imported too.
+- Long price histories were downloaded as monthly or weekly prices. They are now daily.
 
 ## [0.11.1] - 2026-10-06
 

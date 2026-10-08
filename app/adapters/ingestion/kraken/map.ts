@@ -191,7 +191,8 @@ function trade(
 function reward(refid: string, row: KrakenRow, priceAt: PriceAt): MappedItem[] {
   const ts = parseTime(row.time);
   const price = priceAt("BTC", ts);
-  if (price === null) return [discard("reward-unpriced", row)];
+  if (price === null)
+    return [{ ...discard("reward-unpriced", row), instrument: BTC }];
 
   const quantity = abs(row.amount);
   const grossAmount = Money.fromString(price).scaleBy(quantity).toString();

@@ -129,7 +129,7 @@ describe("KrakenCsvAdapter", () => {
     const summary = await adapter.import(CSV);
 
     expect(summary.total).toBe(5);
-    expect(summary.imported).toBe(4);
+    expect(summary.imported).toBe(3);
     expect(summary.discarded).toEqual({ "unmodelled-asset": 2 });
     expect(summary.instruments).toBe(1);
     expect(instruments.upserted[0]!.id).toBe("BTC");

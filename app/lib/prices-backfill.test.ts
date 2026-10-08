@@ -12,6 +12,9 @@ import {
   backfillInstruments,
   isHistoryRange,
   medianGapDays,
+  rangeCovering,
+  rewardBackfillRange,
+  widerRange,
 } from "./prices-backfill";
 
 const day = (iso: string) => new Date(`${iso}T07:00:00.000Z`);
@@ -152,5 +155,44 @@ describe("isHistoryRange", () => {
     expect(isHistoryRange("5y")).toBe(true);
     expect(isHistoryRange("max")).toBe(true);
     expect(isHistoryRange("3y")).toBe(false);
+  });
+});
+
+describe("rangeCovering", () => {
+  const now = new Date("2026-10-07T12:00:00.000Z");
+  const daysAgo = (days: number) =>
+    new Date(now.getTime() - days * 86_400_000);
+
+  it("picks the smallest range that reaches the date with a week to spare", () => {
+    expect(rangeCovering(daysAgo(30), now)).toBe("1y");
+    expect(rangeCovering(daysAgo(358), now)).toBe("1y");
+    expect(rangeCovering(daysAgo(359), now)).toBe("2y");
+    expect(rangeCovering(daysAgo(1000), now)).toBe("5y");
+    expect(rangeCovering(daysAgo(3000), now)).toBe("10y");
+  });
+
+  it("falls back to the whole history beyond ten years", () => {
+    expect(rangeCovering(daysAgo(4000), now)).toBe("max");
+  });
+});
+
+describe("rewardBackfillRange", () => {
+  const now = new Date("2026-10-07T12:00:00.000Z");
+  const daysAgo = (days: number) =>
+    new Date(now.getTime() - days * 86_400_000);
+
+  it("never asks for less than the default range", () => {
+    expect(rewardBackfillRange(daysAgo(30), now)).toBe("5y");
+    expect(rewardBackfillRange(null, now)).toBe("5y");
+  });
+
+  it("widens past the default when the oldest reward is further back", () => {
+    expect(rewardBackfillRange(daysAgo(2000), now)).toBe("10y");
+    expect(rewardBackfillRange(daysAgo(4000), now)).toBe("max");
+  });
+
+  it("keeps the wider of two ranges", () => {
+    expect(widerRange("1y", "5y")).toBe("5y");
+    expect(widerRange("max", "2y")).toBe("max");
   });
 });
