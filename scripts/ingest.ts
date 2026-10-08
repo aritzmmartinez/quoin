@@ -59,7 +59,11 @@ function printSummary(title: string, summary: ImportSummary): void {
     const help = copy.reasonHelp[group.reason];
     if (help) console.log(`        ${help}`);
   }
-  if (groups.some((group) => group.affectsPosition)) {
+  if (
+    groups.some(
+      (group) => group.affectsPosition && !copy.reasonHelp[group.reason],
+    )
+  ) {
     console.log(`  ! ${copy.positionWarning}`);
   }
   console.log(`  errors             : ${summary.errors}`);

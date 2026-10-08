@@ -40,9 +40,11 @@ function DiscardGroup({ group, pending }: { group: Group; pending: boolean }) {
         <span>· {copy.details(details.length)}</span>
       </summary>
       {warn && (
-        <p className="mt-2 text-[12px] text-negative">{copy.positionWarning}</p>
+        <p className="mt-2 text-[12px] text-negative">
+          {help ?? copy.positionWarning}
+        </p>
       )}
-      {help && <p className="mt-1 text-[12px] text-body">{help}</p>}
+      {!warn && help && <p className="mt-1 text-[12px] text-body">{help}</p>}
       <ul className="mt-2">
         {details.map((row, i) => (
           <li

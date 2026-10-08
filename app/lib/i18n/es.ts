@@ -14,7 +14,7 @@ const DISCARD_REASON_HELP: Record<DiscardReason, string | null> = {
   "crypto-swap": null,
   "crypto-transfer": null,
   "reward-unpriced":
-    "Actualiza los precios de BTC con un histórico que llegue a esas fechas y vuelve a importar el fichero: las recompensas se valorarán entonces y no se duplicará nada.",
+    "No hay precio de BTC de esas fechas, así que estas recompensas no se han registrado y tu posición de BTC no las incluye. Se podrán valorar desde Instrumentos, cuando allí se pueda ampliar el histórico de BTC.",
   "unmodelled-asset": null,
   "card-spending": null,
   unsupported: null,
@@ -607,7 +607,7 @@ export const es = {
       duplicates: (count: number): string =>
         count === 1 ? "1 duplicada omitida" : `${count} duplicadas omitidas`,
       discarded: (count: number): string =>
-        count === 1 ? "1 fila descartada" : `${count} filas descartadas`,
+        count === 1 ? "1 operación descartada" : `${count} operaciones descartadas`,
       candles: (count: number): string =>
         count === 1 ? "1 precio histórico" : `${count} precios históricos`,
       synced: (count: number): string =>
