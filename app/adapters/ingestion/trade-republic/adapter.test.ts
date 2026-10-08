@@ -57,10 +57,15 @@ class FakeInstrumentRepository implements InstrumentRepository {
 
 class FakeLedgerRepository implements LedgerRepository {
   appended: LedgerEvent[] = [];
-  async existing(): Promise<Set<string>> {
-    return new Set();
-  }
   private seen = new Set<string>();
+  async existing(events: readonly LedgerEvent[]): Promise<Set<string>> {
+    return new Set(
+      events
+        .filter((e) => e.externalId)
+        .map((e) => `${e.source}::${e.externalId}`)
+        .filter((key) => this.seen.has(key)),
+    );
+  }
   async append(events: readonly LedgerEvent[]) {
     let inserted = 0;
     let skipped = 0;

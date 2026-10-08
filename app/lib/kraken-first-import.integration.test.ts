@@ -139,10 +139,10 @@ describe("first Kraken import into an empty database (integration)", () => {
     expect(unpricedRewards(first)).toBe(3);
 
     expect(unpricedRewards(retry)).toBe(0);
-    expect(retry.imported).toBe(6);
+    expect(retry.imported).toBe(3);
     expect(retry.duplicates).toBe(2);
     expect(merged.recovered).toBe(3);
-    expect(merged.summary.imported).toBe(8);
+    expect(merged.summary.imported).toBe(5);
     expect(merged.summary.discarded["reward-unpriced"]).toBeUndefined();
 
     const events = await ledger.list();
@@ -173,7 +173,7 @@ describe("first Kraken import into an empty database (integration)", () => {
     const third = await adapter.import(BUYS_AND_REWARDS);
 
     expect(third.imported).toBe(0);
-    expect(third.duplicates).toBe(8);
+    expect(third.duplicates).toBe(5);
     expect(unpricedRewards(third)).toBe(0);
   });
 
@@ -226,5 +226,157 @@ describe("wizard path with BTC left unmapped (integration)", () => {
         expect(text).not.toMatch(/pnpm|prices:|ingest --|\bcli\b/i);
       }
     }
+  });
+});
+
+function candles(dates: readonly Date[], price: (date: Date) => string): Quote[] {
+  return dates.map((asOf) => ({
+    symbol: "BTC-EUR",
+    price: price(asOf),
+    currency: "EUR",
+    asOf,
+  }));
+}
+
+function providerOf(quotes: Quote[]): MarketDataProvider {
+  return {
+    source: "FAKE",
+    getQuotes: async () => [],
+    getHistory: async (symbol: string) => (symbol === "BTC-EUR" ? quotes : []),
+  };
+}
+
+async function priceAndRetry(
+  csv: string,
+  first: Awaited<ReturnType<Ingestion["KrakenCsvAdapter"]["prototype"]["import"]>>,
+  quotes: Quote[],
+) {
+  const instruments = new persistence.PrismaInstrumentRepository();
+  const prices = new persistence.PrismaPriceRepository();
+  const adapter = new ingestion.KrakenCsvAdapter(
+    instruments,
+    new persistence.PrismaLedgerRepository(),
+    prices,
+  );
+  if (!(await instruments.get("BTC"))?.quoteSymbol) {
+    await remapQuoteSymbol(instruments, prices, "BTC", "BTC-EUR");
+  }
+  await backfillInstruments(
+    providerOf(quotes),
+    prices,
+    [{ id: "BTC", quoteSymbol: "BTC-EUR" }],
+    "max",
+  );
+  return mergeRewardRetry(first, await adapter.import(csv));
+}
+
+const utcDay = (y: number, m: number, d: number) => new Date(Date.UTC(y, m - 1, d));
+const dailyFrom = (start: Date, days: number) =>
+  Array.from({ length: days }, (_, i) => new Date(start.getTime() + i * 86_400_000));
+
+describe("candle spacing and the 7-day lookup (integration)", () => {
+  const LATE_NOVEMBER = [
+    HEADER,
+    `"n1","B1","2025-11-13 18:04:48","spend","","currency","fiat","EUR","spot / main",-150.0000,0,0`,
+    `"n2","B1","2025-11-13 18:04:48","receive","","currency","crypto","BTC","spot / main",0.0020000000,0,0.002`,
+    `"n3","R1","2025-11-26 05:52:00","reward","","currency","crypto","BTC","spot / main",0.0000040000,0,0.002004`,
+  ].join("\n");
+
+  it("leaves a reward unpriced when the nearest earlier candle is a month away, and prices it from daily candles", async () => {
+    const adapter = new ingestion.KrakenCsvAdapter(
+      new persistence.PrismaInstrumentRepository(),
+      new persistence.PrismaLedgerRepository(),
+      new persistence.PrismaPriceRepository(),
+    );
+    const first = await adapter.import(LATE_NOVEMBER);
+    expect(unpricedRewards(first)).toBe(1);
+
+    const monthly = await priceAndRetry(
+      LATE_NOVEMBER,
+      first,
+      candles([utcDay(2025, 11, 1), utcDay(2025, 12, 1)], () => "90000"),
+    );
+    expect(monthly.recovered).toBe(0);
+    expect(unpricedRewards(monthly.summary)).toBe(1);
+
+    const daily = await priceAndRetry(
+      LATE_NOVEMBER,
+      monthly.summary,
+      candles(dailyFrom(utcDay(2025, 11, 1), 40), (d) => String(80000 + d.getUTCDate())),
+    );
+    expect(daily.recovered).toBe(1);
+    expect(unpricedRewards(daily.summary)).toBe(0);
+
+    const reward = (await new persistence.PrismaLedgerRepository().list()).find(
+      (e) => e.note === "kraken-reward",
+    );
+    expect(reward?.type === "BUY" && reward.price).toBe("80026");
+  });
+
+  it("prices a reward older than the instrument's first written trade", async () => {
+    const BONUS_BEFORE_BUY = [
+      HEADER,
+      `"o1","R0","2026-02-02 05:52:00","reward","welcomebonus","currency","crypto","BTC","spot / main",0.0000020000,0,0.000002`,
+      `"o2","B1","2026-02-10 10:00:00","spend","","currency","fiat","EUR","spot / main",-100.0000,0,0`,
+      `"o3","B1","2026-02-10 10:00:00","receive","","currency","crypto","BTC","spot / main",0.0012500000,0,0.001252`,
+    ].join("\n");
+
+    const { first, merged } = await firstImportFlow(BONUS_BEFORE_BUY);
+
+    expect(unpricedRewards(first)).toBe(1);
+    expect(merged.recovered).toBe(1);
+    const events = await new persistence.PrismaLedgerRepository().list();
+    const bonus = events.find((e) => e.note === "kraken-reward");
+    expect(bonus?.ts.toISOString()).toBe("2026-02-02T05:52:00.000Z");
+    expect(bonus!.ts.getTime()).toBeLessThan(
+      events.find((e) => e.externalId === "B1")!.ts.getTime(),
+    );
+  });
+});
+
+describe("the summary counts operations, like the file and the discards (integration)", () => {
+  const accounted = (summary: {
+    imported: number;
+    duplicates: number;
+    errors: number;
+    discarded: Partial<Record<string, number>>;
+  }) =>
+    summary.imported +
+    summary.duplicates +
+    summary.errors +
+    Object.values(summary.discarded).reduce((sum: number, n) => sum + (n ?? 0), 0);
+
+  it("adds new, duplicate and set-aside operations up to the file, in the preview and after the recovery", async () => {
+    const adapter = new ingestion.KrakenCsvAdapter(
+      new persistence.PrismaInstrumentRepository(),
+      new persistence.PrismaLedgerRepository(),
+      new persistence.PrismaPriceRepository(),
+    );
+    const preview = await ingestion.previewBatch(
+      new persistence.PrismaLedgerRepository(),
+      await adapter.plan(BUYS_AND_REWARDS),
+    );
+    expect(preview.total).toBe(5);
+    expect(accounted(preview)).toBe(preview.total);
+
+    const { retry, merged } = await firstImportFlow(BUYS_AND_REWARDS);
+
+    expect(accounted(retry)).toBe(retry.total);
+    expect(accounted(merged.summary)).toBe(merged.summary.total);
+    expect(merged.summary.imported).toBe(preview.imported + merged.recovered);
+  });
+
+  it("writes two ledger rows per recovered reward, and no key twice", async () => {
+    const { first, merged } = await firstImportFlow(BUYS_AND_REWARDS);
+    const rows = await persistence.prisma.ledgerEntry.count();
+
+    expect(rows).toBe(first.imported + merged.recovered * 2);
+
+    const keys = await persistence.prisma.ledgerEntry.findMany({
+      select: { source: true, externalId: true },
+    });
+    expect(new Set(keys.map((k) => `${k.source}:${k.externalId}`)).size).toBe(
+      rows,
+    );
   });
 });
