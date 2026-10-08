@@ -1,9 +1,10 @@
-import type {
-  HistoryRange,
-  MarketDataProvider,
-  PriceRepository,
-  PriceSnapshot,
-  Quote,
+import {
+  HISTORY_RANGE_DAYS,
+  type HistoryRange,
+  type MarketDataProvider,
+  type PriceRepository,
+  type PriceSnapshot,
+  type Quote,
 } from "~/core/ports";
 
 export const HISTORY_RANGES: readonly HistoryRange[] = [
@@ -16,13 +17,6 @@ export const HISTORY_RANGES: readonly HistoryRange[] = [
 
 export const DEFAULT_HISTORY_RANGE: HistoryRange = "5y";
 
-const RANGE_SPAN_DAYS: Record<Exclude<HistoryRange, "max">, number> = {
-  "1y": 365,
-  "2y": 730,
-  "5y": 1826,
-  "10y": 3652,
-};
-
 export function rangeCovering(
   from: Date,
   now: Date,
@@ -30,7 +24,7 @@ export function rangeCovering(
 ): HistoryRange {
   const needed = (now.getTime() - from.getTime()) / 86_400_000 + marginDays;
   for (const range of HISTORY_RANGES) {
-    if (range !== "max" && RANGE_SPAN_DAYS[range] >= needed) return range;
+    if (range !== "max" && HISTORY_RANGE_DAYS[range] >= needed) return range;
   }
   return "max";
 }

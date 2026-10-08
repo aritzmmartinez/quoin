@@ -157,6 +157,13 @@ This has caused misdirected generation more than once:
 - Stale-quote protection lives at the **write** boundary, not the read: `isFreshQuote`
   discards quotes whose market timestamp is older than 7 days, and it applies **only** to
   `prices:sync`. Yahoo serves stale candles on illiquid venues.
+- **`range=max` is not daily, whatever `interval` says.** Measured 2026-10-08: Yahoo
+  answers `interval=1d&range=max` with monthly candles for BTC-EUR and weekly ones for
+  VWCE.DE, each dated at the start of its period but carrying the period's last close — a
+  price from weeks later, which the 7-day reward lookup and every chart then read as that
+  day's. `1y`…`10y` came back daily. `historyUrl` therefore never sends `range=`: it
+  converts every range into `period1`/`period2` (`max` from the epoch) with `interval=1d`,
+  which returns daily candles for the whole history. Do not reintroduce `range=`.
 - `prices:backfill` deliberately does **not** apply that filter. Discarding old quotes is
   correct for "what is this worth now" and wrong for "what was this worth then".
 - `backfill` issues **sequential** requests (the chart endpoint is unofficial and
