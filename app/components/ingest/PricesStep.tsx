@@ -10,14 +10,16 @@ import { postIngest } from "./api";
 
 export function PricesStep({
   instrumentIds,
+  initialRange = DEFAULT_HISTORY_RANGE,
   onDone,
 }: {
   instrumentIds: readonly string[];
+  initialRange?: HistoryRange;
   onDone: (result: PriceFillResult | null) => void;
 }) {
   const t = useCopy();
   const copy = t.ingest.prices;
-  const [range, setRange] = useState<HistoryRange>(DEFAULT_HISTORY_RANGE);
+  const [range, setRange] = useState<HistoryRange>(initialRange);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

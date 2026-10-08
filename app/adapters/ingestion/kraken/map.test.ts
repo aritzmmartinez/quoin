@@ -149,8 +149,15 @@ describe("Kraken mapGroup", () => {
           subtype: null,
           instrument: "BTC",
         },
+        instrument: expect.objectContaining({ id: "BTC", type: "CRYPTO" }),
       },
     ]);
+  });
+
+  it("brings BTC into the batch even when its only rows are unpriced rewards", () => {
+    const [item] = mapGroup([rewardRow()], () => null);
+
+    expect(item?.kind === "discard" && item.instrument?.id).toBe("BTC");
   });
 
   it("prices an earn the same way as a reward", () => {
