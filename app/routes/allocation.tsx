@@ -1,3 +1,4 @@
+import { Coins, Layers2, type LucideIcon, PieChart, Scale } from "lucide-react";
 import { data, Link } from "react-router";
 
 import type { Route } from "./+types/allocation";
@@ -13,6 +14,7 @@ import {
 import {
   Card,
   CurrencyPanel,
+  SetupChecklist,
   ExposureBars,
   OverlapPanel,
   ReadingCard,
@@ -35,6 +37,7 @@ import {
   summarizeExposures,
 } from "~/core/projections";
 import {
+  type AllocationView,
   buildRebalancePlan,
   type Copy,
   copyFromMatches,
@@ -48,6 +51,12 @@ import {
   parseOverlapMode,
   parseThreshold,
   readingFor,
+  fundsStep,
+  pricesStep,
+  type SetupStep,
+  setupPending,
+  targetStep,
+  tradesStep,
   tailOf,
   toExposureRows,
   useCopy,
@@ -145,9 +154,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       new Map(instruments.map((i) => [i.id, i.name])),
     ),
   );
-  const summary = timing.time("summarize", () =>
-    summarizeExposures(exposures),
-  );
+  const summary = timing.time("summarize", () => summarizeExposures(exposures));
   const rows = timing.time("rows", () =>
     toExposureRows(exposures, summary.total),
   );
@@ -165,9 +172,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   const withHoldings = instruments.filter(
     (instrument) => (holdings.get(instrument.id) ?? []).length > 0,
   );
-  const heldIds = includeSold
-    ? null
-    : new Set(heldValuesByInstrument(positions, marketValues).keys());
+  const held = heldValuesByInstrument(positions, marketValues);
+  const heldIds = includeSold ? null : new Set(held.keys());
   const overlapInstruments =
     heldIds === null
       ? withHoldings
@@ -216,8 +222,20 @@ export async function loader({ request }: Route.LoaderArgs) {
           ),
         );
 
+  const trades = tradesStep(events.length > 0);
+  const priced = pricesStep(
+    [...held.values()].some((value) => !value.unpriced),
+  );
+  const setup: SetupStep[] =
+    view === "overlap"
+      ? [trades, fundsStep(withHoldings.length)]
+      : view === "rebalance"
+        ? [trades, priced, targetStep(target !== null)]
+        : [trades, priced];
+
   return data(
     {
+      setup,
       overlap,
       currency,
       hedgedCount: hedged.size,
@@ -235,10 +253,18 @@ export async function loader({ request }: Route.LoaderArgs) {
   );
 }
 
+const SETUP_ICONS: Record<AllocationView, LucideIcon> = {
+  exposure: PieChart,
+  currency: Coins,
+  overlap: Layers2,
+  rebalance: Scale,
+};
+
 export default function Allocation({ loaderData }: Route.ComponentProps) {
   const { formatMoney, formatPercent } = useFormat();
   const t = useCopy();
   const {
+    setup,
     rows,
     tail,
     reading,
@@ -258,6 +284,23 @@ export default function Allocation({ loaderData }: Route.ComponentProps) {
     Number(summary.total) === 0
       ? "0"
       : String(Number(summary.unresolved) / Number(summary.total));
+
+  if (setupPending(setup)) {
+    const screen = t.setup.screens[view];
+    return (
+      <>
+        <ViewTabs value={view} />
+        <Card>
+          <SetupChecklist
+            icon={SETUP_ICONS[view]}
+            title={screen.title}
+            body={screen.body}
+            steps={setup}
+          />
+        </Card>
+      </>
+    );
+  }
 
   if (view === "currency" && currency !== null) {
     return (

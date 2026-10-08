@@ -42,6 +42,7 @@ export interface ProjectionPlan {
 }
 
 export interface ProjectionContext {
+  hasTrades: boolean;
   annualInflation: string | null;
   plan: ProjectionPlan | null;
 }
@@ -74,7 +75,8 @@ export async function loadProjectionContext(
       : new Decimal(monthlyInflation).plus(1).pow(12).minus(1).toFixed(6);
 
   const target = getActiveTarget(targets, asOf);
-  if (target === null) return { annualInflation, plan: null };
+  const hasTrades = events.length > 0;
+  if (target === null) return { hasTrades, annualInflation, plan: null };
 
   const positions = timing.time("positions", () => computePositions(events));
   const marketValues = timing.time("valuation", () =>
@@ -126,6 +128,7 @@ export async function loadProjectionContext(
   );
 
   return {
+    hasTrades,
     annualInflation,
     plan: {
       target,

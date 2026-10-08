@@ -7,13 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Empty screens offer an Import trades button when importing is the next step.
+- Allocation and Projection list what they still need, with a button for each pending step.
+
 ### Changed
 - Summary, Allocation and Projection open noticeably faster, especially with years of price history.
 - Charts show a placeholder with hinted axes while the page loads, instead of an empty box. It is announced to screen readers and does not pulse when reduced motion is on.
 - When the range or basis on Summary takes a moment to reload, the portfolio value chart stays on screen dimmed instead of looking frozen.
 - Screens without charts load about a third less JavaScript: the charting library is now downloaded only by the screens that draw charts.
+- Empty screens share the look of the error screens.
+- Target explains what it is for when none is set.
+- Messages that pointed to a command now point to the button that does the same, when there is one.
 
 ### Fixed
+- The value total on Portfolio showed in Spanish in the English interface.
 - On an instrument's page, a range with no data in it showed the chart's axes around nothing. It now says the range has no data.
 - Importing a Kraken file showed discarded rows as an internal code ("non-btc: 41"). Each reason is now named, listed row by row with asset and date, and BTC swaps, BTC transfers and BTC rewards without a price come with a warning that the BTC position does not include them. ingest prints the same breakdown.
 
