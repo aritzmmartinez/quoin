@@ -495,6 +495,10 @@ export const es = {
       },
     },
     screens: {
+      summary: {
+        title: "Tus operaciones ya están dentro",
+        body: "Falta saber cuánto vale lo que tienes. Sin un precio, el valor, la rentabilidad, la asignación y las mayores posiciones no tienen nada que mostrar.",
+      },
       exposure: {
         title: "Tu exposición real aparece aquí",
         body: "Desglosa lo que tienes, fondo a fondo, hasta cada empresa, metal o cripto que hay debajo. Para eso necesita posiciones con precio.",

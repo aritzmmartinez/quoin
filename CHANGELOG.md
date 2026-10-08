@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Empty screens offer an Import trades button when importing is the next step.
-- Allocation and Projection list what they still need, with a button for each pending step.
+- Summary, Allocation and Projection list what they still need, with a button for each pending step.
 
 ### Changed
 - Summary, Allocation and Projection open noticeably faster, especially with years of price history.

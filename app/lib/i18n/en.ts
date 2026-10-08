@@ -499,6 +499,10 @@ export const en: Copy = {
       },
     },
     screens: {
+      summary: {
+        title: "Your trades are in",
+        body: "What is missing is what your holdings are worth. Without a price, value, returns, allocation and top positions have nothing to show.",
+      },
       exposure: {
         title: "Your real exposure shows up here",
         body: "It breaks down what you hold, fund by fund, into every company, metal or crypto underneath. For that it needs positions with a price.",
