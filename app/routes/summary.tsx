@@ -1,3 +1,4 @@
+import { LayoutDashboard } from "lucide-react";
 import { data } from "react-router";
 
 import type { Route } from "./+types/summary";
@@ -12,6 +13,7 @@ import {
   BasisNotice,
   Card,
   PortfolioEmpty,
+  SetupChecklist,
   SummaryHero,
   SummaryReturns,
   SummaryStats,
@@ -42,6 +44,9 @@ import {
   parseBenchmark,
   parseLocale,
   parseRange,
+  pricesStep,
+  tradesStep,
+  useCopy,
 } from "~/lib";
 
 import { BASE_CURRENCY, type Revalue } from "~/core/domain";
@@ -238,12 +243,26 @@ export default function Summary({ loaderData }: Route.ComponentProps) {
     series,
     real,
   } = loaderData;
+  const t = useCopy();
   const hasPositions = summary.pricedCount > 0 || summary.unpricedCount > 0;
 
   if (!hasPositions) {
     return (
       <Card>
         <PortfolioEmpty />
+      </Card>
+    );
+  }
+
+  if (summary.pricedCount === 0) {
+    return (
+      <Card>
+        <SetupChecklist
+          icon={LayoutDashboard}
+          title={t.setup.screens.summary.title}
+          body={t.setup.screens.summary.body}
+          steps={[tradesStep(true), pricesStep(false)]}
+        />
       </Card>
     );
   }

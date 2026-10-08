@@ -468,7 +468,7 @@ export const es = {
     worseningHint:
       "Esta línea recibe aportación y aun así se aleja de su objetivo, porque otra posición del plan está sobreponderada y no se vende: el hueco que ocupa de más no se puede rellenar con dinero nuevo, solo diluir. Aportaciones mayores lo corrigen, y venderla tributaría.",
     unpriced: (names: string): string =>
-      `Sin precio utilizable, así que quedan fuera del reparto: ${names}. Un precio que falta no es un valor de cero. Ejecuta pnpm prices:sync antes de fiarte del reparto.`,
+      `Sin precio utilizable, así que quedan fuera del reparto: ${names}. Un precio que falta no es un valor de cero. Refresca los precios desde Instrumentos antes de fiarte del reparto.`,
     offPlan: (count: number): string =>
       count === 1
         ? "1 posición en cartera, fuera del plan"
@@ -477,6 +477,49 @@ export const es = {
       "Tienes posición en esto y tu objetivo vigente no lo nombra. No recibe aportación: meter dinero nuevo ahí no es rebalancear, es cambiar de plan, y eso se hace en Objetivo.",
     empty:
       "Ninguna línea del objetivo se puede repartir todavía. Importa operaciones y sincroniza precios.",
+  },
+  setup: {
+    done: "Hecho",
+    pending: "Pendiente",
+    progress: (have: number, need: number): string => `${have} de ${need}`,
+    steps: {
+      trades: { label: "Operaciones importadas" },
+      prices: {
+        label: "Precio de lo que tienes",
+        action: "Ir a Instrumentos",
+      },
+      target: { label: "Un objetivo vigente", action: "Ir a Objetivo" },
+      funds: {
+        label: "Fondos con composición importada",
+        action: "Ir a Instrumentos",
+      },
+    },
+    screens: {
+      summary: {
+        title: "Tus operaciones ya están dentro",
+        body: "Falta saber cuánto vale lo que tienes. Sin un precio, el valor, la rentabilidad, la asignación y las mayores posiciones no tienen nada que mostrar.",
+      },
+      exposure: {
+        title: "Tu exposición real aparece aquí",
+        body: "Desglosa lo que tienes, fondo a fondo, hasta cada empresa, metal o cripto que hay debajo. Para eso necesita posiciones con precio.",
+      },
+      currency: {
+        title: "Tu exposición por divisa aparece aquí",
+        body: "Agrupa lo que tienes por la divisa del mercado principal de cada valor, también dentro de tus fondos. Para eso necesita posiciones con precio.",
+      },
+      overlap: {
+        title: "Hacen falta dos fondos para comparar",
+        body: "Cuánto de dos fondos es la misma empresa. Arrastra el CSV de composición de cada fondo sobre su fila en Instrumentos. Un fondo sin composición queda fuera del cálculo, no cuenta como 0 %.",
+      },
+      rebalance: {
+        title: "El reparto de tu aportación aparece aquí",
+        body: "Reparte lo que vas a aportar entre las líneas de tu objetivo, empezando por las que más lejos están de su peso. Para eso necesita tu plan y lo que ya tienes, con precio.",
+      },
+      projection: {
+        title: "La proyección de tu plan aparece aquí",
+        body: "Remuestrea los meses que tus instrumentos ya han vivido para estimar dónde podría acabar la cartera si sigues aportando según tu plan.",
+      },
+    },
   },
   ingest: {
     open: "Importar operaciones",
@@ -697,7 +740,10 @@ export const es = {
     saving: "…",
     saved: "Guardado",
     closed: "Cerrada",
-    empty: "Sin instrumentos. Importa tus operaciones con pnpm ingest.",
+    empty: {
+      title: "Sin instrumentos todavía",
+      body: "Cada instrumento aparece aquí al importar sus operaciones. Importa el CSV de tu bróker para empezar.",
+    },
     sync: {
       action: "Refrescar precios",
       loading: "Sincronizando precios…",
@@ -719,7 +765,14 @@ export const es = {
     title: "Objetivo",
     intro:
       "Tu plan de aportación mensual. Los importes son el dato y el peso se deriva de ellos. Un objetivo no se edita: cuando el plan cambia, guardas una versión nueva con su fecha de vigencia, para que siga sabiéndose qué objetivo estaba vigente en cada fecha.",
-    none: "Aún no hay ningún objetivo guardado. Crea la primera versión abajo o usa pnpm target:set.",
+    none: {
+      title: "Aún no tienes objetivo",
+      body: "Escribe abajo cuánto quieres aportar cada mes a cada instrumento. Puede nombrar instrumentos que todavía no has comprado. Con él se calculan el reparto de cada aportación y la proyección.",
+    },
+    notYetActive: {
+      title: "Ningún objetivo vigente hoy",
+      body: "Las versiones guardadas entran en vigor más adelante. Aparecerán aquí desde su fecha de vigencia.",
+    },
     activeFrom: (date: string): string => `Vigente desde el ${date}`,
     columns: {
       instrument: "Instrumento",
@@ -890,7 +943,7 @@ export const es = {
     empty: "Sin movimientos.",
     emptyScreen: {
       title: "Sin movimientos todavía",
-      body: "Importa tus operaciones con la CLI (pnpm ingest) para ver aquí el registro completo.",
+      body: "Importa el CSV de tu bróker (Trade Republic o Kraken) para ver aquí el registro completo.",
     },
     amountHint:
       "El importe es el flujo de caja real: comisiones incluidas y retenciones descontadas.",
@@ -919,10 +972,11 @@ export const es = {
       tradeCount: "Nº de operaciones",
     },
     updatedAt: (relative: string): string => `Actualizado ${relative}`,
-    noPrices: "Sin precios. Ejecuta pnpm prices:sync",
+    noPrices: "Sin precios. Refréscalos desde Instrumentos.",
+    value: (amount: string): string => `${amount} valor`,
     empty: {
       title: "Sin posiciones todavía",
-      body: "Importa tus movimientos con la CLI (pnpm ingest) para empezar a seguir tu cartera.",
+      body: "Importa el CSV de tu bróker (Trade Republic o Kraken) para empezar a seguir tu cartera.",
     },
     error: {
       title: "No se pudieron cargar las posiciones",
@@ -1125,7 +1179,7 @@ export const es = {
     unpriced: (names: string): string =>
       `Sin precio utilizable: ${names}. Se excluyen de los dos lados, porque contar su coste sin su valor inventaría una pérdida.`,
     unmapped: (symbol: string): string =>
-      `Ningún instrumento está mapeado a ${symbol}, así que no hay índice contra el que comparar. Ejecuta pnpm prices:map <ISIN> ${symbol}.`,
+      `Ningún instrumento está mapeado a ${symbol}, así que no hay índice contra el que comparar. Elige en Ajustes uno de tus instrumentos con histórico de precios.`,
     noHistory: (symbol: string): string =>
       `${symbol} no tiene histórico de precios en euros. Ejecuta pnpm prices:backfill <ISIN> max para descargarlo.`,
     chooseBenchmark: "Elegir otro índice en Ajustes",
@@ -1204,7 +1258,7 @@ export const es = {
       sell: "Venta",
       empty: "Sin operaciones registradas.",
       noPrice:
-        "Sin histórico de precio todavía. Se construye con cada pnpm prices:sync.",
+        "Sin histórico de precio todavía. Se construye cada vez que refrescas los precios desde Instrumentos.",
     },
     ivvChart: {
       title: "Aportado frente a valor",

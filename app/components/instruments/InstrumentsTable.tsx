@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, Upload } from "lucide-react";
+import { ChevronDown, Layers, Upload } from "lucide-react";
 import { useFetcher } from "react-router";
 
 import {
@@ -17,7 +17,9 @@ import {
   useFormat,
 } from "~/lib";
 
+import { IngestModal } from "../ingest/IngestModal";
 import { Checkbox } from "../ui/Checkbox";
+import { EmptyState } from "../ui/EmptyState";
 import { HoldingsUpload } from "./HoldingsUpload";
 import { Button } from "../ui/Button";
 import { Select } from "../ui/Select";
@@ -38,9 +40,9 @@ export function InstrumentsTable({ items }: { items: InstrumentListItem[] }) {
 
   if (items.length === 0) {
     return (
-      <p className="px-gutter py-10 text-center text-[13px] text-muted">
-        {copy.empty}
-      </p>
+      <EmptyState icon={Layers} title={copy.empty.title} body={copy.empty.body}>
+        <IngestModal variant="primary" size="md" />
+      </EmptyState>
     );
   }
 

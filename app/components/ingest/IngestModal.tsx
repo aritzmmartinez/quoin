@@ -3,7 +3,7 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useRevalidator } from "react-router";
 
 import { useCopy } from "~/lib";
-import { Button } from "../ui/Button";
+import { Button, type ButtonProps } from "../ui/Button";
 import { asFocusable, returnFocus, type Focusable } from "../ui/focus-return";
 import { Modal } from "../ui/Modal";
 import { ingestRequestPending } from "./api";
@@ -17,7 +17,10 @@ import { IngestStepper, type IngestStatus } from "./IngestStepper";
 
 const IDLE: IngestStatus = { imported: false, atDone: false, importedCount: 0 };
 
-export function IngestModal() {
+export function IngestModal({
+  variant = "default",
+  size = "sm",
+}: Pick<ButtonProps, "variant" | "size">) {
   const t = useCopy();
   const dialog = useRef<HTMLDialogElement>(null);
   const revalidator = useRevalidator();
@@ -59,7 +62,8 @@ export function IngestModal() {
   return (
     <>
       <Button
-        size="sm"
+        variant={variant}
+        size={size}
         onClick={() => dialog.current?.showModal()}
         aria-label={copy.open}
       >

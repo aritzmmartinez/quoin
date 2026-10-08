@@ -472,7 +472,7 @@ export const en: Copy = {
     worseningHint:
       "This line receives a contribution and still drifts further from its target, because another position in the plan is overweight and is not being sold: the extra room it takes up cannot be filled with new money, only diluted. Larger contributions correct it, and selling it would be taxed.",
     unpriced: (names: string): string =>
-      `No usable price, so these are left out of the split: ${names}. A missing price is not a value of zero. Run pnpm prices:sync before trusting the split.`,
+      `No usable price, so these are left out of the split: ${names}. A missing price is not a value of zero. Refresh prices from Instruments before trusting the split.`,
     offPlan: (count: number): string =>
       count === 1
         ? "1 position held, outside the plan"
@@ -481,6 +481,49 @@ export const en: Copy = {
       "You hold this and your target in force does not name it. It receives no contribution: putting new money there is not rebalancing, it is changing the plan, and that is done in Target.",
     empty:
       "No target line can be allocated to yet. Import trades and sync prices.",
+  },
+  setup: {
+    done: "Done",
+    pending: "Pending",
+    progress: (have: number, need: number): string => `${have} of ${need}`,
+    steps: {
+      trades: { label: "Trades imported" },
+      prices: {
+        label: "A price for what you hold",
+        action: "Go to Instruments",
+      },
+      target: { label: "An active target", action: "Go to Target" },
+      funds: {
+        label: "Funds with their composition imported",
+        action: "Go to Instruments",
+      },
+    },
+    screens: {
+      summary: {
+        title: "Your trades are in",
+        body: "What is missing is what your holdings are worth. Without a price, value, returns, allocation and top positions have nothing to show.",
+      },
+      exposure: {
+        title: "Your real exposure shows up here",
+        body: "It breaks down what you hold, fund by fund, into every company, metal or crypto underneath. For that it needs positions with a price.",
+      },
+      currency: {
+        title: "Your currency exposure shows up here",
+        body: "It groups what you hold by the currency of each security's primary market, inside your funds too. For that it needs positions with a price.",
+      },
+      overlap: {
+        title: "Two funds are needed to compare",
+        body: "How much of two funds is the same company. Drop each fund's composition CSV onto its row in Instruments. A fund with no composition is left out of the calculation, not counted as 0%.",
+      },
+      rebalance: {
+        title: "How to split your contribution shows up here",
+        body: "It splits what you are about to put in across the lines of your target, starting with the ones furthest from their weight. For that it needs your plan and what you already hold, with a price.",
+      },
+      projection: {
+        title: "Your plan's projection shows up here",
+        body: "It resamples the months your instruments have already lived through to estimate where the portfolio could end up if you keep contributing to your plan.",
+      },
+    },
   },
   ingest: {
     open: "Import trades",
@@ -699,7 +742,10 @@ export const en: Copy = {
     saving: "…",
     saved: "Saved",
     closed: "Closed",
-    empty: "No instruments. Import your trades with pnpm ingest.",
+    empty: {
+      title: "No instruments yet",
+      body: "Each instrument shows up here once its trades are imported. Import your broker's CSV to get started.",
+    },
     sync: {
       action: "Refresh prices",
       loading: "Syncing prices…",
@@ -719,7 +765,14 @@ export const en: Copy = {
     title: "Target",
     intro:
       "Your monthly savings plan. The amounts are the fact and the weight is derived from them. A target is never edited: when the plan changes you store a new version with its effective date, so which target was in force on any given date stays answerable.",
-    none: "No target stored yet. Create the first version below or use pnpm target:set.",
+    none: {
+      title: "No target yet",
+      body: "Write below how much you want to put into each instrument every month. It can name instruments you have not bought yet. The split of each contribution and the projection are both worked out from it.",
+    },
+    notYetActive: {
+      title: "No target active today",
+      body: "The stored versions take effect later on. They will show up here from their effective date.",
+    },
     activeFrom: (date: string): string => `In force since ${date}`,
     columns: {
       instrument: "Instrument",
@@ -891,7 +944,7 @@ export const en: Copy = {
     empty: "No movements.",
     emptyScreen: {
       title: "No movements yet",
-      body: "Import your trades with the CLI (pnpm ingest) to see the full ledger here.",
+      body: "Import your broker's CSV (Trade Republic or Kraken) to see the full ledger here.",
     },
     amountHint:
       "The amount is the real cash flow: fees included and withholdings deducted.",
@@ -920,10 +973,11 @@ export const en: Copy = {
       tradeCount: "Number of trades",
     },
     updatedAt: (relative: string): string => `Updated ${relative}`,
-    noPrices: "No prices. Run pnpm prices:sync",
+    noPrices: "No prices. Refresh them from Instruments.",
+    value: (amount: string): string => `${amount} value`,
     empty: {
       title: "No positions yet",
-      body: "Import your movements with the CLI (pnpm ingest) to start tracking your portfolio.",
+      body: "Import your broker's CSV (Trade Republic or Kraken) to start tracking your portfolio.",
     },
     error: {
       title: "Positions could not be loaded",
@@ -1130,7 +1184,7 @@ export const en: Copy = {
     unpriced: (names: string): string =>
       `No usable price: ${names}. They are excluded from both sides, because counting their cost without their value would invent a loss.`,
     unmapped: (symbol: string): string =>
-      `No instrument is mapped to ${symbol}, so there is no index to compare against. Run pnpm prices:map <ISIN> ${symbol}.`,
+      `No instrument is mapped to ${symbol}, so there is no index to compare against. Pick one of your instruments with price history in Settings.`,
     noHistory: (symbol: string): string =>
       `${symbol} has no price history in euros. Run pnpm prices:backfill <ISIN> max to download it.`,
     chooseBenchmark: "Choose another index in Settings",
@@ -1209,7 +1263,7 @@ export const en: Copy = {
       sell: "Sell",
       empty: "No trades recorded.",
       noPrice:
-        "No price history yet. It builds up with every pnpm prices:sync.",
+        "No price history yet. It builds up every time you refresh prices from Instruments.",
     },
     ivvChart: {
       title: "Contributed against value",

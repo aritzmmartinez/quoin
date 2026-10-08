@@ -99,7 +99,7 @@ export default function Portfolio({ loaderData }: Route.ComponentProps) {
             {rows.length > 0 && (
               <span className="text-[13px] text-muted">
                 {t.portfolio.summary(rows.length, formatMoney(invested))}
-                {value !== null && <> · {formatMoney(value)} valor</>}
+                {value !== null && <> · {t.portfolio.value(formatMoney(value))}</>}
               </span>
             )}
             {unrealized !== null && (
@@ -117,7 +117,7 @@ export default function Portfolio({ loaderData }: Route.ComponentProps) {
             </p>
           )}
         </div>
-        <IngestModal />
+        {rows.length > 0 && <IngestModal />}
       </header>
 
       <Card>

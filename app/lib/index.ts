@@ -20,6 +20,7 @@ export * from "./quote-symbol";
 export * from "./range";
 export * from "./realized";
 export * from "./rebalance";
+export * from "./setup";
 export * from "./summary";
 export * from "./symbol-check";
 export * from "./target";
