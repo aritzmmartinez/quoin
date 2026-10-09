@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Screens without charts load about a third less JavaScript: the charting library is now downloaded only by the screens that draw charts.
 - Empty screens share the look of the error screens.
 - Target explains what it is for when none is set.
+- The realised result on Summary says it is average cost across all years, and restated when the basis is real; it links to the tax view, where the FIFO result for each year lives.
 - Messages that pointed to a command now point to the button that does the same, when there is one.
 
 ### Fixed

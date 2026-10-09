@@ -307,8 +307,10 @@ export const en: Copy = {
         sub: "Value minus contributed",
       },
       realized: {
-        label: "Realised result",
-        sub: "Result of the closed sales",
+        label: "Realised result (average cost)",
+        sub: "All years. The tax result (FIFO) is under Realized",
+        subReal: (period: string): string =>
+          `All years, restated in ${period} euros. The tax result (FIFO) is under Realized`,
       },
       positions: { label: "Positions", sub: "Open and priced" },
       opportunity: {
