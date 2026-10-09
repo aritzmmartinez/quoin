@@ -484,7 +484,7 @@ export const en: Copy = {
     worseningHint:
       "This line receives a contribution and still drifts further from its target, because another position in the plan is overweight and is not being sold: the extra room it takes up cannot be filled with new money, only diluted. Larger contributions correct it, and selling it would be taxed.",
     unpriced: (names: string): string =>
-      `No usable price, so these are left out of the split: ${names}. A missing price is not a value of zero. In Instruments, give them a symbol or press “Refresh prices” before trusting the split.`,
+      `No usable price, so these are left out of the split: ${names}. A missing price is not a value of zero. Give them a symbol in Instruments or, if they have one, press “Refresh prices” in Portfolio before trusting the split.`,
     offPlan: (count: number): string =>
       count === 1
         ? "1 position held, outside the plan"
@@ -788,7 +788,7 @@ export const en: Copy = {
         count === 1
           ? `1 price saved from ${first}.`
           : `${count} prices saved from ${first}.`,
-      noLive: "Yahoo returned no quote for today: press “Refresh prices” later.",
+      noLive: "Yahoo returned no quote for today: press “Refresh prices” in Portfolio later.",
       noHistory: (symbol: string): string =>
         `Yahoo returned no history for ${symbol}. Nothing was changed.`,
       notEur: (symbol: string, currency: string): string =>
@@ -1048,7 +1048,7 @@ export const en: Copy = {
     },
     updatedAt: (relative: string): string => `Updated ${relative}`,
     noPrices:
-      "No prices. In Instruments, assign the missing symbols or press “Refresh prices”.",
+      "No prices. Press “Refresh prices” or assign the missing symbols in Instruments.",
     value: (amount: string): string => `${amount} value`,
     empty: {
       title: "No positions yet",

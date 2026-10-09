@@ -17,7 +17,6 @@ import {
   Card,
   InstrumentsTable,
   RebuildHistories,
-  SyncPricesButton,
 } from "~/components";
 import {
   BASE_CURRENCY,
@@ -195,29 +194,22 @@ export default function Instruments({ loaderData }: Route.ComponentProps) {
 
   return (
     <>
-      <header className="mb-4">
-        <div className="flex items-start justify-between gap-4">
-          <p className="text-[13px] text-muted">{t.instruments.intro}</p>
-          <SyncPricesButton />
+      <header className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div className="space-y-2 text-[13px] text-muted">
+          <p>{t.instruments.intro}</p>
+          {coarse.length > 0 && (
+            <p>
+              {t.instruments.history.coarse(
+                coarse.length,
+                coarse.map((item) => item.name).join(", "),
+              )}
+            </p>
+          )}
+          {unmapped > 0 && <p>{t.instruments.unmappedHint(unmapped)}</p>}
         </div>
-        {coarse.length > 0 && (
-          <p className="mt-2 text-[13px] text-muted">
-            {t.instruments.history.coarse(
-              coarse.length,
-              coarse.map((item) => item.name).join(", "),
-            )}
-          </p>
-        )}
-        {rebuildable.length > 0 && (
-          <div className="mt-2">
-            <RebuildHistories targets={rebuildable} />
-          </div>
-        )}
-        {unmapped > 0 && (
-          <p className="mt-2 text-[13px] text-muted">
-            {t.instruments.unmappedHint(unmapped)}
-          </p>
-        )}
+        <div className="shrink-0">
+          <RebuildHistories targets={rebuildable} />
+        </div>
       </header>
 
       <Card className="overflow-hidden">

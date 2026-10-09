@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { inTurn, rangeSince, useCopy } from "~/lib";
 import { postIngest } from "../ingest/api";
 import { Button } from "../ui/Button";
+import { Modal } from "../ui/Modal";
 
 export interface RebuildTarget {
   id: string;
@@ -24,8 +25,8 @@ export function RebuildHistories({
   const t = useCopy();
   const copy = t.instruments.history;
   const revalidator = useRevalidator();
+  const dialog = useRef<HTMLDialogElement>(null);
   const mounted = useRef(true);
-  const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -38,7 +39,7 @@ export function RebuildHistories({
   if (targets.length === 0) return null;
 
   async function run() {
-    setConfirming(false);
+    dialog.current?.close();
     setBusy(true);
     const total = targets.length;
     const id = toast.loading(copy.rebuilding(1, total));
@@ -106,36 +107,38 @@ export function RebuildHistories({
   }
 
   return (
-    <div className="text-[12px]">
-      {!confirming && (
-        <Button size="sm" onClick={() => setConfirming(true)} disabled={busy}>
-          <RefreshCw
-            size={13}
-            strokeWidth={1.75}
-            aria-hidden
-            className={busy ? "animate-spin" : undefined}
-          />
-          {copy.rebuild}
-        </Button>
-      )}
+    <>
+      <Button
+        size="sm"
+        onClick={() => dialog.current?.showModal()}
+        disabled={busy}
+      >
+        <RefreshCw
+          size={13}
+          strokeWidth={1.75}
+          aria-hidden
+          className={busy ? "animate-spin" : undefined}
+        />
+        {copy.rebuild}
+      </Button>
 
-      {confirming && (
-        <div className="mt-2 max-w-3xl rounded-md border border-border bg-surface px-3 py-2">
-          <p>{copy.rebuildConfirm(targets.length)}</p>
-          <div className="mt-2 flex items-center gap-2">
-            <Button size="sm" onClick={() => void run()}>
-              {copy.confirm}
-            </Button>
+      <Modal ref={dialog} title={copy.rebuild}>
+        <div className="py-4 text-[13px]">
+          <p className="text-body">{copy.rebuildConfirm(targets.length)}</p>
+          <div className="mt-4 flex justify-end gap-2">
             <Button
               size="sm"
               variant="ghost"
-              onClick={() => setConfirming(false)}
+              onClick={() => dialog.current?.close()}
             >
               {copy.cancel}
             </Button>
+            <Button size="sm" variant="primary" onClick={() => void run()}>
+              {copy.confirm}
+            </Button>
           </div>
         </div>
-      )}
-    </div>
+      </Modal>
+    </>
   );
 }

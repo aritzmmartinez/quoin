@@ -129,7 +129,8 @@ pnpm ipc:sync                     # INE consumer price index (national + Bizkaia
 pnpm target:set [<file>]          # show, or record a version of, the savings plan
 ```
 
-`ingest`, `prices:sync` and `prices:backfill` do the same work as the import wizard,
+`ingest`, `prices:sync` and `prices:backfill` do the same work as the import wizard
+(`prices:sync` is also **Refresh prices** on Portfolio),
 `prices:map` and `prices:rebuild` the same as the Symbol column and **Rebuild all
 histories** on Instruments, and `ipc:sync` the same as the button in the IPC notice on
 Summary. Only `prices:map --clear` has no button.

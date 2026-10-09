@@ -480,7 +480,7 @@ export const es = {
     worseningHint:
       "Esta línea recibe aportación y aun así se aleja de su objetivo, porque otra posición del plan está sobreponderada y no se vende: el hueco que ocupa de más no se puede rellenar con dinero nuevo, solo diluir. Aportaciones mayores lo corrigen, y venderla tributaría.",
     unpriced: (names: string): string =>
-      `Sin precio utilizable, así que quedan fuera del reparto: ${names}. Un precio que falta no es un valor de cero. En Instrumentos, asígnales un símbolo o pulsa «Refrescar precios» antes de fiarte del reparto.`,
+      `Sin precio utilizable, así que quedan fuera del reparto: ${names}. Un precio que falta no es un valor de cero. Asígnales un símbolo en Instrumentos o, si ya lo tienen, pulsa «Refrescar precios» en Cartera antes de fiarte del reparto.`,
     offPlan: (count: number): string =>
       count === 1
         ? "1 posición en cartera, fuera del plan"
@@ -787,7 +787,7 @@ export const es = {
           ? `1 precio guardado desde el ${first}.`
           : `${count} precios guardados desde el ${first}.`,
       noLive:
-        "Yahoo no ha dado cotización de hoy: pulsa «Refrescar precios» más tarde.",
+        "Yahoo no ha dado cotización de hoy: pulsa «Refrescar precios» en Cartera más tarde.",
       noHistory: (symbol: string): string =>
         `Yahoo no ha devuelto histórico para ${symbol}. No se ha tocado nada.`,
       notEur: (symbol: string, currency: string): string =>
@@ -1046,7 +1046,7 @@ export const es = {
     },
     updatedAt: (relative: string): string => `Actualizado ${relative}`,
     noPrices:
-      "Sin precios. En Instrumentos, asigna los símbolos que falten o pulsa «Refrescar precios».",
+      "Sin precios. Pulsa «Refrescar precios» o asigna en Instrumentos los símbolos que falten.",
     value: (amount: string): string => `${amount} valor`,
     empty: {
       title: "Sin posiciones todavía",
