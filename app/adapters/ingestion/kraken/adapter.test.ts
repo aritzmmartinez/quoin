@@ -80,7 +80,7 @@ class FakePriceRepository implements PriceRepository {
   async latest(): Promise<Map<string, PriceSnapshot>> {
     return new Map();
   }
-  async deleteForInstrument(): Promise<number> {
+  async replaceHistory(): Promise<number> {
     return 0;
   }
   async historyFor(instrumentId: string): Promise<PriceSnapshot[]> {

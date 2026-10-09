@@ -1,3 +1,4 @@
+import { foreignCurrency } from "~/core/domain";
 import {
   HISTORY_RANGE_DAYS,
   type HistoryRange,
@@ -33,13 +34,29 @@ export function widerRange(a: HistoryRange, b: HistoryRange): HistoryRange {
   return HISTORY_RANGES.indexOf(a) >= HISTORY_RANGES.indexOf(b) ? a : b;
 }
 
-export function rewardBackfillRange(
+export function rangeSince(
   earliest: Date | null,
   now: Date,
 ): HistoryRange {
   return earliest === null
     ? DEFAULT_HISTORY_RANGE
     : widerRange(DEFAULT_HISTORY_RANGE, rangeCovering(earliest, now));
+}
+
+export function historyCutoff(range: HistoryRange, now: Date): Date | null {
+  return range === "max"
+    ? null
+    : new Date(now.getTime() - HISTORY_RANGE_DAYS[range] * 86_400_000);
+}
+
+export function lostHistoryBefore(
+  range: HistoryRange,
+  earliest: Date | null,
+  now: Date,
+): Date | null {
+  const cutoff = historyCutoff(range, now);
+  if (!cutoff || !earliest) return null;
+  return earliest.getTime() < cutoff.getTime() ? cutoff : null;
 }
 
 export function isHistoryRange(value: string): value is HistoryRange {
@@ -53,6 +70,7 @@ export interface BackfillReport {
   first: string | null;
   last: string | null;
   currency: string | null;
+  foreignCurrency: string | null;
   weekly: boolean;
 }
 
@@ -86,6 +104,7 @@ function reportOf(
     first: quotes[0]?.asOf.toISOString() ?? null,
     last: quotes[quotes.length - 1]?.asOf.toISOString() ?? null,
     currency: quotes[0]?.currency ?? null,
+    foreignCurrency: null,
     weekly: medianGapDays(quotes) >= 4,
   };
 }
@@ -98,6 +117,11 @@ export async function backfillInstrument(
 ): Promise<BackfillReport> {
   const quotes = await provider.getHistory(target.quoteSymbol, range);
   if (quotes.length === 0) return reportOf(target, quotes, 0);
+
+  const foreign = foreignCurrency(quotes);
+  if (foreign) {
+    return { ...reportOf(target, quotes, 0), foreignCurrency: foreign };
+  }
 
   const snapshots: PriceSnapshot[] = quotes.map((quote) => ({
     instrumentId: target.id,

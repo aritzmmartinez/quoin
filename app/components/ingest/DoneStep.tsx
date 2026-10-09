@@ -42,6 +42,9 @@ export function DoneStep({
         {discarded > 0 && <li>{copy.discarded(discarded)}</li>}
         {fill && <li>{copy.candles(fill.candles)}</li>}
         {fill && <li>{copy.synced(fill.synced)}</li>}
+        {fill && fill.notEur > 0 && (
+          <li className="text-negative">{copy.notEurWarning(fill.notEur)}</li>
+        )}
         {fill && fill.stale > 0 && (
           <li className="text-negative">{copy.staleWarning(fill.stale)}</li>
         )}

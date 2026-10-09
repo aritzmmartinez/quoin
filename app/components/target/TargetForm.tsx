@@ -71,7 +71,7 @@ export function TargetForm({
       {error && <p className="text-[12px] text-negative">{error}</p>}
 
       <div>
-        <Button type="submit" disabled={busy}>
+        <Button type="submit" variant="primary" disabled={busy}>
           {busy ? copy.saving : copy.submit}
         </Button>
       </div>

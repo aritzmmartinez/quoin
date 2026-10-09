@@ -3,9 +3,15 @@ export interface Quote {
   price: string;
   currency: string;
   asOf: Date;
+  name?: string;
 }
 
 export type HistoryRange = "1y" | "2y" | "5y" | "10y" | "max";
+
+export interface HistorySpan {
+  from: Date;
+  to: Date;
+}
 
 export const HISTORY_RANGE_DAYS: Record<Exclude<HistoryRange, "max">, number> =
   {
@@ -18,5 +24,8 @@ export const HISTORY_RANGE_DAYS: Record<Exclude<HistoryRange, "max">, number> =
 export interface MarketDataProvider {
   readonly source: string;
   getQuotes(symbols: readonly string[]): Promise<Quote[]>;
-  getHistory(symbol: string, range: HistoryRange): Promise<Quote[]>;
+  getHistory(
+    symbol: string,
+    range: HistoryRange | HistorySpan,
+  ): Promise<Quote[]>;
 }

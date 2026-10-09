@@ -1,6 +1,7 @@
 import {
   HISTORY_RANGE_DAYS,
   type HistoryRange,
+  type HistorySpan,
   type MarketDataProvider,
   type Quote,
 } from "~/core/ports";
@@ -19,18 +20,23 @@ async function fetchOne(symbol: string): Promise<Quote | null> {
 
 export function historyUrl(
   symbol: string,
-  range: HistoryRange,
+  range: HistoryRange | HistorySpan,
   now: Date,
 ): string {
-  const period2 = Math.floor(now.getTime() / 1000);
+  const seconds = (date: Date) => Math.floor(date.getTime() / 1000);
+  const period2 = typeof range === "object" ? seconds(range.to) : seconds(now);
   const period1 =
-    range === "max" ? 0 : period2 - HISTORY_RANGE_DAYS[range] * 86_400;
+    typeof range === "object"
+      ? seconds(range.from)
+      : range === "max"
+        ? 0
+        : period2 - HISTORY_RANGE_DAYS[range] * 86_400;
   return `${BASE}/${encodeURIComponent(symbol)}?interval=1d&period1=${period1}&period2=${period2}`;
 }
 
 async function fetchHistory(
   symbol: string,
-  range: HistoryRange,
+  range: HistoryRange | HistorySpan,
 ): Promise<Quote[]> {
   const res = await fetch(historyUrl(symbol, range, new Date()), {
     headers: HEADERS,
@@ -57,7 +63,10 @@ export class YahooMarketDataProvider implements MarketDataProvider {
       .map((r) => r.value);
   }
 
-  async getHistory(symbol: string, range: HistoryRange): Promise<Quote[]> {
+  async getHistory(
+    symbol: string,
+    range: HistoryRange | HistorySpan,
+  ): Promise<Quote[]> {
     try {
       return await fetchHistory(symbol, range);
     } catch {

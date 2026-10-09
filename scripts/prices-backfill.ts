@@ -72,6 +72,12 @@ async function main(): Promise<void> {
     );
     total += report.written;
 
+    if (report.foreignCurrency) {
+      console.log(
+        `  ${report.instrumentId}  (${report.symbol})  history in ${report.foreignCurrency}, not stored: only EUR histories are valued`,
+      );
+      continue;
+    }
     if (report.written === 0 && report.first === null) {
       console.log(
         `  ${report.instrumentId}  (${report.symbol})  no history returned`,

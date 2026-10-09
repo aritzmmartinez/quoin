@@ -8,6 +8,7 @@ import {
   PortfolioEmpty,
   PortfolioTable,
   SignedMoney,
+  SyncPricesButton,
 } from "~/components";
 import {
   PrismaInstrumentRepository,
@@ -117,7 +118,12 @@ export default function Portfolio({ loaderData }: Route.ComponentProps) {
             </p>
           )}
         </div>
-        {rows.length > 0 && <IngestModal />}
+        {rows.length > 0 && (
+          <div className="flex shrink-0 items-center gap-2">
+            <SyncPricesButton />
+            <IngestModal />
+          </div>
+        )}
       </header>
 
       <Card>

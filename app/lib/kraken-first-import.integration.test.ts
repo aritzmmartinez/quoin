@@ -17,9 +17,9 @@ import {
 import {
   backfillInstruments,
   rangeCovering,
-  rewardBackfillRange,
+  rangeSince,
 } from "./prices-backfill";
-import { remapQuoteSymbol } from "./quote-symbol";
+import { assignQuoteSymbol } from "./quote-symbol";
 
 type Persistence = typeof import("~/adapters/persistence");
 type Ingestion = typeof import("~/adapters/ingestion");
@@ -73,6 +73,19 @@ const provider: MarketDataProvider = {
     symbol === "BTC-EUR" ? dailyCandles() : [],
 };
 
+const btcQuote: MarketDataProvider = {
+  source: "FAKE",
+  getQuotes: async () => [
+    {
+      symbol: "BTC-EUR",
+      price: "90000",
+      currency: "EUR",
+      asOf: new Date(),
+    },
+  ],
+  getHistory: async () => [],
+};
+
 function dayIndex(iso: string): number {
   const date = new Date(iso);
   return Math.round(
@@ -117,7 +130,7 @@ async function firstImportFlow(csv: string) {
 
   const ids = rewardRetryIds(first);
   for (const id of ids) {
-    await remapQuoteSymbol(instruments, prices, id, "BTC-EUR");
+    await assignQuoteSymbol(instruments, prices, btcQuote, id, "BTC-EUR");
   }
   await backfillInstruments(
     provider,
@@ -197,7 +210,7 @@ describe("wizard path with BTC left unmapped (integration)", () => {
 
     const fill = await server.fillPrices(
       committed.retryIds,
-      rewardBackfillRange(earliestUnpricedReward(committed.summary), new Date()),
+      rangeSince(earliestUnpricedReward(committed.summary), new Date()),
     );
 
     expect(fill.backfilled).toEqual([]);
@@ -259,7 +272,13 @@ async function priceAndRetry(
     prices,
   );
   if (!(await instruments.get("BTC"))?.quoteSymbol) {
-    await remapQuoteSymbol(instruments, prices, "BTC", "BTC-EUR");
+    await assignQuoteSymbol(
+      instruments,
+      prices,
+      btcQuote,
+      "BTC",
+      "BTC-EUR",
+    );
   }
   await backfillInstruments(
     providerOf(quotes),

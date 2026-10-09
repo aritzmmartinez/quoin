@@ -75,6 +75,7 @@ export function FileStep({
 
       <div className="mt-4">
         <Button
+          variant="primary"
           onClick={onConfirm}
           disabled={busy || imported || !canImport}
         >

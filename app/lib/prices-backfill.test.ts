@@ -13,7 +13,7 @@ import {
   isHistoryRange,
   medianGapDays,
   rangeCovering,
-  rewardBackfillRange,
+  rangeSince,
   widerRange,
 } from "./prices-backfill";
 
@@ -91,6 +91,26 @@ describe("backfillInstruments", () => {
       "XS00TEST0001",
     ]);
     expect(saved[0]?.source).toBe("FAKE");
+  });
+
+  it("stores nothing for a history that is not in euros, and says which currency", async () => {
+    const { provider } = fakeProvider({
+      AAA: [
+        { ...quote("2026-01-05", "10"), symbol: "AAA", currency: "USD" },
+        { ...quote("2026-01-06", "11"), symbol: "AAA", currency: "USD" },
+      ],
+    });
+    const { prices, saved } = fakeRepository();
+
+    const [report] = await backfillInstruments(
+      provider,
+      prices,
+      [{ id: "XS00TEST0001", quoteSymbol: "AAA" }],
+      "5y",
+    );
+
+    expect(report).toMatchObject({ written: 0, foreignCurrency: "USD" });
+    expect(saved).toEqual([]);
   });
 
   it("flags a range the provider degraded to weekly candles", async () => {
@@ -176,19 +196,19 @@ describe("rangeCovering", () => {
   });
 });
 
-describe("rewardBackfillRange", () => {
+describe("rangeSince", () => {
   const now = new Date("2026-10-07T12:00:00.000Z");
   const daysAgo = (days: number) =>
     new Date(now.getTime() - days * 86_400_000);
 
   it("never asks for less than the default range", () => {
-    expect(rewardBackfillRange(daysAgo(30), now)).toBe("5y");
-    expect(rewardBackfillRange(null, now)).toBe("5y");
+    expect(rangeSince(daysAgo(30), now)).toBe("5y");
+    expect(rangeSince(null, now)).toBe("5y");
   });
 
-  it("widens past the default when the oldest reward is further back", () => {
-    expect(rewardBackfillRange(daysAgo(2000), now)).toBe("10y");
-    expect(rewardBackfillRange(daysAgo(4000), now)).toBe("max");
+  it("widens past the default when the oldest date is further back", () => {
+    expect(rangeSince(daysAgo(2000), now)).toBe("10y");
+    expect(rangeSince(daysAgo(4000), now)).toBe("max");
   });
 
   it("keeps the wider of two ranges", () => {
