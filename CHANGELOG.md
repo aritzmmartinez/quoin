@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Messages that pointed to a command now point to the button that does the same, when there is one.
 - Refresh prices counts the open and closed positions that still have no symbol.
 - Messages that send you to Instruments say what to do there.
+- Include sold funds, in fund overlap, is a checkbox like See more detail, with its explanation next to it instead of on hover.
 - Refresh prices moves to Portfolio, next to when prices were last updated. Instruments keeps Rebuild all histories, which asks for confirmation in a dialog and shows its progress in a notification.
 - The Composition column on Instruments reads "Company", "Crypto · BTC" or "Not broken down" instead of internal codes.
 - The TER field is shown only for ETFs, ETCs and funds, without a sample value.
