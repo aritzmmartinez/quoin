@@ -1,5 +1,7 @@
+import { RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useRevalidator } from "react-router";
+import { toast } from "sonner";
 
 import { inTurn, rangeSince, useCopy } from "~/lib";
 import { postIngest } from "../ingest/api";
@@ -24,8 +26,7 @@ export function RebuildHistories({
   const revalidator = useRevalidator();
   const mounted = useRef(true);
   const [confirming, setConfirming] = useState(false);
-  const [progress, setProgress] = useState<number | null>(null);
-  const [finished, setFinished] = useState<Step[] | null>(null);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     mounted.current = true;
@@ -38,12 +39,19 @@ export function RebuildHistories({
 
   async function run() {
     setConfirming(false);
-    setFinished(null);
-    setProgress(0);
+    setBusy(true);
+    const total = targets.length;
+    const id = toast.loading(copy.rebuilding(1, total));
+    let current = 0;
 
     const steps = await inTurn(
       targets,
       async (target): Promise<Step> => {
+        current += 1;
+        toast.loading(copy.rebuilding(current, total), {
+          id,
+          description: target.name,
+        });
         const response = await postIngest(t, {
           intent: "replace",
           instrumentId: target.id,
@@ -63,25 +71,50 @@ export function RebuildHistories({
           name: target.name,
           error: copy.failed,
         }),
-        onEach: (_step, index) => {
-          if (mounted.current) setProgress(index + 1);
-        },
         stopped: () => !mounted.current,
       },
     );
 
+    const failed = steps.filter((step) => step.error !== null);
+    const summary = copy.rebuilt(steps.length - failed.length, total);
+
+    if (failed.length === 0) {
+      toast.success(summary, { id, description: undefined });
+    } else {
+      toast.error(summary, {
+        id,
+        duration: Infinity,
+        closeButton: true,
+        description: (
+          <>
+            <p>{copy.rebuildFailed}</p>
+            <ul className="mt-1 list-disc pl-4">
+              {failed.map((step) => (
+                <li key={step.name}>
+                  {step.name}: {step.error}
+                </li>
+              ))}
+            </ul>
+          </>
+        ),
+      });
+    }
+
     if (!mounted.current) return;
-    setProgress(null);
-    setFinished(steps);
+    setBusy(false);
     void revalidator.revalidate();
   }
 
-  const failed = finished?.filter((step) => step.error !== null) ?? [];
-
   return (
     <div className="text-[12px]">
-      {!confirming && progress === null && (
-        <Button size="sm" onClick={() => setConfirming(true)}>
+      {!confirming && (
+        <Button size="sm" onClick={() => setConfirming(true)} disabled={busy}>
+          <RefreshCw
+            size={13}
+            strokeWidth={1.75}
+            aria-hidden
+            className={busy ? "animate-spin" : undefined}
+          />
           {copy.rebuild}
         </Button>
       )}
@@ -101,32 +134,6 @@ export function RebuildHistories({
               {copy.cancel}
             </Button>
           </div>
-        </div>
-      )}
-
-      {progress !== null && (
-        <p className="text-muted" role="status">
-          {copy.rebuilding(progress, targets.length)}
-        </p>
-      )}
-
-      {finished && (
-        <div className="mt-2" role="status">
-          <p className="text-muted">
-            {copy.rebuilt(finished.length - failed.length, targets.length)}
-          </p>
-          {failed.length > 0 && (
-            <>
-              <p className="mt-1 text-negative">{copy.rebuildFailed}</p>
-              <ul className="mt-1 list-disc pl-4 text-negative">
-                {failed.map((step) => (
-                  <li key={step.name}>
-                    {step.name}: {step.error}
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
         </div>
       )}
     </div>
