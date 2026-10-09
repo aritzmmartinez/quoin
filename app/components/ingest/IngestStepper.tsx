@@ -239,6 +239,7 @@ export function IngestStepper({
         canGoBack={canGoBack}
         canGoNext={stage !== "file" || summary !== null}
         disabled={busy !== null}
+        primary={stage === "done"}
       />
     </div>
   );

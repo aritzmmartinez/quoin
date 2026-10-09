@@ -52,7 +52,7 @@ export function PricesStep({
         <HistoryRangeSelect value={range} onChange={setRange} disabled={busy} />
       </div>
 
-      <Button onClick={() => void run()} disabled={busy}>
+      <Button variant="primary" onClick={() => void run()} disabled={busy}>
         {busy ? copy.running : copy.run}
       </Button>
 

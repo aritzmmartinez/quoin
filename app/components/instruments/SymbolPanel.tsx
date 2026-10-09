@@ -111,6 +111,7 @@ export function SymbolPanel({ item }: { item: InstrumentListItem }) {
           <div className="mt-2 flex items-center gap-2">
             <Button
               size="sm"
+              variant="primary"
               onClick={() => void replace(pending)}
               disabled={busy}
             >
