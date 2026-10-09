@@ -1,4 +1,8 @@
-import type { PriceRepository, PriceSnapshot } from "~/core/ports";
+import type {
+  PriceRepository,
+  PriceSnapshot,
+  ReplaceHistoryOptions,
+} from "~/core/ports";
 
 import { prisma } from "./db.server";
 
@@ -52,11 +56,37 @@ export class PrismaPriceRepository implements PriceRepository {
     return latest;
   }
 
-  async deleteForInstrument(instrumentId: string): Promise<number> {
-    const { count } = await prisma.priceSnapshot.deleteMany({
-      where: { instrumentId },
+  async replaceHistory(
+    instrumentId: string,
+    snapshots: readonly PriceSnapshot[],
+    options: ReplaceHistoryOptions = {},
+  ): Promise<number> {
+    const { quoteSymbol, keepAfter } = options;
+    return prisma.$transaction(async (tx) => {
+      const { count } = await tx.priceSnapshot.deleteMany({
+        where: keepAfter
+          ? { instrumentId, asOf: { lte: keepAfter } }
+          : { instrumentId },
+      });
+      if (snapshots.length > 0) {
+        await tx.priceSnapshot.createMany({
+          data: snapshots.map((s) => ({
+            instrumentId,
+            price: s.price,
+            currency: s.currency,
+            asOf: s.asOf,
+            source: s.source,
+          })),
+        });
+      }
+      if (quoteSymbol !== undefined) {
+        await tx.instrument.update({
+          where: { id: instrumentId },
+          data: { quoteSymbol },
+        });
+      }
+      return count;
     });
-    return count;
   }
 
   async historyFor(
@@ -100,5 +130,19 @@ export class PrismaPriceRepository implements PriceRepository {
       if (row._min.asOf) starts.set(row.instrumentId, row._min.asOf);
     }
     return starts;
+  }
+
+  async candleTimes(): Promise<Map<string, Date[]>> {
+    const rows = await prisma.priceSnapshot.findMany({
+      select: { instrumentId: true, asOf: true },
+      orderBy: [{ instrumentId: "asc" }, { asOf: "asc" }],
+    });
+    const times = new Map<string, Date[]>();
+    for (const row of rows) {
+      const list = times.get(row.instrumentId);
+      if (list) list.push(row.asOf);
+      else times.set(row.instrumentId, [row.asOf]);
+    }
+    return times;
   }
 }

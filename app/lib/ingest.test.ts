@@ -106,6 +106,7 @@ describe("retryAfterFill", () => {
     first: null,
     last: null,
     currency: "EUR",
+    foreignCurrency: null,
     weekly: false,
   });
   const fill = (backfilled: ReturnType<typeof report>[]) => ({
@@ -114,6 +115,7 @@ describe("retryAfterFill", () => {
     synced: 0,
     stale: 0,
     noQuote: 0,
+    notEur: 0,
   });
 
   it("retries only once the reward's instrument got candles", () => {

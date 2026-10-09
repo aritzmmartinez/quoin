@@ -11,16 +11,21 @@ import {
   fillPrices,
   mapQuoteSymbol,
   previewIngest,
+  replaceHistory,
 } from "~/lib/ingest.server";
 import type { PendingMapping, PriceFillResult } from "~/lib/ingest";
+import type { ReplaceOutcome } from "~/lib/price-history";
 import type { SymbolCheck } from "~/lib/symbol-check";
 
-import { copyFor, parseLocale } from "~/lib";
+import { copyFor, parseLocale, replaceFailureMessage } from "~/lib";
 
 const csvForm = z.object({ csv: z.string().min(1) });
 const symbolForm = z.object({
   instrumentId: z.string().min(1),
   symbol: z.string().trim().min(1),
+});
+const replaceForm = symbolForm.extend({
+  range: z.string().refine(isHistoryRange),
 });
 const fillForm = z.object({
   instrumentIds: z.string(),
@@ -38,7 +43,8 @@ export type IngestResponse =
       retryIds: string[];
     }
   | { ok: true; step: "check"; check: SymbolCheck }
-  | { ok: true; step: "map"; instrumentId: string; removed: number }
+  | { ok: true; step: "map"; instrumentId: string }
+  | ({ step: "replace" } & Extract<ReplaceOutcome, { ok: true }>)
   | ({ ok: true; step: "fill" } & PriceFillResult)
   | { ok: false; error: string };
 
@@ -95,15 +101,26 @@ export async function action({ request }: Route.ActionArgs) {
       case "map": {
         const parsed = symbolForm.safeParse(form);
         if (!parsed.success) return fail(t.ingest.map.invalid);
-        const { removed } = await mapQuoteSymbol(
-          parsed.data.instrumentId,
-          parsed.data.symbol,
-        );
+        await mapQuoteSymbol(t, parsed.data.instrumentId, parsed.data.symbol);
         return Response.json({
           ok: true,
           step: "map",
           instrumentId: parsed.data.instrumentId,
-          removed,
+        } satisfies IngestResponse);
+      }
+
+      case "replace": {
+        const parsed = replaceForm.safeParse(form);
+        if (!parsed.success) return fail(t.ingest.map.invalid);
+        const outcome = await replaceHistory(
+          parsed.data.instrumentId,
+          parsed.data.symbol,
+          parsed.data.range,
+        );
+        if (!outcome.ok) return fail(replaceFailureMessage(t, outcome));
+        return Response.json({
+          step: "replace",
+          ...outcome,
         } satisfies IngestResponse);
       }
 

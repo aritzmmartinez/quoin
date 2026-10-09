@@ -103,6 +103,16 @@ export interface PriceSyncCounts {
   updated: number;
   stale: number;
   noQuote: number;
+  unmappedOpen: number;
+  unmappedClosed: number;
+}
+
+export function splitUnmapped(
+  unmapped: readonly UnmappedInstrument[],
+  openIds: ReadonlySet<string>,
+): { open: number; closed: number } {
+  const open = unmapped.filter((u) => openIds.has(u.instrumentId)).length;
+  return { open, closed: unmapped.length - open };
 }
 
 export interface PriceSyncToast {
@@ -115,18 +125,35 @@ export function priceSyncToast(
   counts: PriceSyncCounts,
 ): PriceSyncToast {
   const copy = t.instruments.sync;
-  if (counts.mapped === 0) return { message: copy.nothing };
+  const unmappedParts = [
+    counts.unmappedOpen > 0 ? copy.unmappedOpen(counts.unmappedOpen) : null,
+    counts.unmappedClosed > 0
+      ? copy.unmappedClosed(counts.unmappedClosed)
+      : null,
+  ].filter((part): part is string => part !== null);
+  const unmapped =
+    unmappedParts.length > 0
+      ? `${unmappedParts.join(" · ")}. ${copy.unmappedAction}`
+      : null;
 
   const failed = counts.stale + counts.noQuote;
-  const headline = copy.done(counts.updated, counts.mapped);
-  if (failed === 0) return { message: headline };
-
-  const description = [
+  const failures = [
     counts.stale > 0 ? copy.staleDetail(counts.stale) : null,
     counts.noQuote > 0 ? copy.noQuoteDetail(counts.noQuote) : null,
+  ].filter((part): part is string => part !== null);
+  const description = [
+    failures.length > 0 ? failures.join(" · ") : null,
+    unmapped,
   ]
     .filter((part): part is string => part !== null)
-    .join(" · ");
+    .join(". ");
 
-  return { message: `${headline}, ${copy.failed(failed)}`, description };
+  const message =
+    counts.mapped === 0
+      ? copy.nothing
+      : failed === 0
+        ? copy.done(counts.updated, counts.mapped)
+        : `${copy.done(counts.updated, counts.mapped)}, ${copy.failed(failed)}`;
+
+  return description === "" ? { message } : { message, description };
 }

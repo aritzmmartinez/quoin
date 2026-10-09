@@ -1,5 +1,24 @@
 import { describe, it, expect } from "vitest";
-import { Money } from "./money";
+import { Money, foreignCurrency } from "./money";
+
+describe("foreignCurrency", () => {
+  it("is null when every quote is in the base currency", () => {
+    expect(
+      foreignCurrency([{ currency: "EUR" }, { currency: "EUR" }]),
+    ).toBeNull();
+    expect(foreignCurrency([])).toBeNull();
+  });
+
+  it("names the first currency that is not the base one", () => {
+    expect(
+      foreignCurrency([
+        { currency: "EUR" },
+        { currency: "USD" },
+        { currency: "GBp" },
+      ]),
+    ).toBe("USD");
+  });
+});
 
 describe("Money", () => {
   it("round-trips a decimal string", () => {

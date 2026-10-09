@@ -5,7 +5,8 @@ const BASE =
 
 const VARIANTS = {
   default: "border border-border bg-surface text-text hover:bg-surface-2",
-  primary: "border border-accent bg-accent font-semibold text-on-accent",
+  primary:
+    "border border-accent bg-accent font-semibold text-on-accent hover:border-accent/85 hover:bg-accent/85",
   ghost: "text-muted hover:text-text",
 } as const;
 
