@@ -315,8 +315,10 @@ export const es = {
       },
       unrealized: { label: "Resultado latente", sub: "Valor menos aportado" },
       realized: {
-        label: "Resultado realizado",
-        sub: "Resultado de las ventas cerradas",
+        label: "Resultado realizado (coste medio)",
+        sub: "Todos los años. El resultado fiscal (FIFO) está en Realizado",
+        subReal: (period: string): string =>
+          `Todos los años, reexpresado en euros de ${period}. El resultado fiscal (FIFO) está en Realizado`,
       },
       positions: { label: "Posiciones", sub: "Abiertas y valoradas" },
       opportunity: {

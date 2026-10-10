@@ -289,6 +289,7 @@ export default function Summary({ loaderData }: Route.ComponentProps) {
         positionCount={summary.pricedCount}
         opportunity={opportunity}
         ter={ter}
+        realReference={real.active ? real.reference : null}
       />
 
       <SummaryReturns

@@ -10,6 +10,7 @@ export interface SummaryStatsProps {
   positionCount: number;
   opportunity?: { difference: string; symbol: string } | null;
   ter?: { weightedTer: string; annualCost: string } | null;
+  realReference?: string | null;
 }
 
 export function SummaryStats({
@@ -19,8 +20,10 @@ export function SummaryStats({
   positionCount,
   opportunity = null,
   ter = null,
+  realReference = null,
 }: SummaryStatsProps) {
-  const { formatMoney, formatSignedMoney, formatPercent } = useFormat();
+  const { formatMoney, formatSignedMoney, formatPercent, formatPeriod } =
+    useFormat();
   const t = useCopy();
   const s = t.summary.stats;
   return (
@@ -41,10 +44,14 @@ export function SummaryStats({
       />
       <StatTile
         label={s.realized.label}
-        sub={s.realized.sub}
+        sub={
+          realReference
+            ? s.realized.subReal(formatPeriod(realReference))
+            : s.realized.sub
+        }
         value={formatSignedMoney(realizedPnL).text}
         valueClass={signClass(realizedPnL)}
-        to="/realized"
+        to="/realized?view=tax"
       />
       <StatTile
         label={s.positions.label}
