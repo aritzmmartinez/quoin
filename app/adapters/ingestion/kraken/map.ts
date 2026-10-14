@@ -180,9 +180,9 @@ function trade(
 
 /**
  * A reward is an acquisition with no counter-leg, so it needs two ledger
- * rows sharing one market value: a BUY that becomes the FIFO/AVCO lot's
- * acquisition cost, and a DIVIDEND recording the same value as income
- * ("rendimiento de capital mobiliario" on receipt, Bizkaia foral IRPF).
+ * rows sharing one market value: an IN_KIND BUY that becomes the FIFO/AVCO
+ * lot's acquisition cost, and an IN_KIND DIVIDEND recording the same value as
+ * income. Its tax classification is not settled, and nothing fiscal reads it.
  * One event doing both jobs is what hid the income in the original bug —
  * see CLAUDE.md "Kraken rewards". The two rows share `refid` as a prefix
  * but need distinct `externalId`s to both survive the (source, externalId)
@@ -209,6 +209,7 @@ function reward(refid: string, row: KrakenRow, priceAt: PriceAt): MappedItem[] {
       price,
       grossAmount,
       fees: "0",
+      funding: "IN_KIND",
       currency: "EUR",
       fxToBase: "1",
       account: "kraken",
@@ -228,6 +229,7 @@ function reward(refid: string, row: KrakenRow, priceAt: PriceAt): MappedItem[] {
       instrumentId: "BTC",
       grossAmount,
       taxWithheld: "0",
+      funding: "IN_KIND",
       currency: "EUR",
       fxToBase: "1",
       account: "kraken",

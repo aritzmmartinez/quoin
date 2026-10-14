@@ -21,6 +21,7 @@ export interface LedgerEntryRow {
   source: string;
   externalId: string | null;
   note: string | null;
+  funding: string;
 }
 
 export type LedgerEntryCreateData = Omit<LedgerEntryRow, never>;
@@ -48,6 +49,7 @@ export function rowToEvent(row: LedgerEntryRow): LedgerEvent {
         price: row.price,
         grossAmount: row.grossAmount,
         fees: row.fees,
+        funding: row.funding,
       });
     case "DIVIDEND":
       return ledgerEventSchema.parse({
@@ -56,6 +58,7 @@ export function rowToEvent(row: LedgerEntryRow): LedgerEvent {
         instrumentId: row.instrumentId,
         grossAmount: row.grossAmount,
         taxWithheld: row.taxWithheld,
+        funding: row.funding,
       });
     case "DEPOSIT":
     case "WITHDRAWAL":
@@ -94,6 +97,7 @@ export function eventToCreateData(event: LedgerEvent): LedgerEntryCreateData {
         grossAmount: event.grossAmount,
         fees: event.fees,
         taxWithheld: "0",
+        funding: event.funding ?? "CASH",
       };
     case "DIVIDEND":
       return {
@@ -105,6 +109,7 @@ export function eventToCreateData(event: LedgerEvent): LedgerEntryCreateData {
         grossAmount: event.grossAmount,
         fees: "0",
         taxWithheld: event.taxWithheld,
+        funding: event.funding ?? "CASH",
       };
     case "DEPOSIT":
     case "WITHDRAWAL":
@@ -118,6 +123,7 @@ export function eventToCreateData(event: LedgerEvent): LedgerEntryCreateData {
         grossAmount: event.grossAmount,
         fees: "0",
         taxWithheld: "0",
+        funding: "CASH",
       };
   }
 }
