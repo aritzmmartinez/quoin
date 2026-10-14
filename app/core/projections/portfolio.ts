@@ -8,6 +8,9 @@ import type { Position } from "./positions";
 export interface PortfolioSummary {
   totalValue: string;
   totalInvested: string;
+  openCost: string;
+  pricedCost: string;
+  unpricedCost: string;
   unrealizedPnL: string;
   realizedPnL: string;
   returnPct: string | null;
@@ -21,6 +24,7 @@ export function computePortfolioSummary(
 ): PortfolioSummary {
   let totalValue = Money.zero();
   let totalInvested = Money.zero();
+  let unpricedCost = Money.zero();
   let realizedPnL = Money.zero();
   let pricedCount = 0;
   let unpricedCount = 0;
@@ -35,6 +39,7 @@ export function computePortfolioSummary(
 
     if (!marketValue || marketValue.marketValue === null) {
       unpricedCount += 1;
+      unpricedCost = unpricedCost.add(Money.fromString(position.costBasis));
       continue;
     }
 
@@ -53,12 +58,30 @@ export function computePortfolioSummary(
   return {
     totalValue: totalValue.toString(),
     totalInvested: totalInvested.toString(),
+    openCost: totalInvested.add(unpricedCost).toString(),
+    pricedCost: totalInvested.toString(),
+    unpricedCost: unpricedCost.toString(),
     unrealizedPnL: unrealizedPnL.toString(),
     realizedPnL: realizedPnL.toString(),
     returnPct,
     pricedCount,
     unpricedCount,
   };
+}
+
+export function unpricedOpenIds(
+  positions: readonly Position[],
+  marketValues: ReadonlyMap<string, MarketValue>,
+): Set<string> {
+  return new Set(
+    positions
+      .filter(
+        (p) =>
+          !new Decimal(p.quantity).isZero() &&
+          (marketValues.get(p.instrumentId)?.marketValue ?? null) === null,
+      )
+      .map((p) => p.instrumentId),
+  );
 }
 
 export interface AllocationSlice {
@@ -172,8 +195,9 @@ export function computePortfolioInvestedVsValueSeries(
       })),
   );
   const cursors = sorted.map(() => 0);
-  const carried: ({ invested: Money; value: Money } | undefined)[] =
-    sorted.map(() => undefined);
+  const carried: ({ invested: Money; value: Money } | undefined)[] = sorted.map(
+    () => undefined,
+  );
 
   return [...timestamps]
     .sort((a, b) => a - b)
