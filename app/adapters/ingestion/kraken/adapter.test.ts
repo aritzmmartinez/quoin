@@ -70,6 +70,9 @@ class FakeLedgerRepository implements LedgerRepository {
   async list(_filter?: LedgerEventFilter): Promise<LedgerEvent[]> {
     return this.appended;
   }
+  async markInKind(): Promise<number> {
+    return 0;
+  }
 }
 
 class FakePriceRepository implements PriceRepository {

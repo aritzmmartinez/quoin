@@ -4,6 +4,7 @@ export const DISCARD_REASONS = [
   "reward-unpriced",
   "unmodelled-asset",
   "card-spending",
+  "saveback-unpaired",
   "unsupported",
 ] as const;
 
@@ -15,6 +16,7 @@ export const AFFECTS_POSITION: Record<DiscardReason, boolean> = {
   "reward-unpriced": true,
   "unmodelled-asset": false,
   "card-spending": false,
+  "saveback-unpaired": false,
   unsupported: false,
 };
 

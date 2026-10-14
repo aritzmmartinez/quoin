@@ -96,4 +96,55 @@ describe("PrismaLedgerRepository (integration)", () => {
       }),
     ).rejects.toThrow(/CHECK constraint failed/);
   });
+
+  it("refuses a funding the domain does not model", async () => {
+    const { prisma } = await import("./index");
+
+    await expect(
+      prisma.ledgerEntry.create({
+        data: {
+          id: crypto.randomUUID(),
+          ts: new Date("2025-01-01"),
+          type: "BUY",
+          grossAmount: "2.50",
+          currency: "EUR",
+          source: "MANUAL",
+          funding: "GIFT",
+        },
+      }),
+    ).rejects.toThrow(/CHECK constraint failed/);
+  });
+
+  it("markInKind changes funding and nothing else, once, and never back", async () => {
+    const { prisma } = await import("./index");
+    await ledgerRepo.append([event("m-1"), event("m-2")]);
+    const before = await prisma.ledgerEntry.findMany({
+      where: { externalId: { in: ["m-1", "m-2"] } },
+      orderBy: { externalId: "asc" },
+    });
+
+    const inKind = { ...event("m-1"), grossAmount: "999", funding: "IN_KIND" };
+    expect(await ledgerRepo.markInKind([inKind as LedgerEvent])).toBe(1);
+    expect(await ledgerRepo.markInKind([inKind as LedgerEvent])).toBe(0);
+    expect(await ledgerRepo.markInKind([event("m-1")])).toBe(0);
+
+    const after = await prisma.ledgerEntry.findMany({
+      where: { externalId: { in: ["m-1", "m-2"] } },
+      orderBy: { externalId: "asc" },
+    });
+    expect(after.map((row) => row.funding)).toEqual(["IN_KIND", "CASH"]);
+    expect(after.map(({ funding: _f, ...rest }) => rest)).toEqual(
+      before.map(({ funding: _f, ...rest }) => rest),
+    );
+  });
+
+  it("round-trips an in-kind acquisition", async () => {
+    await ledgerRepo.append([
+      { ...event("k-1"), funding: "IN_KIND" } as LedgerEvent,
+    ]);
+    const stored = (await ledgerRepo.list()).find(
+      (e) => e.externalId === "k-1",
+    );
+    expect(stored && "funding" in stored && stored.funding).toBe("IN_KIND");
+  });
 });

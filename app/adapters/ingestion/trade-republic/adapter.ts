@@ -6,8 +6,9 @@ import {
   type ImportSummary,
   type MappedBatch,
 } from "../ingest";
-import { mapRow } from "./map";
-import { parseTradeRepublicCsv } from "./row";
+import { mapRow, mapSavebackPurchase } from "./map";
+import { parseTradeRepublicCsv, type TradeRepublicRow } from "./row";
+import { pairSavebacks } from "./saveback";
 
 export class TradeRepublicCsvAdapter {
   constructor(
@@ -17,10 +18,20 @@ export class TradeRepublicCsvAdapter {
 
   plan(csv: string): MappedBatch {
     const rows = parseTradeRepublicCsv(csv);
+    const pairs = pairSavebacks(rows);
+    const savebackOf = new Map<string, TradeRepublicRow>();
+    for (const row of rows) {
+      const buy = pairs.get(row.transaction_id);
+      if (buy !== undefined && !savebackOf.has(buy)) savebackOf.set(buy, row);
+    }
+
     const builder = new BatchBuilder();
     for (const row of rows) {
       try {
-        builder.add(mapRow(row));
+        if (pairs.has(row.transaction_id)) continue;
+        const saveback = savebackOf.get(row.transaction_id);
+        if (saveback) builder.addOperation(mapSavebackPurchase(row, saveback));
+        else builder.add(mapRow(row));
       } catch {
         builder.addError();
       }

@@ -139,6 +139,7 @@ export async function persistBatch(
   await instruments.upsert(batch.instruments);
   const existing = await ledger.existing(batch.events);
   await ledger.append(batch.events);
+  await ledger.markInKind(batch.events);
   return summarize(batch, countOperations(batch, existing));
 }
 

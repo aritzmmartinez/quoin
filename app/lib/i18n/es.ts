@@ -12,6 +12,7 @@ const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
   "reward-unpriced": "Recompensas de BTC sin precio",
   "unmodelled-asset": "Activos que Quoin no modela",
   "card-spending": "Pagos con tarjeta",
+  "saveback-unpaired": "Saveback sin compra emparejada",
   unsupported: "Sin soporte",
 };
 
@@ -22,6 +23,8 @@ const DISCARD_REASON_HELP: Record<DiscardReason, string | null> = {
     "No hay precio de BTC de esas fechas, así que estas recompensas no se han registrado y tu posición de BTC no las incluye. En Instrumentos, abre el símbolo de BTC y pulsa «Volver a descargar el histórico» con un rango que llegue a esas fechas. Después vuelve a importar este mismo fichero: lo ya registrado no se duplica.",
   "unmodelled-asset": null,
   "card-spending": null,
+  "saveback-unpaired":
+    "No se ha encontrado la compra que pagó este saveback (una compra del mismo importe en los 7 días siguientes, y solo una). Si esa compra está en el fichero, cuenta como aportación tuya. Si está en otro export, importa uno que cubra las dos fechas.",
   unsupported: null,
 };
 
@@ -331,9 +334,9 @@ export const es = {
       },
       invested: {
         label: "Total aportado",
-        sub: "Todas las compras, incluido lo vendido",
+        sub: "Lo que pusiste tú, incluido lo vendido; sin recompensas",
         subReal: (period: string): string =>
-          `Todas las compras, incluido lo vendido, en euros de ${period}`,
+          `Lo que pusiste tú en euros de ${period}, incluido lo vendido; sin recompensas`,
       },
       realized: {
         label: "Resultado realizado (coste medio)",
@@ -696,7 +699,9 @@ export const es = {
       duplicates: (count: number): string =>
         count === 1 ? "1 duplicada omitida" : `${count} duplicadas omitidas`,
       discarded: (count: number): string =>
-        count === 1 ? "1 operación descartada" : `${count} operaciones descartadas`,
+        count === 1
+          ? "1 operación descartada"
+          : `${count} operaciones descartadas`,
       candles: (count: number): string =>
         count === 1 ? "1 precio histórico" : `${count} precios históricos`,
       synced: (count: number): string =>
@@ -1037,6 +1042,10 @@ export const es = {
       WITHDRAWAL: "Retirada",
       INTEREST: "Intereses",
     },
+    inKindTypes: {
+      BUY: "Compra en especie",
+      DIVIDEND: "Recompensa",
+    },
     empty: "Sin movimientos.",
     emptyScreen: {
       title: "Sin movimientos todavía",
@@ -1219,6 +1228,13 @@ export const es = {
         title: "Sin ventas en este año",
         body: "Elige otro año fiscal en el desplegable.",
       },
+      inKind: {
+        title: "Ingresos en especie",
+        body: "Recompensas de Kraken y saveback de Trade Republic recibidos en participaciones. Clasificación fiscal pendiente de verificar: no se suman a ninguna cifra de esta vista.",
+        count: "Recepciones",
+        gross: "Valor al recibirlas",
+        withheld: "Retenido",
+      },
       carryforwardTitle: "Arrastre de pérdidas, últimos 4 años (Art. 66)",
       carryforwardColumns: {
         year: "Año",
@@ -1350,7 +1366,7 @@ export const es = {
       },
       totalInvested: {
         label: "Total aportado",
-        sub: "todas las compras, incluido lo vendido",
+        sub: "lo que pusiste tú, incluido lo vendido; sin recompensas",
       },
       buyCount: { label: "Aportaciones", sub: "compras realizadas" },
       avgBuyAmount: { label: "Importe medio", sub: "por aportación" },

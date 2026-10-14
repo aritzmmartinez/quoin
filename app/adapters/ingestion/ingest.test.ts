@@ -34,6 +34,7 @@ describe("previewBatch", () => {
       append: async () => ({ inserted: 0, skipped: 0 }),
       list: async () => [],
       existing: async () => new Set([ledgerDedupKey("TEST", "b")]),
+      markInKind: async () => 0,
     };
 
     const summary = await previewBatch(ledger, b);
@@ -48,6 +49,7 @@ describe("counting by operation", () => {
     append: async () => ({ inserted: 0, skipped: 0 }),
     list: async () => [],
     existing: async () => new Set(keys.map((k) => ledgerDedupKey("TEST", k))),
+    markInKind: async () => 0,
   });
 
   function rewardBatch(): MappedBatch {
@@ -60,10 +62,10 @@ describe("counting by operation", () => {
       { kind: "domain", instrument: null, event: event("R2") },
       { kind: "domain", instrument: null, event: event("R2:income") },
     ]);
+    builder.addOperation([{ kind: "discard", reason: "unmodelled-asset" }]);
     builder.addOperation([
-      { kind: "discard", reason: "unmodelled-asset" },
+      { kind: "domain", instrument: null, event: event("D1") },
     ]);
-    builder.addOperation([{ kind: "domain", instrument: null, event: event("D1") }]);
     return builder.build(5);
   }
 
@@ -84,13 +86,18 @@ describe("counting by operation", () => {
 
   it("adds up to the operations in the file", async () => {
     const builder = new BatchBuilder();
-    builder.addOperation([{ kind: "domain", instrument: null, event: event("A") }]);
+    builder.addOperation([
+      { kind: "domain", instrument: null, event: event("A") },
+    ]);
     builder.addOperation([{ kind: "discard", reason: "card-spending" }]);
     builder.addError();
     const b = builder.build(3);
 
     const summary = await previewBatch(ledgerWith([]), b);
-    const discarded = Object.values(summary.discarded).reduce((s, n) => s + n, 0);
+    const discarded = Object.values(summary.discarded).reduce(
+      (s, n) => s + n,
+      0,
+    );
     expect(
       summary.imported + summary.duplicates + discarded + summary.errors,
     ).toBe(summary.total);
