@@ -1,7 +1,14 @@
 import Decimal from "decimal.js";
 import { useNavigate, useSearchParams } from "react-router";
 
-import { DASH, taxYearHref, type TaxYearView, useCopy, useFormat } from "~/lib";
+import {
+  DASH,
+  taxYearHref,
+  type TaxInKindIncome,
+  type TaxYearView,
+  useCopy,
+  useFormat,
+} from "~/lib";
 
 import { Card } from "../ui/Card";
 import { InfoHint } from "../ui/Hint";
@@ -194,6 +201,10 @@ export function TaxYearPanel({
             />
           )}
 
+          {view.inKindIncome.count > 0 && (
+            <InKindIncomeCard income={view.inKindIncome} />
+          )}
+
           <Card className="p-6">
             <h2 className="mb-3 text-[14px] font-semibold">
               {copy.carryforwardTitle}
@@ -249,6 +260,35 @@ export function TaxYearPanel({
         </>
       )}
     </div>
+  );
+}
+
+function InKindIncomeCard({ income }: { income: TaxInKindIncome }) {
+  const { formatMoney } = useFormat();
+  const copy = useCopy().realized.fiscal.inKind;
+  const figures = [
+    { label: copy.count, value: String(income.count) },
+    { label: copy.gross, value: formatMoney(income.gross) },
+    { label: copy.withheld, value: formatMoney(income.withheld) },
+  ];
+
+  return (
+    <Card className="p-6">
+      <h2 className="text-[14px] font-semibold">{copy.title}</h2>
+      <p className="mt-1 mb-4 text-[11.5px] text-muted">{copy.body}</p>
+      <dl className="grid gap-4 sm:grid-cols-3">
+        {figures.map((f) => (
+          <div key={f.label}>
+            <dt className="text-[11px] uppercase tracking-[0.08em] text-muted">
+              {f.label}
+            </dt>
+            <dd className="mt-1 font-mono text-[15px] tabular-nums">
+              {f.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </Card>
   );
 }
 
