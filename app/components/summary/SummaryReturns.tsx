@@ -1,40 +1,46 @@
+import type { PeriodReturns } from "~/core/projections";
 import { useCopy, useFormat } from "~/lib";
 
-import { signClass, signedPercent } from "../ui/signed";
+import { periodReturnTile, signClass } from "../ui/signed";
 import { StatTile } from "../ui/StatTile";
 
 export interface SummaryReturnsProps {
-  twr: string | null;
-  mwr: string | null;
+  period: PeriodReturns;
+  pricedCount: number;
+  openCount: number;
   realBasis?: boolean;
 }
 
 export function SummaryReturns({
-  twr,
-  mwr,
+  period,
+  pricedCount,
+  openCount,
   realBasis = false,
 }: SummaryReturnsProps) {
   const t = useCopy();
-  const { formatPercent } = useFormat();
+  const format = useFormat();
   const r = t.summary.returns;
+  const twr = periodReturnTile(period, "twr", format, t);
+  const mwr = periodReturnTile(period, "mwr", format, t);
 
   return (
     <section className="flex flex-col gap-3">
       <div className="grid grid-cols-2 gap-3">
         <StatTile
-          label={r.twr.label}
-          sub={twr === null ? r.unavailable : r.twr.sub}
-          value={signedPercent(formatPercent, twr)}
-          valueClass={signClass(twr)}
+          label={r.twr}
+          sub={twr.sub}
+          value={twr.value}
+          valueClass={signClass(twr.sign)}
         />
         <StatTile
-          label={r.mwr.label}
-          sub={mwr === null ? r.unavailable : r.mwr.sub}
-          value={signedPercent(formatPercent, mwr)}
-          valueClass={signClass(mwr)}
+          label={r.mwr}
+          sub={mwr.sub}
+          value={mwr.value}
+          valueClass={signClass(mwr.sign)}
         />
       </div>
       <p className="text-[12px] leading-relaxed text-muted">
+        {pricedCount < openCount && `${r.coverage(pricedCount, openCount)}. `}
         {r.note}
         {realBasis && ` ${r.nominal}`}
       </p>

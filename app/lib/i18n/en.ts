@@ -162,7 +162,7 @@ export const en: Copy = {
         term: "Unrealised and realised result",
         short: "What your investments have made, in euros.",
         detail:
-          "The unrealised result is what you would make if you sold today what you still hold: current value minus what you contributed. The realised one covers what you already sold, and is closed. They are shown apart because they answer different questions: «how is what I hold doing» and «how much have I actually made». «Contributed» includes fees, because the acquisition cost includes them for tax purposes and leaving them out would flatter the return.",
+          "The unrealised result is what you would make if you sold today what you still hold: current value minus what it cost you. The realised one covers what you already sold, and is closed. They are shown apart because they answer different questions: «how is what I hold doing» and «how much have I actually made». That cost includes fees, because the acquisition cost includes them for tax purposes and leaving them out would flatter the return.",
       },
       {
         term: "TER",
@@ -241,6 +241,14 @@ export const en: Copy = {
       },
     ],
   },
+  periodReturn: {
+    annual: (cumulative: string, since: string): string =>
+      `annual · ${cumulative} cumulative since ${since}`,
+    annualEquivalent: (period: string, since: string): string =>
+      `annual · equivalent to ${period} over the period since ${since}`,
+    period: (since: string): string => `for the period · since ${since}`,
+    unavailable: "no solution",
+  },
   range: {
     label: "Time range",
     m1: "1M",
@@ -297,26 +305,36 @@ export const en: Copy = {
       label: "Total portfolio value",
       rangeLabel: (range: string): string => `in ${range}`,
       allTimeLabel: "since inception",
-      unpriced: (count: number): string =>
-        count === 1
-          ? "1 unpriced position, excluded from the total"
-          : `${count} unpriced positions, excluded from the total`,
+      unpriced: (count: number, cost: string): string =>
+        `${count} unpriced (${cost} cost)`,
       empty: "No priced positions yet.",
     },
     chart: {
       title: "Portfolio over time",
       value: "Value",
-      invested: "Contributed",
+      invested: "Cost",
       building: "At least two points are needed to draw the series.",
+      unpriced: (count: number): string =>
+        count === 1
+          ? "The chart leaves out 1 unpriced position"
+          : `The chart leaves out ${count} unpriced positions`,
     },
     stats: {
-      invested: {
-        label: "Total contributed",
-        sub: "Cost of the open positions",
+      cost: {
+        label: "Cost of what you hold",
+        sub: "Every open position, priced or not",
       },
       unrealized: {
         label: "Unrealised result",
-        sub: "Value minus contributed",
+        sub: "Value minus the cost of what is priced",
+        subUnpriced: (count: number, cost: string): string =>
+          `Value minus the cost of what is priced. ${count} unpriced (${cost} cost)`,
+      },
+      invested: {
+        label: "Total contributed",
+        sub: "Every purchase, including what was sold",
+        subReal: (period: string): string =>
+          `Every purchase, including what was sold, in ${period} euros`,
       },
       realized: {
         label: "Realised result (average cost)",
@@ -335,10 +353,11 @@ export const en: Copy = {
       },
     },
     returns: {
-      twr: { label: "TWR", sub: "time-weighted" },
-      mwr: { label: "MWR / IRR", sub: "money-weighted" },
-      unavailable: "no solution",
-      note: "TWR measures how the assets did and MWR (IRR) measures how your money did. Contributing bit by bit makes them diverge on purpose: most of the capital has been invested for less time, so an old rise weighs fully in TWR and barely at all in MWR.",
+      twr: "TWR",
+      mwr: "MWR / IRR",
+      coverage: (priced: number, open: number): string =>
+        `Over ${priced} of ${open} open positions`,
+      note: "TWR measures how the assets did; IRR (MWR), how your money did, given when and how much you contributed. Contributing bit by bit makes them diverge on purpose: an old rise weighs fully in TWR and barely at all in IRR, because little capital was invested then. Both run from the first included trade to today, whatever range the chart shows. Over a year or more they are shown annualised, with what they amount to over the whole period beside them; under a year, the return for the period is shown instead, because annualising a few months would stretch one streak over a whole year. Open positions with no price are left out with all their trades; closed ones still count.",
       nominal:
         "Both are always computed in nominal euros, even when the rest of the screen is in today's purchasing power.",
     },
@@ -1028,13 +1047,13 @@ export const en: Copy = {
   portfolio: {
     title: "Portfolio",
     summary: (count: number, invested: string): string =>
-      `${count} ${count === 1 ? "position" : "positions"} · ${invested} contributed`,
+      `${count} ${count === 1 ? "position" : "positions"} · ${invested} cost`,
     columns: {
       name: "Instrument",
       type: "Type",
       quantity: "Quantity",
       averageCost: "Average price",
-      costBasis: "Contributed",
+      costBasis: "Cost",
       marketValue: "Value",
       unrealizedPnL: "Result",
       weight: "Weight",
@@ -1326,9 +1345,16 @@ export const en: Copy = {
     value: "Value",
     unrealizedPnL: "Unrealised result",
     kpis: {
-      twr: { label: "TWR", sub: "time-weighted" },
-      mwr: { label: "MWR / IRR", sub: "money-weighted" },
-      totalInvested: { label: "Total contributed", sub: "sum of purchases" },
+      twr: "TWR",
+      mwr: "MWR / IRR",
+      openCost: {
+        label: "Cost of what you hold",
+        sub: "average cost of what is left",
+      },
+      totalInvested: {
+        label: "Total contributed",
+        sub: "every purchase, including what was sold",
+      },
       buyCount: { label: "Contributions", sub: "purchases made" },
       avgBuyAmount: { label: "Average amount", sub: "per contribution" },
     },
@@ -1343,8 +1369,8 @@ export const en: Copy = {
         "No price history yet. In Instruments, give it a symbol or download its history again.",
     },
     ivvChart: {
-      title: "Contributed against value",
-      invested: "Contributed",
+      title: "Cost against value",
+      invested: "Cost",
       value: "Value",
       building: "The value line draws itself as the price history accumulates.",
     },

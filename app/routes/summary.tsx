@@ -31,7 +31,10 @@ import {
   computePortfolioSummary,
   computePositions,
   computeTopPositions,
+  computeTotalContributed,
   computeWeightedTer,
+  unpricedOpenIds,
+  withoutInstruments,
 } from "~/core/projections";
 import {
   computeHeroChange,
@@ -131,7 +134,11 @@ export async function loader({ request }: Route.LoaderArgs) {
     unrealizedPnLPct: row.unrealizedPnLPct,
   }));
 
-  const heldIds = [...new Set(positions.map((p) => p.instrumentId))];
+  const unpriced = unpricedOpenIds(positions, marketValues);
+  const included = withoutInstruments(events, unpriced);
+  const heldIds = [...new Set(positions.map((p) => p.instrumentId))].filter(
+    (id) => !unpriced.has(id),
+  );
   const firstEvents = firstEventByInstrument(events);
   const histories = await timing.time("db-history", () =>
     Promise.all(
@@ -144,7 +151,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     computePortfolioInvestedVsValueSeries(
       heldIds.map((id, index) =>
         computeInvestedVsValueSeries(
-          events,
+          included,
           id,
           (histories[index] ?? [])
             .filter((snapshot) => snapshot.currency === BASE_CURRENCY)
@@ -170,7 +177,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     ? timing.time("series-nominal", () => buildSeries())
     : portfolioSeries;
   const returns = timing.time("returns", () =>
-    computePortfolioReturns(events, nominalSeries),
+    computePortfolioReturns(included, nominalSeries),
   );
 
   const opportunity = await timing.time("opportunity", () =>
@@ -196,7 +203,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   return data(
     {
       summary,
-      returns,
+      totalContributed: computeTotalContributed(events, real.revalue),
+      returns: returns.period,
       ter:
         ter.coveredValue === "0"
           ? null
@@ -233,6 +241,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 export default function Summary({ loaderData }: Route.ComponentProps) {
   const {
     summary,
+    totalContributed,
     returns,
     opportunity,
     ter,
@@ -277,13 +286,20 @@ export default function Summary({ loaderData }: Route.ComponentProps) {
         changePct={change.pct}
         range={range}
         unpricedCount={summary.unpricedCount}
+        unpricedCost={summary.unpricedCost}
         hasPositions={summary.pricedCount > 0}
       />
 
-      <PortfolioValueChart data={series} />
+      <PortfolioValueChart
+        data={series}
+        unpricedCount={summary.unpricedCount}
+      />
 
       <SummaryStats
-        totalInvested={summary.totalInvested}
+        openCost={summary.openCost}
+        totalContributed={totalContributed}
+        unpricedCount={summary.unpricedCount}
+        unpricedCost={summary.unpricedCost}
         unrealizedPnL={summary.unrealizedPnL}
         realizedPnL={summary.realizedPnL}
         positionCount={summary.pricedCount}
@@ -293,8 +309,9 @@ export default function Summary({ loaderData }: Route.ComponentProps) {
       />
 
       <SummaryReturns
-        twr={returns.twr}
-        mwr={returns.mwr}
+        period={returns}
+        pricedCount={summary.pricedCount}
+        openCount={summary.pricedCount + summary.unpricedCount}
         realBasis={real.active}
       />
 
