@@ -41,6 +41,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The first import of a Kraken file into an empty Quoin left out every BTC reward, because there were no BTC prices yet to value them. The import now values them once its price step has run and says how many it recovered; ingest offers to download the prices and import again. A file with nothing but rewards can now be imported too.
 - Long price histories were downloaded as monthly or weekly prices. They are now daily.
 - The price step of the import wizard stored histories in other currencies, which Quoin cannot value. It now leaves them out and says which symbols to change. prices:backfill does the same.
+- Summary counted open positions with no price in its chart, TWR and IRR at their last trade price. They are now left out, and the screen says how many and what they cost. Closed positions still count.
+- Summary separates the cost of what you hold, which now includes unpriced positions, from the total contributed, every purchase including what was sold. Portfolio's column and the instrument's chart showed that cost as contributed; they now say cost. An instrument now shows the cost of what you hold beside the total contributed.
+- TWR and IRR, on Summary and on an instrument, are both annual over a year or more, TWR with its cumulative figure beside it and IRR with what it amounts to over the period, and the return for the period under a year, each saying since when. A closed position without a price now gets its TWR and IRR.
 
 ## [0.11.1] - 2026-10-06
 

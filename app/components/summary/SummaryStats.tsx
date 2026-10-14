@@ -4,7 +4,10 @@ import { signClass } from "../ui/signed";
 import { StatTile } from "../ui/StatTile";
 
 export interface SummaryStatsProps {
-  totalInvested: string;
+  openCost: string;
+  totalContributed: string;
+  unpricedCount: number;
+  unpricedCost: string;
   unrealizedPnL: string;
   realizedPnL: string;
   positionCount: number;
@@ -14,7 +17,10 @@ export interface SummaryStatsProps {
 }
 
 export function SummaryStats({
-  totalInvested,
+  openCost,
+  totalContributed,
+  unpricedCount,
+  unpricedCost,
   unrealizedPnL,
   realizedPnL,
   positionCount,
@@ -32,13 +38,17 @@ export function SummaryStats({
       style={{ gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))" }}
     >
       <StatTile
-        label={s.invested.label}
-        sub={s.invested.sub}
-        value={formatMoney(totalInvested)}
+        label={s.cost.label}
+        sub={s.cost.sub}
+        value={formatMoney(openCost)}
       />
       <StatTile
         label={s.unrealized.label}
-        sub={s.unrealized.sub}
+        sub={
+          unpricedCount > 0
+            ? s.unrealized.subUnpriced(unpricedCount, formatMoney(unpricedCost))
+            : s.unrealized.sub
+        }
         value={formatSignedMoney(unrealizedPnL).text}
         valueClass={signClass(unrealizedPnL)}
       />
@@ -52,6 +62,15 @@ export function SummaryStats({
         value={formatSignedMoney(realizedPnL).text}
         valueClass={signClass(realizedPnL)}
         to="/realized?view=tax"
+      />
+      <StatTile
+        label={s.invested.label}
+        sub={
+          realReference
+            ? s.invested.subReal(formatPeriod(realReference))
+            : s.invested.sub
+        }
+        value={formatMoney(totalContributed)}
       />
       <StatTile
         label={s.positions.label}

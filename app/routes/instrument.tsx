@@ -145,7 +145,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       marketValue: marketValue?.toString() ?? null,
       unrealizedPnL: unrealizedPnL?.toString() ?? null,
     },
-    kpis: returns,
+    kpis: { ...returns, openCost: costBasis.toString() },
     priceChartData,
     ivvData,
     movements,

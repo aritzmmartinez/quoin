@@ -471,10 +471,16 @@ manual aliasing was abandoned — 726 confirmations is not a system.
 - `computePositions` uses **AVCO** (weighted average cost) for the portfolio view.
   **FIFO** exists only for foral tax (`computeTaxHistory`, over the `walkFifo` fold in
   `core/tax/`) and is a **separate** projection. Do not merge them.
-- **Contributed ("aportado") = what left the bank, fees included.** One definition, shared
-  by `computePositions.costBasis`, `computeCostBasisTimeline`, `computeReturns.totalInvested`
-  and the XIRR cash flows. Rationale: the foral rule puts inherent costs inside the
-  acquisition value, and excluding them flatters returns.
+- **Two money-in figures, both with fees included, and they are not interchangeable.**
+  *Cost of what you hold* ("Coste de lo que tienes") is the AVCO cost of the open
+  positions — `computePositions.costBasis`, `computeCostBasisTimeline`, the chart's cost
+  line, and `PortfolioSummary.openCost` (priced or not). *Total contributed* ("Total
+  aportado") is every purchase ever made, sold ones included — `computeReturns.totalInvested`
+  and `computeTotalContributed`, which in real mode restates each purchase at its own month.
+  The XIRR flows use the same per-trade amounts. Fees stay inside both because the foral
+  rule puts inherent costs inside the acquisition value, and excluding them flatters
+  returns. Rewards and saveback still count as purchases; taking them out is tracked in an
+  issue, not done.
 - **TWR excludes fees on purpose** — it uses price marks (`grossAmount / quantity`), and a
   fee is not a price. TWR = how the **asset** did. MWR/XIRR = how **my money** did. Their
   divergence under DCA is the point, not a bug.
@@ -582,8 +588,18 @@ manual aliasing was abandoned — 726 confirmations is not a system.
   named "USD Acc" states the fund's *denomination* currency, not the currency of the line
   being bought — it needs no conversion.
 - Positions without a usable price are excluded from **both** `totalValue` and
-  `totalInvested`, and reported via `unpricedCount`. Adding a cost without its value
-  invents a loss.
+  `totalInvested` (= `pricedCost`, what `returnPct` and the all-time hero change measure
+  against), and reported via `unpricedCount` / `unpricedCost`. Adding a cost without its
+  value invents a loss. `openCost` is the one figure that includes them.
+- **The Summary line, TWR and MWR leave out every open unpriced instrument whole**, sales
+  included, through one set: `unpricedOpenIds` → `withoutInstruments`, and the filtered
+  ledger feeds both the series and the flows (`twr:explain` does the same). Filtering only
+  the series keeps a flow with no value behind it and breaks a TWR link. Closed positions
+  stay in, priced or not — nothing is held, so nothing needs a price.
+- **A return is stated through `periodReturns`, on Summary and on an instrument alike.**
+  From the first included trade to today, independent of the range selector, on the
+  `YEAR_MS` 365-day year `xirr` uses: a year or more shows the annual figure with the
+  cumulative beside it; under a year, the period return (`(1 + IRR)^years − 1` for MWR).
 - The portfolio series merge carries each instrument's **last known value forward** across
   gaps. Without it, an instrument missing a datapoint on some date counts as 0 and opens a
   false valley.

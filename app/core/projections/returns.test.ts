@@ -226,14 +226,14 @@ describe("computePortfolioReturns", () => {
       }),
     ];
 
-    expect(computePortfolioReturns(events, [])).toEqual({
+    expect(computePortfolioReturns(events, [])).toMatchObject({
       twr: null,
       mwr: null,
+      period: { since: null },
     });
-    expect(computePortfolioReturns([], [point("2026-01-01", "1000")])).toEqual({
-      twr: null,
-      mwr: null,
-    });
+    expect(
+      computePortfolioReturns([], [point("2026-01-01", "1000")]),
+    ).toMatchObject({ twr: null, mwr: null, period: { since: null } });
   });
 
   it("returns a null MWR when every flow points the same way", () => {

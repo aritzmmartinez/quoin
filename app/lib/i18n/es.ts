@@ -158,7 +158,7 @@ export const es = {
         term: "Resultado latente y realizado",
         short: "El resultado de tus inversiones, en euros.",
         detail:
-          "El resultado latente es lo que ganarías si vendieras hoy lo que sigues teniendo: valor actual menos lo aportado. El realizado es el de lo que ya vendiste, cerrado. Se muestran por separado porque responden preguntas distintas: «cómo va lo que tengo» y «cuánto he ganado ya de verdad». «Aportado» incluye las comisiones, porque el coste de adquisición las incluye a efectos fiscales y excluirlas maquillaría la rentabilidad.",
+          "El resultado latente es lo que ganarías si vendieras hoy lo que sigues teniendo: valor actual menos lo que te costó. El realizado es el de lo que ya vendiste, cerrado. Se muestran por separado porque responden preguntas distintas: «cómo va lo que tengo» y «cuánto he ganado ya de verdad». Ese coste incluye las comisiones, porque el coste de adquisición las incluye a efectos fiscales y excluirlas maquillaría la rentabilidad.",
       },
       {
         term: "TER",
@@ -240,6 +240,14 @@ export const es = {
       },
     ],
   },
+  periodReturn: {
+    annual: (cumulative: string, since: string): string =>
+      `anual · ${cumulative} acumulado desde el ${since}`,
+    annualEquivalent: (period: string, since: string): string =>
+      `anual · equivale a ${period} en el periodo desde el ${since}`,
+    period: (since: string): string => `del periodo · desde el ${since}`,
+    unavailable: "sin solución",
+  },
   range: {
     label: "Rango temporal",
     m1: "1M",
@@ -296,24 +304,37 @@ export const es = {
       label: "Valor total de la cartera",
       rangeLabel: (range: string): string => `en ${range}`,
       allTimeLabel: "desde el inicio",
-      unpriced: (count: number): string =>
-        count === 1
-          ? "1 posición sin valorar, excluida del total"
-          : `${count} posiciones sin valorar, excluidas del total`,
+      unpriced: (count: number, cost: string): string =>
+        `${count} sin valorar (${cost} de coste)`,
       empty: "Aún no hay posiciones valoradas.",
     },
     chart: {
       title: "Evolución de la cartera",
       value: "Valor",
-      invested: "Aportado",
+      invested: "Coste",
       building: "Se necesitan al menos dos puntos para dibujar la evolución.",
+      unpriced: (count: number): string =>
+        count === 1
+          ? "El gráfico no incluye 1 posición sin valorar"
+          : `El gráfico no incluye ${count} posiciones sin valorar`,
     },
     stats: {
+      cost: {
+        label: "Coste de lo que tienes",
+        sub: "Todas las posiciones abiertas, valoradas o no",
+      },
+      unrealized: {
+        label: "Resultado latente",
+        sub: "Valor menos coste de lo valorado",
+        subUnpriced: (count: number, cost: string): string =>
+          `Valor menos coste de lo valorado. ${count} sin valorar (${cost} de coste)`,
+      },
       invested: {
         label: "Total aportado",
-        sub: "Coste de las posiciones abiertas",
+        sub: "Todas las compras, incluido lo vendido",
+        subReal: (period: string): string =>
+          `Todas las compras, incluido lo vendido, en euros de ${period}`,
       },
-      unrealized: { label: "Resultado latente", sub: "Valor menos aportado" },
       realized: {
         label: "Resultado realizado (coste medio)",
         sub: "Todos los años. El resultado fiscal (FIFO) está en Realizado",
@@ -331,10 +352,11 @@ export const es = {
       },
     },
     returns: {
-      twr: { label: "TWR", sub: "ponderada por tiempo" },
-      mwr: { label: "MWR / TIR", sub: "ponderada por dinero" },
-      unavailable: "sin solución",
-      note: "El TWR mide cómo lo han hecho los activos y el MWR (TIR) mide cómo lo ha hecho tu dinero. Aportando poco a poco divergen a propósito: la mayor parte del capital lleva menos tiempo invertido, así que una subida antigua pesa entera en el TWR y casi nada en el MWR.",
+      twr: "TWR",
+      mwr: "MWR / TIR",
+      coverage: (priced: number, open: number): string =>
+        `Sobre ${priced} de ${open} posiciones abiertas`,
+      note: "El TWR mide cómo lo han hecho los activos; la TIR (MWR), cómo lo ha hecho tu dinero, según cuándo y cuánto aportaste. Aportando poco a poco divergen a propósito: una subida antigua pesa entera en el TWR y casi nada en la TIR, porque entonces había poco capital invertido. Las dos se calculan desde la primera operación incluida hasta hoy, sin depender del rango del gráfico. Con un año o más se muestran anuales, con lo que suponen en todo el periodo al lado; con menos, se muestra el rendimiento del periodo, porque anualizar unos meses extrapolaría una racha a un año entero. Las posiciones abiertas sin precio quedan fuera con todas sus operaciones; las ya cerradas sí cuentan.",
       nominal:
         "Ambas se calculan siempre en euros nominales, aunque el resto de la pantalla esté en poder adquisitivo de hoy.",
     },
@@ -1026,13 +1048,13 @@ export const es = {
   portfolio: {
     title: "Cartera",
     summary: (count: number, invested: string): string =>
-      `${count} ${count === 1 ? "posición" : "posiciones"} · ${invested} aportado`,
+      `${count} ${count === 1 ? "posición" : "posiciones"} · ${invested} de coste`,
     columns: {
       name: "Instrumento",
       type: "Tipo",
       quantity: "Cantidad",
       averageCost: "Precio medio",
-      costBasis: "Aportado",
+      costBasis: "Coste",
       marketValue: "Valor",
       unrealizedPnL: "Resultado",
       weight: "Peso",
@@ -1320,9 +1342,16 @@ export const es = {
     value: "Valor",
     unrealizedPnL: "Resultado latente",
     kpis: {
-      twr: { label: "TWR", sub: "ponderada por tiempo" },
-      mwr: { label: "MWR / TIR", sub: "ponderada por dinero" },
-      totalInvested: { label: "Total aportado", sub: "suma de compras" },
+      twr: "TWR",
+      mwr: "MWR / TIR",
+      openCost: {
+        label: "Coste de lo que tienes",
+        sub: "coste medio de lo que queda",
+      },
+      totalInvested: {
+        label: "Total aportado",
+        sub: "todas las compras, incluido lo vendido",
+      },
       buyCount: { label: "Aportaciones", sub: "compras realizadas" },
       avgBuyAmount: { label: "Importe medio", sub: "por aportación" },
     },
@@ -1337,8 +1366,8 @@ export const es = {
         "Sin histórico de precio todavía. En Instrumentos, asígnale un símbolo o vuelve a descargar su histórico.",
     },
     ivvChart: {
-      title: "Aportado frente a valor",
-      invested: "Aportado",
+      title: "Coste frente a valor",
+      invested: "Coste",
       value: "Valor",
       building:
         "El valor se irá dibujando conforme el histórico de precio se acumule.",
