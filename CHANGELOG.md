@@ -14,8 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Download the history of an instrument again from its row, or rebuild every history at once. Old prices are replaced only if new ones arrive, and trades are never touched.
 - Instruments warns when an instrument still has weekly or monthly prices from old downloads.
 - prices:rebuild downloads every mapped history again from the command line.
+- Trade Republic saveback is imported: each one is matched with the purchase it paid for, and a saveback with no single match is listed in the import summary.
+- The tax view lists the year's rewards and saveback, with their tax classification pending verification. They are not added to any tax figure.
 
 ### Changed
+- Kraken rewards and Trade Republic saveback no longer count as contributions: they stay out of Total contributed, the number of contributions, the average amount and the money-weighted return. They keep their market value as cost, and the time-weighted return does not change.
+- Movements shows those purchases as "In-kind purchase" and their income as "Reward".
+- Importing a Trade Republic file again marks the saveback purchases imported before this change.
 - Summary, Allocation and Projection open noticeably faster, especially with years of price history.
 - Charts show a placeholder with hinted axes while the page loads, instead of an empty box. It is announced to screen readers and does not pulse when reduced motion is on.
 - When the range or basis on Summary takes a moment to reload, the portfolio value chart stays on screen dimmed instead of looking frozen.

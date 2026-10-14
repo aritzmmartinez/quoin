@@ -475,12 +475,18 @@ manual aliasing was abandoned — 726 confirmations is not a system.
   *Cost of what you hold* ("Coste de lo que tienes") is the AVCO cost of the open
   positions — `computePositions.costBasis`, `computeCostBasisTimeline`, the chart's cost
   line, and `PortfolioSummary.openCost` (priced or not). *Total contributed* ("Total
-  aportado") is every purchase ever made, sold ones included — `computeReturns.totalInvested`
-  and `computeTotalContributed`, which in real mode restates each purchase at its own month.
-  The XIRR flows use the same per-trade amounts. Fees stay inside both because the foral
-  rule puts inherent costs inside the acquisition value, and excluding them flatters
-  returns. Rewards and saveback still count as purchases; taking them out is tracked in an
-  issue, not done.
+  aportado") is the money that left the bank: every purchase paid in cash, sold ones
+  included — `computeReturns.totalInvested` and `computeTotalContributed`, which in real mode
+  restates each purchase at its own month. The XIRR flows use the same per-trade amounts.
+  Fees stay inside both because the foral rule puts inherent costs inside the acquisition
+  value, and excluding them flatters returns.
+- **An `IN_KIND` purchase is cost but not contribution.** A Kraken reward or a Trade
+  Republic saveback is `funding: "IN_KIND"`: it enters AVCO and FIFO at its market value on
+  receipt, and stays out of *Total contributed*, the contribution count, the average and
+  the XIRR flows (`isInKind`), on both sides of the opportunity cost too. **TWR keeps it**:
+  `portfolioFlows` carries every trade and only the MWR list filters, because value
+  arriving with no flow behind it is booked by TWR as return. `since` comes from the full
+  list. Expect MWR to rise when units arrive for free; that is the point, not a bug.
 - **TWR excludes fees on purpose** — it uses price marks (`grossAmount / quantity`), and a
   fee is not a price. TWR = how the **asset** did. MWR/XIRR = how **my money** did. Their
   divergence under DCA is the point, not a bug.
@@ -810,7 +816,41 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
   fits — instrument plus gross amount, no quantity needed — and a new type would touch the
   SQLite `LedgerEntry` CHECK migration for no functional gain. `mapGroup` emits it alongside
   the BUY, same market value, distinct `externalId` (`refid:income`) so both survive dedup.
-  Distinguish it from a real fund dividend by `note: "kraken-reward-income"`, not by type.
+  Both legs are `funding: "IN_KIND"`, and that — not the note — is what makes the income
+  "Recompensa" on screen and keeps the BUY out of contributions. The notes stay for
+  `symbol-check`, which excludes the BUY because its price came from a history.
+- **No tax figure reads this income, and its classification is pending.** `/tax` lists the
+  year's `IN_KIND` dividends in their own block, "pendiente de verificar", added to nothing;
+  a test pins that `computeTaxHistory` and `buildTaxYearView` are unchanged by them. Do not
+  write a classification into a comment or a total until it is verified.
+
+## Trade Republic saveback
+
+A `BENEFITS_SAVEBACK` row is cash with no units, followed by the purchase it paid for.
+`pairSavebacks` joins them, pure, before mapping: a `TRADING|BUY` within **7 calendar days
+after** the saveback (measured on a real export: 1 day pairs 4/14, 3 days 13/14 — a long
+weekend — 7 days 14/14), of the saveback's instrument when it names one, for exactly
+`amount − |tax|` of the saveback. That one rule covers both regimes: until Nov 2025 the
+retention sits on the purchase's `tax` and the gross is bought; from Dec 2025 it sits on the
+saveback and the net is bought. Dec 2025–May 2026 savebacks carry no name or ISIN, so the
+amount alone decides there.
+
+- **A pair counts only when it is unique both ways** — one candidate for the saveback, and
+  that purchase a candidate for no other saveback. Anything else is `saveback-unpaired`:
+  the purchase stays `CASH`, which overstates contributions, never invents free units.
+  Rows are deduplicated by `transaction_id` before pairing, or a repeated line is an
+  ambiguity that does not exist.
+- **A pair is one operation in two rows**, like a Kraken reward: the purchase as `IN_KIND`,
+  and the saveback as an `IN_KIND` `DIVIDEND` in that fund, carrying the retention from
+  whichever row holds it. Movements then nets each pair to exactly the cash that moved.
+- **The only write that changes a stored ledger row is `markInKind`.** Saveback rows were
+  discarded before this existed, so past purchases sit in the ledger as `CASH` and only a
+  re-import can mark them; `append` skips existing rows, so `persistBatch` calls
+  `markInKind` after it. It flips `funding` from `CASH` to `IN_KIND` on rows matching an
+  `IN_KIND` event by `(source, externalId)` — never the reverse, never another column. Not
+  the reverse because an export that cuts a pair in half maps the purchase as `CASH`, and
+  re-importing it must not undo a pair an earlier file found. An integration test pins that
+  no other column moves. Every other ledger write is append-only.
 
 ## Ledger entry types
 
@@ -828,7 +868,10 @@ adding it in **both** places, in the same change.
   never modelled anywhere.
 - **The CHECK lives only in migration SQL** — Prisma cannot express it in `schema.prisma`
   for SQLite. A future migration that rebuilds `LedgerEntry` (SQLite rebuilds the table for
-  most column changes) will silently drop it. Re-add it in that migration.
+  most column changes) will silently drop it. Re-add it in that migration. Adding `funding`
+  is the measured case: `migrate dev` generated a rebuild for a plain new column, so it was
+  written with `--create-only` as `ADD COLUMN`. `funding` has its own CHECK
+  (`CASH | IN_KIND`), same reason as `type`.
 
 ## CSV ingestion
 
