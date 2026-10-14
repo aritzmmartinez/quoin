@@ -213,3 +213,20 @@ describe("computeOpportunityCost", () => {
     ).toThrow(/No EUR price history/);
   });
 });
+
+describe("in-kind acquisitions", () => {
+  it("count in neither what was contributed nor the flows, on either side", () => {
+    const buy = trade("BUY", "X", "2025-01-15T10:00:00Z", "10", "1000", "0");
+    const reward = {
+      ...trade("BUY", "X", "2025-03-17T10:00:00Z", "1", "125", "0"),
+      funding: "IN_KIND" as const,
+    };
+    const withReward = run([buy, reward], prices({ X: "150" }));
+    const without = run([buy], prices({ X: "150" }));
+
+    expect(lineFor(withReward, "X")?.contributed).toBe("1000");
+    expect(withReward.benchmarkValue).toBe(without.benchmarkValue);
+    expect(withReward.benchmarkMwr).toBe(without.benchmarkMwr);
+    expect(withReward.realValue).toBe("1650");
+  });
+});

@@ -346,4 +346,11 @@ describe("computeTotalContributed", () => {
       computeTotalContributed([A_BUY, B_BUY, sale], doubleBeforeMarch),
     ).toBe("2502");
   });
+
+  it("leaves out what arrived in kind: no money left the bank for it", () => {
+    const reward = { ...B_BUY, id: "reward", funding: "IN_KIND" as const };
+    expect(computeTotalContributed([A_BUY, B_BUY, reward])).toBe(
+      computeTotalContributed([A_BUY, B_BUY]),
+    );
+  });
 });
