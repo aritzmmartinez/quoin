@@ -1,10 +1,14 @@
+import { planDailyWrite } from "~/core/prices";
 import type {
+  DailyWriteCount,
   PriceRepository,
   PriceSnapshot,
   ReplaceHistoryOptions,
 } from "~/core/ports";
 
 import { prisma } from "./db.server";
+
+const DAY_MS = 86_400_000;
 
 export class PrismaPriceRepository implements PriceRepository {
   async saveMany(snapshots: readonly PriceSnapshot[]): Promise<number> {
@@ -27,6 +31,60 @@ export class PrismaPriceRepository implements PriceRepository {
       ),
     );
     return snapshots.length;
+  }
+
+  async saveDaily(
+    instrumentId: string,
+    candles: readonly PriceSnapshot[],
+    live: PriceSnapshot | null,
+  ): Promise<DailyWriteCount> {
+    const incoming = live ? [...candles, live] : candles;
+    if (incoming.length === 0) return { inserted: 0, corrected: 0, live: false };
+    const earliest = Math.min(...incoming.map((s) => s.asOf.getTime()));
+
+    return prisma.$transaction(async (tx) => {
+      const stored = await tx.priceSnapshot.findMany({
+        where: { instrumentId, asOf: { gte: new Date(earliest - 2 * DAY_MS) } },
+        select: {
+          id: true,
+          asOf: true,
+          source: true,
+          price: true,
+          currency: true,
+        },
+      });
+      const plan = planDailyWrite(stored, candles, live);
+      if (plan.remove.length > 0) {
+        await tx.priceSnapshot.deleteMany({ where: { id: { in: plan.remove } } });
+      }
+      for (const s of plan.write) {
+        await tx.priceSnapshot.upsert({
+          where: { instrumentId_asOf: { instrumentId, asOf: s.asOf } },
+          create: {
+            instrumentId,
+            price: s.price,
+            currency: s.currency,
+            asOf: s.asOf,
+            source: s.source,
+          },
+          update: { price: s.price, currency: s.currency, source: s.source },
+        });
+      }
+      return {
+        inserted: plan.inserted,
+        corrected: plan.corrected,
+        live: plan.live,
+      };
+    });
+  }
+
+  async lastAsOf(instrumentId: string): Promise<Date | null> {
+    const row = await prisma.priceSnapshot.findFirst({
+      where: { instrumentId },
+      orderBy: { asOf: "desc" },
+      select: { asOf: true },
+    });
+    return row?.asOf ?? null;
   }
 
   async latest(): Promise<Map<string, PriceSnapshot>> {
