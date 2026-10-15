@@ -3,54 +3,59 @@ import "dotenv/config";
 import { exit } from "node:process";
 
 import { prisma } from "~/adapters/persistence";
-import { syncPrices } from "~/lib/prices-sync.server";
+import { inTurn } from "~/lib/in-turn";
+import { failedSync, syncInstrumentPrices } from "~/lib/prices-sync";
+import { defaultDeps, syncTargets } from "~/lib/prices-sync.server";
 
 async function main(): Promise<void> {
-  const result = await syncPrices();
+  const { targets, unmapped } = await syncTargets();
 
-  const total = result.mapped + result.unmapped.length;
   console.log(
-    `Instruments: ${total} | mapped: ${result.mapped} | unmapped: ${result.unmapped.length}`,
+    `Instruments: ${targets.length + unmapped.length} | mapped: ${targets.length} | unmapped: ${unmapped.length}`,
   );
 
-  if (result.unmapped.length > 0) {
+  if (unmapped.length > 0) {
     console.log(
       "\nNo quote symbol yet (set one with `pnpm prices:map <ISIN> <SYMBOL>`):",
     );
-    for (const i of result.unmapped) {
-      console.log(`  ${i.instrumentId}  ${i.name}`);
-    }
+    for (const i of unmapped) console.log(`  ${i.instrumentId}  ${i.name}`);
   }
-  if (result.mapped === 0) {
+  if (targets.length === 0) {
     console.log("\nNothing to sync.");
     return;
   }
 
-  console.log(`\nPersisted ${result.updated} fresh quote(s):`);
-  for (const s of result.snapshots) {
-    console.log(
-      `  ${s.instrumentId}  ${s.price} ${s.currency}  @ ${s.asOf.toISOString()}`,
-    );
-  }
+  console.log("");
+  const deps = defaultDeps();
+  const steps = await inTurn(
+    targets,
+    (target) => syncInstrumentPrices(deps, target),
+    {
+      onError: (error, target) => {
+        console.error(
+          `  ${target.id}  failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        return failedSync(target);
+      },
+      onEach: (step, index) => {
+        const symbol = targets[index]?.quoteSymbol ?? "?";
+        const live = step.live ? "live quote" : "no live quote";
+        const problem = step.problem ? `  [${step.problem}]` : "";
+        console.log(
+          `  ${step.instrumentId}  (${symbol})  ${step.inserted} new, ${step.corrected} corrected, ${live}${problem}`,
+        );
+      },
+    },
+  );
 
-  const stale = result.failures.filter((f) => f.reason === "stale");
-  if (stale.length > 0) {
-    console.log(
-      "\nStale quotes skipped (provider returned an old timestamp — try another venue):",
-    );
-    for (const f of stale) {
-      console.log(
-        `  ${f.instrumentId}  (${f.symbol})  last @ ${f.asOf?.toISOString() ?? "?"}`,
-      );
-    }
-  }
-
-  const noQuote = result.failures.filter((f) => f.reason === "no-quote");
-  if (noQuote.length > 0) {
-    console.log(
-      "\nNo quote returned for (check the symbol on finance.yahoo.com):",
-    );
-    for (const f of noQuote) console.log(`  ${f.instrumentId}  (${f.symbol})`);
+  const failed = steps.filter((s) => s.problem !== null);
+  console.log(
+    `\nUpdated ${steps.length - failed.length} of ${steps.length}; ${steps.reduce((n, s) => n + s.inserted, 0)} daily close(s) recovered, ${steps.reduce((n, s) => n + s.corrected, 0)} corrected.`,
+  );
+  if (failed.length > 0) {
+    console.log("\nCould not update:");
+    for (const f of failed)
+      console.log(`  ${f.instrumentId}  ${f.name}: ${f.problem}`);
   }
 }
 

@@ -25,7 +25,12 @@ import {
   type PriceFillResult,
 } from "./ingest";
 import { backfillInstruments } from "./prices-backfill";
-import { syncPrices } from "./prices-sync.server";
+import { inTurn } from "./in-turn";
+import {
+  failedSync,
+  syncInstrumentPrices,
+  type SyncProblem,
+} from "./prices-sync";
 import { replaceQuoteHistory, type ReplaceOutcome } from "./price-history";
 import { assignQuoteSymbol } from "./quote-symbol";
 import {
@@ -168,9 +173,11 @@ export async function fillPrices(
   const provider = new YahooMarketDataProvider();
 
   const wanted = new Set(instrumentIds);
-  const targets = (await instruments.list())
-    .filter((i) => wanted.has(i.id) && i.quoteSymbol)
-    .map((i) => ({ id: i.id, quoteSymbol: i.quoteSymbol! }));
+  const targets = (await instruments.list()).flatMap((i) =>
+    wanted.has(i.id) && i.quoteSymbol
+      ? [{ id: i.id, name: i.name, quoteSymbol: i.quoteSymbol }]
+      : [],
+  );
 
   const backfilled = await backfillInstruments(
     provider,
@@ -182,19 +189,20 @@ export async function fillPrices(
   const refused = new Set(
     backfilled.filter((r) => r.foreignCurrency).map((r) => r.instrumentId),
   );
-  const sync = await syncPrices({
-    instruments,
-    prices,
-    provider,
-    only: targets.map((t) => t.id).filter((id) => !refused.has(id)),
-  });
+  const synced = await inTurn(
+    targets.filter((t) => !refused.has(t.id)),
+    (target) => syncInstrumentPrices({ prices, provider }, target),
+    { onError: (_error, target) => failedSync(target) },
+  );
+  const count = (problem: SyncProblem) =>
+    synced.filter((s) => s.problem === problem).length;
 
   return {
     backfilled,
     candles: backfilled.reduce((sum, report) => sum + report.written, 0),
-    synced: sync.updated,
-    stale: sync.failures.filter((f) => f.reason === "stale").length,
-    noQuote: sync.failures.filter((f) => f.reason === "no-quote").length,
-    notEur: refused.size,
+    synced: synced.filter((s) => s.live).length,
+    stale: count("stale"),
+    noQuote: count("no-quote"),
+    notEur: refused.size + count("not-eur"),
   };
 }

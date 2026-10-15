@@ -10,6 +10,7 @@ import type {
   InstrumentRepository,
   LedgerEventFilter,
   LedgerRepository,
+  DailyWriteCount,
   PriceRepository,
   PriceSnapshot,
 } from "~/core/ports";
@@ -85,6 +86,12 @@ class FakePriceRepository implements PriceRepository {
   }
   async replaceHistory(): Promise<number> {
     return 0;
+  }
+  async saveDaily(): Promise<DailyWriteCount> {
+    return { inserted: 0, corrected: 0, live: false };
+  }
+  async lastAsOf(): Promise<Date | null> {
+    return null;
   }
   async historyFor(instrumentId: string): Promise<PriceSnapshot[]> {
     return this.snapshots.filter((s) => s.instrumentId === instrumentId);

@@ -3,269 +3,436 @@ import { describe, expect, it } from "vitest";
 import { es } from "./i18n";
 
 import { MAX_QUOTE_AGE_MS } from "~/adapters/marketdata";
-import type { Quote } from "~/core/ports";
+import type {
+  HistorySpan,
+  MarketDataProvider,
+  PriceRepository,
+  PriceSnapshot,
+  Quote,
+} from "~/core/ports";
+import { planDailyWrite } from "~/core/prices";
 
+import { inTurn } from "./in-turn";
 import {
-  planPriceSync,
+  failedSync,
   priceSyncToast,
   splitUnmapped,
-  type SyncableInstrument,
+  SYNC_OVERLAP_DAYS,
+  syncInstrumentPrices,
+  toSyncTargets,
+  type SyncTarget,
 } from "./prices-sync";
 
-const NOW = new Date("2026-09-02T12:00:00Z");
+const ETF: SyncTarget = { id: "XS00TEST0001", name: "Fund A", quoteSymbol: "AAA.DE" };
+const BTC: SyncTarget = { id: "BTC", name: "Bitcoin", quoteSymbol: "BTC-EUR" };
 
-const instrument = (
-  id: string,
-  quoteSymbol: string | null,
-): SyncableInstrument => ({ id, name: `Fund ${id}`, quoteSymbol });
-
-const quote = (symbol: string, asOf: Date, price = "10.00"): Quote => ({
+const at = (iso: string) => new Date(iso);
+const q = (symbol: string, asOf: string, price = "10", currency = "EUR"): Quote => ({
   symbol,
   price,
-  currency: "EUR",
-  asOf,
+  currency,
+  asOf: at(asOf),
 });
 
-const fresh = new Date(NOW.getTime() - 24 * 60 * 60 * 1000);
-const ancient = new Date(NOW.getTime() - MAX_QUOTE_AGE_MS - 1);
-
-describe("planPriceSync", () => {
-  it("turns a fresh quote into a snapshot carrying the provider source", () => {
-    const plan = planPriceSync(
-      [instrument("A", "AAA.DE")],
-      [quote("AAA.DE", fresh, "12.34")],
-      "YAHOO",
-      NOW,
-    );
-
-    expect(plan.snapshots).toEqual([
-      {
-        instrumentId: "A",
-        price: "12.34",
+function memory(seed: Record<string, [string, string][]> = {}) {
+  let next = 0;
+  const rows: (PriceSnapshot & { id: string })[] = [];
+  for (const [instrumentId, list] of Object.entries(seed)) {
+    for (const [asOf, source] of list) {
+      rows.push({
+        id: `seed${next++}`,
+        instrumentId,
+        price: "1",
         currency: "EUR",
-        asOf: fresh,
-        source: "YAHOO",
-      },
-    ]);
-    expect(plan.failures).toEqual([]);
-    expect(plan.mapped).toBe(1);
-  });
+        asOf: at(asOf),
+        source,
+      });
+    }
+  }
+  const of = (id: string) =>
+    rows.filter((r) => r.instrumentId === id).sort((a, b) => +a.asOf - +b.asOf);
+  const prices = {
+    lastAsOf: async (id: string) => of(id).at(-1)?.asOf ?? null,
+    saveDaily: async (
+      id: string,
+      candles: readonly PriceSnapshot[],
+      live: PriceSnapshot | null,
+    ) => {
+      const plan = planDailyWrite(of(id), candles, live);
+      for (const removed of plan.remove) {
+        rows.splice(rows.findIndex((r) => r.id === removed), 1);
+      }
+      for (const s of plan.write) {
+        const same = rows.find(
+          (r) => r.instrumentId === id && +r.asOf === +s.asOf,
+        );
+        if (same) Object.assign(same, s);
+        else rows.push({ ...s, id: `w${next++}` });
+      }
+      return {
+        inserted: plan.inserted,
+        corrected: plan.corrected,
+        live: plan.live,
+      };
+    },
+  } as unknown as PriceRepository;
+  const view = (id: string) =>
+    of(id).map((r) => `${r.asOf.toISOString().slice(0, 16)} ${r.source}`);
+  return { prices, view };
+}
 
-  it("reports an instrument with no quote symbol as unmapped, not as a failure", () => {
-    const plan = planPriceSync([instrument("A", null)], [], "YAHOO", NOW);
+function yahoo(
+  history: Record<string, Quote[]>,
+  live: Quote[] = [],
+  spans: HistorySpan[] = [],
+): MarketDataProvider {
+  return {
+    source: "YAHOO",
+    getQuotes: async (symbols) => live.filter((x) => symbols.includes(x.symbol)),
+    getHistory: async (symbol, range) => {
+      const span = range as HistorySpan;
+      spans.push(span);
+      return (history[symbol] ?? []).filter(
+        (x) => x.asOf >= span.from && x.asOf <= span.to,
+      );
+    },
+  };
+}
 
-    expect(plan.mapped).toBe(0);
-    expect(plan.unmapped).toEqual([{ instrumentId: "A", name: "Fund A" }]);
-    expect(plan.failures).toEqual([]);
-  });
-
-  it("drops a stale quote and reports it rather than persisting it", () => {
-    const plan = planPriceSync(
-      [instrument("A", "AAA.DE")],
-      [quote("AAA.DE", ancient)],
-      "YAHOO",
-      NOW,
-    );
-
-    expect(plan.snapshots).toEqual([]);
-    expect(plan.failures).toEqual([
+describe("syncInstrumentPrices — filling the gaps", () => {
+  it("an exchange: weekdays only, today's unfinished candle dropped", async () => {
+    const { prices, view } = memory({ [ETF.id]: [["2026-10-07T07:00Z", "YAHOO"]] });
+    const provider = yahoo(
       {
-        instrumentId: "A",
-        name: "Fund A",
-        symbol: "AAA.DE",
-        reason: "stale",
-        asOf: ancient,
+        "AAA.DE": [
+          q("AAA.DE", "2026-10-07T07:00Z"),
+          q("AAA.DE", "2026-10-08T07:00Z"),
+          q("AAA.DE", "2026-10-09T07:00Z"),
+          q("AAA.DE", "2026-10-12T07:00Z"),
+        ],
       },
-    ]);
-  });
-
-  it("reports a symbol the provider never answered for", () => {
-    const plan = planPriceSync([instrument("A", "AAA.DE")], [], "YAHOO", NOW);
-
-    expect(plan.failures).toEqual([
-      {
-        instrumentId: "A",
-        name: "Fund A",
-        symbol: "AAA.DE",
-        reason: "no-quote",
-        asOf: null,
-      },
-    ]);
-  });
-
-  it("keeps the successes when only some symbols fail", () => {
-    const plan = planPriceSync(
-      [
-        instrument("A", "AAA.DE"),
-        instrument("B", "BBB.DE"),
-        instrument("C", "CCC.DE"),
-      ],
-      [quote("AAA.DE", fresh), quote("BBB.DE", ancient)],
-      "YAHOO",
-      NOW,
+      [q("AAA.DE", "2026-10-12T09:30Z")],
     );
 
-    expect(plan.snapshots.map((s) => s.instrumentId)).toEqual(["A"]);
-    expect(plan.failures.map((f) => [f.instrumentId, f.reason])).toEqual([
-      ["B", "stale"],
-      ["C", "no-quote"],
-    ]);
-  });
-
-  it("accounts for every mapped instrument exactly once", () => {
-    const plan = planPriceSync(
-      [
-        instrument("A", "AAA.DE"),
-        instrument("B", "BBB.DE"),
-        instrument("C", "CCC.DE"),
-        instrument("D", null),
-      ],
-      [quote("AAA.DE", fresh), quote("BBB.DE", ancient)],
-      "YAHOO",
-      NOW,
+    const sync = await syncInstrumentPrices(
+      { prices, provider, now: at("2026-10-12T10:00Z") },
+      ETF,
     );
 
-    expect(plan.mapped).toBe(3);
-    expect(plan.snapshots.length + plan.failures.length).toBe(plan.mapped);
-  });
-
-  it("syncs both instruments when two of them share one quote symbol", () => {
-    const plan = planPriceSync(
-      [instrument("A", "AAA.DE"), instrument("B", "AAA.DE")],
-      [quote("AAA.DE", fresh)],
-      "YAHOO",
-      NOW,
-    );
-
-    expect(plan.snapshots.map((s) => s.instrumentId)).toEqual(["A", "B"]);
-    expect(plan.failures).toEqual([]);
-  });
-
-  it("ignores a quote for a symbol nobody maps", () => {
-    const plan = planPriceSync(
-      [instrument("A", "AAA.DE")],
-      [quote("ZZZ.DE", fresh), quote("AAA.DE", fresh)],
-      "YAHOO",
-      NOW,
-    );
-
-    expect(plan.snapshots).toHaveLength(1);
-    expect(plan.snapshots[0]?.instrumentId).toBe("A");
-  });
-});
-
-describe("splitUnmapped", () => {
-  it("counts open and closed positions without a symbol separately", () => {
-    const unmapped = ["A", "B", "C"].map((id) => ({
-      instrumentId: id,
-      name: `Fund ${id}`,
-    }));
-
-    expect(splitUnmapped(unmapped, new Set(["A", "C", "Z"]))).toEqual({
-      open: 2,
-      closed: 1,
+    expect(sync).toMatchObject({
+      inserted: 2,
+      corrected: 1,
+      live: true,
+      problem: null,
     });
-    expect(splitUnmapped([], new Set(["A"]))).toEqual({ open: 0, closed: 0 });
+    expect(view(ETF.id)).toEqual([
+      "2026-10-07T07:00 YAHOO",
+      "2026-10-08T07:00 YAHOO",
+      "2026-10-09T07:00 YAHOO",
+      "2026-10-12T09:30 YAHOO_LIVE",
+    ]);
+  });
+
+  it("crypto: every calendar day, weekend included", async () => {
+    const { prices, view } = memory({ [BTC.id]: [["2026-10-09T00:00Z", "YAHOO"]] });
+    const days = ["09", "10", "11", "12"].map((d) =>
+      q("BTC-EUR", `2026-10-${d}T00:00Z`),
+    );
+    const provider = yahoo({ "BTC-EUR": days }, [q("BTC-EUR", "2026-10-13T08:00Z")]);
+
+    await syncInstrumentPrices({ prices, provider, now: at("2026-10-13T08:05Z") }, BTC);
+
+    expect(view(BTC.id)).toEqual([
+      "2026-10-09T00:00 YAHOO",
+      "2026-10-10T00:00 YAHOO",
+      "2026-10-11T00:00 YAHOO",
+      "2026-10-12T00:00 YAHOO",
+      "2026-10-13T08:00 YAHOO_LIVE",
+    ]);
+  });
+
+  it("an empty answer over a weekend is not a failure", async () => {
+    const { prices, view } = memory({ [ETF.id]: [["2026-10-09T07:00Z", "YAHOO"]] });
+    const provider = yahoo({}, [q("AAA.DE", "2026-10-09T15:35Z")]);
+
+    const sync = await syncInstrumentPrices(
+      { prices, provider, now: at("2026-10-11T10:00Z") },
+      ETF,
+    );
+
+    expect(sync.problem).toBeNull();
+    expect(view(ETF.id)).toEqual([
+      "2026-10-09T07:00 YAHOO",
+    ]);
+  });
+
+  it("a Saturday quote is dated Friday and not written over Friday's candle", async () => {
+    const { prices, view } = memory({ [ETF.id]: [["2026-10-08T07:00Z", "YAHOO"]] });
+    const provider = yahoo(
+      { "AAA.DE": [q("AAA.DE", "2026-10-09T07:00Z")] },
+      [q("AAA.DE", "2026-10-09T15:35Z")],
+    );
+
+    const sync = await syncInstrumentPrices(
+      { prices, provider, now: at("2026-10-10T10:00Z") },
+      ETF,
+    );
+
+    expect(sync).toMatchObject({
+      inserted: 1,
+      corrected: 0,
+      live: false,
+      problem: null,
+    });
+    expect(view(ETF.id)).toEqual([
+      "2026-10-08T07:00 YAHOO",
+      "2026-10-09T07:00 YAHOO",
+    ]);
+  });
+
+  it("fills a gap inside the window even when the last row is a live quote", async () => {
+    const { prices, view } = memory({
+      [ETF.id]: [
+        ["2026-10-09T07:00Z", "YAHOO"],
+        ["2026-10-09T15:35Z", "YAHOO"],
+        ["2026-10-14T15:37Z", "YAHOO"],
+      ],
+    });
+    const spans: HistorySpan[] = [];
+    const candles = ["07", "08", "09", "12", "13", "14"].map((d) =>
+      q("AAA.DE", `2026-10-${d}T07:00Z`),
+    );
+    const provider = yahoo({ "AAA.DE": candles }, [q("AAA.DE", "2026-10-15T08:00Z")], spans);
+
+    await syncInstrumentPrices({ prices, provider, now: at("2026-10-15T08:05Z") }, ETF);
+
+    expect(spans[0]?.from.getTime()).toBeLessThanOrEqual(at("2026-10-06T22:00Z").getTime());
+    expect(view(ETF.id)).toEqual([
+      "2026-10-07T07:00 YAHOO",
+      "2026-10-08T07:00 YAHOO",
+      "2026-10-09T07:00 YAHOO",
+      "2026-10-12T07:00 YAHOO",
+      "2026-10-13T07:00 YAHOO",
+      "2026-10-14T07:00 YAHOO",
+      "2026-10-15T08:00 YAHOO_LIVE",
+    ]);
+  });
+
+  it("reaches SYNC_OVERLAP_DAYS Madrid days back from the last row", async () => {
+    expect(SYNC_OVERLAP_DAYS).toBe(7);
+    const { prices, view } = memory({ [ETF.id]: [["2026-10-14T15:37Z", "YAHOO_LIVE"]] });
+    const provider = yahoo({
+      "AAA.DE": [
+        q("AAA.DE", "2026-10-06T21:59Z"),
+        q("AAA.DE", "2026-10-06T22:00Z"),
+      ],
+    });
+
+    await syncInstrumentPrices({ prices, provider, now: at("2026-10-15T08:00Z") }, ETF);
+
+    expect(view(ETF.id)).toEqual([
+      "2026-10-06T22:00 YAHOO",
+      "2026-10-14T15:37 YAHOO_LIVE",
+    ]);
+  });
+
+  it("asks for no history when the instrument has none, and writes the live quote", async () => {
+    const { prices, view } = memory();
+    const spans: HistorySpan[] = [];
+    const provider = yahoo({}, [q("AAA.DE", "2026-10-15T08:00Z")], spans);
+
+    const sync = await syncInstrumentPrices(
+      { prices, provider, now: at("2026-10-15T08:05Z") },
+      ETF,
+    );
+
+    expect(spans).toEqual([]);
+    expect(sync).toMatchObject({ inserted: 0, corrected: 0, live: true });
+    expect(view(ETF.id)).toEqual(["2026-10-15T08:00 YAHOO_LIVE"]);
   });
 });
 
-const NONE = { unmappedOpen: 0, unmappedClosed: 0 };
+describe("syncInstrumentPrices — syncing again", () => {
+  it("the same answer from Yahoo inserts and corrects nothing, and leaves past rows identical", async () => {
+    const { prices, view } = memory({ [ETF.id]: [["2026-10-09T07:00Z", "YAHOO"]] });
+    const candles = ["09", "12", "13", "14"].map((d) =>
+      q("AAA.DE", `2026-10-${d}T07:00Z`),
+    );
+    const provider = yahoo({ "AAA.DE": candles }, [q("AAA.DE", "2026-10-15T08:00Z")]);
+    const deps = { prices, provider, now: at("2026-10-15T08:05Z") };
+
+    const first = await syncInstrumentPrices(deps, ETF);
+    const before = view(ETF.id);
+    const second = await syncInstrumentPrices(deps, ETF);
+
+    expect(first).toMatchObject({ inserted: 3, corrected: 1 });
+    expect(second).toMatchObject({ inserted: 0, corrected: 0, live: true });
+    expect(view(ETF.id)).toEqual(before);
+  });
+});
+
+describe("syncInstrumentPrices — the live quote", () => {
+  it("replaces the day's earlier live row", async () => {
+    const { prices, view } = memory({ [ETF.id]: [["2026-10-15T07:30Z", "YAHOO_LIVE"]] });
+    const provider = yahoo({}, [q("AAA.DE", "2026-10-15T15:35Z")]);
+
+    await syncInstrumentPrices({ prices, provider, now: at("2026-10-15T16:00Z") }, ETF);
+
+    expect(view(ETF.id)).toEqual(["2026-10-15T15:35 YAHOO_LIVE"]);
+  });
+
+  it("is removed when that day's candle arrives, and latest() never goes back a day", async () => {
+    const { prices, view } = memory({
+      [ETF.id]: [
+        ["2026-10-13T07:00Z", "YAHOO"],
+        ["2026-10-14T15:35Z", "YAHOO_LIVE"],
+      ],
+    });
+    const provider = yahoo(
+      { "AAA.DE": [q("AAA.DE", "2026-10-13T07:00Z"), q("AAA.DE", "2026-10-14T07:00Z")] },
+      [q("AAA.DE", "2026-10-15T08:00Z")],
+    );
+
+    await syncInstrumentPrices({ prices, provider, now: at("2026-10-15T08:05Z") }, ETF);
+
+    expect(view(ETF.id)).toEqual([
+      "2026-10-13T07:00 YAHOO",
+      "2026-10-14T07:00 YAHOO",
+      "2026-10-15T08:00 YAHOO_LIVE",
+    ]);
+  });
+
+  it("refuses a stale quote but keeps the candles", async () => {
+    const { prices } = memory({ [ETF.id]: [["2026-10-01T07:00Z", "YAHOO"]] });
+    const now = at("2026-10-15T08:00Z");
+    const old = new Date(now.getTime() - MAX_QUOTE_AGE_MS - 1).toISOString();
+    const provider = yahoo(
+      { "AAA.DE": [q("AAA.DE", "2026-10-02T07:00Z")] },
+      [q("AAA.DE", old)],
+    );
+
+    expect(await syncInstrumentPrices({ prices, provider, now }, ETF)).toMatchObject({
+      inserted: 1,
+      live: false,
+      problem: "stale",
+    });
+  });
+
+  it("reports a missing quote", async () => {
+    const { prices } = memory();
+    const provider = yahoo({});
+    expect(
+      (await syncInstrumentPrices({ prices, provider, now: at("2026-10-15T08:00Z") }, ETF))
+        .problem,
+    ).toBe("no-quote");
+  });
+});
+
+describe("syncInstrumentPrices — only euros", () => {
+  it("writes nothing when the candles are not in EUR", async () => {
+    const { prices, view } = memory({ [ETF.id]: [["2026-10-13T07:00Z", "YAHOO"]] });
+    const provider = yahoo(
+      { "AAA.DE": [q("AAA.DE", "2026-10-14T13:30Z", "10", "USD")] },
+      [q("AAA.DE", "2026-10-15T13:30Z")],
+    );
+
+    const sync = await syncInstrumentPrices(
+      { prices, provider, now: at("2026-10-15T14:00Z") },
+      ETF,
+    );
+
+    expect(sync).toMatchObject({
+      inserted: 0,
+      corrected: 0,
+      live: false,
+      problem: "not-eur",
+    });
+    expect(view(ETF.id)).toEqual(["2026-10-13T07:00 YAHOO"]);
+  });
+
+  it("refuses a live quote not in EUR", async () => {
+    const { prices, view } = memory();
+    const provider = yahoo({}, [q("AAA.DE", "2026-10-15T13:30Z", "10", "USD")]);
+
+    const sync = await syncInstrumentPrices(
+      { prices, provider, now: at("2026-10-15T14:00Z") },
+      ETF,
+    );
+
+    expect(sync).toMatchObject({ live: false, problem: "not-eur" });
+    expect(view(ETF.id)).toEqual([]);
+  });
+});
+
+describe("syncing instruments in turn", () => {
+  it("carries on past an instrument that throws and names it", async () => {
+    const { prices } = memory();
+    const provider = yahoo({}, [
+      q("AAA.DE", "2026-10-15T08:00Z"),
+      q("BTC-EUR", "2026-10-15T08:00Z"),
+    ]);
+    const broken: SyncTarget = { id: "XS00TEST0002", name: "Broken", quoteSymbol: "BAD" };
+    const deps = { prices, provider, now: at("2026-10-15T08:05Z") };
+
+    const steps = await inTurn(
+      [ETF, broken, BTC],
+      (target) => {
+        if (target === broken) throw new Error("boom");
+        return syncInstrumentPrices(deps, target);
+      },
+      { onError: (_error, target) => failedSync(target) },
+    );
+
+    expect(steps.map((s) => [s.name, s.problem])).toEqual([
+      ["Fund A", null],
+      ["Broken", "error"],
+      ["Bitcoin", null],
+    ]);
+    const toast = priceSyncToast(es, steps, { open: 0, closed: 0 });
+    expect(toast.message).toBe(es.instruments.sync.done(2, 3));
+    expect(toast.failures).toEqual([
+      { name: "Broken", reason: es.instruments.sync.problem.error },
+    ]);
+  });
+});
+
+describe("toSyncTargets / splitUnmapped", () => {
+  it("every instrument with a symbol is a target, open or closed", () => {
+    const { targets, unmapped } = toSyncTargets([
+      { id: "A", name: "A", quoteSymbol: "A.DE" },
+      { id: "B", name: "B", quoteSymbol: null },
+    ]);
+    expect(targets).toEqual([{ id: "A", name: "A", quoteSymbol: "A.DE" }]);
+    expect(splitUnmapped(unmapped, new Set(["B"]))).toEqual({ open: 1, closed: 0 });
+  });
+});
 
 describe("priceSyncToast", () => {
-  it("reports a clean run without mentioning failures", () => {
-    expect(
-      priceSyncToast(es, { mapped: 20, updated: 20, stale: 0, noQuote: 0, ...NONE }),
-    ).toEqual({
-      message: "20 de 20 precios actualizados",
-    });
+  const ok = (inserted: number, corrected = 0) => ({
+    instrumentId: "A",
+    name: "A",
+    inserted,
+    corrected,
+    live: true,
+    problem: null,
   });
 
-  it("names the misses when only some prices came back", () => {
-    expect(
-      priceSyncToast(es, { mapped: 20, updated: 18, stale: 1, noQuote: 1, ...NONE }),
-    ).toEqual({
-      message: "18 de 20 precios actualizados, 2 fallidos",
-      description: "1 con cotización caducada · 1 sin respuesta",
-    });
-  });
-
-  it("describes only the failure kinds that actually happened", () => {
-    expect(
-      priceSyncToast(es, { mapped: 5, updated: 3, stale: 0, noQuote: 2, ...NONE }),
-    ).toEqual({
-      message: "3 de 5 precios actualizados, 2 fallidos",
-      description: "2 sin respuesta",
-    });
-  });
-
-  it("says nothing is mapped rather than reporting 0 of 0", () => {
-    expect(
-      priceSyncToast(es, { mapped: 0, updated: 0, stale: 0, noQuote: 0, ...NONE }),
-    ).toEqual({
-      message: "Ningún instrumento tiene símbolo de cotización todavía.",
-    });
-  });
-
-  it("keeps the singular when a single instrument is mapped", () => {
-    expect(
-      priceSyncToast(es, { mapped: 1, updated: 1, stale: 0, noQuote: 0, ...NONE }),
-    ).toEqual({
-      message: "1 de 1 precio actualizado",
-    });
-    expect(
-      priceSyncToast(es, { mapped: 1, updated: 0, stale: 1, noQuote: 0, ...NONE }),
-    ).toEqual({
-      message: "0 de 1 precio actualizado, 1 fallido",
-      description: "1 con cotización caducada",
-    });
-  });
-
-  it("counts the instruments without a symbol and says where to fix them", () => {
-    expect(
-      priceSyncToast(es, {
-        mapped: 3,
-        updated: 3,
-        stale: 0,
-        noQuote: 0,
-        unmappedOpen: 2,
-        unmappedClosed: 1,
-      }),
-    ).toEqual({
-      message: "3 de 3 precios actualizados",
-      description:
-        "2 posiciones abiertas sin símbolo · 1 cerrada sin símbolo. Asígnalo en la columna Símbolo.",
-    });
-  });
-
-  it("puts the failures first and the missing symbols after", () => {
-    expect(
-      priceSyncToast(es, {
-        mapped: 2,
-        updated: 1,
-        stale: 1,
-        noQuote: 0,
-        unmappedOpen: 0,
-        unmappedClosed: 1,
-      }).description,
-    ).toBe(
-      "1 con cotización caducada. 1 cerrada sin símbolo. Asígnalo en la columna Símbolo.",
+  it("says when nothing has a symbol", () => {
+    expect(priceSyncToast(es, [], { open: 0, closed: 0 }).message).toBe(
+      es.instruments.sync.nothing,
     );
   });
 
-  it("still counts the missing symbols when nothing is mapped yet", () => {
+  it("leaves out the recovered line when nothing was inserted, corrections included", () => {
     expect(
-      priceSyncToast(es, {
-        mapped: 0,
-        updated: 0,
-        stale: 0,
-        noQuote: 0,
-        unmappedOpen: 1,
-        unmappedClosed: 0,
-      }),
-    ).toEqual({
-      message: "Ningún instrumento tiene símbolo de cotización todavía.",
-      description:
-        "1 posición abierta sin símbolo. Asígnalo en la columna Símbolo.",
-    });
+      priceSyncToast(es, [ok(0, 4)], { open: 0, closed: 0 }).description,
+    ).toBeUndefined();
+  });
+
+  it("counts recovered candles and unmapped positions", () => {
+    const toast = priceSyncToast(es, [ok(2), ok(1)], { open: 1, closed: 0 });
+    expect(toast.description).toBe(
+      `${es.instruments.sync.candles(3)}. ${es.instruments.sync.unmappedOpen(1)}. ${es.instruments.sync.unmappedAction}`,
+    );
   });
 });

@@ -59,7 +59,7 @@ pnpm db:studio
 pnpm db:backup                    # VACUUM INTO data/backups/, keeps the last 30
 pnpm db:seed [--anchor=YYYY-MM-DD]   # synthetic portfolio into the scratch database
 pnpm ingest --broker=<trade-republic|kraken> <file>
-pnpm prices:sync                  # quote every mapped instrument
+pnpm prices:sync                  # fill daily gaps, then quote every mapped instrument
 pnpm prices:map <ISIN> <SYMBOL> [range]   # set a Yahoo symbol and replace the history; show / --clear
 pnpm prices:backfill [ISIN] [1y|2y|5y|10y|max]   # daily history, default 5y
 pnpm prices:rebuild [ISIN]        # replace every mapped history, one at a time
@@ -184,9 +184,33 @@ This has caused misdirected generation more than once:
   timestamp), so `@@unique([instrumentId, asOf])` keeps both and `latest()` resolves the
   sync's. Run backfill first and sync second — the requirement is that **both** run;
   ending on the sync just means the last row written is also the newest in time.
-- `PriceSnapshot` is append-only and idempotent via `@@unique([instrumentId, asOf])`.
-- **Deleting an instrument's snapshots happens in exactly one place:
-  `PriceRepository.replaceHistory`, and it is atomic.** One transaction deletes the
+- `PriceSnapshot` is idempotent via `@@unique([instrumentId, asOf])`.
+- **A sync fills gaps, then writes at most one live row per Madrid day.** `prices:sync` and
+  "Refresh prices" share `syncInstrumentPrices`, one instrument at a time (`inTurn` on the
+  client, as "Rebuild all"). It asks Yahoo for daily candles from the Madrid day of the
+  instrument's newest row, **whatever its source**, minus `SYNC_OVERLAP_DAYS` (7), through
+  yesterday; today's candle is dropped because it has not closed. Then the live quote,
+  stored as `YAHOO_LIVE` (`liveSource`) and dated by **its own** `regularMarketTime`, never
+  by the clock — on a Saturday it is Friday's close and belongs to Friday. The overlap is
+  what heals rows written before `YAHOO_LIVE` existed: they cannot be told apart from
+  candles, and nothing tries to.
+- **Once a day has its candle, that candle is the day's only row** (`planDailyWrite`, applied
+  by `PriceRepository.saveDaily` in one transaction). Any other row that Madrid day is
+  deleted by id, `YAHOO` or `YAHOO_LIVE`; a candle on an `asOf` already stored updates it.
+  Each candle is *inserted* (its day had no candle, even if a live or old `YAHOO` row is
+  replaced), *corrected* (same `asOf`, new price) or *unchanged* (not written). Only
+  inserted ones are "recovered" on screen: the overlap re-reads a week every time, so a
+  count of candles written would claim recoveries on every click.
+- **A candle Yahoo has not consolidated arrives dated correctly with `close: null`**, and
+  the parser drops it. Measured 2026-10-15 at 10:20Z: VWCE.DE and SGLE.MI still had a null
+  14/10 candle, APC.DE on the same exchange had it. The day keeps its live row until a
+  later sync inside the overlap window finds the close — not a filter bug.
+  A live quote is not written on a day that has a candle, and replaces the day's earlier
+  live row. `latest()` never returns to an **earlier day**; within one day it may move from
+  the live row's time back to the session open, because the close it carries is newer
+  information. "Day" is `dayOf` in `core/calendar`, the same Madrid rule as `periodOf`.
+- **Deleting an instrument's snapshots happens in two places, both atomic:** `saveDaily`
+  above, and `PriceRepository.replaceHistory`. One transaction deletes the
   instrument's rows (all of them, or only those at or before `keepAfter`), writes the new
   ones and, if asked, sets `quoteSymbol`. A failed write rolls back the delete and the
   symbol together — an integration test pins that. Two symbols' prices must never share
@@ -203,9 +227,9 @@ This has caused misdirected generation more than once:
   `foreignCurrency` (so the wizard's `fill` skips that instrument's sync too),
   `checkSymbol` carries it so the symbol check warns and `canSave` refuses, and
   `assignQuoteSymbol` asks the provider for a quote and refuses on the server too, so the
-  `map` endpoint holds when called without the screen. Only `planPriceSync` does **not**
-  apply it yet: a live quote in another currency is still written by `prices:sync`. Write
-  any new check through this function, never as a literal `"EUR"`.
+  `map` endpoint holds when called without the screen. `syncInstrumentPrices` writes
+  nothing when a gap candle is foreign and no live row when the quote is. Write any new
+  check through this function, never as a literal `"EUR"`.
 - **The wizard's `map` only assigns; it cannot replace.** `assignQuoteSymbol` refuses an
   instrument that already has prices and the endpoint sends the user to Instruments.
   Changing a symbol is the `replace` intent, which carries the range and goes through

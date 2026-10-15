@@ -194,11 +194,13 @@ describe("replaceQuoteHistory", () => {
       live: true,
     });
     expect(state.symbol).toBe("NEW.DE");
-    expect(state.rows.map((r) => [r.asOf.toISOString(), r.price])).toEqual([
-      ["2026-10-05T07:00:00.000Z", "100"],
-      ["2026-10-06T07:00:00.000Z", "101"],
-      ["2026-10-07T07:00:00.000Z", "102"],
-      ["2026-10-08T14:00:00.000Z", "103"],
+    expect(
+      state.rows.map((r) => [r.asOf.toISOString(), r.price, r.source]),
+    ).toEqual([
+      ["2026-10-05T07:00:00.000Z", "100", "YAHOO"],
+      ["2026-10-06T07:00:00.000Z", "101", "YAHOO"],
+      ["2026-10-07T07:00:00.000Z", "102", "YAHOO"],
+      ["2026-10-08T14:00:00.000Z", "103", "YAHOO_LIVE"],
     ]);
   });
 

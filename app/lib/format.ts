@@ -1,5 +1,6 @@
 import Decimal from "decimal.js";
 
+import { dayOf } from "~/core/calendar";
 import { Money } from "~/core/domain";
 
 import { intlTag, type Locale } from "./locale";
@@ -171,13 +172,6 @@ export function createFormat(locale: Locale): Format {
   };
 }
 
-const DAY_IN_MADRID = new Intl.DateTimeFormat("en-CA", {
-  timeZone: "Europe/Madrid",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-});
-
 export function todayInMadrid(now: Date = new Date()): string {
-  return DAY_IN_MADRID.format(now);
+  return dayOf(now);
 }

@@ -837,16 +837,22 @@ export const en: Copy = {
     },
     sync: {
       action: "Refresh prices",
-      loading: "Syncing prices…",
+      syncing: (done: number, total: number): string =>
+        `Syncing prices… ${done} of ${total}`,
       nothing: "No instrument has a quote symbol yet.",
-      done: (updated: number, mapped: number): string =>
-        `${updated} of ${mapped} ${mapped === 1 ? "price updated" : "prices updated"}`,
-      failed: (count: number): string =>
-        count === 1 ? "1 failed" : `${count} failed`,
-      staleDetail: (count: number): string =>
-        count === 1 ? "1 with a stale quote" : `${count} with stale quotes`,
-      noQuoteDetail: (count: number): string =>
-        count === 1 ? "1 with no answer" : `${count} with no answer`,
+      done: (updated: number, total: number): string =>
+        `${updated} of ${total} ${total === 1 ? "price updated" : "prices updated"}`,
+      candles: (count: number): string =>
+        count === 1
+          ? "1 daily close recovered"
+          : `${count} daily closes recovered`,
+      failedList: "Could not update:",
+      problem: {
+        "no-quote": "no answer",
+        stale: "stale quote",
+        "not-eur": "not quoted in euros",
+        error: "unexpected error",
+      },
       unmappedOpen: (count: number): string =>
         count === 1
           ? "1 open position without a symbol"
@@ -856,7 +862,6 @@ export const en: Copy = {
           ? "1 closed without a symbol"
           : `${count} closed without a symbol`,
       unmappedAction: "Assign one in the Symbol column.",
-      error: "Prices could not be synced.",
     },
   },
   target: {
