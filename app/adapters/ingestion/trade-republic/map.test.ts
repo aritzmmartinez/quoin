@@ -104,7 +104,7 @@ describe("mapRow", () => {
     }
   });
 
-  it("discards saveback and corporate actions as unsupported, keeping the row", () => {
+  it("discards an unpaired saveback, and corporate actions as unsupported, keeping the row", () => {
     expect(
       mapRow(
         row({
@@ -116,7 +116,7 @@ describe("mapRow", () => {
       ),
     ).toEqual({
       kind: "discard",
-      reason: "unsupported",
+      reason: "saveback-unpaired",
       detail: {
         date: "2025-01-01T10:00:00.000Z",
         type: "BENEFITS_SAVEBACK",

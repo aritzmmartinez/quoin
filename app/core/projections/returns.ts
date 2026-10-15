@@ -2,6 +2,7 @@ import Decimal from "decimal.js";
 
 import {
   Money,
+  isInKind,
   type LedgerEvent,
   type Revalue,
   type TradeEvent,
@@ -59,7 +60,7 @@ export function computeTotalContributed(
 ): string {
   let total = Money.zero();
   for (const e of events) {
-    if (e.type !== "BUY") continue;
+    if (e.type !== "BUY" || isInKind(e)) continue;
     const paid = Money.fromString(
       baseAmount(e.grossAmount, e.fxToBase)
         .plus(baseAmount(e.fees, e.fxToBase))
@@ -99,7 +100,7 @@ export function computeReturns(
     .slice()
     .sort((a, b) => a.ts.getTime() - b.ts.getTime());
 
-  const buys = trades.filter((t) => t.type === "BUY");
+  const buys = trades.filter((t) => t.type === "BUY" && !isInKind(t));
 
   const totalInvested = buys.reduce(
     (sum, b) =>
@@ -153,6 +154,7 @@ export function computeReturns(
 
     const flows: CashFlow[] = [];
     for (const t of trades) {
+      if (isInKind(t)) continue;
       const gross = baseAmount(t.grossAmount, t.fxToBase);
       const fees = baseAmount(t.fees, t.fxToBase);
       if (t.type === "BUY") {
@@ -196,6 +198,7 @@ interface PortfolioFlow {
   t: number;
   gross: Decimal;
   net: Decimal;
+  inKind: boolean;
 }
 
 function portfolioFlows(events: readonly LedgerEvent[]): PortfolioFlow[] {
@@ -204,9 +207,15 @@ function portfolioFlows(events: readonly LedgerEvent[]): PortfolioFlow[] {
     .map((t) => {
       const gross = baseAmount(t.grossAmount, t.fxToBase);
       const fees = baseAmount(t.fees, t.fxToBase);
+      const inKind = isInKind(t);
       return t.type === "BUY"
-        ? { t: t.ts.getTime(), gross, net: gross.plus(fees).neg() }
-        : { t: t.ts.getTime(), gross: gross.neg(), net: gross.minus(fees) };
+        ? { t: t.ts.getTime(), gross, net: gross.plus(fees).neg(), inKind }
+        : {
+            t: t.ts.getTime(),
+            gross: gross.neg(),
+            net: gross.minus(fees),
+            inKind,
+          };
     })
     .sort((a, b) => a.t - b.t);
 }
@@ -223,7 +232,11 @@ export function computePortfolioReturns(
   if (flows.length === 0) return EMPTY_PORTFOLIO_RETURNS;
 
   const twr = linkTwr(explainPortfolioTwr(events, points));
-  const mwr = portfolioMwr(flows, new Decimal(last.value), last.t);
+  const mwr = portfolioMwr(
+    flows.filter((f) => !f.inKind),
+    new Decimal(last.value),
+    last.t,
+  );
   return {
     twr,
     mwr,

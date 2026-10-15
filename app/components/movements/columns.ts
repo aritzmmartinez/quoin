@@ -28,10 +28,10 @@ export function movementColumns(showInstrument: boolean): MovementColumnDef[] {
 
 export function movementsGrid(showInstrument: boolean): string {
   return showInstrument
-    ? "grid-cols-[104px_84px_minmax(0,1.4fr)_96px_104px_92px_128px]"
+    ? "grid-cols-[104px_128px_minmax(0,1.4fr)_96px_104px_92px_128px]"
     : "grid-cols-[104px_minmax(84px,1fr)_96px_104px_92px_128px]";
 }
 
 export function movementsMinWidth(showInstrument: boolean): string {
-  return showInstrument ? "min-w-[840px]" : "min-w-[688px]";
+  return showInstrument ? "min-w-[884px]" : "min-w-[688px]";
 }

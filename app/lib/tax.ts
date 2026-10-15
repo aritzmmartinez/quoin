@@ -6,7 +6,7 @@ import type {
   Thesis,
   TradeEvent,
 } from "~/core/domain";
-import { Money } from "~/core/domain";
+import { Money, isInKind, type DividendEvent } from "~/core/domain";
 import {
   WASH_SALE_WINDOW_MONTHS,
   carryforwardFrom,
@@ -27,9 +27,15 @@ function isSellTrade(event: LedgerEvent): event is TradeEvent {
   return event.type === "SELL";
 }
 
+function isInKindIncome(event: LedgerEvent): event is DividendEvent {
+  return event.type === "DIVIDEND" && isInKind(event);
+}
+
 export function listTaxYears(events: readonly LedgerEvent[]): number[] {
   const years = new Set(
-    events.filter(isSellTrade).map((e) => fiscalYearOf(e.ts)),
+    events
+      .filter((e) => isSellTrade(e) || isInKindIncome(e))
+      .map((e) => fiscalYearOf(e.ts)),
   );
   return [...years].sort((a, b) => b - a);
 }
@@ -133,6 +139,34 @@ export interface TaxPendingRow {
 
 export type TaxCarryforwardRow = CarryforwardStep;
 
+export interface TaxInKindIncome {
+  count: number;
+  gross: string;
+  withheld: string;
+}
+
+export function inKindIncomeOf(
+  events: readonly LedgerEvent[],
+  year: number,
+): TaxInKindIncome {
+  const received = events.filter(
+    (e): e is DividendEvent => isInKindIncome(e) && fiscalYearOf(e.ts) === year,
+  );
+  const inBase = (value: string, fxToBase: string) =>
+    Money.fromString(value).scaleBy(fxToBase).toString();
+  return {
+    count: received.length,
+    gross: sum(
+      received.map((e) => inBase(e.grossAmount, e.fxToBase)),
+      2,
+    ),
+    withheld: sum(
+      received.map((e) => inBase(e.taxWithheld, e.fxToBase)),
+      2,
+    ),
+  };
+}
+
 export interface TaxScaleView {
   source: string;
   brackets: TaxBracket[];
@@ -155,6 +189,7 @@ export interface TaxYearView {
   netSavingsBase: string;
   scale: TaxScaleView | null;
   quota: string | null;
+  inKindIncome: TaxInKindIncome;
 }
 
 export function buildTaxYearView(
@@ -237,6 +272,7 @@ export function buildTaxYearView(
     netSavingsBase: carry.netSavingsBase,
     scale: scale ? { source: scale.source, brackets: scale.brackets } : null,
     quota,
+    inKindIncome: inKindIncomeOf(events, year),
   };
 }
 

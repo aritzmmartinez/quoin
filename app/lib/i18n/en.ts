@@ -14,6 +14,7 @@ const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
   "reward-unpriced": "BTC rewards without a price",
   "unmodelled-asset": "Assets Quoin does not model",
   "card-spending": "Card payments",
+  "saveback-unpaired": "Saveback with no paired purchase",
   unsupported: "Unsupported",
 };
 
@@ -24,6 +25,8 @@ const DISCARD_REASON_HELP: Record<DiscardReason, string | null> = {
     "There is no BTC price for those dates, so these rewards were not recorded and your BTC position does not include them. In Instruments, open BTC's symbol and use “Download the history again” with a range that reaches those dates. Then import this same file again: what is already recorded is not duplicated.",
   "unmodelled-asset": null,
   "card-spending": null,
+  "saveback-unpaired":
+    "The purchase this saveback paid for was not found (one purchase of the same amount in the 7 days after it, and only one). If that purchase is in the file, it counts as your own contribution. If it is in another export, import one that covers both dates.",
   unsupported: null,
 };
 
@@ -332,9 +335,9 @@ export const en: Copy = {
       },
       invested: {
         label: "Total contributed",
-        sub: "Every purchase, including what was sold",
+        sub: "What you put in, including what was sold; rewards excluded",
         subReal: (period: string): string =>
-          `Every purchase, including what was sold, in ${period} euros`,
+          `What you put in, in ${period} euros, including what was sold; rewards excluded`,
       },
       realized: {
         label: "Realised result (average cost)",
@@ -1036,6 +1039,10 @@ export const en: Copy = {
       WITHDRAWAL: "Withdrawal",
       INTEREST: "Interest",
     },
+    inKindTypes: {
+      BUY: "In-kind purchase",
+      DIVIDEND: "Reward",
+    },
     empty: "No movements.",
     emptyScreen: {
       title: "No movements yet",
@@ -1216,6 +1223,13 @@ export const en: Copy = {
         title: "No sales in this year",
         body: "Pick another tax year from the dropdown.",
       },
+      inKind: {
+        title: "Income received in kind",
+        body: "Kraken rewards and Trade Republic saveback, received as units. Tax classification pending verification: none of it is added to any figure in this view.",
+        count: "Receipts",
+        gross: "Value on receipt",
+        withheld: "Withheld",
+      },
       carryforwardTitle: "Loss carryforward, last 4 years (Art. 66)",
       carryforwardColumns: {
         year: "Year",
@@ -1353,7 +1367,7 @@ export const en: Copy = {
       },
       totalInvested: {
         label: "Total contributed",
-        sub: "every purchase, including what was sold",
+        sub: "what you put in, including what was sold; rewards excluded",
       },
       buyCount: { label: "Contributions", sub: "purchases made" },
       avgBuyAmount: { label: "Average amount", sub: "per contribution" },

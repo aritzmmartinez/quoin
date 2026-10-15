@@ -14,4 +14,5 @@ export interface LedgerRepository {
   ): Promise<{ inserted: number; skipped: number }>;
   list(filter?: LedgerEventFilter): Promise<LedgerEvent[]>;
   existing(events: readonly LedgerEvent[]): Promise<Set<string>>;
+  markInKind(events: readonly LedgerEvent[]): Promise<number>;
 }

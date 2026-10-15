@@ -111,6 +111,15 @@ describe("Kraken mapGroup", () => {
     }
   });
 
+  it("marks both legs of a reward as in kind: no money left the bank", () => {
+    const [buy, income] = mapGroup([rewardRow()], () => "80000");
+    for (const item of [buy, income]) {
+      expect(item!.kind === "domain" && "funding" in item!.event).toBe(true);
+      if (item!.kind === "domain" && "funding" in item!.event)
+        expect(item!.event.funding).toBe("IN_KIND");
+    }
+  });
+
   it("gives the BUY and the income row distinct externalIds so both survive dedup", () => {
     const [buy, income] = mapGroup([rewardRow()], () => "80000");
 

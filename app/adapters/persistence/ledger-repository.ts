@@ -1,4 +1,4 @@
-import type { LedgerEvent } from "~/core/domain";
+import { isInKind, type LedgerEvent } from "~/core/domain";
 import {
   ledgerDedupKey,
   type LedgerEventFilter,
@@ -51,6 +51,19 @@ export class PrismaLedgerRepository implements LedgerRepository {
       inserted: toInsert.length,
       skipped: events.length - toInsert.length,
     };
+  }
+
+  async markInKind(events: readonly LedgerEvent[]): Promise<number> {
+    const keys = events
+      .filter((event) => isInKind(event) && event.externalId)
+      .map((event) => ({ source: event.source, externalId: event.externalId }));
+    if (keys.length === 0) return 0;
+
+    const { count } = await prisma.ledgerEntry.updateMany({
+      where: { funding: "CASH", OR: keys },
+      data: { funding: "IN_KIND" },
+    });
+    return count;
   }
 
   async list(filter?: LedgerEventFilter): Promise<LedgerEvent[]> {

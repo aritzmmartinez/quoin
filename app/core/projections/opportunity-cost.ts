@@ -3,6 +3,7 @@ import Decimal from "decimal.js";
 import {
   BASE_CURRENCY,
   Money,
+  isInKind,
   type LedgerEvent,
   type TradeEvent,
 } from "../domain";
@@ -187,6 +188,7 @@ export function computeOpportunityCost(
     }
 
     bucket.quantity = bucket.quantity.plus(trade.quantity);
+    if (isInKind(trade)) continue;
     const spent = gross.add(fees);
     bucket.contributed = bucket.contributed.add(spent);
     bucket.flows.push({ t, amount: spent.negate().toNumber() });
