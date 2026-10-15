@@ -3,58 +3,30 @@ import {
   PrismaInstrumentRepository,
   PrismaPriceRepository,
 } from "~/adapters/persistence";
-import type {
-  InstrumentRepository,
-  MarketDataProvider,
-  PriceRepository,
-} from "~/core/ports";
 
-import { planPriceSync, type PriceSyncPlan } from "./prices-sync";
+import {
+  syncInstrumentPrices,
+  toSyncTargets,
+  type InstrumentSync,
+  type SyncDeps,
+} from "./prices-sync";
 
-export interface SyncPricesDeps {
-  instruments: InstrumentRepository;
-  prices: PriceRepository;
-  provider: MarketDataProvider;
-  now?: Date;
-  only?: readonly string[];
-}
-
-export interface PriceSyncResult extends PriceSyncPlan {
-  updated: number;
-}
-
-export async function syncPrices(
-  deps: SyncPricesDeps = defaultDeps(),
-): Promise<PriceSyncResult> {
-  const all = await deps.instruments.list();
-  const only = deps.only;
-  const instruments = only ? all.filter((i) => only.includes(i.id)) : all;
-  const symbols = [
-    ...new Set(
-      instruments.map((i) => i.quoteSymbol).filter((s): s is string => !!s),
-    ),
-  ];
-
-  const quotes =
-    symbols.length > 0 ? await deps.provider.getQuotes(symbols) : [];
-
-  const plan = planPriceSync(
-    instruments,
-    quotes,
-    deps.provider.source,
-    deps.now ?? new Date(),
-  );
-
-  const updated =
-    plan.snapshots.length > 0 ? await deps.prices.saveMany(plan.snapshots) : 0;
-
-  return { ...plan, updated };
-}
-
-export function defaultDeps(): SyncPricesDeps {
+export function defaultDeps(): SyncDeps {
   return {
-    instruments: new PrismaInstrumentRepository(),
     prices: new PrismaPriceRepository(),
     provider: new YahooMarketDataProvider(),
   };
+}
+
+export async function syncTargets() {
+  return toSyncTargets(await new PrismaInstrumentRepository().list());
+}
+
+export async function syncInstrument(
+  instrumentId: string,
+  deps: SyncDeps = defaultDeps(),
+): Promise<InstrumentSync | null> {
+  const instrument = await new PrismaInstrumentRepository().get(instrumentId);
+  const [target] = instrument ? toSyncTargets([instrument]).targets : [];
+  return target ? syncInstrumentPrices(deps, target) : null;
 }

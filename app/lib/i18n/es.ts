@@ -841,18 +841,22 @@ export const es = {
     },
     sync: {
       action: "Refrescar precios",
-      loading: "Sincronizando precios…",
+      syncing: (done: number, total: number): string =>
+        `Sincronizando precios… ${done} de ${total}`,
       nothing: "Ningún instrumento tiene símbolo de cotización todavía.",
-      done: (updated: number, mapped: number): string =>
-        `${updated} de ${mapped} ${mapped === 1 ? "precio actualizado" : "precios actualizados"}`,
-      failed: (count: number): string =>
-        count === 1 ? "1 fallido" : `${count} fallidos`,
-      staleDetail: (count: number): string =>
+      done: (updated: number, total: number): string =>
+        `${updated} de ${total} ${total === 1 ? "precio actualizado" : "precios actualizados"}`,
+      candles: (count: number): string =>
         count === 1
-          ? "1 con cotización caducada"
-          : `${count} con cotización caducada`,
-      noQuoteDetail: (count: number): string =>
-        count === 1 ? "1 sin respuesta" : `${count} sin respuesta`,
+          ? "1 cierre diario recuperado"
+          : `${count} cierres diarios recuperados`,
+      failedList: "No se han podido actualizar:",
+      problem: {
+        "no-quote": "sin respuesta",
+        stale: "cotización caducada",
+        "not-eur": "no cotiza en euros",
+        error: "error inesperado",
+      },
       unmappedOpen: (count: number): string =>
         count === 1
           ? "1 posición abierta sin símbolo"
@@ -860,7 +864,6 @@ export const es = {
       unmappedClosed: (count: number): string =>
         count === 1 ? "1 cerrada sin símbolo" : `${count} cerradas sin símbolo`,
       unmappedAction: "Asígnalo en la columna Símbolo.",
-      error: "No se pudieron sincronizar los precios.",
     },
   },
   target: {

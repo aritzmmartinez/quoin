@@ -8,6 +8,7 @@ import type {
   PriceSnapshot,
   Quote,
 } from "~/core/ports";
+import { liveSource } from "~/core/prices";
 
 import type { Copy } from "./i18n";
 import { inTurn } from "./in-turn";
@@ -105,15 +106,17 @@ export async function replaceQuoteHistory(
   const live = await liveQuote(provider, symbol, last.asOf, now);
   const unchanged = instrument.quoteSymbol === symbol;
 
-  const snapshots: PriceSnapshot[] = [...history, ...(live ? [live] : [])].map(
-    (quote) => ({
-      instrumentId,
-      price: quote.price,
-      currency: quote.currency,
-      asOf: quote.asOf,
-      source: provider.source,
-    }),
-  );
+  const snapshot = (quote: Quote, source: string): PriceSnapshot => ({
+    instrumentId,
+    price: quote.price,
+    currency: quote.currency,
+    asOf: quote.asOf,
+    source,
+  });
+  const snapshots: PriceSnapshot[] = [
+    ...history.map((quote) => snapshot(quote, provider.source)),
+    ...(live ? [snapshot(live, liveSource(provider.source))] : []),
+  ];
 
   const removed = await prices.replaceHistory(instrumentId, snapshots, {
     ...(unchanged ? {} : { quoteSymbol: symbol }),
