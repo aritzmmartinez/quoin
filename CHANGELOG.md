@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Checking a symbol shows its name on Yahoo and compares your last three trades with the symbol's close on those days, with a warning when they do not match. It works for closed positions too.
 
 ### Fixed
+- Refresh prices and prices:sync only stored the price of the moment, so every day the app was not opened was left without a price. They now fill the daily closes missing since the last sync, going a week further back to replace earlier same-day prices with the day's close, and keep at most one current price per day. Prices not in euros are refused. Each instrument is synced in turn, with progress shown, and the ones that fail are listed at the end. Gaps older than that week are filled by Rebuild all histories, on Instruments.
 - The value total on Portfolio showed in Spanish in the English interface.
 - On an instrument's page, a range with no data in it showed the chart's axes around nothing. It now says the range has no data.
 - Importing a Kraken file showed discarded rows as an internal code ("non-btc: 41"). Each reason is now named, listed row by row with asset and date, and BTC swaps, BTC transfers and BTC rewards without a price come with a warning that the BTC position does not include them. ingest prints the same breakdown.
