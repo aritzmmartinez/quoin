@@ -125,7 +125,7 @@ export function InvestedVsValueChart({
           tickLine={false}
           axisLine={false}
           tickMargin={6}
-          domain={["auto", "auto"]}
+          domain={[0, "auto"]}
         />
         <Tooltip
           cursor={CURSOR}
