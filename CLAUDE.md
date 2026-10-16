@@ -54,7 +54,8 @@ pnpm test:integration             # migrate deploy against a temp sqlite db
 pnpm verify                       # lint + typecheck + build + test (the four unit-level checks)
 pnpm verify:full                  # verify + test:integration — the full CI gate, run before a tag
 pnpm db:generate                  # prisma generate
-pnpm db:migrate                   # prisma migrate dev
+pnpm db:migrate                   # prisma migrate dev — development only
+pnpm db:deploy                    # prisma migrate deploy — apply pending migrations to a ledger
 pnpm db:studio
 pnpm db:backup                    # VACUUM INTO data/backups/, keeps the last 30
 pnpm db:seed [--anchor=YYYY-MM-DD]   # synthetic portfolio into the scratch database
@@ -163,8 +164,8 @@ This has caused misdirected generation more than once:
   discards quotes whose market timestamp is older than 7 days, and it applies **only** to
   `prices:sync`. Yahoo serves stale candles on illiquid venues.
 - **`range=max` is not daily, whatever `interval` says.** Measured 2026-10-08: Yahoo
-  answers `interval=1d&range=max` with monthly candles for BTC-EUR and weekly ones for
-  VWCE.DE, each dated at the start of its period but carrying the period's last close — a
+  answers `interval=1d&range=max` with monthly candles for a crypto pair and weekly ones
+  for an ETF, each dated at the start of its period but carrying the period's last close — a
   price from weeks later, which the 7-day reward lookup and every chart then read as that
   day's. `1y`…`10y` came back daily. `historyUrl` therefore never sends `range=`: it
   converts every range into `period1`/`period2` (`max` from the epoch) with `interval=1d`,
@@ -176,7 +177,7 @@ This has caused misdirected generation more than once:
 - **A backfill does not necessarily cover today, so a fresh mapping needs both steps.**
   Yahoo consolidates the newest daily candle late: for hours after a session closes,
   `range=` still returns it with `close: null`, and the parser drops it rather than
-  interpolate. Measured on VWCE.DE, IWDA.AS and SXR8.DE at 22:20Z on a Saturday — the
+  interpolate. Measured on three ETFs on two exchanges at 22:20Z on a Saturday — the
   Friday candle was null; ten minutes later the same request had it filled. Crypto is
   unaffected (24/7, no consolidation gap), which is why testing this on `BTC-EUR` shows
   nothing. `prices:sync` is what closes the gap, writing the live session from
@@ -202,8 +203,8 @@ This has caused misdirected generation more than once:
   inserted ones are "recovered" on screen: the overlap re-reads a week every time, so a
   count of candles written would claim recoveries on every click.
 - **A candle Yahoo has not consolidated arrives dated correctly with `close: null`**, and
-  the parser drops it. Measured 2026-10-15 at 10:20Z: VWCE.DE and SGLE.MI still had a null
-  14/10 candle, APC.DE on the same exchange had it. The day keeps its live row until a
+  the parser drops it. Measured 2026-10-15 at 10:20Z: two ETFs still had a null 14/10
+  candle, a stock on the same exchange as one of them had it. The day keeps its live row until a
   later sync inside the overlap window finds the close — not a filter bug.
   A live quote is not written on a day that has a candle, and replaces the day's earlier
   live row. `latest()` never returns to an **earlier day**; within one day it may move from
@@ -242,7 +243,7 @@ This has caused misdirected generation more than once:
 - **Coarse candles are detected by gaps only** (`isCoarseSeries`): more than half the gaps
   ≥6 days, or three ≥6-day gaps in a row. Two rows on one Madrid day is **not** a signal:
   a live quote beside that day's candle produces exactly that, and Yahoo's weekly candle
-  (Monday 00:00 exchange time, measured on VWCE.DE) looks the same. Undetectable cases
+  (Monday 00:00 exchange time, measured on an ETF) looks the same. Undetectable cases
   exist — a monthly BTC candle that overwrote the day-1 daily one leaves a perfectly daily
   series — so "Rebuild all histories" is always offered and no text claims a history is
   clean.
@@ -827,8 +828,7 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
 - **The lookup never reaches forward.** `priceLookupFrom` takes the last close at or before
   the timestamp, within 7 days; a later candle is information that did not exist yet.
 - Scope is still BTC-only by choice (`isBtc` in `map.ts`). Measured on a real export:
-  87% of refid groups are set aside — SOL and ETH `earn`, plus `welcomebonus` in five
-  assets. **A discard is classified by what it does to a modelled position, not by asset.**
+  most refid groups are set aside — `earn` rewards and `welcomebonus` in other assets. **A discard is classified by what it does to a modelled position, not by asset.**
   `unmodelled-asset` is noise (rewards, transfers and trades of assets Quoin does not
   track); `crypto-swap` (BTC ↔ another crypto, in either direction), `crypto-transfer`
   (BTC on-chain in or out) and `reward-unpriced` each leave the BTC position wrong, and
@@ -852,8 +852,8 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
 
 A `BENEFITS_SAVEBACK` row is cash with no units, followed by the purchase it paid for.
 `pairSavebacks` joins them, pure, before mapping: a `TRADING|BUY` within **7 calendar days
-after** the saveback (measured on a real export: 1 day pairs 4/14, 3 days 13/14 — a long
-weekend — 7 days 14/14), of the saveback's instrument when it names one, for exactly
+after** the saveback (measured on a real export: 1 day pairs under a third, 3 days all but one —
+a long weekend — 7 days all of them), of the saveback's instrument when it names one, for exactly
 `amount − |tax|` of the saveback. That one rule covers both regimes: until Nov 2025 the
 retention sits on the purchase's `tax` and the gross is bought; from Dec 2025 it sits on the
 saveback and the net is bought. Dec 2025–May 2026 savebacks carry no name or ISIN, so the
