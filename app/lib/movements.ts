@@ -1,11 +1,17 @@
 import Decimal from "decimal.js";
 
-import type { Instrument, LedgerEvent, LedgerEventType } from "~/core/domain";
+import {
+  isInKind,
+  type Instrument,
+  type LedgerEvent,
+  type LedgerEventType,
+} from "~/core/domain";
 
 export interface MovementRow {
   id: string;
   t: string;
   type: LedgerEventType;
+  inKind: boolean;
   instrumentId: string | null;
   instrumentName: string | null;
   quantity: string | null;
@@ -62,6 +68,7 @@ export function toMovementRows(
         id: event.id,
         t: event.ts.toISOString(),
         type: event.type,
+        inKind: isInKind(event),
         instrumentId,
         instrumentName: instrumentId
           ? (byId.get(instrumentId)?.name ?? instrumentId)

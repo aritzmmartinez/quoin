@@ -54,14 +54,16 @@ pnpm test:integration             # migrate deploy against a temp sqlite db
 pnpm verify                       # lint + typecheck + build + test (the four unit-level checks)
 pnpm verify:full                  # verify + test:integration — the full CI gate, run before a tag
 pnpm db:generate                  # prisma generate
-pnpm db:migrate                   # prisma migrate dev
+pnpm db:migrate                   # prisma migrate dev — development only
+pnpm db:deploy                    # prisma migrate deploy — apply pending migrations to a ledger
 pnpm db:studio
 pnpm db:backup                    # VACUUM INTO data/backups/, keeps the last 30
 pnpm db:seed [--anchor=YYYY-MM-DD]   # synthetic portfolio into the scratch database
 pnpm ingest --broker=<trade-republic|kraken> <file>
-pnpm prices:sync                  # quote every mapped instrument
-pnpm prices:map <ISIN> <SYMBOL>   # set / show / --clear a Yahoo symbol
+pnpm prices:sync                  # fill daily gaps, then quote every mapped instrument
+pnpm prices:map <ISIN> <SYMBOL> [range]   # set a Yahoo symbol and replace the history; show / --clear
 pnpm prices:backfill [ISIN] [1y|2y|5y|10y|max]   # daily history, default 5y
+pnpm prices:rebuild [ISIN]        # replace every mapped history, one at a time
 pnpm exposure:map                 # list how every instrument resolves
 pnpm exposure:map <ISIN> <KIND> [LEAF]           # e.g. XS00TEST0003 COMMODITY XAU
 pnpm identity:resolve [--limit N] [--all] [--retry-ambiguous] [--refresh] [--report]
@@ -112,7 +114,7 @@ duplicating logic across screens.
 Every CLI action that also has a button in the app lives in `app/lib/<name>.ts`, and the
 script under `scripts/` only parses argv and formats what the function returns:
 `syncPrices`, `syncInflation`, `backfillInstrument` / `backfillInstruments`,
-`remapQuoteSymbol`. Adding behaviour to the script gives it to the CLI and silently
+`replaceQuoteHistory` / `replaceQuoteHistories`. Adding behaviour to the script gives it to the CLI and silently
 **not** to the route (`api/prices/sync`, `api/ipc/sync`), and the two then disagree about
 what a sync did — the counts on screen are the ones the function returns, not the ones the
 script printed. `api/ingest` is the exception and is allowed to be: `scripts/ingest.ts`
@@ -130,6 +132,10 @@ file at once vs. a preview, a commit and two follow-up steps).
   wholesale, so `scripts/ipc-sync.ts` owns the flag and `syncInflation` cannot rebase at
   all: it *reports* `rebaseBlocked`, and the endpoint names the affected series without
   acting. A button is one click; a flag is a decision. Same reasoning as `db-guard`.
+  Replacing an instrument's price history **is** on a button, and that is not an
+  exception: it downloads before it deletes, refuses when nothing arrives, and can be
+  repeated to the same result. What is gone is a re-downloadable cache, never the ledger.
+  `prices:map --clear`, which drops prices with nothing to replace them, stays CLI-only.
 
 ## Money rules
 
@@ -157,6 +163,13 @@ This has caused misdirected generation more than once:
 - Stale-quote protection lives at the **write** boundary, not the read: `isFreshQuote`
   discards quotes whose market timestamp is older than 7 days, and it applies **only** to
   `prices:sync`. Yahoo serves stale candles on illiquid venues.
+- **`range=max` is not daily, whatever `interval` says.** Measured 2026-10-08: Yahoo
+  answers `interval=1d&range=max` with monthly candles for a crypto pair and weekly ones
+  for an ETF, each dated at the start of its period but carrying the period's last close — a
+  price from weeks later, which the 7-day reward lookup and every chart then read as that
+  day's. `1y`…`10y` came back daily. `historyUrl` therefore never sends `range=`: it
+  converts every range into `period1`/`period2` (`max` from the epoch) with `interval=1d`,
+  which returns daily candles for the whole history. Do not reintroduce `range=`.
 - `prices:backfill` deliberately does **not** apply that filter. Discarding old quotes is
   correct for "what is this worth now" and wrong for "what was this worth then".
 - `backfill` issues **sequential** requests (the chart endpoint is unofficial and
@@ -164,7 +177,7 @@ This has caused misdirected generation more than once:
 - **A backfill does not necessarily cover today, so a fresh mapping needs both steps.**
   Yahoo consolidates the newest daily candle late: for hours after a session closes,
   `range=` still returns it with `close: null`, and the parser drops it rather than
-  interpolate. Measured on VWCE.DE, IWDA.AS and SXR8.DE at 22:20Z on a Saturday — the
+  interpolate. Measured on three ETFs on two exchanges at 22:20Z on a Saturday — the
   Friday candle was null; ten minutes later the same request had it filled. Crypto is
   unaffected (24/7, no consolidation gap), which is why testing this on `BTC-EUR` shows
   nothing. `prices:sync` is what closes the gap, writing the live session from
@@ -172,11 +185,68 @@ This has caused misdirected generation more than once:
   timestamp), so `@@unique([instrumentId, asOf])` keeps both and `latest()` resolves the
   sync's. Run backfill first and sync second — the requirement is that **both** run;
   ending on the sync just means the last row written is also the newest in time.
-- `PriceSnapshot` is append-only and idempotent via `@@unique([instrumentId, asOf])`.
-- Remapping an `Instrument.quoteSymbol` **deletes** that instrument's existing snapshots.
-  Two symbols' prices must never share a series. That deletion lives in exactly one place,
-  `remapQuoteSymbol` — `prices:map` and the instruments screen both go through it, and a
-  test pins that the delete precedes the write.
+- `PriceSnapshot` is idempotent via `@@unique([instrumentId, asOf])`.
+- **A sync fills gaps, then writes at most one live row per Madrid day.** `prices:sync` and
+  "Refresh prices" share `syncInstrumentPrices`, one instrument at a time (`inTurn` on the
+  client, as "Rebuild all"). It asks Yahoo for daily candles from the Madrid day of the
+  instrument's newest row, **whatever its source**, minus `SYNC_OVERLAP_DAYS` (7), through
+  yesterday; today's candle is dropped because it has not closed. Then the live quote,
+  stored as `YAHOO_LIVE` (`liveSource`) and dated by **its own** `regularMarketTime`, never
+  by the clock — on a Saturday it is Friday's close and belongs to Friday. The overlap is
+  what heals rows written before `YAHOO_LIVE` existed: they cannot be told apart from
+  candles, and nothing tries to.
+- **Once a day has its candle, that candle is the day's only row** (`planDailyWrite`, applied
+  by `PriceRepository.saveDaily` in one transaction). Any other row that Madrid day is
+  deleted by id, `YAHOO` or `YAHOO_LIVE`; a candle on an `asOf` already stored updates it.
+  Each candle is *inserted* (its day had no candle, even if a live or old `YAHOO` row is
+  replaced), *corrected* (same `asOf`, new price) or *unchanged* (not written). Only
+  inserted ones are "recovered" on screen: the overlap re-reads a week every time, so a
+  count of candles written would claim recoveries on every click.
+- **A candle Yahoo has not consolidated arrives dated correctly with `close: null`**, and
+  the parser drops it. Measured 2026-10-15 at 10:20Z: two ETFs still had a null 14/10
+  candle, a stock on the same exchange as one of them had it. The day keeps its live row until a
+  later sync inside the overlap window finds the close — not a filter bug.
+  A live quote is not written on a day that has a candle, and replaces the day's earlier
+  live row. `latest()` never returns to an **earlier day**; within one day it may move from
+  the live row's time back to the session open, because the close it carries is newer
+  information. "Day" is `dayOf` in `core/calendar`, the same Madrid rule as `periodOf`.
+- **Deleting an instrument's snapshots happens in two places, both atomic:** `saveDaily`
+  above, and `PriceRepository.replaceHistory`. One transaction deletes the
+  instrument's rows (all of them, or only those at or before `keepAfter`), writes the new
+  ones and, if asked, sets `quoteSymbol`. A failed write rolls back the delete and the
+  symbol together — an integration test pins that. Two symbols' prices must never share
+  a series, so a symbol change only ever goes through it.
+- **`replaceQuoteHistory` fetches everything before it writes anything.** Daily candles
+  first; none, or any not in EUR, returns a failure and touches nothing — a failed Yahoo
+  call must leave the old series intact. Then today's quote, kept only if fresh, in EUR
+  and newer than the last candle, because the newest daily candle can arrive without a
+  close. If that quote is missing and the symbol is unchanged, rows newer than the last
+  candle are kept (`keepAfter`), so `latest()` never moves back. On a symbol change it
+  may: the old rows belong to another security.
+- **"Only EUR is valued" is one function: `foreignCurrency` in `core/domain/money.ts`.**
+  `replaceQuoteHistory` refuses with it, `backfillInstrument` stores nothing and reports
+  `foreignCurrency` (so the wizard's `fill` skips that instrument's sync too),
+  `checkSymbol` carries it so the symbol check warns and `canSave` refuses, and
+  `assignQuoteSymbol` asks the provider for a quote and refuses on the server too, so the
+  `map` endpoint holds when called without the screen. `syncInstrumentPrices` writes
+  nothing when a gap candle is foreign and no live row when the quote is. Write any new
+  check through this function, never as a literal `"EUR"`.
+- **The wizard's `map` only assigns; it cannot replace.** `assignQuoteSymbol` refuses an
+  instrument that already has prices and the endpoint sends the user to Instruments.
+  Changing a symbol is the `replace` intent, which carries the range and goes through
+  `replaceQuoteHistory` — the same function as "Download the history again", "Rebuild all
+  histories", `prices:map` and `prices:rebuild`.
+- **The default range never shortens what is stored.** `rangeSince(earliest, now)` is the
+  wider of `DEFAULT_HISTORY_RANGE` and the range covering the oldest stored row;
+  `lostHistoryBefore` names the date a narrower choice would drop, and the screen says it
+  before confirming.
+- **Coarse candles are detected by gaps only** (`isCoarseSeries`): more than half the gaps
+  ≥6 days, or three ≥6-day gaps in a row. Two rows on one Madrid day is **not** a signal:
+  a live quote beside that day's candle produces exactly that, and Yahoo's weekly candle
+  (Monday 00:00 exchange time, measured on an ETF) looks the same. Undetectable cases
+  exist — a monthly BTC candle that overwrote the day-1 daily one leaves a perfectly daily
+  series — so "Rebuild all histories" is always offered and no text claims a history is
+  clean.
 
 ## The live ledger — never the agent's target
 
@@ -272,6 +342,12 @@ ISIN itself, and always sanity-check the price magnitude.
   fund with a different entitlement per certificate — observed at 5.5x, 0.5x and 0.4x the
   correct line. Check the candidate price against the broker's own `amount / quantity` for
   a real trade before committing the mapping.
+- **The symbol check does that comparison itself** (`checkQuoteAgainstLedger`): the last
+  three EUR trades of the instrument, `grossAmount / quantity` against the last close at
+  or before each trade, within a week, never a later one. It downloads only that date
+  span. The warning is on the **median** deviation above 10%, so one odd fill does not
+  trip it while a 0.4x or 5.5x line always does. Kraken reward buys are excluded: they
+  were valued from a price history, so comparing them with one proves nothing.
 
 ## Exposure and look-through
 
@@ -302,8 +378,11 @@ ISIN itself, and always sanity-check the price magnitude.
 - **Contributions are kept, not summed.** "NVIDIA is 11.6%" is not actionable; "9.9% direct,
   1.4% via FTSE" is. The provenance is lost in the fold, so the fold keeps it.
   `weightInParent: null` marks a direct holding, distinct from a 100% constituent.
-- **Leaf totals are derived (`leafTotal`), never stored.** Storing both invites the day they
-  disagree — which is exactly how the fee bug happened.
+- A leaf's total and weight are computed once, in withLeafTotals, and carried
+  on the leaf; computeExposures is the only producer. The sort,
+  summarizeExposures, toExposureRows and tailOf read total/weight and never
+  call leafTotal/leafWeight. Those two remain the definition, and a test pins
+  the carried fields to them. Do not add a second place that computes either.
 
 ## Holdings import — one parser, no issuer branches
 
@@ -417,10 +496,22 @@ manual aliasing was abandoned — 726 confirmations is not a system.
 - `computePositions` uses **AVCO** (weighted average cost) for the portfolio view.
   **FIFO** exists only for foral tax (`computeTaxHistory`, over the `walkFifo` fold in
   `core/tax/`) and is a **separate** projection. Do not merge them.
-- **Contributed ("aportado") = what left the bank, fees included.** One definition, shared
-  by `computePositions.costBasis`, `computeCostBasisTimeline`, `computeReturns.totalInvested`
-  and the XIRR cash flows. Rationale: the foral rule puts inherent costs inside the
-  acquisition value, and excluding them flatters returns.
+- **Two money-in figures, both with fees included, and they are not interchangeable.**
+  *Cost of what you hold* ("Coste de lo que tienes") is the AVCO cost of the open
+  positions — `computePositions.costBasis`, `computeCostBasisTimeline`, the chart's cost
+  line, and `PortfolioSummary.openCost` (priced or not). *Total contributed* ("Total
+  aportado") is the money that left the bank: every purchase paid in cash, sold ones
+  included — `computeReturns.totalInvested` and `computeTotalContributed`, which in real mode
+  restates each purchase at its own month. The XIRR flows use the same per-trade amounts.
+  Fees stay inside both because the foral rule puts inherent costs inside the acquisition
+  value, and excluding them flatters returns.
+- **An `IN_KIND` purchase is cost but not contribution.** A Kraken reward or a Trade
+  Republic saveback is `funding: "IN_KIND"`: it enters AVCO and FIFO at its market value on
+  receipt, and stays out of *Total contributed*, the contribution count, the average and
+  the XIRR flows (`isInKind`), on both sides of the opportunity cost too. **TWR keeps it**:
+  `portfolioFlows` carries every trade and only the MWR list filters, because value
+  arriving with no flow behind it is booked by TWR as return. `since` comes from the full
+  list. Expect MWR to rise when units arrive for free; that is the point, not a bug.
 - **TWR excludes fees on purpose** — it uses price marks (`grossAmount / quantity`), and a
   fee is not a price. TWR = how the **asset** did. MWR/XIRR = how **my money** did. Their
   divergence under DCA is the point, not a bug.
@@ -528,8 +619,18 @@ manual aliasing was abandoned — 726 confirmations is not a system.
   named "USD Acc" states the fund's *denomination* currency, not the currency of the line
   being bought — it needs no conversion.
 - Positions without a usable price are excluded from **both** `totalValue` and
-  `totalInvested`, and reported via `unpricedCount`. Adding a cost without its value
-  invents a loss.
+  `totalInvested` (= `pricedCost`, what `returnPct` and the all-time hero change measure
+  against), and reported via `unpricedCount` / `unpricedCost`. Adding a cost without its
+  value invents a loss. `openCost` is the one figure that includes them.
+- **The Summary line, TWR and MWR leave out every open unpriced instrument whole**, sales
+  included, through one set: `unpricedOpenIds` → `withoutInstruments`, and the filtered
+  ledger feeds both the series and the flows (`twr:explain` does the same). Filtering only
+  the series keeps a flow with no value behind it and breaks a TWR link. Closed positions
+  stay in, priced or not — nothing is held, so nothing needs a price.
+- **A return is stated through `periodReturns`, on Summary and on an instrument alike.**
+  From the first included trade to today, independent of the range selector, on the
+  `YEAR_MS` 365-day year `xirr` uses: a year or more shows the annual figure with the
+  cumulative beside it; under a year, the period return (`(1 + IRR)^years − 1` for MWR).
 - The portfolio series merge carries each instrument's **last known value forward** across
   gaps. Without it, an instrument missing a datapoint on some date counts as 0 and opens a
   false valley.
@@ -718,18 +819,62 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
   value of the units.
 - **No price for that day means discard (`reward-unpriced`), never zero.** A discard is
   counted and printed; a zero is a wrong number that looks like data. Fix by running
-  `prices:backfill` and importing again — dedup by `refid` makes re-import safe.
+  `prices:backfill` and importing again — dedup by `refid` makes re-import safe. The
+  plan reads BTC prices **before** anything is written, so a first import into an empty
+  database sets every reward aside; the wizard re-imports the same file after its price
+  step and `pnpm ingest` offers to, both merging the two writes with `mergeRewardRetry`.
+  An unpriced reward still carries the BTC instrument, so a file of nothing but rewards
+  creates BTC and the mapping step can reach it.
 - **The lookup never reaches forward.** `priceLookupFrom` takes the last close at or before
   the timestamp, within 7 days; a later candle is information that did not exist yet.
 - Scope is still BTC-only by choice (`isBtc` in `map.ts`). Measured on a real export:
-  87% of refid groups are discarded as `non-btc` — SOL and ETH `earn`, plus `welcomebonus`
-  in five assets. `pnpm ingest` prints the count under one label, so the breakdown by asset
-  is not visible from the summary.
+  most refid groups are set aside — `earn` rewards and `welcomebonus` in other assets. **A discard is classified by what it does to a modelled position, not by asset.**
+  `unmodelled-asset` is noise (rewards, transfers and trades of assets Quoin does not
+  track); `crypto-swap` (BTC ↔ another crypto, in either direction), `crypto-transfer`
+  (BTC on-chain in or out) and `reward-unpriced` each leave the BTC position wrong, and
+  `AFFECTS_POSITION` flags them so the wizard and `pnpm ingest` warn. Every Kraken discard
+  carries a per-group detail (date, type, subtype, asset or pair — never amounts).
+  `DiscardReason` is a union and its labels are `Record<DiscardReason, string>` in both
+  locales, so a new reason without a label or a position decision does not compile.
 - **A reward's income leg is a `DIVIDEND` event, not a dedicated type.** The shape already
   fits — instrument plus gross amount, no quantity needed — and a new type would touch the
   SQLite `LedgerEntry` CHECK migration for no functional gain. `mapGroup` emits it alongside
   the BUY, same market value, distinct `externalId` (`refid:income`) so both survive dedup.
-  Distinguish it from a real fund dividend by `note: "kraken-reward-income"`, not by type.
+  Both legs are `funding: "IN_KIND"`, and that — not the note — is what makes the income
+  "Recompensa" on screen and keeps the BUY out of contributions. The notes stay for
+  `symbol-check`, which excludes the BUY because its price came from a history.
+- **No tax figure reads this income, and its classification is pending.** `/tax` lists the
+  year's `IN_KIND` dividends in their own block, "pendiente de verificar", added to nothing;
+  a test pins that `computeTaxHistory` and `buildTaxYearView` are unchanged by them. Do not
+  write a classification into a comment or a total until it is verified.
+
+## Trade Republic saveback
+
+A `BENEFITS_SAVEBACK` row is cash with no units, followed by the purchase it paid for.
+`pairSavebacks` joins them, pure, before mapping: a `TRADING|BUY` within **7 calendar days
+after** the saveback (measured on a real export: 1 day pairs under a third, 3 days all but one —
+a long weekend — 7 days all of them), of the saveback's instrument when it names one, for exactly
+`amount − |tax|` of the saveback. That one rule covers both regimes: until Nov 2025 the
+retention sits on the purchase's `tax` and the gross is bought; from Dec 2025 it sits on the
+saveback and the net is bought. Dec 2025–May 2026 savebacks carry no name or ISIN, so the
+amount alone decides there.
+
+- **A pair counts only when it is unique both ways** — one candidate for the saveback, and
+  that purchase a candidate for no other saveback. Anything else is `saveback-unpaired`:
+  the purchase stays `CASH`, which overstates contributions, never invents free units.
+  Rows are deduplicated by `transaction_id` before pairing, or a repeated line is an
+  ambiguity that does not exist.
+- **A pair is one operation in two rows**, like a Kraken reward: the purchase as `IN_KIND`,
+  and the saveback as an `IN_KIND` `DIVIDEND` in that fund, carrying the retention from
+  whichever row holds it. Movements then nets each pair to exactly the cash that moved.
+- **The only write that changes a stored ledger row is `markInKind`.** Saveback rows were
+  discarded before this existed, so past purchases sit in the ledger as `CASH` and only a
+  re-import can mark them; `append` skips existing rows, so `persistBatch` calls
+  `markInKind` after it. It flips `funding` from `CASH` to `IN_KIND` on rows matching an
+  `IN_KIND` event by `(source, externalId)` — never the reverse, never another column. Not
+  the reverse because an export that cuts a pair in half maps the purchase as `CASH`, and
+  re-importing it must not undo a pair an earlier file found. An integration test pins that
+  no other column moves. Every other ledger write is append-only.
 
 ## Ledger entry types
 
@@ -747,7 +892,10 @@ adding it in **both** places, in the same change.
   never modelled anywhere.
 - **The CHECK lives only in migration SQL** — Prisma cannot express it in `schema.prisma`
   for SQLite. A future migration that rebuilds `LedgerEntry` (SQLite rebuilds the table for
-  most column changes) will silently drop it. Re-add it in that migration.
+  most column changes) will silently drop it. Re-add it in that migration. Adding `funding`
+  is the measured case: `migrate dev` generated a rebuild for a plain new column, so it was
+  written with `--create-only` as `ADD COLUMN`. `funding` has its own CHECK
+  (`CASH | IN_KIND`), same reason as `type`.
 
 ## CSV ingestion
 
@@ -1009,7 +1157,8 @@ The image is **public**. Everything below was found by running it, not by readin
   pushes by digest and a `merge` job joins them; do not fold the matrix back into one
   `platforms: linux/amd64,linux/arm64` build to "simplify" it.
 - **Only `db:backup` ships as a CLI** (`docker exec quoin npm run db:backup`; the image
-  has no pnpm). Every other command has a screen. Adding one means copying its script and
+  has no pnpm). Every other command has a screen, except the CLI-only destructive options
+  above (`ipc:sync --force-rebase`, `prices:map --clear`). Adding one means copying its script and
   every file it imports, and `~/` imports need the tsconfig and `app/` too.
 
 ## Working agreement

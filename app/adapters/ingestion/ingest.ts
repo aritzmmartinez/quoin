@@ -5,22 +5,29 @@ import {
   type LedgerRepository,
 } from "~/core/ports";
 
-export interface DiscardDetail {
-  date: string;
-  type: string;
-  instrument: string | null;
-}
+import type { DiscardDetail, DiscardReason } from "./discard";
+
+export type { DiscardDetail, DiscardReason } from "./discard";
+
+export type DiscardCounts = Partial<Record<DiscardReason, number>>;
+export type DiscardDetails = Partial<Record<DiscardReason, DiscardDetail[]>>;
 
 export type MappedItem =
   | { kind: "domain"; instrument: Instrument | null; event: LedgerEvent }
-  | { kind: "discard"; reason: string; detail?: DiscardDetail };
+  | {
+      kind: "discard";
+      reason: DiscardReason;
+      detail?: DiscardDetail;
+      instrument?: Instrument;
+    };
 
 export interface MappedBatch {
   total: number;
   instruments: Instrument[];
   events: LedgerEvent[];
-  discarded: Record<string, number>;
-  discardedDetails: Record<string, DiscardDetail[]>;
+  operationOf: number[];
+  discarded: DiscardCounts;
+  discardedDetails: DiscardDetails;
   errors: number;
 }
 
@@ -28,20 +35,32 @@ export interface ImportSummary {
   total: number;
   imported: number;
   duplicates: number;
-  discarded: Record<string, number>;
-  discardedDetails: Record<string, DiscardDetail[]>;
+  discarded: DiscardCounts;
+  discardedDetails: DiscardDetails;
   errors: number;
   instruments: number;
 }
 
 export class BatchBuilder {
   private readonly events: LedgerEvent[] = [];
+  private readonly operationOf: number[] = [];
+  private operations = 0;
   private readonly instruments = new Map<string, Instrument>();
-  private readonly discarded: Record<string, number> = {};
-  private readonly discardedDetails: Record<string, DiscardDetail[]> = {};
+  private readonly discarded: DiscardCounts = {};
+  private readonly discardedDetails: DiscardDetails = {};
   private errors = 0;
 
   add(item: MappedItem): void {
+    this.addOperation([item]);
+  }
+
+  addOperation(items: readonly MappedItem[]): void {
+    const operation = this.operations;
+    this.operations += 1;
+    for (const item of items) this.addItem(item, operation);
+  }
+
+  private addItem(item: MappedItem, operation: number): void {
     if (item.kind === "discard") {
       this.discarded[item.reason] = (this.discarded[item.reason] ?? 0) + 1;
       if (item.detail) {
@@ -49,12 +68,16 @@ export class BatchBuilder {
         list.push(item.detail);
         this.discardedDetails[item.reason] = list;
       }
+      if (item.instrument) {
+        this.instruments.set(item.instrument.id, item.instrument);
+      }
       return;
     }
     if (item.instrument) {
       this.instruments.set(item.instrument.id, item.instrument);
     }
     this.events.push(item.event);
+    this.operationOf.push(operation);
   }
 
   addError(): void {
@@ -66,11 +89,46 @@ export class BatchBuilder {
       total,
       instruments: [...this.instruments.values()],
       events: this.events,
+      operationOf: this.operationOf,
       discarded: this.discarded,
       discardedDetails: this.discardedDetails,
       errors: this.errors,
     };
   }
+}
+
+export function countOperations(
+  batch: MappedBatch,
+  existing: ReadonlySet<string>,
+): { imported: number; duplicates: number } {
+  const writes = new Map<number, boolean>();
+  batch.events.forEach((event, index) => {
+    const operation = batch.operationOf[index] ?? index;
+    const isNew =
+      !event.externalId ||
+      !existing.has(ledgerDedupKey(event.source, event.externalId));
+    writes.set(operation, (writes.get(operation) ?? false) || isNew);
+  });
+  let imported = 0;
+  for (const writesSomething of writes.values()) {
+    if (writesSomething) imported += 1;
+  }
+  return { imported, duplicates: writes.size - imported };
+}
+
+function summarize(
+  batch: MappedBatch,
+  counts: { imported: number; duplicates: number },
+): ImportSummary {
+  return {
+    total: batch.total,
+    imported: counts.imported,
+    duplicates: counts.duplicates,
+    discarded: batch.discarded,
+    discardedDetails: batch.discardedDetails,
+    errors: batch.errors,
+    instruments: batch.instruments.length,
+  };
 }
 
 export async function persistBatch(
@@ -79,16 +137,10 @@ export async function persistBatch(
   batch: MappedBatch,
 ): Promise<ImportSummary> {
   await instruments.upsert(batch.instruments);
-  const { inserted, skipped } = await ledger.append(batch.events);
-  return {
-    total: batch.total,
-    imported: inserted,
-    duplicates: skipped,
-    discarded: batch.discarded,
-    discardedDetails: batch.discardedDetails,
-    errors: batch.errors,
-    instruments: batch.instruments.length,
-  };
+  const existing = await ledger.existing(batch.events);
+  await ledger.append(batch.events);
+  await ledger.markInKind(batch.events);
+  return summarize(batch, countOperations(batch, existing));
 }
 
 export async function previewBatch(
@@ -96,22 +148,5 @@ export async function previewBatch(
   batch: MappedBatch,
 ): Promise<ImportSummary> {
   const existing = await ledger.existing(batch.events);
-  let duplicates = 0;
-  for (const event of batch.events) {
-    if (
-      event.externalId &&
-      existing.has(ledgerDedupKey(event.source, event.externalId))
-    ) {
-      duplicates += 1;
-    }
-  }
-  return {
-    total: batch.total,
-    imported: batch.events.length - duplicates,
-    duplicates,
-    discarded: batch.discarded,
-    discardedDetails: batch.discardedDetails,
-    errors: batch.errors,
-    instruments: batch.instruments.length,
-  };
+  return summarize(batch, countOperations(batch, existing));
 }

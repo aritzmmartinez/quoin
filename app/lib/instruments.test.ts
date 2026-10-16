@@ -38,7 +38,10 @@ describe("toInstrumentListItems", () => {
       [position("US67066G1040", "10")],
       new Map([priced("US67066G1040", "1250.00")]),
     );
-    expect(item?.resolvesTo).toBe("COMPANY:US67066G1040");
+    expect(item?.resolvesTo).toEqual({
+      kind: "COMPANY",
+      id: "US67066G1040",
+    });
     expect(item?.isExplicit).toBe(false);
     expect(item?.value).toBe("1250.00");
   });
@@ -49,7 +52,7 @@ describe("toInstrumentListItems", () => {
       [],
       new Map(),
     );
-    expect(item?.resolvesTo).toBe("COMMODITY:XAU");
+    expect(item?.resolvesTo).toEqual({ kind: "COMMODITY", id: "XAU" });
     expect(item?.isExplicit).toBe(true);
   });
 
@@ -153,6 +156,41 @@ describe("toInstrumentListItems", () => {
       new Map(),
     );
     expect(items).toHaveLength(2);
+  });
+});
+
+describe("toInstrumentListItems history", () => {
+  const at = (iso: string) => new Date(`${iso}T07:00:00.000Z`);
+
+  it("carries where the stored history starts and flags coarse candles", () => {
+    const monthly = ["2025-01-01", "2025-02-01", "2025-03-01", "2025-04-01"];
+    const daily = ["2026-10-05", "2026-10-06", "2026-10-07", "2026-10-08"];
+    const items = toInstrumentListItems(
+      [instrument({ id: "M", name: "M" }), instrument({ id: "D", name: "D" })],
+      [],
+      new Map(),
+      new Map(),
+      "es-ES",
+      new Map([
+        ["M", monthly.map(at)],
+        ["D", daily.map(at)],
+      ]),
+    );
+    const byId = new Map(items.map((i) => [i.id, i]));
+
+    expect(byId.get("M")).toMatchObject({
+      historyStart: "2025-01-01T07:00:00.000Z",
+      coarseHistory: true,
+    });
+    expect(byId.get("D")).toMatchObject({
+      historyStart: "2026-10-05T07:00:00.000Z",
+      coarseHistory: false,
+    });
+  });
+
+  it("has no start and nothing to flag without a single price", () => {
+    const [item] = toInstrumentListItems([instrument()], [], new Map());
+    expect(item).toMatchObject({ historyStart: null, coarseHistory: false });
   });
 });
 

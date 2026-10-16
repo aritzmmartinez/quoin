@@ -1,3 +1,4 @@
+import { Receipt } from "lucide-react";
 import { useNavigation } from "react-router";
 
 import type { Route } from "./+types/realized";
@@ -9,6 +10,7 @@ import {
 import {
   BasisNotice,
   Card,
+  EmptyState,
   RealizedTable,
   RealizedViewTabs,
   TaxYearPanel,
@@ -151,14 +153,11 @@ export default function Realized({ loaderData }: Route.ComponentProps) {
 
       <Card>
         {totals.count === 0 ? (
-          <div className="px-6 py-16 text-center">
-            <div className="text-[15px] font-semibold">
-              {t.realized.empty.title}
-            </div>
-            <p className="mx-auto mt-1.5 max-w-sm text-[13px] text-muted">
-              {t.realized.empty.body}
-            </p>
-          </div>
+          <EmptyState
+            icon={Receipt}
+            title={t.realized.empty.title}
+            body={t.realized.empty.body}
+          />
         ) : (
           <RealizedTable
             years={years}

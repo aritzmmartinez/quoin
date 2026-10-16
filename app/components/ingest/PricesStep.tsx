@@ -3,21 +3,23 @@ import { useState } from "react";
 import type { HistoryRange } from "~/core/ports";
 import type { PriceFillResult } from "~/lib/ingest";
 
-import { DEFAULT_HISTORY_RANGE, HISTORY_RANGES, useCopy } from "~/lib";
+import { DEFAULT_HISTORY_RANGE, useCopy } from "~/lib";
 import { Button } from "../ui/Button";
-import { Select } from "../ui/Select";
 import { postIngest } from "./api";
+import { HistoryRangeSelect } from "./HistoryRangeSelect";
 
 export function PricesStep({
   instrumentIds,
+  initialRange = DEFAULT_HISTORY_RANGE,
   onDone,
 }: {
   instrumentIds: readonly string[];
+  initialRange?: HistoryRange;
   onDone: (result: PriceFillResult | null) => void;
 }) {
   const t = useCopy();
   const copy = t.ingest.prices;
-  const [range, setRange] = useState<HistoryRange>(DEFAULT_HISTORY_RANGE);
+  const [range, setRange] = useState<HistoryRange>(initialRange);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,23 +49,10 @@ export function PricesStep({
       <p className="mb-4 text-[12px] text-muted">{copy.rangeHint}</p>
 
       <div className="mb-4">
-        <span aria-hidden className="mb-1 block text-[11px] text-muted">
-          {copy.range}
-        </span>
-        <Select
-          label={copy.range}
-          value={range}
-          onChange={(value) => setRange(value as HistoryRange)}
-          options={HISTORY_RANGES.map((option) => ({
-            value: option,
-            label: option,
-          }))}
-          disabled={busy}
-          className="w-40"
-        />
+        <HistoryRangeSelect value={range} onChange={setRange} disabled={busy} />
       </div>
 
-      <Button onClick={() => void run()} disabled={busy}>
+      <Button variant="primary" onClick={() => void run()} disabled={busy}>
         {busy ? copy.running : copy.run}
       </Button>
 

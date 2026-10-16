@@ -102,7 +102,9 @@ function Cell({
     case "type":
       return (
         <span className={TYPE_TONE[row.type]}>
-          {t.movements.types[row.type]}
+          {row.inKind && (row.type === "BUY" || row.type === "DIVIDEND")
+            ? t.movements.inKindTypes[row.type]
+            : t.movements.types[row.type]}
         </span>
       );
 

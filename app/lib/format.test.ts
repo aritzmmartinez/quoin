@@ -69,6 +69,14 @@ describe("formatPercent", () => {
     expect(norm(formatPercent("0.1732"))).toContain("%");
   });
 
+  it("signs a deviation on request, and leaves zero unsigned", () => {
+    expect(norm(formatPercent("0.0125", 1, { signed: true }))).toContain("+1,3");
+    expect(norm(formatPercent("-0.00125", 1, { signed: true }))).toMatch(
+      /[-−]0,1/,
+    );
+    expect(norm(formatPercent("0", 1, { signed: true }))).not.toMatch(/[+-]/);
+  });
+
   it("floors a tiny non-zero weight to '<0,1 %' rather than '0,0 %'", () => {
     const out = norm(formatPercent("0.0001344", 1, { floorNonZero: true }));
     expect(out).toContain("<0,1");

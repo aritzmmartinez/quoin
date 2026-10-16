@@ -1,4 +1,5 @@
 export * from "./detect";
+export * from "./discard";
 export * from "./ingest";
 export * from "./trade-republic/adapter";
 export * from "./trade-republic/map";

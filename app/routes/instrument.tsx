@@ -12,10 +12,11 @@ import {
   Card,
   InstrumentHeader,
   InstrumentStats,
-  InvestedVsValue,
   MovementsTable,
-  PriceChartWithTrades,
 } from "~/components";
+import { InstrumentPriceChart } from "~/components/instrument/InstrumentPriceChart";
+import { InstrumentValueChart } from "~/components/instrument/InstrumentValueChart";
+import { buildPriceChartData } from "~/components/instrument/price-chart-data";
 import {
   PrismaInstrumentRepository,
   PrismaLedgerRepository,
@@ -82,33 +83,18 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
   const returns = computeReturns(events, id, currentPrice, now);
 
-  const priceChartData = [
-    ...computeCostBasisTimeline(events, id).map((pt) => ({
-      t: new Date(pt.ts).getTime(),
-      price: null as number | null,
-      avgCost: Number(pt.avgCostAfter),
-      buy: pt.side === "BUY" ? Number(pt.tradePrice) : null,
-      sell: pt.side === "SELL" ? Number(pt.tradePrice) : null,
-    })),
-    ...baseHistory.map((s) => ({
-      t: s.asOf.getTime(),
-      price: Number(s.price),
-      avgCost: null as number | null,
-      buy: null as number | null,
-      sell: null as number | null,
-    })),
-    ...(currentPrice !== null
-      ? [
-          {
-            t: now.getTime(),
-            price: Number(currentPrice),
-            avgCost: null,
-            buy: null,
-            sell: null,
-          },
-        ]
-      : []),
-  ].sort((a, b) => a.t - b.t);
+  const priceChartData = buildPriceChartData(
+    computeCostBasisTimeline(events, id),
+    [
+      ...baseHistory.map((s) => ({
+        t: s.asOf.getTime(),
+        price: Number(s.price),
+      })),
+      ...(currentPrice !== null
+        ? [{ t: now.getTime(), price: Number(currentPrice) }]
+        : []),
+    ],
+  );
 
   const ivvData = computeInvestedVsValueSeries(
     events,
@@ -145,7 +131,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       marketValue: marketValue?.toString() ?? null,
       unrealizedPnL: unrealizedPnL?.toString() ?? null,
     },
-    kpis: returns,
+    kpis: { ...returns, openCost: costBasis.toString() },
     priceChartData,
     ivvData,
     movements,
@@ -168,8 +154,8 @@ export default function Instrument({ loaderData }: Route.ComponentProps) {
     <>
       <InstrumentHeader instrument={instrument} />
       <InstrumentStats kpis={kpis} />
-      <PriceChartWithTrades data={priceChartData} />
-      <InvestedVsValue data={ivvData} />
+      <InstrumentPriceChart data={priceChartData} />
+      <InstrumentValueChart data={ivvData} />
       <Card className="overflow-hidden">
         <div className="px-gutter pb-3 pt-4 text-[14px] font-semibold">
           {t.instrument.movements.title}

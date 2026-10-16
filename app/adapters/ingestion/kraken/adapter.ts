@@ -30,9 +30,7 @@ export class KrakenCsvAdapter {
     const builder = new BatchBuilder();
     for (const group of groups.values()) {
       try {
-        for (const item of mapGroup(group, priceAt)) {
-          builder.add(item);
-        }
+        builder.addOperation(mapGroup(group, priceAt));
       } catch {
         builder.addError();
       }

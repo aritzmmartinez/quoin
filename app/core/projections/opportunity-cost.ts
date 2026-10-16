@@ -3,9 +3,11 @@ import Decimal from "decimal.js";
 import {
   BASE_CURRENCY,
   Money,
+  isInKind,
   type LedgerEvent,
   type TradeEvent,
 } from "../domain";
+import { dayOf } from "../calendar";
 import type { PriceSnapshot } from "../ports";
 import type { PriceLike } from "./market-value";
 import { xirr, type CashFlow } from "./xirr";
@@ -44,24 +46,6 @@ export interface OpportunityCostInput {
   prices: ReadonlyMap<string, PriceLike>;
   baseCurrency?: string;
   now?: Date;
-}
-
-const DAY_IN_MADRID = new Intl.DateTimeFormat("en-CA", {
-  timeZone: "Europe/Madrid",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-});
-
-function dayOf(date: Date): string {
-  const parts = DAY_IN_MADRID.formatToParts(date);
-  const year = parts.find((p) => p.type === "year")?.value;
-  const month = parts.find((p) => p.type === "month")?.value;
-  const day = parts.find((p) => p.type === "day")?.value;
-  if (!year || !month || !day) {
-    throw new Error(`Cannot derive a day from ${date.toISOString()}`);
-  }
-  return `${year}-${month}-${day}`;
 }
 
 interface Close {
@@ -187,6 +171,7 @@ export function computeOpportunityCost(
     }
 
     bucket.quantity = bucket.quantity.plus(trade.quantity);
+    if (isInKind(trade)) continue;
     const spent = gross.add(fees);
     bucket.contributed = bucket.contributed.add(spent);
     bucket.flows.push({ t, amount: spent.negate().toNumber() });

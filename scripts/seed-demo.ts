@@ -238,6 +238,7 @@ interface LedgerRow {
   source: string;
   externalId: string;
   note: string | null;
+  funding?: "IN_KIND";
 }
 
 function buildLedger(
@@ -351,26 +352,14 @@ function buildLedger(
       );
     }
     if (month % 3 === 0) {
-      trade(
-        addDays(day, 4),
-        "BUY",
-        "BTC",
-        new Decimal(120),
-        new Decimal(0.85),
-      );
+      trade(addDays(day, 4), "BUY", "BTC", new Decimal(120), new Decimal(0.85));
     }
   }
 
   const q3 = new Date(
     Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth() - 9, 12, 10, 30),
   );
-  trade(
-    q3,
-    "BUY",
-    "NL00DEMO0003",
-    new Decimal(1500),
-    new Decimal(1),
-  );
+  trade(q3, "BUY", "NL00DEMO0003", new Decimal(1500), new Decimal(1));
 
   const sell = new Date(
     Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth() - 3, 18, 15, 45),
@@ -415,6 +404,30 @@ function buildLedger(
     "quarterly dividend",
     "NL00DEMO0003",
     new Decimal(2.76),
+  );
+
+  const saveback = (
+    ts: Date,
+    gross: Decimal,
+    bought: Decimal,
+    withheld: Decimal,
+  ): void => {
+    trade(addDays(ts, 1), "BUY", "IE00DEMO0001", bought, new Decimal(0));
+    rows[rows.length - 1]!.funding = "IN_KIND";
+    cash(ts, "DIVIDEND", gross, "saveback", "IE00DEMO0001", withheld);
+    rows[rows.length - 1]!.funding = "IN_KIND";
+  };
+  saveback(
+    new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth() - 4, 2, 6)),
+    new Decimal(6),
+    new Decimal(6),
+    new Decimal(1.14),
+  );
+  saveback(
+    new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth() - 1, 2, 6)),
+    new Decimal(5),
+    new Decimal(4.05),
+    new Decimal(0.95),
   );
 
   const custody = new Date(

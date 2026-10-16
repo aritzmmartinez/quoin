@@ -1,11 +1,12 @@
+import type { PeriodReturns } from "~/core/projections";
 import { useCopy, useFormat } from "~/lib";
 
 import { Card } from "../ui/Card";
-import { signClass, signedPercent } from "../ui/signed";
+import { periodReturnTile, signClass } from "../ui/signed";
 
 export interface InstrumentKpis {
-  twr: string | null;
-  mwr: string | null;
+  period: PeriodReturns;
+  openCost: string;
   totalInvested: string;
   buyCount: number;
   avgBuyAmount: string;
@@ -36,23 +37,31 @@ function Tile({
 }
 
 export function InstrumentStats({ kpis }: { kpis: InstrumentKpis }) {
-  const { formatMoney, formatPercent } = useFormat();
+  const format = useFormat();
+  const { formatMoney } = format;
   const t = useCopy();
   const k = t.instrument.kpis;
+  const twr = periodReturnTile(kpis.period, "twr", format, t);
+  const mwr = periodReturnTile(kpis.period, "mwr", format, t);
   return (
     <Card className="mb-6">
-      <div className="grid grid-cols-2 divide-x divide-y divide-border sm:grid-cols-3 lg:grid-cols-5 lg:divide-y-0">
+      <div className="grid grid-cols-2 divide-x divide-y divide-border sm:grid-cols-3 lg:grid-cols-6 lg:divide-y-0">
         <Tile
-          label={k.twr.label}
-          sub={k.twr.sub}
-          value={signedPercent(formatPercent, kpis.twr)}
-          valueClass={signClass(kpis.twr)}
+          label={k.twr}
+          sub={twr.sub}
+          value={twr.value}
+          valueClass={signClass(twr.sign)}
         />
         <Tile
-          label={k.mwr.label}
-          sub={k.mwr.sub}
-          value={signedPercent(formatPercent, kpis.mwr)}
-          valueClass={signClass(kpis.mwr)}
+          label={k.mwr}
+          sub={mwr.sub}
+          value={mwr.value}
+          valueClass={signClass(mwr.sign)}
+        />
+        <Tile
+          label={k.openCost.label}
+          sub={k.openCost.sub}
+          value={formatMoney(kpis.openCost)}
         />
         <Tile
           label={k.totalInvested.label}

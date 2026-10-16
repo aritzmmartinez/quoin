@@ -1,6 +1,9 @@
+import { TrendingUp } from "lucide-react";
+import { data } from "react-router";
+
 import type { Route } from "./+types/projection";
 
-import { ProjectionPanel } from "~/components";
+import { Card, ProjectionPanel, SetupChecklist } from "~/components";
 import {
   computeProjection,
   projectionWindow,
@@ -17,8 +20,16 @@ import {
   parseGoal,
   parseHorizonYears,
   type ProjectionView,
+  setupPending,
+  targetStep,
+  tradesStep,
+  useCopy,
 } from "~/lib";
-import { loadProjectionContext } from "~/lib/projection.server";
+import {
+  loadProjectionContext,
+  type ProjectionContext,
+} from "~/lib/projection.server";
+import { createServerTiming, type ServerTiming } from "~/lib/server-timing";
 
 export function meta({ matches }: Route.MetaArgs) {
   const t = copyFromMatches(matches);
@@ -30,14 +41,34 @@ export function meta({ matches }: Route.MetaArgs) {
 
 export const handle = { title: (t: Copy) => t.projection.title };
 
+export function headers({ loaderHeaders }: Route.HeadersArgs) {
+  return loaderHeaders;
+}
+
 export async function loader({ request }: Route.LoaderArgs) {
-  const params = new URL(request.url).searchParams;
+  const timing = createServerTiming();
+  const context = await loadProjectionContext(new Date(), timing);
+  const view = projectionView(
+    new URL(request.url).searchParams,
+    context,
+    timing,
+  );
+  const setup = [
+    tradesStep(context.hasTrades),
+    targetStep(context.plan !== null),
+  ];
+  return data({ view, setup }, { headers: timing.headers() });
+}
+
+function projectionView(
+  params: URLSearchParams,
+  { annualInflation, plan }: ProjectionContext,
+  timing: ServerTiming,
+) {
   const horizonYears = parseHorizonYears(params);
   const horizonMonths = horizonYears * 12;
   const goal = parseGoal(params);
   const extended = parseExtended(params);
-
-  const { annualInflation, plan } = await loadProjectionContext();
 
   const empty = {
     horizonYears,
@@ -100,11 +131,13 @@ export async function loader({ request }: Route.LoaderArgs) {
     } satisfies ProjectionView;
   }
 
-  const result = computeProjection({
-    ...input,
-    horizonMonths,
-    monthlyContribution: contribution,
-  });
+  const result = timing.time("simulate", () =>
+    computeProjection({
+      ...input,
+      horizonMonths,
+      monthlyContribution: contribution,
+    }),
+  );
 
   const unsimulated: NamedValue[] = result.unsimulatedInstrumentIds.map(
     (id) => ({
@@ -124,20 +157,37 @@ export async function loader({ request }: Route.LoaderArgs) {
         ? null
         : {
             amount: goal,
-            monthlyContribution: solveContribution(
-              { ...input, horizonMonths },
-              goal,
+            monthlyContribution: timing.time("goal-contribution", () =>
+              solveContribution({ ...input, horizonMonths }, goal),
             ),
-            horizonMonths: solveHorizon(
-              { ...input, monthlyContribution: contribution },
-              goal,
+            horizonMonths: timing.time("goal-horizon", () =>
+              solveHorizon(
+                { ...input, monthlyContribution: contribution },
+                goal,
+              ),
             ),
           },
   } satisfies ProjectionView;
 }
 
 export default function Projection({ loaderData }: Route.ComponentProps) {
-  return <ProjectionPanel view={loaderData} />;
+  const t = useCopy();
+  const { view, setup } = loaderData;
+
+  if (setupPending(setup)) {
+    return (
+      <Card>
+        <SetupChecklist
+          icon={TrendingUp}
+          title={t.setup.screens.projection.title}
+          body={t.setup.screens.projection.body}
+          steps={setup}
+        />
+      </Card>
+    );
+  }
+
+  return <ProjectionPanel view={view} />;
 }
 
 export { ErrorBoundary } from "~/components/ui/ErrorBoundary";

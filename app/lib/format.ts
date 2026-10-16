@@ -1,5 +1,6 @@
 import Decimal from "decimal.js";
 
+import { dayOf } from "~/core/calendar";
 import { Money } from "~/core/domain";
 
 import { intlTag, type Locale } from "./locale";
@@ -28,7 +29,7 @@ export interface Format {
   formatPercent: (
     fraction: string,
     maximumFractionDigits?: number,
-    options?: { floorNonZero?: boolean },
+    options?: { floorNonZero?: boolean; signed?: boolean },
   ) => string;
   formatRelativeTime: (iso: string, now?: Date) => string;
   formatClock: (now?: Date) => string;
@@ -107,13 +108,14 @@ export function createFormat(locale: Locale): Format {
   function formatPercent(
     fraction: string,
     maximumFractionDigits = 1,
-    options: { floorNonZero?: boolean } = {},
+    options: { floorNonZero?: boolean; signed?: boolean } = {},
   ): string {
     const value = new Decimal(fraction);
     const formatter = new Intl.NumberFormat(tag, {
       style: "percent",
       minimumFractionDigits: maximumFractionDigits,
       maximumFractionDigits,
+      ...(options.signed ? { signDisplay: "exceptZero" as const } : {}),
     });
     if (
       options.floorNonZero &&
@@ -170,13 +172,6 @@ export function createFormat(locale: Locale): Format {
   };
 }
 
-const DAY_IN_MADRID = new Intl.DateTimeFormat("en-CA", {
-  timeZone: "Europe/Madrid",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-});
-
 export function todayInMadrid(now: Date = new Date()): string {
-  return DAY_IN_MADRID.format(now);
+  return dayOf(now);
 }

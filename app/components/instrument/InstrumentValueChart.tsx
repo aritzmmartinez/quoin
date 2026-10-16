@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { filterByRange, type Range, useCopy } from "~/lib";
+import { type Range, rangedSeries, useCopy } from "~/lib";
 
 import {
   InvestedVsValueChart,
@@ -11,11 +11,15 @@ import { RangeSelector } from "../ui/RangeSelector";
 
 export type { InvestedVsValueDatum };
 
-export function InvestedVsValue({ data }: { data: InvestedVsValueDatum[] }) {
+export function InstrumentValueChart({
+  data,
+}: {
+  data: InvestedVsValueDatum[];
+}) {
   const t = useCopy();
   const [range, setRange] = useState<Range>("all");
   const c = t.instrument.ivvChart;
-  const view = filterByRange(data, range);
+  const series = rangedSeries(data, range, 2);
 
   return (
     <Card className="mb-6 p-4">
@@ -23,11 +27,15 @@ export function InvestedVsValue({ data }: { data: InvestedVsValueDatum[] }) {
         <h2 className="text-[14px] font-semibold">{c.title}</h2>
         <RangeSelector value={range} onChange={setRange} />
       </div>
-      {data.length < 2 ? (
+      {series.kind === "empty" ? (
         <p className="py-10 text-center text-[13px] text-muted">{c.building}</p>
+      ) : series.kind === "outOfRange" ? (
+        <p className="py-10 text-center text-[13px] text-muted">
+          {t.range.empty}
+        </p>
       ) : (
         <InvestedVsValueChart
-          data={view}
+          data={series.points}
           labels={{ value: c.value, invested: c.invested }}
         />
       )}

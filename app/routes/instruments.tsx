@@ -13,7 +13,11 @@ import {
   PrismaLedgerRepository,
   PrismaPriceRepository,
 } from "~/adapters/persistence";
-import { Card, InstrumentsTable, SyncPricesButton } from "~/components";
+import {
+  Card,
+  InstrumentsTable,
+  RebuildHistories,
+} from "~/components";
 import {
   BASE_CURRENCY,
   KINDS_NEEDING_LEAF,
@@ -45,12 +49,15 @@ export function meta({ matches }: Route.MetaArgs) {
 export const handle = { title: (t: Copy) => t.instruments.title };
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const [events, instruments, prices, holdings] = await Promise.all([
-    new PrismaLedgerRepository().list(),
-    new PrismaInstrumentRepository().list(),
-    new PrismaPriceRepository().latest(),
-    new PrismaHoldingsRepository().all(),
-  ]);
+  const priceRepository = new PrismaPriceRepository();
+  const [events, instruments, prices, holdings, candleTimes] =
+    await Promise.all([
+      new PrismaLedgerRepository().list(),
+      new PrismaInstrumentRepository().list(),
+      priceRepository.latest(),
+      new PrismaHoldingsRepository().all(),
+      priceRepository.candleTimes(),
+    ]);
 
   const positions = computePositions(events);
   const marketValues = computeMarketValues(positions, prices, BASE_CURRENCY);
@@ -61,6 +68,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     marketValues,
     holdings,
     tag,
+    candleTimes,
   );
 
   return { items, unmapped: needsMapping(items).length };
@@ -170,19 +178,38 @@ async function importHoldings(t: Copy, form: Record<string, unknown>) {
 export default function Instruments({ loaderData }: Route.ComponentProps) {
   const t = useCopy();
   const { items, unmapped } = loaderData;
+  const coarse = items.filter((item) => item.coarseHistory);
+  const rebuildable = items.flatMap((item) =>
+    item.quoteSymbol
+      ? [
+          {
+            id: item.id,
+            name: item.name,
+            symbol: item.quoteSymbol,
+            historyStart: item.historyStart,
+          },
+        ]
+      : [],
+  );
 
   return (
     <>
-      <header className="mb-4">
-        <div className="flex items-start justify-between gap-4">
-          <p className="text-[13px] text-muted">{t.instruments.intro}</p>
-          <SyncPricesButton />
+      <header className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div className="space-y-2 text-[13px] text-muted">
+          <p>{t.instruments.intro}</p>
+          {coarse.length > 0 && (
+            <p>
+              {t.instruments.history.coarse(
+                coarse.length,
+                coarse.map((item) => item.name).join(", "),
+              )}
+            </p>
+          )}
+          {unmapped > 0 && <p>{t.instruments.unmappedHint(unmapped)}</p>}
         </div>
-        {unmapped > 0 && (
-          <p className="mt-2 text-[13px] text-muted">
-            {t.instruments.unmappedHint(unmapped)}
-          </p>
-        )}
+        <div className="shrink-0">
+          <RebuildHistories targets={rebuildable} />
+        </div>
       </header>
 
       <Card className="overflow-hidden">

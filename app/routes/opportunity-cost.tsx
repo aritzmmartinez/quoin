@@ -1,3 +1,4 @@
+import { Scale } from "lucide-react";
 import { Link } from "react-router";
 
 import type { Route } from "./+types/opportunity-cost";
@@ -9,6 +10,8 @@ import {
 } from "~/adapters/persistence";
 import {
   Card,
+  EmptyState,
+  IngestModal,
   OpportunityTable,
   Explainer,
   SignedMoney,
@@ -85,17 +88,19 @@ export default function OpportunityCost({ loaderData }: Route.ComponentProps) {
   if (!loaderData.ok) {
     return (
       <Card>
-        <div className="px-6 py-16 text-center">
-          <div className="text-[15px] font-semibold">{o.title}</div>
-          <p className="mx-auto mt-1.5 max-w-md text-[13px] text-muted">
-            {loaderData.reason === "unmapped"
+        <EmptyState
+          icon={Scale}
+          title={o.title}
+          body={
+            loaderData.reason === "unmapped"
               ? o.unmapped(loaderData.symbol)
-              : o.noHistory(loaderData.symbol)}
-          </p>
-          <Link to="/settings" className={`${buttonClass()} mt-4`}>
+              : o.noHistory(loaderData.symbol)
+          }
+        >
+          <Link to="/settings" className={buttonClass()}>
             {o.chooseBenchmark}
           </Link>
-        </div>
+        </EmptyState>
       </Card>
     );
   }
@@ -122,12 +127,9 @@ export default function OpportunityCost({ loaderData }: Route.ComponentProps) {
 
       {rows.length === 0 ? (
         <Card>
-          <div className="px-6 py-16 text-center">
-            <div className="text-[15px] font-semibold">{o.empty.title}</div>
-            <p className="mx-auto mt-1.5 max-w-sm text-[13px] text-muted">
-              {o.empty.body}
-            </p>
-          </div>
+          <EmptyState icon={Scale} title={o.empty.title} body={o.empty.body}>
+            <IngestModal variant="primary" size="md" />
+          </EmptyState>
         </Card>
       ) : (
         <>

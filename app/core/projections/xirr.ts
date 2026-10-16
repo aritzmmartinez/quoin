@@ -3,7 +3,7 @@ export interface CashFlow {
   amount: number;
 }
 
-const YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+export const YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 
 const RATE_FLOOR = -0.999999;
 const RATE_CEILING = 1e6;

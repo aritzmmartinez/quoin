@@ -20,7 +20,7 @@ const GAP = 2.5;
 const RADIUS = (SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
-export function DonutChart({
+export function Donut({
   slices,
   label,
 }: {

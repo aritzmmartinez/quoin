@@ -1,15 +1,17 @@
 import Decimal from "decimal.js";
 
 import {
-  leafKey,
   resolveIntrinsic,
   type ExposureKind,
   type Instrument,
   type InstrumentType,
+  type LeafId,
   type Thesis,
 } from "~/core/domain";
 import type { EtfHolding } from "~/core/ports";
 import type { MarketValue, Position } from "~/core/projections";
+
+import { isCoarseSeries } from "./coarse-candles";
 
 export interface InstrumentListItem {
   id: string;
@@ -21,7 +23,7 @@ export interface InstrumentListItem {
   ter: string | null;
   hedgedToBase: boolean;
   thesis: Thesis;
-  resolvesTo: string;
+  resolvesTo: LeafId | null;
   isExplicit: boolean;
   quantity: string;
   isClosed: boolean;
@@ -29,6 +31,8 @@ export interface InstrumentListItem {
   holdingsCount: number;
   holdingsCovered: string | null;
   holdingsAsOf: string | null;
+  historyStart: string | null;
+  coarseHistory: boolean;
 }
 
 export function toInstrumentListItems(
@@ -37,6 +41,7 @@ export function toInstrumentListItems(
   marketValues: ReadonlyMap<string, MarketValue>,
   holdings: ReadonlyMap<string, EtfHolding[]> = new Map(),
   tag = "es-ES",
+  candleTimes: ReadonlyMap<string, readonly Date[]> = new Map(),
 ): InstrumentListItem[] {
   const held = new Map<string, Decimal>();
   const valued = new Map<string, Decimal>();
@@ -55,6 +60,7 @@ export function toInstrumentListItems(
     const quantity = held.get(instrument.id) ?? new Decimal(0);
     const value = valued.get(instrument.id);
     const composition = holdings.get(instrument.id) ?? [];
+    const times = candleTimes.get(instrument.id) ?? [];
     const covered = composition.reduce(
       (sum, h) => sum.plus(new Decimal(h.weight)),
       new Decimal(0),
@@ -70,7 +76,7 @@ export function toInstrumentListItems(
       ter: instrument.ter ?? null,
       hedgedToBase: instrument.hedgedToBase ?? false,
       thesis: instrument.thesis,
-      resolvesTo: leaf ? leafKey(leaf.leaf) : "—",
+      resolvesTo: leaf ? leaf.leaf : null,
       isExplicit: Boolean(instrument.exposureKind),
       quantity: quantity.toFixed(),
       isClosed: quantity.isZero(),
@@ -78,6 +84,8 @@ export function toInstrumentListItems(
       holdingsCount: composition.length,
       holdingsCovered: composition.length > 0 ? covered.toString() : null,
       holdingsAsOf: composition[0]?.asOf.toISOString() ?? null,
+      historyStart: times[0]?.toISOString() ?? null,
+      coarseHistory: isCoarseSeries(times),
     };
   });
 
@@ -93,6 +101,6 @@ export function needsMapping(
   items: readonly InstrumentListItem[],
 ): InstrumentListItem[] {
   return items.filter(
-    (i) => !i.isExplicit && i.resolvesTo.startsWith("UNRESOLVED"),
+    (i) => !i.isExplicit && i.resolvesTo?.kind === "UNRESOLVED",
   );
 }

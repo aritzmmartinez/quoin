@@ -10,6 +10,7 @@ export interface SummaryHeroProps {
   changePct: string | null;
   range: Range;
   unpricedCount: number;
+  unpricedCost: string;
   hasPositions: boolean;
 }
 
@@ -19,6 +20,7 @@ export function SummaryHero({
   changePct,
   range,
   unpricedCount,
+  unpricedCost,
   hasPositions,
 }: SummaryHeroProps) {
   const { formatMoney, formatSignedMoney, formatPercent } = useFormat();
@@ -62,7 +64,7 @@ export function SummaryHero({
         </p>
       )}
       {unpricedCount > 0 && (
-        <p className="text-[12px] text-muted">{h.unpriced(unpricedCount)}</p>
+        <p className="text-[12px] text-muted">{h.unpriced(unpricedCount, formatMoney(unpricedCost))}</p>
       )}
     </header>
   );

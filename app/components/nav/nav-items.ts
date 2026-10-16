@@ -1,10 +1,10 @@
 import {
   ArrowLeftRight,
   Boxes,
+  Crosshair,
   LayoutDashboard,
   PieChart,
   Settings,
-  Target,
   TrendingUp,
   Wallet,
   type LucideIcon,
@@ -25,7 +25,7 @@ export function navItems(t: Copy): readonly NavItem[] {
     { label: t.nav.portfolio, icon: Wallet, to: "/portfolio" },
     { label: t.nav.allocation, icon: PieChart, to: "/allocation" },
     { label: t.nav.movements, icon: ArrowLeftRight, to: "/movements" },
-    { label: t.target.title, icon: Target, to: "/target" },
+    { label: t.target.title, icon: Crosshair, to: "/target" },
     { label: t.projection.title, icon: TrendingUp, to: "/projection" },
     { label: t.nav.instruments, icon: Boxes, to: "/instruments" },
   ];

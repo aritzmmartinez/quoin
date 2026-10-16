@@ -1,20 +1,24 @@
 import { isFreshQuote } from "~/adapters/marketdata";
-import type { Instrument } from "~/core/domain";
-import type { PriceSnapshot, Quote } from "~/core/ports";
+import { dayOf, shiftDay } from "~/core/calendar";
+import { foreignCurrency, type Instrument } from "~/core/domain";
+import type {
+  MarketDataProvider,
+  PriceRepository,
+  PriceSnapshot,
+  Quote,
+} from "~/core/ports";
+import { liveSource } from "~/core/prices";
 
 import type { Copy } from "./i18n";
 
-export type SyncableInstrument = Pick<
-  Instrument,
-  "id" | "name" | "quoteSymbol"
->;
+export const SYNC_OVERLAP_DAYS = 7;
 
-export interface PriceSyncFailure {
-  instrumentId: string;
+const DAY_MS = 86_400_000;
+
+export interface SyncTarget {
+  id: string;
   name: string;
-  symbol: string;
-  reason: "stale" | "no-quote";
-  asOf: Date | null;
+  quoteSymbol: string;
 }
 
 export interface UnmappedInstrument {
@@ -22,111 +26,163 @@ export interface UnmappedInstrument {
   name: string;
 }
 
-export interface PriceSyncPlan {
-  mapped: number;
-  unmapped: UnmappedInstrument[];
-  snapshots: PriceSnapshot[];
-  failures: PriceSyncFailure[];
-}
-
-export function planPriceSync(
-  instruments: readonly SyncableInstrument[],
-  quotes: readonly Quote[],
-  source: string,
-  now: Date = new Date(),
-): PriceSyncPlan {
+export function toSyncTargets(
+  instruments: readonly Pick<Instrument, "id" | "name" | "quoteSymbol">[],
+): { targets: SyncTarget[]; unmapped: UnmappedInstrument[] } {
+  const targets: SyncTarget[] = [];
   const unmapped: UnmappedInstrument[] = [];
-  const idsBySymbol = new Map<string, SyncableInstrument[]>();
-
-  for (const instrument of instruments) {
-    const symbol = instrument.quoteSymbol;
-    if (!symbol) {
-      unmapped.push({ instrumentId: instrument.id, name: instrument.name });
-      continue;
-    }
-    const bucket = idsBySymbol.get(symbol);
-    if (bucket) bucket.push(instrument);
-    else idsBySymbol.set(symbol, [instrument]);
+  for (const { id, name, quoteSymbol } of instruments) {
+    if (quoteSymbol) targets.push({ id, name, quoteSymbol });
+    else unmapped.push({ instrumentId: id, name });
   }
-
-  const mapped = instruments.length - unmapped.length;
-  const snapshots: PriceSnapshot[] = [];
-  const failures: PriceSyncFailure[] = [];
-  const answered = new Set<string>();
-
-  for (const quote of quotes) {
-    const holders = idsBySymbol.get(quote.symbol);
-    if (!holders) continue;
-    if (answered.has(quote.symbol)) continue;
-    answered.add(quote.symbol);
-
-    const fresh = isFreshQuote(quote, now);
-    for (const instrument of holders) {
-      if (!fresh) {
-        failures.push({
-          instrumentId: instrument.id,
-          name: instrument.name,
-          symbol: quote.symbol,
-          reason: "stale",
-          asOf: quote.asOf,
-        });
-        continue;
-      }
-      snapshots.push({
-        instrumentId: instrument.id,
-        price: quote.price,
-        currency: quote.currency,
-        asOf: quote.asOf,
-        source,
-      });
-    }
-  }
-
-  for (const [symbol, holders] of idsBySymbol) {
-    if (answered.has(symbol)) continue;
-    for (const instrument of holders) {
-      failures.push({
-        instrumentId: instrument.id,
-        name: instrument.name,
-        symbol,
-        reason: "no-quote",
-        asOf: null,
-      });
-    }
-  }
-
-  return { mapped, unmapped, snapshots, failures };
+  return { targets, unmapped };
 }
 
-export interface PriceSyncCounts {
-  mapped: number;
-  updated: number;
-  stale: number;
-  noQuote: number;
+export type SyncProblem = "no-quote" | "stale" | "not-eur" | "error";
+
+export interface InstrumentSync {
+  instrumentId: string;
+  name: string;
+  inserted: number;
+  corrected: number;
+  live: boolean;
+  problem: SyncProblem | null;
+}
+
+export interface SyncDeps {
+  prices: PriceRepository;
+  provider: MarketDataProvider;
+  now?: Date;
+}
+
+function toSnapshot(
+  instrumentId: string,
+  quote: Quote,
+  source: string,
+): PriceSnapshot {
+  return {
+    instrumentId,
+    price: quote.price,
+    currency: quote.currency,
+    asOf: quote.asOf,
+    source,
+  };
+}
+
+async function gapCandles(
+  deps: SyncDeps,
+  target: SyncTarget,
+  now: Date,
+): Promise<Quote[]> {
+  const last = await deps.prices.lastAsOf(target.id);
+  if (!last) return [];
+  const from = shiftDay(dayOf(last), -SYNC_OVERLAP_DAYS);
+  const yesterday = shiftDay(dayOf(now), -1);
+  if (from > yesterday) return [];
+  const history = await deps.provider.getHistory(target.quoteSymbol, {
+    from: new Date(last.getTime() - (SYNC_OVERLAP_DAYS + 1) * DAY_MS),
+    to: now,
+  });
+  return history.filter((quote) => {
+    const day = dayOf(quote.asOf);
+    return day >= from && day <= yesterday;
+  });
+}
+
+export async function syncInstrumentPrices(
+  deps: SyncDeps,
+  target: SyncTarget,
+): Promise<InstrumentSync> {
+  const now = deps.now ?? new Date();
+  const { provider } = deps;
+  const result = (
+    written: { inserted: number; corrected: number; live: boolean },
+    problem: SyncProblem | null,
+  ): InstrumentSync => ({
+    instrumentId: target.id,
+    name: target.name,
+    ...written,
+    problem,
+  });
+
+  const candles = await gapCandles(deps, target, now);
+  if (foreignCurrency(candles)) {
+    return result({ inserted: 0, corrected: 0, live: false }, "not-eur");
+  }
+
+  const quote = (await provider.getQuotes([target.quoteSymbol])).find(
+    (q) => q.symbol === target.quoteSymbol,
+  );
+  let problem: SyncProblem | null = null;
+  let live: PriceSnapshot | null = null;
+  if (!quote) problem = "no-quote";
+  else if (foreignCurrency([quote])) problem = "not-eur";
+  else if (!isFreshQuote(quote, now)) problem = "stale";
+  else live = toSnapshot(target.id, quote, liveSource(provider.source));
+
+  const written = await deps.prices.saveDaily(
+    target.id,
+    candles.map((c) => toSnapshot(target.id, c, provider.source)),
+    live,
+  );
+  return result(written, problem);
+}
+
+export function failedSync(target: Pick<SyncTarget, "id" | "name">): InstrumentSync {
+  return {
+    instrumentId: target.id,
+    name: target.name,
+    inserted: 0,
+    corrected: 0,
+    live: false,
+    problem: "error",
+  };
+}
+
+export function splitUnmapped(
+  unmapped: readonly UnmappedInstrument[],
+  openIds: ReadonlySet<string>,
+): { open: number; closed: number } {
+  const open = unmapped.filter((u) => openIds.has(u.instrumentId)).length;
+  return { open, closed: unmapped.length - open };
 }
 
 export interface PriceSyncToast {
   message: string;
   description?: string;
+  failures: { name: string; reason: string }[];
 }
 
 export function priceSyncToast(
   t: Copy,
-  counts: PriceSyncCounts,
+  steps: readonly InstrumentSync[],
+  unmapped: { open: number; closed: number },
 ): PriceSyncToast {
   const copy = t.instruments.sync;
-  if (counts.mapped === 0) return { message: copy.nothing };
+  const failures = steps.flatMap((step) =>
+    step.problem ? [{ name: step.name, reason: copy.problem[step.problem] }] : [],
+  );
+  const inserted = steps.reduce((sum, step) => sum + step.inserted, 0);
 
-  const failed = counts.stale + counts.noQuote;
-  const headline = copy.done(counts.updated, counts.mapped);
-  if (failed === 0) return { message: headline };
-
+  const unmappedParts = [
+    unmapped.open > 0 ? copy.unmappedOpen(unmapped.open) : null,
+    unmapped.closed > 0 ? copy.unmappedClosed(unmapped.closed) : null,
+  ].filter((part): part is string => part !== null);
   const description = [
-    counts.stale > 0 ? copy.staleDetail(counts.stale) : null,
-    counts.noQuote > 0 ? copy.noQuoteDetail(counts.noQuote) : null,
+    inserted > 0 ? copy.candles(inserted) : null,
+    unmappedParts.length > 0
+      ? `${unmappedParts.join(" · ")}. ${copy.unmappedAction}`
+      : null,
   ]
     .filter((part): part is string => part !== null)
-    .join(" · ");
+    .join(". ");
 
-  return { message: `${headline}, ${copy.failed(failed)}`, description };
+  const message =
+    steps.length === 0
+      ? copy.nothing
+      : copy.done(steps.length - failures.length, steps.length);
+
+  return description === ""
+    ? { message, failures }
+    : { message, description, failures };
 }

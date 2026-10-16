@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { computeCurrencyExposure } from "./currency-exposure";
-import type { LeafExposure } from "./exposures";
+import type { LeafExposureInput } from "./exposures";
 
 const leaf = (
   id: string,
@@ -10,8 +10,8 @@ const leaf = (
     value: string;
     weightInParent?: string | null;
   }[],
-  kind: LeafExposure["leaf"]["kind"] = "COMPANY",
-): LeafExposure => ({
+  kind: LeafExposureInput["leaf"]["kind"] = "COMPANY",
+): LeafExposureInput => ({
   leaf: { kind, id },
   name: id,
   contributions: contributions.map((c) => ({

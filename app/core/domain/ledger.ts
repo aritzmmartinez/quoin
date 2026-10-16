@@ -50,6 +50,9 @@ const baseEventSchema = z.object({
   note: z.string().nullish(),
 });
 
+export const fundingSchema = z.enum(["CASH", "IN_KIND"]);
+export type Funding = z.infer<typeof fundingSchema>;
+
 export const tradeEventSchema = baseEventSchema.extend({
   type: z.enum(["BUY", "SELL"]),
   instrumentId: z.string(),
@@ -57,6 +60,7 @@ export const tradeEventSchema = baseEventSchema.extend({
   price: decimalString,
   grossAmount: decimalString,
   fees: decimalString,
+  funding: fundingSchema.optional(),
 });
 export type TradeEvent = z.infer<typeof tradeEventSchema>;
 
@@ -65,6 +69,7 @@ export const dividendEventSchema = baseEventSchema.extend({
   instrumentId: z.string(),
   grossAmount: decimalString,
   taxWithheld: decimalString,
+  funding: fundingSchema.optional(),
 });
 export type DividendEvent = z.infer<typeof dividendEventSchema>;
 
@@ -82,6 +87,10 @@ export const ledgerEventSchema = z.discriminatedUnion("type", [
 export type LedgerEvent = z.infer<typeof ledgerEventSchema>;
 
 export type LedgerEventType = LedgerEvent["type"];
+
+export function isInKind(event: LedgerEvent): boolean {
+  return "funding" in event && event.funding === "IN_KIND";
+}
 
 export const MAX_TER_PERCENT = 5;
 

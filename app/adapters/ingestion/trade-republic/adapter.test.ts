@@ -57,10 +57,15 @@ class FakeInstrumentRepository implements InstrumentRepository {
 
 class FakeLedgerRepository implements LedgerRepository {
   appended: LedgerEvent[] = [];
-  async existing(): Promise<Set<string>> {
-    return new Set();
-  }
   private seen = new Set<string>();
+  async existing(events: readonly LedgerEvent[]): Promise<Set<string>> {
+    return new Set(
+      events
+        .filter((e) => e.externalId)
+        .map((e) => `${e.source}::${e.externalId}`)
+        .filter((key) => this.seen.has(key)),
+    );
+  }
   async append(events: readonly LedgerEvent[]) {
     let inserted = 0;
     let skipped = 0;
@@ -78,6 +83,23 @@ class FakeLedgerRepository implements LedgerRepository {
   }
   async list(_filter?: LedgerEventFilter): Promise<LedgerEvent[]> {
     return this.appended;
+  }
+  async markInKind(events: readonly LedgerEvent[]): Promise<number> {
+    let changed = 0;
+    for (const event of events) {
+      if (!("funding" in event) || event.funding !== "IN_KIND") continue;
+      this.appended = this.appended.map((stored) => {
+        const same =
+          stored.source === event.source &&
+          stored.externalId === event.externalId &&
+          stored.type === event.type;
+        if (!same || ("funding" in stored && stored.funding === "IN_KIND"))
+          return stored;
+        changed++;
+        return { ...stored, funding: "IN_KIND" } as LedgerEvent;
+      });
+    }
+    return changed;
   }
 }
 
@@ -112,7 +134,10 @@ describe("TradeRepublicCsvAdapter", () => {
     expect(summary.total).toBe(7);
     expect(summary.imported).toBe(5);
     expect(summary.duplicates).toBe(0);
-    expect(summary.discarded).toEqual({ "card-spending": 1, unsupported: 1 });
+    expect(summary.discarded).toEqual({
+      "card-spending": 1,
+      "saveback-unpaired": 1,
+    });
     expect(summary.errors).toBe(0);
     expect(summary.instruments).toBe(2);
     expect(instruments.upserted).toHaveLength(2);
@@ -126,5 +151,57 @@ describe("TradeRepublicCsvAdapter", () => {
     expect(second.imported).toBe(0);
     expect(second.duplicates).toBe(5);
     expect(ledger.appended).toHaveLength(5);
+  });
+
+  const SAVEBACK_CSV = [
+    HEADER,
+    `"2025-06-02T08:00:00Z","CASH","BENEFITS_SAVEBACK","","Test ETF","IE00AAA","","","1.000000","","","EUR","s-old"`,
+    `"2025-06-02T08:04:00Z","TRADING","BUY","FUND","Test ETF","IE00AAA","0.01","100","-1.00","","-0.19","EUR","b-old"`,
+    `"2026-01-02T05:30:00Z","CASH","BENEFITS_SAVEBACK","","","","","","2.000000","","-0.380000","EUR","s-new"`,
+    `"2026-01-05T09:00:00Z","TRADING","BUY","FUND","Test ETF","IE00AAA","0.0162","100","-1.62","","","EUR","b-new"`,
+  ].join("\n");
+
+  const found = (externalId: string) =>
+    ledger.appended.find((e) => e.externalId === externalId);
+
+  it("books a paired saveback as an in-kind purchase plus in-kind income, in both regimes", async () => {
+    const summary = await adapter.import(SAVEBACK_CSV);
+
+    expect(summary.imported).toBe(2);
+    expect(summary.discarded).toEqual({});
+    for (const [buy, income, gross, tax] of [
+      ["b-old", "s-old", "1", "0.19"],
+      ["b-new", "s-new", "2", "0.38"],
+    ] as const) {
+      expect(found(buy)).toMatchObject({ type: "BUY", funding: "IN_KIND" });
+      expect(found(income)).toMatchObject({
+        type: "DIVIDEND",
+        instrumentId: "IE00AAA",
+        grossAmount: gross,
+        taxWithheld: tax,
+        funding: "IN_KIND",
+      });
+    }
+  });
+
+  it("keeps the purchase's amount and fee exactly as the file states them", async () => {
+    await adapter.import(SAVEBACK_CSV);
+    expect(found("b-old")).toMatchObject({ grossAmount: "1", fees: "0" });
+    expect(found("b-new")).toMatchObject({ grossAmount: "1.62", fees: "0" });
+  });
+
+  it("marks a purchase already stored as CASH when a re-import finds its saveback", async () => {
+    const purchasesOnly = SAVEBACK_CSV.split("\n")
+      .filter((line) => !line.includes("BENEFITS_SAVEBACK"))
+      .join("\n");
+    await adapter.import(purchasesOnly);
+    expect(found("b-old")).not.toHaveProperty("funding", "IN_KIND");
+
+    await adapter.import(SAVEBACK_CSV);
+    expect(found("b-old")).toMatchObject({ funding: "IN_KIND" });
+    expect(found("s-old")).toMatchObject({ funding: "IN_KIND" });
+    expect(
+      ledger.appended.filter((e) => e.externalId === "b-old"),
+    ).toHaveLength(1);
   });
 });

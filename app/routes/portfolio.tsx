@@ -1,3 +1,4 @@
+import Decimal from "decimal.js";
 import { useNavigation } from "react-router";
 
 import type { Route } from "./+types/portfolio";
@@ -8,6 +9,7 @@ import {
   PortfolioEmpty,
   PortfolioTable,
   SignedMoney,
+  SyncPricesButton,
 } from "~/components";
 import {
   PrismaInstrumentRepository,
@@ -27,7 +29,9 @@ import {
   parseLocale,
   parseSort,
   sortPortfolioRows,
+  splitUnmapped,
   toPortfolioRows,
+  toSyncTargets,
   totalInvested,
   totalMarketValue,
   totalUnrealizedPnL,
@@ -74,9 +78,18 @@ export async function loader({ request }: Route.LoaderArgs) {
     }
   }
 
+  const { targets, unmapped } = toSyncTargets(instruments);
+  const openIds = new Set(
+    positions
+      .filter((p) => new Decimal(p.quantity).gt(0))
+      .map((p) => p.instrumentId),
+  );
+
   return {
     rows,
     sort,
+    syncTargets: targets.map(({ id, name }) => ({ id, name })),
+    unmapped: splitUnmapped(unmapped, openIds),
     invested: totalInvested(rows),
     value: totalMarketValue(rows),
     unrealized: totalUnrealizedPnL(rows),
@@ -87,7 +100,16 @@ export async function loader({ request }: Route.LoaderArgs) {
 export default function Portfolio({ loaderData }: Route.ComponentProps) {
   const { formatMoney, formatRelativeTime } = useFormat();
   const t = useCopy();
-  const { rows, sort, invested, value, unrealized, updatedAt } = loaderData;
+  const {
+    rows,
+    sort,
+    invested,
+    value,
+    unrealized,
+    updatedAt,
+    syncTargets,
+    unmapped,
+  } = loaderData;
   const navigation = useNavigation();
   const busy = navigation.state === "loading";
 
@@ -99,7 +121,7 @@ export default function Portfolio({ loaderData }: Route.ComponentProps) {
             {rows.length > 0 && (
               <span className="text-[13px] text-muted">
                 {t.portfolio.summary(rows.length, formatMoney(invested))}
-                {value !== null && <> · {formatMoney(value)} valor</>}
+                {value !== null && <> · {t.portfolio.value(formatMoney(value))}</>}
               </span>
             )}
             {unrealized !== null && (
@@ -117,7 +139,12 @@ export default function Portfolio({ loaderData }: Route.ComponentProps) {
             </p>
           )}
         </div>
-        <IngestModal />
+        {rows.length > 0 && (
+          <div className="flex shrink-0 items-center gap-2">
+            <SyncPricesButton targets={syncTargets} unmapped={unmapped} />
+            <IngestModal />
+          </div>
+        )}
       </header>
 
       <Card>

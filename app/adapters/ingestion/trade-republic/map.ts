@@ -65,8 +65,10 @@ function base(row: TradeRepublicRow) {
  * Map a Trade Republic row to a domain contribution, or flag it for discard.
  *
  * Card spending is discarded (the CSV is the whole bank account, not just investing).
- * Saveback, corporate actions and any unrecognized type are discarded as "unsupported"
- * so they surface in the import summary instead of being silently mis-booked.
+ * A saveback reaching here found no purchase to pair with (`mapSavebackPurchase`
+ * handles the ones that did). Corporate actions and any unrecognized type are
+ * discarded as "unsupported" so they surface in the import summary instead of
+ * being silently mis-booked.
  */
 export function mapRow(row: TradeRepublicRow): MappedItem {
   switch (`${row.category}|${row.type}`) {
@@ -123,6 +125,18 @@ export function mapRow(row: TradeRepublicRow): MappedItem {
         event: toCash(row, "WITHDRAWAL"),
       };
 
+    case "CASH|BENEFITS_SAVEBACK":
+      return {
+        kind: "discard",
+        reason: "saveback-unpaired",
+        detail: {
+          date: row.datetime,
+          type: row.type,
+          subtype: null,
+          instrument: row.name || null,
+        },
+      };
+
     case "CASH|CARD_TRANSACTION":
     case "CASH|CARD_TRANSACTION_INTERNATIONAL":
       return { kind: "discard", reason: "card-spending" };
@@ -134,10 +148,40 @@ export function mapRow(row: TradeRepublicRow): MappedItem {
         detail: {
           date: row.datetime,
           type: row.type,
+          subtype: null,
           instrument: row.name || null,
         },
       };
   }
+}
+
+export function mapSavebackPurchase(
+  buy: TradeRepublicRow,
+  saveback: TradeRepublicRow,
+): MappedItem[] {
+  const purchase = mapRow(buy);
+  if (purchase.kind !== "domain" || purchase.event.type !== "BUY") {
+    throw new Error(
+      `Saveback ${saveback.transaction_id} paired with a non-buy`,
+    );
+  }
+  return [
+    { ...purchase, event: { ...purchase.event, funding: "IN_KIND" } },
+    {
+      kind: "domain",
+      instrument: null,
+      event: dividendEventSchema.parse({
+        ...base(saveback),
+        type: "DIVIDEND",
+        instrumentId: buy.symbol,
+        grossAmount: abs(saveback.amount),
+        taxWithheld: new Decimal(absOrZero(saveback.tax))
+          .plus(absOrZero(buy.tax))
+          .toFixed(),
+        funding: "IN_KIND",
+      }),
+    },
+  ];
 }
 
 function toCash(

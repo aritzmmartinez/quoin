@@ -4,23 +4,32 @@ import { signClass } from "../ui/signed";
 import { StatTile } from "../ui/StatTile";
 
 export interface SummaryStatsProps {
-  totalInvested: string;
+  openCost: string;
+  totalContributed: string;
+  unpricedCount: number;
+  unpricedCost: string;
   unrealizedPnL: string;
   realizedPnL: string;
   positionCount: number;
   opportunity?: { difference: string; symbol: string } | null;
   ter?: { weightedTer: string; annualCost: string } | null;
+  realReference?: string | null;
 }
 
 export function SummaryStats({
-  totalInvested,
+  openCost,
+  totalContributed,
+  unpricedCount,
+  unpricedCost,
   unrealizedPnL,
   realizedPnL,
   positionCount,
   opportunity = null,
   ter = null,
+  realReference = null,
 }: SummaryStatsProps) {
-  const { formatMoney, formatSignedMoney, formatPercent } = useFormat();
+  const { formatMoney, formatSignedMoney, formatPercent, formatPeriod } =
+    useFormat();
   const t = useCopy();
   const s = t.summary.stats;
   return (
@@ -29,22 +38,39 @@ export function SummaryStats({
       style={{ gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))" }}
     >
       <StatTile
-        label={s.invested.label}
-        sub={s.invested.sub}
-        value={formatMoney(totalInvested)}
+        label={s.cost.label}
+        sub={s.cost.sub}
+        value={formatMoney(openCost)}
       />
       <StatTile
         label={s.unrealized.label}
-        sub={s.unrealized.sub}
+        sub={
+          unpricedCount > 0
+            ? s.unrealized.subUnpriced(unpricedCount, formatMoney(unpricedCost))
+            : s.unrealized.sub
+        }
         value={formatSignedMoney(unrealizedPnL).text}
         valueClass={signClass(unrealizedPnL)}
       />
       <StatTile
         label={s.realized.label}
-        sub={s.realized.sub}
+        sub={
+          realReference
+            ? s.realized.subReal(formatPeriod(realReference))
+            : s.realized.sub
+        }
         value={formatSignedMoney(realizedPnL).text}
         valueClass={signClass(realizedPnL)}
-        to="/realized"
+        to="/realized?view=tax"
+      />
+      <StatTile
+        label={s.invested.label}
+        sub={
+          realReference
+            ? s.invested.subReal(formatPeriod(realReference))
+            : s.invested.sub
+        }
+        value={formatMoney(totalContributed)}
       />
       <StatTile
         label={s.positions.label}

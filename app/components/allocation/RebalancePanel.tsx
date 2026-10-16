@@ -77,7 +77,9 @@ export function RebalancePanel({
                 className={`${FIELD} w-24`}
               />
             </label>
-            <Button type="submit">{copy.submit}</Button>
+            <Button type="submit" variant="primary">
+              {copy.submit}
+            </Button>
           </Form>
 
           {plan === null ? (

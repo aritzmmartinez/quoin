@@ -68,6 +68,11 @@ model LedgerEntry {
   currency String // operation currency (ISO 4217)
   fxToBase String  @default("1") // rate to EUR at operation time
 
+  /// CASH | IN_KIND — CHECK-constrained in migration SQL, same reason as `type`.
+  /// IN_KIND on a BUY: units that arrived without money leaving the bank (a
+  /// Kraken reward, a Trade Republic saveback). On a DIVIDEND: that income's leg.
+  funding String @default("CASH")
+
   account    String  @default("trade-republic")
   source     String  @default("MANUAL") // MANUAL | TR_CSV | ...
   externalId String? // source transaction id (TR transaction_id) -> dedup key

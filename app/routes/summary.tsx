@@ -1,3 +1,6 @@
+import { LayoutDashboard } from "lucide-react";
+import { data } from "react-router";
+
 import type { Route } from "./+types/summary";
 
 import {
@@ -10,7 +13,7 @@ import {
   BasisNotice,
   Card,
   PortfolioEmpty,
-  PortfolioValueChart,
+  SetupChecklist,
   SummaryHero,
   SummaryReturns,
   SummaryStats,
@@ -18,6 +21,7 @@ import {
   type AllocationRow,
   type TopPositionRow,
 } from "~/components";
+import { PortfolioValueChart } from "~/components/summary/PortfolioValueChart";
 import {
   computeAllocation,
   computeInvestedVsValueSeries,
@@ -27,7 +31,10 @@ import {
   computePortfolioSummary,
   computePositions,
   computeTopPositions,
+  computeTotalContributed,
   computeWeightedTer,
+  unpricedOpenIds,
+  withoutInstruments,
 } from "~/core/projections";
 import {
   computeHeroChange,
@@ -40,11 +47,16 @@ import {
   parseBenchmark,
   parseLocale,
   parseRange,
+  pricesStep,
+  tradesStep,
+  useCopy,
 } from "~/lib";
 
 import { BASE_CURRENCY, type Revalue } from "~/core/domain";
+import { firstEventByInstrument } from "~/lib/history-start";
 import { loadOpportunityCost } from "~/lib/opportunity-cost.server";
 import { resolveRealView } from "~/lib/real.server";
+import { createServerTiming } from "~/lib/server-timing";
 
 const TOP_POSITIONS = 5;
 
@@ -62,20 +74,35 @@ export const handle = {
   basis: true,
 };
 
+export function headers({ loaderHeaders }: Route.HeadersArgs) {
+  return loaderHeaders;
+}
+
 export async function loader({ request }: Route.LoaderArgs) {
   const range = parseRange(new URL(request.url).searchParams);
   const t = copyFor(parseLocale(request.headers.get("Cookie")));
   const priceRepository = new PrismaPriceRepository();
+  const timing = createServerTiming();
 
-  const [events, instruments, prices] = await Promise.all([
+  const events = await timing.time("db-ledger", () =>
     new PrismaLedgerRepository().list(),
+  );
+  const instruments = await timing.time("db-instruments", () =>
     new PrismaInstrumentRepository().list(),
+  );
+  const prices = await timing.time("db-prices-latest", () =>
     priceRepository.latest(),
-  ]);
+  );
 
-  const real = await resolveRealView(request, events);
-  const positions = computePositions(events, real.revalue);
-  const marketValues = computeMarketValues(positions, prices, BASE_CURRENCY);
+  const real = await timing.time("real-view", () =>
+    resolveRealView(request, events),
+  );
+  const positions = timing.time("positions", () =>
+    computePositions(events, real.revalue),
+  );
+  const marketValues = timing.time("valuation", () =>
+    computeMarketValues(positions, prices, BASE_CURRENCY),
+  );
   const summary = computePortfolioSummary(positions, marketValues);
 
   const instrumentsById = new Map(instruments.map((i) => [i.id, i]));
@@ -107,9 +134,16 @@ export async function loader({ request }: Route.LoaderArgs) {
     unrealizedPnLPct: row.unrealizedPnLPct,
   }));
 
-  const heldIds = [...new Set(positions.map((p) => p.instrumentId))];
-  const histories = await Promise.all(
-    heldIds.map((id) => priceRepository.historyFor(id)),
+  const unpriced = unpricedOpenIds(positions, marketValues);
+  const included = withoutInstruments(events, unpriced);
+  const heldIds = [...new Set(positions.map((p) => p.instrumentId))].filter(
+    (id) => !unpriced.has(id),
+  );
+  const firstEvents = firstEventByInstrument(events);
+  const histories = await timing.time("db-history", () =>
+    Promise.all(
+      heldIds.map((id) => priceRepository.historyFor(id, firstEvents.get(id))),
+    ),
   );
 
   const now = new Date();
@@ -117,7 +151,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     computePortfolioInvestedVsValueSeries(
       heldIds.map((id, index) =>
         computeInvestedVsValueSeries(
-          events,
+          included,
           id,
           (histories[index] ?? [])
             .filter((snapshot) => snapshot.currency === BASE_CURRENCY)
@@ -134,20 +168,26 @@ export async function loader({ request }: Route.LoaderArgs) {
       ),
     );
 
-  const portfolioSeries = buildSeries(real.revalue);
+  const portfolioSeries = timing.time("series", () =>
+    buildSeries(real.revalue),
+  );
   const series = filterByRange(portfolioSeries, range, now);
 
-  const returns = computePortfolioReturns(
-    events,
-    real.revalue ? buildSeries() : portfolioSeries,
+  const nominalSeries = real.revalue
+    ? timing.time("series-nominal", () => buildSeries())
+    : portfolioSeries;
+  const returns = timing.time("returns", () =>
+    computePortfolioReturns(included, nominalSeries),
   );
 
-  const opportunity = await loadOpportunityCost(
-    events,
-    instruments,
-    prices,
-    parseBenchmark(request.headers.get("Cookie")),
-    now,
+  const opportunity = await timing.time("opportunity", () =>
+    loadOpportunityCost(
+      events,
+      instruments,
+      prices,
+      parseBenchmark(request.headers.get("Cookie")),
+      now,
+    ),
   );
 
   const ter = computeWeightedTer(
@@ -160,43 +200,48 @@ export async function loader({ request }: Route.LoaderArgs) {
     ),
   );
 
-  return {
-    summary,
-    returns,
-    ter:
-      ter.coveredValue === "0"
-        ? null
-        : { weightedTer: ter.weightedTer, annualCost: ter.annualCost },
-    opportunity: opportunity.ok
-      ? {
-          difference: opportunity.result.difference,
-          symbol: opportunity.symbol,
-        }
-      : null,
-    allocation,
-    top,
-    range,
-    real: {
-      basis: real.basis,
-      active: real.active,
-      reference: real.reference,
-      missing: real.missing,
-      hasIndex: real.hasIndex,
-      syncedAt: real.syncedAt,
-      checkStale: real.checkStale,
+  return data(
+    {
+      summary,
+      totalContributed: computeTotalContributed(events, real.revalue),
+      returns: returns.period,
+      ter:
+        ter.coveredValue === "0"
+          ? null
+          : { weightedTer: ter.weightedTer, annualCost: ter.annualCost },
+      opportunity: opportunity.ok
+        ? {
+            difference: opportunity.result.difference,
+            symbol: opportunity.symbol,
+          }
+        : null,
+      allocation,
+      top,
+      range,
+      real: {
+        basis: real.basis,
+        active: real.active,
+        reference: real.reference,
+        missing: real.missing,
+        hasIndex: real.hasIndex,
+        syncedAt: real.syncedAt,
+        checkStale: real.checkStale,
+      },
+      change: computeHeroChange(range, series, summary),
+      series: series.map((point) => ({
+        t: point.t,
+        invested: Number(point.invested),
+        value: Number(point.value),
+      })),
     },
-    change: computeHeroChange(range, series, summary),
-    series: series.map((point) => ({
-      t: point.t,
-      invested: Number(point.invested),
-      value: Number(point.value),
-    })),
-  };
+    { headers: timing.headers() },
+  );
 }
 
 export default function Summary({ loaderData }: Route.ComponentProps) {
   const {
     summary,
+    totalContributed,
     returns,
     opportunity,
     ter,
@@ -207,12 +252,26 @@ export default function Summary({ loaderData }: Route.ComponentProps) {
     series,
     real,
   } = loaderData;
+  const t = useCopy();
   const hasPositions = summary.pricedCount > 0 || summary.unpricedCount > 0;
 
   if (!hasPositions) {
     return (
       <Card>
         <PortfolioEmpty />
+      </Card>
+    );
+  }
+
+  if (summary.pricedCount === 0) {
+    return (
+      <Card>
+        <SetupChecklist
+          icon={LayoutDashboard}
+          title={t.setup.screens.summary.title}
+          body={t.setup.screens.summary.body}
+          steps={[tradesStep(true), pricesStep(false)]}
+        />
       </Card>
     );
   }
@@ -227,23 +286,32 @@ export default function Summary({ loaderData }: Route.ComponentProps) {
         changePct={change.pct}
         range={range}
         unpricedCount={summary.unpricedCount}
+        unpricedCost={summary.unpricedCost}
         hasPositions={summary.pricedCount > 0}
       />
 
-      <PortfolioValueChart data={series} />
+      <PortfolioValueChart
+        data={series}
+        unpricedCount={summary.unpricedCount}
+      />
 
       <SummaryStats
-        totalInvested={summary.totalInvested}
+        openCost={summary.openCost}
+        totalContributed={totalContributed}
+        unpricedCount={summary.unpricedCount}
+        unpricedCost={summary.unpricedCost}
         unrealizedPnL={summary.unrealizedPnL}
         realizedPnL={summary.realizedPnL}
         positionCount={summary.pricedCount}
         opportunity={opportunity}
         ter={ter}
+        realReference={real.active ? real.reference : null}
       />
 
       <SummaryReturns
-        twr={returns.twr}
-        mwr={returns.mwr}
+        period={returns}
+        pricedCount={summary.pricedCount}
+        openCount={summary.pricedCount + summary.unpricedCount}
         realBasis={real.active}
       />
 

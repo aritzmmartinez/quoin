@@ -1,6 +1,34 @@
-import type { ExposureKind, InstrumentType, Thesis } from "~/core/domain";
+import type { DiscardReason } from "~/adapters/ingestion/discard";
+import type {
+  ExposureKind,
+  InstrumentType,
+  LeafKind,
+  Thesis,
+} from "~/core/domain";
 
 import type { Copy } from "./types";
+
+const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
+  "crypto-swap": "Swaps involving BTC",
+  "crypto-transfer": "BTC transfers",
+  "reward-unpriced": "BTC rewards without a price",
+  "unmodelled-asset": "Assets Quoin does not model",
+  "card-spending": "Card payments",
+  "saveback-unpaired": "Saveback with no paired purchase",
+  unsupported: "Unsupported",
+};
+
+const DISCARD_REASON_HELP: Record<DiscardReason, string | null> = {
+  "crypto-swap": null,
+  "crypto-transfer": null,
+  "reward-unpriced":
+    "There is no BTC price for those dates, so these rewards were not recorded and your BTC position does not include them. In Instruments, open BTC's symbol and use “Download the history again” with a range that reaches those dates. Then import this same file again: what is already recorded is not duplicated.",
+  "unmodelled-asset": null,
+  "card-spending": null,
+  "saveback-unpaired":
+    "The purchase this saveback paid for was not found (one purchase of the same amount in the 7 days after it, and only one). If that purchase is in the file, it counts as your own contribution. If it is in another export, import one that covers both dates.",
+  unsupported: null,
+};
 
 const THESIS_LABELS: Record<Thesis, string> = {
   CORE: "Core",
@@ -22,6 +50,13 @@ const TYPE_LABELS: Record<InstrumentType, string> = {
   BOND: "Bond",
   COMMODITY: "Commodity",
   CASH: "Cash",
+};
+
+const RESOLVES_LABELS: Record<LeafKind, (id: string) => string> = {
+  COMPANY: () => "Company",
+  COMMODITY: (id) => `Commodity · ${id}`,
+  CRYPTO: (id) => `Crypto · ${id}`,
+  UNRESOLVED: () => "Not broken down",
 };
 
 const EXPOSURE_KIND_LABELS: Record<ExposureKind, string> = {
@@ -118,7 +153,7 @@ export const en: Copy = {
         since: (date: string): string => `history since ${date}`,
         unusable:
           "Unavailable: no instrument with euro history carries this symbol",
-        none: "No instrument has a symbol and euro history yet. Map one in Instruments and download its history.",
+        none: "No instrument has a symbol and euro history yet. Give one a symbol in the Symbol column of Instruments: saving it downloads its history.",
       },
     },
   },
@@ -130,7 +165,7 @@ export const en: Copy = {
         term: "Unrealised and realised result",
         short: "What your investments have made, in euros.",
         detail:
-          "The unrealised result is what you would make if you sold today what you still hold: current value minus what you contributed. The realised one covers what you already sold, and is closed. They are shown apart because they answer different questions: «how is what I hold doing» and «how much have I actually made». «Contributed» includes fees, because the acquisition cost includes them for tax purposes and leaving them out would flatter the return.",
+          "The unrealised result is what you would make if you sold today what you still hold: current value minus what it cost you. The realised one covers what you already sold, and is closed. They are shown apart because they answer different questions: «how is what I hold doing» and «how much have I actually made». That cost includes fees, because the acquisition cost includes them for tax purposes and leaving them out would flatter the return.",
       },
       {
         term: "TER",
@@ -209,12 +244,24 @@ export const en: Copy = {
       },
     ],
   },
+  periodReturn: {
+    annual: (cumulative: string, since: string): string =>
+      `annual · ${cumulative} cumulative since ${since}`,
+    annualEquivalent: (period: string, since: string): string =>
+      `annual · equivalent to ${period} over the period since ${since}`,
+    period: (since: string): string => `for the period · since ${since}`,
+    unavailable: "no solution",
+  },
   range: {
     label: "Time range",
     m1: "1M",
     m6: "6M",
     y1: "1Y",
     all: "All",
+    empty: "No data in this range.",
+  },
+  chart: {
+    loading: "Loading chart",
   },
   basis: {
     label: "Calculation basis",
@@ -261,30 +308,42 @@ export const en: Copy = {
       label: "Total portfolio value",
       rangeLabel: (range: string): string => `in ${range}`,
       allTimeLabel: "since inception",
-      unpriced: (count: number): string =>
-        count === 1
-          ? "1 unpriced position, excluded from the total"
-          : `${count} unpriced positions, excluded from the total`,
+      unpriced: (count: number, cost: string): string =>
+        `${count} unpriced (${cost} cost)`,
       empty: "No priced positions yet.",
     },
     chart: {
       title: "Portfolio over time",
       value: "Value",
-      invested: "Contributed",
+      invested: "Cost",
       building: "At least two points are needed to draw the series.",
+      unpriced: (count: number): string =>
+        count === 1
+          ? "The chart leaves out 1 unpriced position"
+          : `The chart leaves out ${count} unpriced positions`,
     },
     stats: {
-      invested: {
-        label: "Total contributed",
-        sub: "Cost of the open positions",
+      cost: {
+        label: "Cost of what you hold",
+        sub: "Every open position, priced or not",
       },
       unrealized: {
         label: "Unrealised result",
-        sub: "Value minus contributed",
+        sub: "Value minus the cost of what is priced",
+        subUnpriced: (count: number, cost: string): string =>
+          `Value minus the cost of what is priced. ${count} unpriced (${cost} cost)`,
+      },
+      invested: {
+        label: "Total contributed",
+        sub: "What you put in, including what was sold; rewards excluded",
+        subReal: (period: string): string =>
+          `What you put in, in ${period} euros, including what was sold; rewards excluded`,
       },
       realized: {
-        label: "Realised result",
-        sub: "Result of the closed sales",
+        label: "Realised result (average cost)",
+        sub: "All years. The tax result (FIFO) is under Realized",
+        subReal: (period: string): string =>
+          `All years, restated in ${period} euros. The tax result (FIFO) is under Realized`,
       },
       positions: { label: "Positions", sub: "Open and priced" },
       opportunity: {
@@ -297,10 +356,11 @@ export const en: Copy = {
       },
     },
     returns: {
-      twr: { label: "TWR", sub: "time-weighted" },
-      mwr: { label: "MWR / IRR", sub: "money-weighted" },
-      unavailable: "no solution",
-      note: "TWR measures how the assets did and MWR (IRR) measures how your money did. Contributing bit by bit makes them diverge on purpose: most of the capital has been invested for less time, so an old rise weighs fully in TWR and barely at all in MWR.",
+      twr: "TWR",
+      mwr: "MWR / IRR",
+      coverage: (priced: number, open: number): string =>
+        `Over ${priced} of ${open} open positions`,
+      note: "TWR measures how the assets did; IRR (MWR), how your money did, given when and how much you contributed. Contributing bit by bit makes them diverge on purpose: an old rise weighs fully in TWR and barely at all in IRR, because little capital was invested then. Both run from the first included trade to today, whatever range the chart shows. Over a year or more they are shown annualised, with what they amount to over the whole period beside them; under a year, the return for the period is shown instead, because annualising a few months would stretch one streak over a whole year. Open positions with no price are left out with all their trades; closed ones still count.",
       nominal:
         "Both are always computed in nominal euros, even when the rest of the screen is in today's purchasing power.",
     },
@@ -448,7 +508,7 @@ export const en: Copy = {
     worseningHint:
       "This line receives a contribution and still drifts further from its target, because another position in the plan is overweight and is not being sold: the extra room it takes up cannot be filled with new money, only diluted. Larger contributions correct it, and selling it would be taxed.",
     unpriced: (names: string): string =>
-      `No usable price, so these are left out of the split: ${names}. A missing price is not a value of zero. Run pnpm prices:sync before trusting the split.`,
+      `No usable price, so these are left out of the split: ${names}. A missing price is not a value of zero. Give them a symbol in Instruments or, if they have one, press “Refresh prices” in Portfolio before trusting the split.`,
     offPlan: (count: number): string =>
       count === 1
         ? "1 position held, outside the plan"
@@ -457,6 +517,49 @@ export const en: Copy = {
       "You hold this and your target in force does not name it. It receives no contribution: putting new money there is not rebalancing, it is changing the plan, and that is done in Target.",
     empty:
       "No target line can be allocated to yet. Import trades and sync prices.",
+  },
+  setup: {
+    done: "Done",
+    pending: "Pending",
+    progress: (have: number, need: number): string => `${have} of ${need}`,
+    steps: {
+      trades: { label: "Trades imported" },
+      prices: {
+        label: "A price for what you hold",
+        action: "Go to Instruments",
+      },
+      target: { label: "An active target", action: "Go to Target" },
+      funds: {
+        label: "Funds with their composition imported",
+        action: "Go to Instruments",
+      },
+    },
+    screens: {
+      summary: {
+        title: "Your trades are in",
+        body: "What is missing is what your holdings are worth. Without a price, value, returns, allocation and top positions have nothing to show.",
+      },
+      exposure: {
+        title: "Your real exposure shows up here",
+        body: "It breaks down what you hold, fund by fund, into every company, metal or crypto underneath. For that it needs positions with a price.",
+      },
+      currency: {
+        title: "Your currency exposure shows up here",
+        body: "It groups what you hold by the currency of each security's primary market, inside your funds too. For that it needs positions with a price.",
+      },
+      overlap: {
+        title: "Two funds are needed to compare",
+        body: "How much of two funds is the same company. Drop each fund's composition CSV onto its row in Instruments. A fund with no composition is left out of the calculation, not counted as 0%.",
+      },
+      rebalance: {
+        title: "How to split your contribution shows up here",
+        body: "It splits what you are about to put in across the lines of your target, starting with the ones furthest from their weight. For that it needs your plan and what you already hold, with a price.",
+      },
+      projection: {
+        title: "Your plan's projection shows up here",
+        body: "It resamples the months your instruments have already lived through to estimate where the portfolio could end up if you keep contributing to your plan.",
+      },
+    },
   },
   ingest: {
     open: "Import trades",
@@ -484,6 +587,7 @@ export const en: Copy = {
     failed: "The import failed.",
     analysing: "Analysing the file…",
     importing: "Importing…",
+    retrying: "Valuing the rewards…",
     brokerLabel: (broker: string): string =>
       broker === "kraken" ? "Kraken" : "Trade Republic",
     detected: (broker: string): string => `${broker} detected`,
@@ -496,14 +600,20 @@ export const en: Copy = {
       discarded: "Discarded",
       errors: "With errors",
       none: "none",
-      unsupportedDetails: (count: number): string =>
-        count === 1
-          ? "View 1 unsupported row"
-          : `View ${count} unsupported rows`,
+      reasons: DISCARD_REASON_LABELS,
+      reasonHelp: DISCARD_REASON_HELP,
+      details: (count: number): string =>
+        count === 1 ? "1 transaction" : `${count} transactions`,
+      pendingPrice: "BTC rewards awaiting a price",
+      pendingPriceNote:
+        "They will be valued after the price step, by importing the file again.",
+      positionWarning:
+        "These change your BTC balance and Quoin does not record them, so your BTC position does not reflect them and may not match the broker's.",
       noInstrument: "No instrument",
     },
     nothingNew:
       "Nothing new to import: every trade in this file was already in the ledger.",
+    confirmPending: "Continue to value the rewards",
     confirmCount: (count: number): string =>
       count === 1 ? "Import 1 trade" : `Import ${count} trades`,
     appliesNow:
@@ -513,7 +623,7 @@ export const en: Copy = {
         count === 1
           ? "1 trade has already been imported and stays in the ledger even if you close now."
           : `${count} trades have already been imported and stay in the ledger even if you close now.`,
-      hint: "Any symbols left unmapped can be finished in Instruments.",
+      hint: "Any missing symbols can be assigned later in the Symbol column of Instruments.",
       keep: "Carry on with the import",
       close: "Close anyway",
     },
@@ -537,12 +647,22 @@ export const en: Copy = {
       quantity: "Units",
       stale:
         "The timestamp is old: almost always it means the wrong venue, or a very illiquid one.",
-      closed:
-        "You hold no units of this instrument, so the implied value verifies nothing. Check the venue by hand.",
-      removed: (count: number): string =>
-        count === 1
-          ? "1 price from the previous symbol has been deleted."
-          : `${count} prices from the previous symbol have been deleted.`,
+      trades: "Your latest trades against the symbol's close",
+      tradeLine: (
+        date: string,
+        traded: string,
+        close: string,
+        deviation: string,
+      ): string =>
+        `${date}: you traded at ${traded}, the symbol closed at ${close} (${deviation})`,
+      tradesOff:
+        "Your trades and this symbol's closes do not match: it is almost always another venue or another class of the fund. Try another quote before saving.",
+      noTrades:
+        "This symbol has no closes on the dates of your trades, so they cannot be compared.",
+      notEur: (currency: string): string =>
+        `This symbol quotes in ${currency}. Quoin only values euro histories today: choose the euro line of the same fund on another venue (.DE, .MI, .PA, .AS).`,
+      hasHistory:
+        "This instrument already has stored prices. Change its symbol in the Symbol column of Instruments: the new history is downloaded there before the old one is removed.",
       pending: (count: number): string =>
         count === 1
           ? "1 instrument without a symbol"
@@ -551,7 +671,7 @@ export const en: Copy = {
       mapped: (done: number, total: number): string =>
         `${done} of ${total} mapped`,
       canContinue:
-        "You can continue without mapping them all: any missing symbols can be finished in Instruments.",
+        "You can continue without mapping them all: any missing ones can be assigned later in the Symbol column of Instruments, which also downloads their history.",
     },
     prices: {
       title: "Prices",
@@ -567,12 +687,18 @@ export const en: Copy = {
     },
     done: {
       title: "Import summary",
+      rewardsNeedMapping:
+        "The BTC rewards are still unvalued because BTC has no symbol. Go back to the mapping step, give it one and carry on: the wizard will download its prices and import the file again.",
+      recovered: (count: number): string =>
+        count === 1
+          ? "1 reward recovered by valuing it with the downloaded prices"
+          : `${count} rewards recovered by valuing them with the downloaded prices`,
       imported: (count: number): string =>
         count === 1 ? "1 trade imported" : `${count} trades imported`,
       duplicates: (count: number): string =>
         count === 1 ? "1 duplicate skipped" : `${count} duplicates skipped`,
       discarded: (count: number): string =>
-        count === 1 ? "1 row discarded" : `${count} rows discarded`,
+        count === 1 ? "1 operation discarded" : `${count} operations discarded`,
       candles: (count: number): string =>
         count === 1 ? "1 historical price" : `${count} historical prices`,
       synced: (count: number): string =>
@@ -581,6 +707,10 @@ export const en: Copy = {
         count === 1
           ? "1 instrument still has no symbol and cannot be valued."
           : `${count} instruments still have no symbol and cannot be valued.`,
+      notEurWarning: (count: number): string =>
+        count === 1
+          ? "1 symbol does not quote in euros and its history was not downloaded: only euro histories are valued today. Change it in the Symbol column of Instruments."
+          : `${count} symbols do not quote in euros and their history was not downloaded: only euro histories are valued today. Change them in the Symbol column of Instruments.`,
       staleWarning: (count: number): string =>
         count === 1
           ? "1 symbol returned an old quote: check the venue."
@@ -643,6 +773,7 @@ export const en: Copy = {
       leaf: "Leaf",
       resolvesTo: "Resolves as",
       composition: "Composition",
+      symbol: "Symbol",
       ter: "TER %",
       hedged: "Currency",
       thesis: "Thesis",
@@ -654,7 +785,6 @@ export const en: Copy = {
     defaultOption: "(default for the type)",
     leafPlaceholder: "XAU, BTC…",
     leafRequired: "This kind needs a leaf (e.g. XAU).",
-    terPlaceholder: "0.22",
     terInvalid:
       "The TER goes in annual percent, between 0 and 5. A 0.22% is written 0.22.",
     invalid: "Invalid data.",
@@ -662,27 +792,90 @@ export const en: Copy = {
     saving: "…",
     saved: "Saved",
     closed: "Closed",
-    empty: "No instruments. Import your trades with pnpm ingest.",
+    noSymbol: "No symbol",
+    resolves: RESOLVES_LABELS,
+    history: {
+      title: "Symbol and history",
+      assign: "Use this symbol",
+      change: "Switch to this symbol",
+      redownload: (symbol: string): string =>
+        `Download the history of ${symbol} again`,
+      range: "History",
+      confirmReplace: (symbol: string): string =>
+        `The daily history of ${symbol} and today's quote will be downloaded. If candles arrive, they replace every price stored for this instrument; if none arrive, nothing is touched. Trades do not change.`,
+      lost: (cutoff: string, earliest: string): string =>
+        `This range starts on ${cutoff} and your current history on ${earliest}: prices before ${cutoff} will be lost.`,
+      confirm: "Confirm",
+      cancel: "Cancel",
+      running: "Downloading…",
+      done: (count: number, first: string): string =>
+        count === 1
+          ? `1 price saved from ${first}.`
+          : `${count} prices saved from ${first}.`,
+      noLive: "Yahoo returned no quote for today: press “Refresh prices” in Portfolio later.",
+      noHistory: (symbol: string): string =>
+        `Yahoo returned no history for ${symbol}. Nothing was changed.`,
+      notEur: (symbol: string, currency: string): string =>
+        `The history of ${symbol} is in ${currency}. Quoin only values euro histories today, so nothing was changed.`,
+      failed: "The download failed. Nothing was changed.",
+      rebuild: "Rebuild all histories",
+      rebuildConfirm: (count: number): string =>
+        `The daily history of ${count === 1 ? "1 instrument" : `${count} instruments`} with a symbol will be downloaded again, one after another. Each one is replaced only if Yahoo returns candles, and trades are not touched. Leaving this screen stops it; whatever was already rebuilt stays.`,
+      rebuilding: (done: number, total: number): string =>
+        `Rebuilding ${done} of ${total}…`,
+      rebuilt: (done: number, total: number): string =>
+        `${done} of ${total} histories rebuilt.`,
+      rebuildFailed: "Could not rebuild:",
+      coarse: (count: number, names: string): string =>
+        count === 1
+          ? `${names} has weekly or monthly candles from old downloads. Rebuild its history to get daily prices.`
+          : `${count} instruments have weekly or monthly candles from old downloads: ${names}. Rebuild their histories to get daily prices.`,
+    },
+    empty: {
+      title: "No instruments yet",
+      body: "Each instrument shows up here once its trades are imported. Import your broker's CSV to get started.",
+    },
     sync: {
       action: "Refresh prices",
-      loading: "Syncing prices…",
+      syncing: (done: number, total: number): string =>
+        `Syncing prices… ${done} of ${total}`,
       nothing: "No instrument has a quote symbol yet.",
-      done: (updated: number, mapped: number): string =>
-        `${updated} of ${mapped} ${mapped === 1 ? "price updated" : "prices updated"}`,
-      failed: (count: number): string =>
-        count === 1 ? "1 failed" : `${count} failed`,
-      staleDetail: (count: number): string =>
-        count === 1 ? "1 with a stale quote" : `${count} with stale quotes`,
-      noQuoteDetail: (count: number): string =>
-        count === 1 ? "1 with no answer" : `${count} with no answer`,
-      error: "Prices could not be synced.",
+      done: (updated: number, total: number): string =>
+        `${updated} of ${total} ${total === 1 ? "price updated" : "prices updated"}`,
+      candles: (count: number): string =>
+        count === 1
+          ? "1 daily close recovered"
+          : `${count} daily closes recovered`,
+      failedList: "Could not update:",
+      problem: {
+        "no-quote": "no answer",
+        stale: "stale quote",
+        "not-eur": "not quoted in euros",
+        error: "unexpected error",
+      },
+      unmappedOpen: (count: number): string =>
+        count === 1
+          ? "1 open position without a symbol"
+          : `${count} open positions without a symbol`,
+      unmappedClosed: (count: number): string =>
+        count === 1
+          ? "1 closed without a symbol"
+          : `${count} closed without a symbol`,
+      unmappedAction: "Assign one in the Symbol column.",
     },
   },
   target: {
     title: "Target",
     intro:
       "Your monthly savings plan. The amounts are the fact and the weight is derived from them. A target is never edited: when the plan changes you store a new version with its effective date, so which target was in force on any given date stays answerable.",
-    none: "No target stored yet. Create the first version below or use pnpm target:set.",
+    none: {
+      title: "No target yet",
+      body: "Write below how much you want to put into each instrument every month. It can name instruments you have not bought yet. The split of each contribution and the projection are both worked out from it.",
+    },
+    notYetActive: {
+      title: "No target active today",
+      body: "The stored versions take effect later on. They will show up here from their effective date.",
+    },
     activeFrom: (date: string): string => `In force since ${date}`,
     columns: {
       instrument: "Instrument",
@@ -851,10 +1044,14 @@ export const en: Copy = {
       WITHDRAWAL: "Withdrawal",
       INTEREST: "Interest",
     },
+    inKindTypes: {
+      BUY: "In-kind purchase",
+      DIVIDEND: "Reward",
+    },
     empty: "No movements.",
     emptyScreen: {
       title: "No movements yet",
-      body: "Import your trades with the CLI (pnpm ingest) to see the full ledger here.",
+      body: "Import your broker's CSV (Trade Republic or Kraken) to see the full ledger here.",
     },
     amountHint:
       "The amount is the real cash flow: fees included and withholdings deducted.",
@@ -862,13 +1059,13 @@ export const en: Copy = {
   portfolio: {
     title: "Portfolio",
     summary: (count: number, invested: string): string =>
-      `${count} ${count === 1 ? "position" : "positions"} · ${invested} contributed`,
+      `${count} ${count === 1 ? "position" : "positions"} · ${invested} cost`,
     columns: {
       name: "Instrument",
       type: "Type",
       quantity: "Quantity",
       averageCost: "Average price",
-      costBasis: "Contributed",
+      costBasis: "Cost",
       marketValue: "Value",
       unrealizedPnL: "Result",
       weight: "Weight",
@@ -883,10 +1080,12 @@ export const en: Copy = {
       tradeCount: "Number of trades",
     },
     updatedAt: (relative: string): string => `Updated ${relative}`,
-    noPrices: "No prices. Run pnpm prices:sync",
+    noPrices:
+      "No prices. Press “Refresh prices” or assign the missing symbols in Instruments.",
+    value: (amount: string): string => `${amount} value`,
     empty: {
       title: "No positions yet",
-      body: "Import your movements with the CLI (pnpm ingest) to start tracking your portfolio.",
+      body: "Import your broker's CSV (Trade Republic or Kraken) to start tracking your portfolio.",
     },
     error: {
       title: "Positions could not be loaded",
@@ -1029,6 +1228,13 @@ export const en: Copy = {
         title: "No sales in this year",
         body: "Pick another tax year from the dropdown.",
       },
+      inKind: {
+        title: "Income received in kind",
+        body: "Kraken rewards and Trade Republic saveback, received as units. Tax classification pending verification: none of it is added to any figure in this view.",
+        count: "Receipts",
+        gross: "Value on receipt",
+        withheld: "Withheld",
+      },
       carryforwardTitle: "Loss carryforward, last 4 years (Art. 66)",
       carryforwardColumns: {
         year: "Year",
@@ -1093,7 +1299,7 @@ export const en: Copy = {
     unpriced: (names: string): string =>
       `No usable price: ${names}. They are excluded from both sides, because counting their cost without their value would invent a loss.`,
     unmapped: (symbol: string): string =>
-      `No instrument is mapped to ${symbol}, so there is no index to compare against. Run pnpm prices:map <ISIN> ${symbol}.`,
+      `No instrument is mapped to ${symbol}, so there is no index to compare against. Pick one of your instruments with price history in Settings.`,
     noHistory: (symbol: string): string =>
       `${symbol} has no price history in euros. Run pnpm prices:backfill <ISIN> max to download it.`,
     chooseBenchmark: "Choose another index in Settings",
@@ -1158,9 +1364,16 @@ export const en: Copy = {
     value: "Value",
     unrealizedPnL: "Unrealised result",
     kpis: {
-      twr: { label: "TWR", sub: "time-weighted" },
-      mwr: { label: "MWR / IRR", sub: "money-weighted" },
-      totalInvested: { label: "Total contributed", sub: "sum of purchases" },
+      twr: "TWR",
+      mwr: "MWR / IRR",
+      openCost: {
+        label: "Cost of what you hold",
+        sub: "average cost of what is left",
+      },
+      totalInvested: {
+        label: "Total contributed",
+        sub: "what you put in, including what was sold; rewards excluded",
+      },
       buyCount: { label: "Contributions", sub: "purchases made" },
       avgBuyAmount: { label: "Average amount", sub: "per contribution" },
     },
@@ -1172,11 +1385,11 @@ export const en: Copy = {
       sell: "Sell",
       empty: "No trades recorded.",
       noPrice:
-        "No price history yet. It builds up with every pnpm prices:sync.",
+        "No price history yet. In Instruments, give it a symbol or download its history again.",
     },
     ivvChart: {
-      title: "Contributed against value",
-      invested: "Contributed",
+      title: "Cost against value",
+      invested: "Cost",
       value: "Value",
       building: "The value line draws itself as the price history accumulates.",
     },

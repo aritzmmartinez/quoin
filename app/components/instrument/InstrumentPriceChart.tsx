@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   CartesianGrid,
   ComposedChart,
@@ -11,19 +11,16 @@ import {
   YAxis,
 } from "recharts";
 
-import { filterByRange, type Range, useCopy, useFormat } from "~/lib";
+import { type Range, rangedSeries, useCopy, useFormat } from "~/lib";
 
 import { legendOrder } from "../charts/legend-order";
+import { timeTicks } from "../charts/time-ticks";
+import { useHydrated } from "../charts/use-hydrated";
 import { Card } from "../ui/Card";
+import { ChartSkeleton } from "../ui/ChartSkeleton";
 import { RangeSelector } from "../ui/RangeSelector";
-
-export interface PriceChartDatum {
-  t: number;
-  price: number | null;
-  avgCost: number | null;
-  buy: number | null;
-  sell: number | null;
-}
+import type { PriceChartPoint } from "./price-chart-data";
+import { sinceFirstTrade } from "./since-first-trade";
 
 const LEGEND_ORDER = legendOrder(["price", "avgCost", "buy", "sell"]);
 
@@ -34,17 +31,25 @@ const TOOLTIP_STYLE = {
   fontSize: 12,
 } as const;
 
-export function PriceChartWithTrades({ data }: { data: PriceChartDatum[] }) {
+export function InstrumentPriceChart({ data }: { data: PriceChartPoint[] }) {
   const { formatMoney, formatDate, formatTimeTick } = useFormat();
   const axisEur = (v: number) => formatMoney(String(v), 0);
-  const axisDate = (t: number) => formatTimeTick(t, "month", true);
-  const [mounted, setMounted] = useState(false);
+  const hydrated = useHydrated();
   const [range, setRange] = useState<Range>("all");
-  useEffect(() => setMounted(true), []);
 
-  const c = useCopy().instrument.priceChart;
-  const view = filterByRange(data, range);
+  const t = useCopy();
+  const c = t.instrument.priceChart;
+  const series = rangedSeries(
+    range === "all" ? sinceFirstTrade(data) : data,
+    range,
+    1,
+  );
   const hasPrice = data.some((d) => d.price !== null);
+  const points = series.kind === "ready" ? series.points : [];
+  const { unit, ticks } = timeTicks(
+    points[0]?.t ?? 0,
+    points[points.length - 1]?.t ?? 0,
+  );
 
   return (
     <Card className="mb-6 p-4">
@@ -53,14 +58,18 @@ export function PriceChartWithTrades({ data }: { data: PriceChartDatum[] }) {
         <RangeSelector value={range} onChange={setRange} />
       </div>
       {!hasPrice && <p className="mb-2 text-[12px] text-muted">{c.noPrice}</p>}
-      {data.length === 0 ? (
+      {series.kind === "empty" ? (
         <p className="py-10 text-center text-[13px] text-muted">{c.empty}</p>
-      ) : !mounted ? (
-        <div style={{ height: 280 }} />
+      ) : series.kind === "outOfRange" ? (
+        <p className="py-10 text-center text-[13px] text-muted">
+          {t.range.empty}
+        </p>
+      ) : !hydrated ? (
+        <ChartSkeleton height={280} />
       ) : (
         <ResponsiveContainer width="100%" height={280}>
           <ComposedChart
-            data={view}
+            data={series.points}
             margin={{ top: 8, right: 8, bottom: 0, left: 8 }}
           >
             <CartesianGrid
@@ -73,7 +82,16 @@ export function PriceChartWithTrades({ data }: { data: PriceChartDatum[] }) {
               type="number"
               scale="time"
               domain={["dataMin", "dataMax"]}
-              tickFormatter={axisDate}
+              ticks={ticks}
+              tickFormatter={(t: number, index: number) =>
+                formatTimeTick(
+                  t,
+                  unit,
+                  index === 0 || new Date(t).getMonth() === 0,
+                )
+              }
+              minTickGap={24}
+              padding={{ left: 8 }}
               stroke="var(--color-muted)"
               fontSize={11}
               tickLine={false}
@@ -119,7 +137,7 @@ export function PriceChartWithTrades({ data }: { data: PriceChartDatum[] }) {
               strokeWidth={1.25}
               strokeDasharray="4 3"
               dot={false}
-              connectNulls
+              connectNulls={false}
               isAnimationActive={false}
             />
             <Scatter

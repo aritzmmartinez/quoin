@@ -1,12 +1,80 @@
 import Decimal from "decimal.js";
 
-import type { LedgerEvent, TradeEvent } from "../domain";
+import {
+  Money,
+  isInKind,
+  type LedgerEvent,
+  type Revalue,
+  type TradeEvent,
+} from "../domain";
 import type { InvestedVsValuePoint } from "./invested-vs-value";
-import { xirr, type CashFlow } from "./xirr";
+import { xirr, YEAR_MS, type CashFlow } from "./xirr";
+
+export interface PeriodReturn {
+  annual: string | null;
+  cumulative: string | null;
+}
+
+export interface PeriodReturns {
+  since: number | null;
+  annualized: boolean;
+  twr: PeriodReturn;
+  mwr: PeriodReturn;
+}
+
+function growth(rate: string | null, exponent: number): string | null {
+  if (rate === null || !Number.isFinite(exponent)) return null;
+  const base = new Decimal(rate).plus(1);
+  if (base.lte(0)) return null;
+  return base.pow(exponent).minus(1).toFixed(6);
+}
+
+export function periodReturns(
+  twr: string | null,
+  mwr: string | null,
+  since: number | null,
+  to: number,
+): PeriodReturns {
+  const years = since === null ? 0 : (to - since) / YEAR_MS;
+  return {
+    since,
+    annualized: since !== null && to - since >= YEAR_MS,
+    twr: { cumulative: twr, annual: years > 0 ? growth(twr, 1 / years) : null },
+    mwr: { annual: mwr, cumulative: years > 0 ? growth(mwr, years) : null },
+  };
+}
+
+export function withoutInstruments(
+  events: readonly LedgerEvent[],
+  excluded: ReadonlySet<string>,
+): LedgerEvent[] {
+  if (excluded.size === 0) return [...events];
+  return events.filter(
+    (e) => !("instrumentId" in e) || !excluded.has(e.instrumentId),
+  );
+}
+
+export function computeTotalContributed(
+  events: readonly LedgerEvent[],
+  revalue?: Revalue,
+): string {
+  let total = Money.zero();
+  for (const e of events) {
+    if (e.type !== "BUY" || isInKind(e)) continue;
+    const paid = Money.fromString(
+      baseAmount(e.grossAmount, e.fxToBase)
+        .plus(baseAmount(e.fees, e.fxToBase))
+        .toString(),
+    );
+    total = total.add(revalue ? revalue(paid, e.ts) : paid);
+  }
+  return total.toString();
+}
 
 export interface ReturnsSummary {
   twr: string | null;
   mwr: string | null;
+  period: PeriodReturns;
   totalInvested: string;
   buyCount: number;
   avgBuyAmount: string;
@@ -32,7 +100,7 @@ export function computeReturns(
     .slice()
     .sort((a, b) => a.ts.getTime() - b.ts.getTime());
 
-  const buys = trades.filter((t) => t.type === "BUY");
+  const buys = trades.filter((t) => t.type === "BUY" && !isInKind(t));
 
   const totalInvested = buys.reduce(
     (sum, b) =>
@@ -48,13 +116,13 @@ export function computeReturns(
   let twr: string | null = null;
   let mwr: string | null = null;
 
-  if (currentPrice !== null && trades.length > 0) {
-    const price = new Decimal(currentPrice);
+  const quantity = trades.reduce(
+    (q, t) => (t.type === "BUY" ? q.plus(t.quantity) : q.minus(t.quantity)),
+    new Decimal(0),
+  );
 
-    const quantity = trades.reduce(
-      (q, t) => (t.type === "BUY" ? q.plus(t.quantity) : q.minus(t.quantity)),
-      new Decimal(0),
-    );
+  if (trades.length > 0 && (currentPrice !== null || quantity.isZero())) {
+    const price = new Decimal(currentPrice ?? 0);
 
     const marks: { t: number; price: Decimal }[] = trades.map((t) => ({
       t: t.ts.getTime(),
@@ -86,6 +154,7 @@ export function computeReturns(
 
     const flows: CashFlow[] = [];
     for (const t of trades) {
+      if (isInKind(t)) continue;
       const gross = baseAmount(t.grossAmount, t.fxToBase);
       const fees = baseAmount(t.fees, t.fxToBase);
       if (t.type === "BUY") {
@@ -101,9 +170,12 @@ export function computeReturns(
     mwr = rate === null ? null : new Decimal(rate).toFixed(6);
   }
 
+  const since = trades[0]?.ts.getTime() ?? null;
+
   return {
     twr,
     mwr,
+    period: periodReturns(twr, mwr, since, now.getTime()),
     totalInvested: totalInvested.toString(),
     buyCount,
     avgBuyAmount: avgBuyAmount.toString(),
@@ -113,17 +185,20 @@ export function computeReturns(
 export interface PortfolioReturnsSummary {
   twr: string | null;
   mwr: string | null;
+  period: PeriodReturns;
 }
 
 const EMPTY_PORTFOLIO_RETURNS: PortfolioReturnsSummary = {
   twr: null,
   mwr: null,
+  period: periodReturns(null, null, null, 0),
 };
 
 interface PortfolioFlow {
   t: number;
   gross: Decimal;
   net: Decimal;
+  inKind: boolean;
 }
 
 function portfolioFlows(events: readonly LedgerEvent[]): PortfolioFlow[] {
@@ -132,9 +207,15 @@ function portfolioFlows(events: readonly LedgerEvent[]): PortfolioFlow[] {
     .map((t) => {
       const gross = baseAmount(t.grossAmount, t.fxToBase);
       const fees = baseAmount(t.fees, t.fxToBase);
+      const inKind = isInKind(t);
       return t.type === "BUY"
-        ? { t: t.ts.getTime(), gross, net: gross.plus(fees).neg() }
-        : { t: t.ts.getTime(), gross: gross.neg(), net: gross.minus(fees) };
+        ? { t: t.ts.getTime(), gross, net: gross.plus(fees).neg(), inKind }
+        : {
+            t: t.ts.getTime(),
+            gross: gross.neg(),
+            net: gross.minus(fees),
+            inKind,
+          };
     })
     .sort((a, b) => a.t - b.t);
 }
@@ -150,9 +231,16 @@ export function computePortfolioReturns(
   const flows = portfolioFlows(events);
   if (flows.length === 0) return EMPTY_PORTFOLIO_RETURNS;
 
+  const twr = linkTwr(explainPortfolioTwr(events, points));
+  const mwr = portfolioMwr(
+    flows.filter((f) => !f.inKind),
+    new Decimal(last.value),
+    last.t,
+  );
   return {
-    twr: linkTwr(explainPortfolioTwr(events, points)),
-    mwr: portfolioMwr(flows, new Decimal(last.value), last.t),
+    twr,
+    mwr,
+    period: periodReturns(twr, mwr, flows[0]?.t ?? null, last.t),
   };
 }
 

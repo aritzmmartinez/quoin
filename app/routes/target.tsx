@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import Decimal from "decimal.js";
+import { Crosshair } from "lucide-react";
 import { Link } from "react-router";
 import { z } from "zod";
 
@@ -11,7 +12,13 @@ import {
   PrismaLedgerRepository,
   PrismaTargetRepository,
 } from "~/adapters/persistence";
-import { Card, TargetForm, TargetLines, TargetVersions } from "~/components";
+import {
+  Card,
+  EmptyState,
+  TargetForm,
+  TargetLines,
+  TargetVersions,
+} from "~/components";
 import {
   findIdMismatches,
   getActiveTarget,
@@ -184,9 +191,10 @@ export default function Target({ loaderData }: Route.ComponentProps) {
             note={active.note}
           />
         ) : (
-          <p className="px-gutter py-10 text-center text-[13px] text-muted">
-            {copy.none}
-          </p>
+          <EmptyState
+            icon={Crosshair}
+            {...(versions.length === 0 ? copy.none : copy.notYetActive)}
+          />
         )}
       </Card>
 
@@ -195,10 +203,14 @@ export default function Target({ loaderData }: Route.ComponentProps) {
         <TargetForm defaultLines={defaultLines} today={today} />
       </Card>
 
-      <h2 className="mb-2 text-[13px] text-muted">{copy.history.title}</h2>
-      <Card>
-        <TargetVersions versions={versions} />
-      </Card>
+      {versions.length > 0 && (
+        <>
+          <h2 className="mb-2 text-[13px] text-muted">{copy.history.title}</h2>
+          <Card>
+            <TargetVersions versions={versions} />
+          </Card>
+        </>
+      )}
     </>
   );
 }

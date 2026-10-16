@@ -3,7 +3,7 @@ import { Link } from "react-router";
 
 import { useCopy, useFormat } from "~/lib";
 
-import { DonutChart, donutColor } from "../charts/DonutChart";
+import { Donut, donutColor } from "../charts/Donut";
 import { Card } from "../ui/Card";
 import { TABLE_DIVIDER } from "../ui/table";
 
@@ -35,7 +35,7 @@ export function AllocationCard({ rows }: { rows: readonly AllocationRow[] }) {
         <p className="py-8 text-center text-[13px] text-muted">{a.empty}</p>
       ) : (
         <div className="flex flex-1 flex-wrap items-center gap-8">
-          <DonutChart slices={rows} label={a.title} />
+          <Donut slices={rows} label={a.title} />
           <ul className="min-w-0 flex-1 basis-55">
             {rows.map((row, index) => (
               <li

@@ -1,4 +1,32 @@
-import type { ExposureKind, InstrumentType, Thesis } from "~/core/domain";
+import type { DiscardReason } from "~/adapters/ingestion/discard";
+import type {
+  ExposureKind,
+  InstrumentType,
+  LeafKind,
+  Thesis,
+} from "~/core/domain";
+
+const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
+  "crypto-swap": "Intercambios con BTC",
+  "crypto-transfer": "Transferencias de BTC",
+  "reward-unpriced": "Recompensas de BTC sin precio",
+  "unmodelled-asset": "Activos que Quoin no modela",
+  "card-spending": "Pagos con tarjeta",
+  "saveback-unpaired": "Saveback sin compra emparejada",
+  unsupported: "Sin soporte",
+};
+
+const DISCARD_REASON_HELP: Record<DiscardReason, string | null> = {
+  "crypto-swap": null,
+  "crypto-transfer": null,
+  "reward-unpriced":
+    "No hay precio de BTC de esas fechas, así que estas recompensas no se han registrado y tu posición de BTC no las incluye. En Instrumentos, abre el símbolo de BTC y pulsa «Volver a descargar el histórico» con un rango que llegue a esas fechas. Después vuelve a importar este mismo fichero: lo ya registrado no se duplica.",
+  "unmodelled-asset": null,
+  "card-spending": null,
+  "saveback-unpaired":
+    "No se ha encontrado la compra que pagó este saveback (una compra del mismo importe en los 7 días siguientes, y solo una). Si esa compra está en el fichero, cuenta como aportación tuya. Si está en otro export, importa uno que cubra las dos fechas.",
+  unsupported: null,
+};
 
 const THESIS_LABELS: Record<Thesis, string> = {
   CORE: "Núcleo",
@@ -18,6 +46,13 @@ const TYPE_LABELS: Record<InstrumentType, string> = {
   BOND: "Bono",
   COMMODITY: "Materia prima",
   CASH: "Efectivo",
+};
+
+const RESOLVES_LABELS: Record<LeafKind, (id: string) => string> = {
+  COMPANY: () => "Empresa",
+  COMMODITY: (id) => `Materia prima · ${id}`,
+  CRYPTO: (id) => `Cripto · ${id}`,
+  UNRESOLVED: () => "Sin desglosar",
 };
 
 const EXPOSURE_KIND_LABELS: Record<ExposureKind, string> = {
@@ -114,7 +149,7 @@ export const es = {
         since: (date: string): string => `histórico desde ${date}`,
         unusable:
           "No disponible: ningún instrumento con histórico en euros lleva este símbolo",
-        none: "Ningún instrumento tiene todavía símbolo e histórico en euros. Mapéalo en Instrumentos y descarga su histórico.",
+        none: "Ningún instrumento tiene todavía símbolo e histórico en euros. Asígnale uno en la columna Símbolo de Instrumentos: al guardarlo se descarga su histórico.",
       },
     },
   },
@@ -126,7 +161,7 @@ export const es = {
         term: "Resultado latente y realizado",
         short: "El resultado de tus inversiones, en euros.",
         detail:
-          "El resultado latente es lo que ganarías si vendieras hoy lo que sigues teniendo: valor actual menos lo aportado. El realizado es el de lo que ya vendiste, cerrado. Se muestran por separado porque responden preguntas distintas: «cómo va lo que tengo» y «cuánto he ganado ya de verdad». «Aportado» incluye las comisiones, porque el coste de adquisición las incluye a efectos fiscales y excluirlas maquillaría la rentabilidad.",
+          "El resultado latente es lo que ganarías si vendieras hoy lo que sigues teniendo: valor actual menos lo que te costó. El realizado es el de lo que ya vendiste, cerrado. Se muestran por separado porque responden preguntas distintas: «cómo va lo que tengo» y «cuánto he ganado ya de verdad». Ese coste incluye las comisiones, porque el coste de adquisición las incluye a efectos fiscales y excluirlas maquillaría la rentabilidad.",
       },
       {
         term: "TER",
@@ -208,12 +243,24 @@ export const es = {
       },
     ],
   },
+  periodReturn: {
+    annual: (cumulative: string, since: string): string =>
+      `anual · ${cumulative} acumulado desde el ${since}`,
+    annualEquivalent: (period: string, since: string): string =>
+      `anual · equivale a ${period} en el periodo desde el ${since}`,
+    period: (since: string): string => `del periodo · desde el ${since}`,
+    unavailable: "sin solución",
+  },
   range: {
     label: "Rango temporal",
     m1: "1M",
     m6: "6M",
     y1: "1A",
     all: "Todo",
+    empty: "Sin datos en este rango.",
+  },
+  chart: {
+    loading: "Cargando gráfico",
   },
   basis: {
     label: "Base de cálculo",
@@ -260,27 +307,42 @@ export const es = {
       label: "Valor total de la cartera",
       rangeLabel: (range: string): string => `en ${range}`,
       allTimeLabel: "desde el inicio",
-      unpriced: (count: number): string =>
-        count === 1
-          ? "1 posición sin valorar, excluida del total"
-          : `${count} posiciones sin valorar, excluidas del total`,
+      unpriced: (count: number, cost: string): string =>
+        `${count} sin valorar (${cost} de coste)`,
       empty: "Aún no hay posiciones valoradas.",
     },
     chart: {
       title: "Evolución de la cartera",
       value: "Valor",
-      invested: "Aportado",
+      invested: "Coste",
       building: "Se necesitan al menos dos puntos para dibujar la evolución.",
+      unpriced: (count: number): string =>
+        count === 1
+          ? "El gráfico no incluye 1 posición sin valorar"
+          : `El gráfico no incluye ${count} posiciones sin valorar`,
     },
     stats: {
+      cost: {
+        label: "Coste de lo que tienes",
+        sub: "Todas las posiciones abiertas, valoradas o no",
+      },
+      unrealized: {
+        label: "Resultado latente",
+        sub: "Valor menos coste de lo valorado",
+        subUnpriced: (count: number, cost: string): string =>
+          `Valor menos coste de lo valorado. ${count} sin valorar (${cost} de coste)`,
+      },
       invested: {
         label: "Total aportado",
-        sub: "Coste de las posiciones abiertas",
+        sub: "Lo que pusiste tú, incluido lo vendido; sin recompensas",
+        subReal: (period: string): string =>
+          `Lo que pusiste tú en euros de ${period}, incluido lo vendido; sin recompensas`,
       },
-      unrealized: { label: "Resultado latente", sub: "Valor menos aportado" },
       realized: {
-        label: "Resultado realizado",
-        sub: "Resultado de las ventas cerradas",
+        label: "Resultado realizado (coste medio)",
+        sub: "Todos los años. El resultado fiscal (FIFO) está en Realizado",
+        subReal: (period: string): string =>
+          `Todos los años, reexpresado en euros de ${period}. El resultado fiscal (FIFO) está en Realizado`,
       },
       positions: { label: "Posiciones", sub: "Abiertas y valoradas" },
       opportunity: {
@@ -293,10 +355,11 @@ export const es = {
       },
     },
     returns: {
-      twr: { label: "TWR", sub: "ponderada por tiempo" },
-      mwr: { label: "MWR / TIR", sub: "ponderada por dinero" },
-      unavailable: "sin solución",
-      note: "El TWR mide cómo lo han hecho los activos y el MWR (TIR) mide cómo lo ha hecho tu dinero. Aportando poco a poco divergen a propósito: la mayor parte del capital lleva menos tiempo invertido, así que una subida antigua pesa entera en el TWR y casi nada en el MWR.",
+      twr: "TWR",
+      mwr: "MWR / TIR",
+      coverage: (priced: number, open: number): string =>
+        `Sobre ${priced} de ${open} posiciones abiertas`,
+      note: "El TWR mide cómo lo han hecho los activos; la TIR (MWR), cómo lo ha hecho tu dinero, según cuándo y cuánto aportaste. Aportando poco a poco divergen a propósito: una subida antigua pesa entera en el TWR y casi nada en la TIR, porque entonces había poco capital invertido. Las dos se calculan desde la primera operación incluida hasta hoy, sin depender del rango del gráfico. Con un año o más se muestran anuales, con lo que suponen en todo el periodo al lado; con menos, se muestra el rendimiento del periodo, porque anualizar unos meses extrapolaría una racha a un año entero. Las posiciones abiertas sin precio quedan fuera con todas sus operaciones; las ya cerradas sí cuentan.",
       nominal:
         "Ambas se calculan siempre en euros nominales, aunque el resto de la pantalla esté en poder adquisitivo de hoy.",
     },
@@ -444,7 +507,7 @@ export const es = {
     worseningHint:
       "Esta línea recibe aportación y aun así se aleja de su objetivo, porque otra posición del plan está sobreponderada y no se vende: el hueco que ocupa de más no se puede rellenar con dinero nuevo, solo diluir. Aportaciones mayores lo corrigen, y venderla tributaría.",
     unpriced: (names: string): string =>
-      `Sin precio utilizable, así que quedan fuera del reparto: ${names}. Un precio que falta no es un valor de cero. Ejecuta pnpm prices:sync antes de fiarte del reparto.`,
+      `Sin precio utilizable, así que quedan fuera del reparto: ${names}. Un precio que falta no es un valor de cero. Asígnales un símbolo en Instrumentos o, si ya lo tienen, pulsa «Refrescar precios» en Cartera antes de fiarte del reparto.`,
     offPlan: (count: number): string =>
       count === 1
         ? "1 posición en cartera, fuera del plan"
@@ -453,6 +516,49 @@ export const es = {
       "Tienes posición en esto y tu objetivo vigente no lo nombra. No recibe aportación: meter dinero nuevo ahí no es rebalancear, es cambiar de plan, y eso se hace en Objetivo.",
     empty:
       "Ninguna línea del objetivo se puede repartir todavía. Importa operaciones y sincroniza precios.",
+  },
+  setup: {
+    done: "Hecho",
+    pending: "Pendiente",
+    progress: (have: number, need: number): string => `${have} de ${need}`,
+    steps: {
+      trades: { label: "Operaciones importadas" },
+      prices: {
+        label: "Precio de lo que tienes",
+        action: "Ir a Instrumentos",
+      },
+      target: { label: "Un objetivo vigente", action: "Ir a Objetivo" },
+      funds: {
+        label: "Fondos con composición importada",
+        action: "Ir a Instrumentos",
+      },
+    },
+    screens: {
+      summary: {
+        title: "Tus operaciones ya están dentro",
+        body: "Falta saber cuánto vale lo que tienes. Sin un precio, el valor, la rentabilidad, la asignación y las mayores posiciones no tienen nada que mostrar.",
+      },
+      exposure: {
+        title: "Tu exposición real aparece aquí",
+        body: "Desglosa lo que tienes, fondo a fondo, hasta cada empresa, metal o cripto que hay debajo. Para eso necesita posiciones con precio.",
+      },
+      currency: {
+        title: "Tu exposición por divisa aparece aquí",
+        body: "Agrupa lo que tienes por la divisa del mercado principal de cada valor, también dentro de tus fondos. Para eso necesita posiciones con precio.",
+      },
+      overlap: {
+        title: "Hacen falta dos fondos para comparar",
+        body: "Cuánto de dos fondos es la misma empresa. Arrastra el CSV de composición de cada fondo sobre su fila en Instrumentos. Un fondo sin composición queda fuera del cálculo, no cuenta como 0 %.",
+      },
+      rebalance: {
+        title: "El reparto de tu aportación aparece aquí",
+        body: "Reparte lo que vas a aportar entre las líneas de tu objetivo, empezando por las que más lejos están de su peso. Para eso necesita tu plan y lo que ya tienes, con precio.",
+      },
+      projection: {
+        title: "La proyección de tu plan aparece aquí",
+        body: "Remuestrea los meses que tus instrumentos ya han vivido para estimar dónde podría acabar la cartera si sigues aportando según tu plan.",
+      },
+    },
   },
   ingest: {
     open: "Importar operaciones",
@@ -480,6 +586,7 @@ export const es = {
     failed: "La importación ha fallado.",
     analysing: "Analizando el fichero…",
     importing: "Importando…",
+    retrying: "Valorando las recompensas…",
     brokerLabel: (broker: string): string =>
       broker === "kraken" ? "Kraken" : "Trade Republic",
     detected: (broker: string): string => `${broker} detectado`,
@@ -492,14 +599,20 @@ export const es = {
       discarded: "Descartadas",
       errors: "Con error",
       none: "ninguna",
-      unsupportedDetails: (count: number): string =>
-        count === 1
-          ? "Ver 1 fila sin soporte"
-          : `Ver ${count} filas sin soporte`,
+      reasons: DISCARD_REASON_LABELS,
+      reasonHelp: DISCARD_REASON_HELP,
+      details: (count: number): string =>
+        count === 1 ? "1 operación" : `${count} operaciones`,
+      pendingPrice: "Recompensas de BTC pendientes de precio",
+      pendingPriceNote:
+        "Se valorarán después del paso de precios, volviendo a importar el fichero.",
+      positionWarning:
+        "Estas operaciones cambian tu saldo de BTC y Quoin no las registra, así que la posición de BTC no las refleja y puede no cuadrar con la del bróker.",
       noInstrument: "Sin instrumento",
     },
     nothingNew:
       "Nada nuevo que importar: todas las operaciones de este fichero ya estaban en el registro.",
+    confirmPending: "Continuar para valorar las recompensas",
     confirmCount: (count: number): string =>
       count === 1 ? "Importar 1 operación" : `Importar ${count} operaciones`,
     appliesNow:
@@ -509,7 +622,7 @@ export const es = {
         count === 1
           ? "Ya se ha importado 1 operación y se mantiene en el registro aunque cierres ahora."
           : `Ya se han importado ${count} operaciones y se mantienen en el registro aunque cierres ahora.`,
-      hint: "Los símbolos que falten por mapear se completan en Instrumentos.",
+      hint: "Los símbolos que falten se asignan después en la columna Símbolo de Instrumentos.",
       keep: "Seguir con la importación",
       close: "Cerrar de todos modos",
     },
@@ -533,12 +646,22 @@ export const es = {
       quantity: "Unidades",
       stale:
         "La marca de tiempo es antigua: casi siempre significa que es la plaza equivocada, o una muy ilíquida.",
-      closed:
-        "No tienes unidades de este instrumento, así que el valor implícito no verifica nada. Comprueba la plaza a mano.",
-      removed: (count: number): string =>
-        count === 1
-          ? "Se ha borrado 1 precio del símbolo anterior."
-          : `Se han borrado ${count} precios del símbolo anterior.`,
+      trades: "Tus últimas operaciones frente al cierre del símbolo",
+      tradeLine: (
+        date: string,
+        traded: string,
+        close: string,
+        deviation: string,
+      ): string =>
+        `${date}: operaste a ${traded}, el símbolo cerró a ${close} (${deviation})`,
+      tradesOff:
+        "Tus operaciones y los cierres de este símbolo no cuadran: casi siempre es otra plaza u otra clase del fondo. Prueba otra cotización antes de guardar.",
+      noTrades:
+        "No hay cierres de este símbolo en las fechas de tus operaciones, así que no se pueden comparar.",
+      notEur: (currency: string): string =>
+        `Este símbolo cotiza en ${currency}. Hoy Quoin solo valora históricos en euros: elige la cotización en euros del mismo fondo en otra plaza (.DE, .MI, .PA, .AS).`,
+      hasHistory:
+        "Este instrumento ya tiene precios guardados. Cambia su símbolo en la columna Símbolo de Instrumentos: allí se descarga el histórico nuevo antes de borrar el anterior.",
       pending: (count: number): string =>
         count === 1
           ? "1 instrumento sin símbolo"
@@ -547,7 +670,7 @@ export const es = {
       mapped: (done: number, total: number): string =>
         `${done} de ${total} mapeados`,
       canContinue:
-        "Puedes continuar sin mapearlos todos: los símbolos que falten se completan en Instrumentos.",
+        "Puedes continuar sin mapearlos todos: los que falten se asignan después en la columna Símbolo de Instrumentos, que también descarga su histórico.",
     },
     prices: {
       title: "Precios",
@@ -563,6 +686,12 @@ export const es = {
     },
     done: {
       title: "Resumen de la importación",
+      rewardsNeedMapping:
+        "Las recompensas de BTC siguen sin valorar porque BTC no tiene símbolo. Vuelve al paso de mapeo, asígnale uno y continúa: el asistente descargará sus precios y volverá a importar el fichero.",
+      recovered: (count: number): string =>
+        count === 1
+          ? "1 recompensa recuperada al valorarla con los precios descargados"
+          : `${count} recompensas recuperadas al valorarlas con los precios descargados`,
       imported: (count: number): string =>
         count === 1
           ? "1 operación importada"
@@ -570,7 +699,9 @@ export const es = {
       duplicates: (count: number): string =>
         count === 1 ? "1 duplicada omitida" : `${count} duplicadas omitidas`,
       discarded: (count: number): string =>
-        count === 1 ? "1 fila descartada" : `${count} filas descartadas`,
+        count === 1
+          ? "1 operación descartada"
+          : `${count} operaciones descartadas`,
       candles: (count: number): string =>
         count === 1 ? "1 precio histórico" : `${count} precios históricos`,
       synced: (count: number): string =>
@@ -579,6 +710,10 @@ export const es = {
         count === 1
           ? "1 instrumento sigue sin símbolo y no se puede valorar."
           : `${count} instrumentos siguen sin símbolo y no se pueden valorar.`,
+      notEurWarning: (count: number): string =>
+        count === 1
+          ? "1 símbolo no cotiza en euros y no se ha descargado su histórico: hoy solo se valoran históricos en euros. Cámbialo en la columna Símbolo de Instrumentos."
+          : `${count} símbolos no cotizan en euros y no se ha descargado su histórico: hoy solo se valoran históricos en euros. Cámbialos en la columna Símbolo de Instrumentos.`,
       staleWarning: (count: number): string =>
         count === 1
           ? "1 símbolo ha devuelto una cotización antigua: revisa la plaza."
@@ -641,6 +776,7 @@ export const es = {
       leaf: "Hoja",
       resolvesTo: "Se resuelve como",
       composition: "Composición",
+      symbol: "Símbolo",
       ter: "TER %",
       hedged: "Divisa",
       thesis: "Tesis",
@@ -652,7 +788,6 @@ export const es = {
     defaultOption: "(por defecto del tipo)",
     leafPlaceholder: "XAU, BTC…",
     leafRequired: "Esta clase necesita una hoja (p. ej. XAU).",
-    terPlaceholder: "0,22",
     terInvalid:
       "El TER va en porcentaje anual, entre 0 y 5. Un 0,22 % se escribe 0,22.",
     invalid: "Datos no válidos.",
@@ -660,29 +795,89 @@ export const es = {
     saving: "…",
     saved: "Guardado",
     closed: "Cerrada",
-    empty: "Sin instrumentos. Importa tus operaciones con pnpm ingest.",
+    noSymbol: "Sin símbolo",
+    resolves: RESOLVES_LABELS,
+    history: {
+      title: "Símbolo e histórico",
+      assign: "Usar este símbolo",
+      change: "Cambiar a este símbolo",
+      redownload: (symbol: string): string =>
+        `Volver a descargar el histórico de ${symbol}`,
+      range: "Histórico",
+      confirmReplace: (symbol: string): string =>
+        `Se descargará el histórico diario de ${symbol} y la cotización de hoy. Si llegan velas, sustituyen a todos los precios guardados de este instrumento; si no llega ninguna, no se toca nada. Las operaciones no cambian.`,
+      lost: (cutoff: string, earliest: string): string =>
+        `Este rango empieza el ${cutoff} y tu histórico actual el ${earliest}: se perderán los precios anteriores al ${cutoff}.`,
+      confirm: "Confirmar",
+      cancel: "Cancelar",
+      running: "Descargando…",
+      done: (count: number, first: string): string =>
+        count === 1
+          ? `1 precio guardado desde el ${first}.`
+          : `${count} precios guardados desde el ${first}.`,
+      noLive:
+        "Yahoo no ha dado cotización de hoy: pulsa «Refrescar precios» en Cartera más tarde.",
+      noHistory: (symbol: string): string =>
+        `Yahoo no ha devuelto histórico para ${symbol}. No se ha tocado nada.`,
+      notEur: (symbol: string, currency: string): string =>
+        `El histórico de ${symbol} viene en ${currency}. Hoy Quoin solo valora históricos en euros, así que no se ha tocado nada.`,
+      failed: "La descarga ha fallado. No se ha tocado nada.",
+      rebuild: "Rehacer todos los históricos",
+      rebuildConfirm: (count: number): string =>
+        `Se volverá a descargar el histórico diario de ${count === 1 ? "1 instrumento" : `${count} instrumentos`} con símbolo, uno tras otro. Cada uno solo se sustituye si Yahoo devuelve velas, y las operaciones no se tocan. Si sales de esta pantalla se detiene; lo ya rehecho se queda.`,
+      rebuilding: (done: number, total: number): string =>
+        `Rehaciendo ${done} de ${total}…`,
+      rebuilt: (done: number, total: number): string =>
+        `${done} de ${total} históricos rehechos.`,
+      rebuildFailed: "No se han podido rehacer:",
+      coarse: (count: number, names: string): string =>
+        count === 1
+          ? `${names} tiene velas semanales o mensuales de descargas antiguas. Rehaz su histórico para tener precios diarios.`
+          : `${count} instrumentos tienen velas semanales o mensuales de descargas antiguas: ${names}. Rehaz sus históricos para tener precios diarios.`,
+    },
+    empty: {
+      title: "Sin instrumentos todavía",
+      body: "Cada instrumento aparece aquí al importar sus operaciones. Importa el CSV de tu bróker para empezar.",
+    },
     sync: {
       action: "Refrescar precios",
-      loading: "Sincronizando precios…",
+      syncing: (done: number, total: number): string =>
+        `Sincronizando precios… ${done} de ${total}`,
       nothing: "Ningún instrumento tiene símbolo de cotización todavía.",
-      done: (updated: number, mapped: number): string =>
-        `${updated} de ${mapped} ${mapped === 1 ? "precio actualizado" : "precios actualizados"}`,
-      failed: (count: number): string =>
-        count === 1 ? "1 fallido" : `${count} fallidos`,
-      staleDetail: (count: number): string =>
+      done: (updated: number, total: number): string =>
+        `${updated} de ${total} ${total === 1 ? "precio actualizado" : "precios actualizados"}`,
+      candles: (count: number): string =>
         count === 1
-          ? "1 con cotización caducada"
-          : `${count} con cotización caducada`,
-      noQuoteDetail: (count: number): string =>
-        count === 1 ? "1 sin respuesta" : `${count} sin respuesta`,
-      error: "No se pudieron sincronizar los precios.",
+          ? "1 cierre diario recuperado"
+          : `${count} cierres diarios recuperados`,
+      failedList: "No se han podido actualizar:",
+      problem: {
+        "no-quote": "sin respuesta",
+        stale: "cotización caducada",
+        "not-eur": "no cotiza en euros",
+        error: "error inesperado",
+      },
+      unmappedOpen: (count: number): string =>
+        count === 1
+          ? "1 posición abierta sin símbolo"
+          : `${count} posiciones abiertas sin símbolo`,
+      unmappedClosed: (count: number): string =>
+        count === 1 ? "1 cerrada sin símbolo" : `${count} cerradas sin símbolo`,
+      unmappedAction: "Asígnalo en la columna Símbolo.",
     },
   },
   target: {
     title: "Objetivo",
     intro:
       "Tu plan de aportación mensual. Los importes son el dato y el peso se deriva de ellos. Un objetivo no se edita: cuando el plan cambia, guardas una versión nueva con su fecha de vigencia, para que siga sabiéndose qué objetivo estaba vigente en cada fecha.",
-    none: "Aún no hay ningún objetivo guardado. Crea la primera versión abajo o usa pnpm target:set.",
+    none: {
+      title: "Aún no tienes objetivo",
+      body: "Escribe abajo cuánto quieres aportar cada mes a cada instrumento. Puede nombrar instrumentos que todavía no has comprado. Con él se calculan el reparto de cada aportación y la proyección.",
+    },
+    notYetActive: {
+      title: "Ningún objetivo vigente hoy",
+      body: "Las versiones guardadas entran en vigor más adelante. Aparecerán aquí desde su fecha de vigencia.",
+    },
     activeFrom: (date: string): string => `Vigente desde el ${date}`,
     columns: {
       instrument: "Instrumento",
@@ -850,10 +1045,14 @@ export const es = {
       WITHDRAWAL: "Retirada",
       INTEREST: "Intereses",
     },
+    inKindTypes: {
+      BUY: "Compra en especie",
+      DIVIDEND: "Recompensa",
+    },
     empty: "Sin movimientos.",
     emptyScreen: {
       title: "Sin movimientos todavía",
-      body: "Importa tus operaciones con la CLI (pnpm ingest) para ver aquí el registro completo.",
+      body: "Importa el CSV de tu bróker (Trade Republic o Kraken) para ver aquí el registro completo.",
     },
     amountHint:
       "El importe es el flujo de caja real: comisiones incluidas y retenciones descontadas.",
@@ -861,13 +1060,13 @@ export const es = {
   portfolio: {
     title: "Cartera",
     summary: (count: number, invested: string): string =>
-      `${count} ${count === 1 ? "posición" : "posiciones"} · ${invested} aportado`,
+      `${count} ${count === 1 ? "posición" : "posiciones"} · ${invested} de coste`,
     columns: {
       name: "Instrumento",
       type: "Tipo",
       quantity: "Cantidad",
       averageCost: "Precio medio",
-      costBasis: "Aportado",
+      costBasis: "Coste",
       marketValue: "Valor",
       unrealizedPnL: "Resultado",
       weight: "Peso",
@@ -882,10 +1081,12 @@ export const es = {
       tradeCount: "Nº de operaciones",
     },
     updatedAt: (relative: string): string => `Actualizado ${relative}`,
-    noPrices: "Sin precios. Ejecuta pnpm prices:sync",
+    noPrices:
+      "Sin precios. Pulsa «Refrescar precios» o asigna en Instrumentos los símbolos que falten.",
+    value: (amount: string): string => `${amount} valor`,
     empty: {
       title: "Sin posiciones todavía",
-      body: "Importa tus movimientos con la CLI (pnpm ingest) para empezar a seguir tu cartera.",
+      body: "Importa el CSV de tu bróker (Trade Republic o Kraken) para empezar a seguir tu cartera.",
     },
     error: {
       title: "No se pudieron cargar las posiciones",
@@ -1030,6 +1231,13 @@ export const es = {
         title: "Sin ventas en este año",
         body: "Elige otro año fiscal en el desplegable.",
       },
+      inKind: {
+        title: "Ingresos en especie",
+        body: "Recompensas de Kraken y saveback de Trade Republic recibidos en participaciones. Clasificación fiscal pendiente de verificar: no se suman a ninguna cifra de esta vista.",
+        count: "Recepciones",
+        gross: "Valor al recibirlas",
+        withheld: "Retenido",
+      },
       carryforwardTitle: "Arrastre de pérdidas, últimos 4 años (Art. 66)",
       carryforwardColumns: {
         year: "Año",
@@ -1088,7 +1296,7 @@ export const es = {
     unpriced: (names: string): string =>
       `Sin precio utilizable: ${names}. Se excluyen de los dos lados, porque contar su coste sin su valor inventaría una pérdida.`,
     unmapped: (symbol: string): string =>
-      `Ningún instrumento está mapeado a ${symbol}, así que no hay índice contra el que comparar. Ejecuta pnpm prices:map <ISIN> ${symbol}.`,
+      `Ningún instrumento está mapeado a ${symbol}, así que no hay índice contra el que comparar. Elige en Ajustes uno de tus instrumentos con histórico de precios.`,
     noHistory: (symbol: string): string =>
       `${symbol} no tiene histórico de precios en euros. Ejecuta pnpm prices:backfill <ISIN> max para descargarlo.`,
     chooseBenchmark: "Elegir otro índice en Ajustes",
@@ -1153,9 +1361,16 @@ export const es = {
     value: "Valor",
     unrealizedPnL: "Resultado latente",
     kpis: {
-      twr: { label: "TWR", sub: "ponderada por tiempo" },
-      mwr: { label: "MWR / TIR", sub: "ponderada por dinero" },
-      totalInvested: { label: "Total aportado", sub: "suma de compras" },
+      twr: "TWR",
+      mwr: "MWR / TIR",
+      openCost: {
+        label: "Coste de lo que tienes",
+        sub: "coste medio de lo que queda",
+      },
+      totalInvested: {
+        label: "Total aportado",
+        sub: "lo que pusiste tú, incluido lo vendido; sin recompensas",
+      },
       buyCount: { label: "Aportaciones", sub: "compras realizadas" },
       avgBuyAmount: { label: "Importe medio", sub: "por aportación" },
     },
@@ -1167,11 +1382,11 @@ export const es = {
       sell: "Venta",
       empty: "Sin operaciones registradas.",
       noPrice:
-        "Sin histórico de precio todavía. Se construye con cada pnpm prices:sync.",
+        "Sin histórico de precio todavía. En Instrumentos, asígnale un símbolo o vuelve a descargar su histórico.",
     },
     ivvChart: {
-      title: "Aportado frente a valor",
-      invested: "Aportado",
+      title: "Coste frente a valor",
+      invested: "Coste",
       value: "Valor",
       building:
         "El valor se irá dibujando conforme el histórico de precio se acumule.",

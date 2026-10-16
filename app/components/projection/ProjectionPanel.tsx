@@ -90,7 +90,9 @@ export function ProjectionPanel({ view }: { view: ProjectionView }) {
                   className={`${FIELD} w-44`}
                 />
               </label>
-              <Button type="submit">{copy.form.submit}</Button>
+              <Button type="submit" variant="primary">
+                {copy.form.submit}
+              </Button>
               <div className="flex items-center gap-1.5">
                 <Checkbox name={DETAIL_PARAM} defaultChecked={view.extended}>
                   {copy.form.detail}

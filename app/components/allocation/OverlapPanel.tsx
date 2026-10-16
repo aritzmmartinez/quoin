@@ -1,4 +1,5 @@
-import { Link, useSearchParams } from "react-router";
+import { Info } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router";
 
 import type { FundOverlapPair } from "~/core/projections";
 import {
@@ -10,7 +11,9 @@ import {
 } from "~/lib";
 
 import { Card } from "../ui/Card";
+import { Checkbox } from "../ui/Checkbox";
 import { Explainer } from "../ui/Explainer";
+import { Hint } from "../ui/Hint";
 import { SegmentedLinks } from "../ui/Segmented";
 import { OverlapList } from "./OverlapList";
 import { OverlapMatrix } from "./OverlapMatrix";
@@ -80,21 +83,30 @@ export function OverlapPanel({
 function IncludeSoldToggle({ value }: { value: boolean }) {
   const t = useCopy();
   const [params] = useSearchParams();
+  const navigate = useNavigate();
   const copy = t.overlap;
 
   return (
-    <Link
-      to={includeSoldHref(params, !value)}
-      aria-current={value ? "page" : undefined}
-      title={copy.includeSoldHint}
-      className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[12px] font-medium transition-colors ${
-        value
-          ? "border-border bg-surface-2 text-text"
-          : "border-border text-muted hover:text-text"
-      }`}
-    >
-      {copy.includeSold}
-    </Link>
+    <div className="flex items-center gap-1.5">
+      <Checkbox
+        name="includeSold"
+        checked={value}
+        onChange={(checked) =>
+          void navigate(includeSoldHref(params, checked), {
+            preventScrollReset: true,
+          })
+        }
+      >
+        {copy.includeSold}
+      </Checkbox>
+      <Hint
+        label={copy.includeSoldHint}
+        name={copy.includeSold}
+        className="shrink-0 text-muted"
+      >
+        <Info size={12} strokeWidth={1.75} aria-hidden />
+      </Hint>
+    </div>
   );
 }
 

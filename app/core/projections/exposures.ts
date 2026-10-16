@@ -11,10 +11,15 @@ export interface Contribution {
   weightInParent: string | null;
 }
 
-export interface LeafExposure {
+export interface LeafExposureInput {
   leaf: LeafId;
   name: string;
   contributions: Contribution[];
+}
+
+export interface LeafExposure extends LeafExposureInput {
+  readonly total: string;
+  readonly weight: string | null;
 }
 
 export function computeExposures(
@@ -23,7 +28,7 @@ export function computeExposures(
   resolutions: ReadonlyMap<string, readonly WeightedLeaf[]>,
   instrumentNames: ReadonlyMap<string, string> = new Map(),
 ): LeafExposure[] {
-  const byLeaf = new Map<string, LeafExposure>();
+  const byLeaf = new Map<string, LeafExposureInput>();
 
   for (const position of positions) {
     if (new Decimal(position.quantity).isZero()) continue;
@@ -41,7 +46,7 @@ export function computeExposures(
 
       const key = leafKey(weighted.leaf);
       const existing = byLeaf.get(key);
-      const exposure: LeafExposure = existing ?? {
+      const exposure: LeafExposureInput = existing ?? {
         leaf: weighted.leaf,
         name: weighted.name,
         contributions: [],
@@ -63,19 +68,44 @@ export function computeExposures(
     }
   }
 
-  return [...byLeaf.values()].sort((a, b) =>
-    new Decimal(leafTotal(b)).comparedTo(new Decimal(leafTotal(a))),
+  const exposures = withLeafTotals([...byLeaf.values()]);
+  const totals = new Map(
+    exposures.map((exposure) => [exposure, new Decimal(exposure.total)]),
   );
+  return exposures.sort((a, b) => totals.get(b)!.comparedTo(totals.get(a)!));
 }
 
-export function leafTotal(exposure: LeafExposure): string {
+export function withLeafTotals(
+  leaves: readonly LeafExposureInput[],
+  total?: string,
+): LeafExposure[] {
+  const totals = leaves.map(leafTotal);
+  const denominator = new Decimal(
+    total ??
+      totals
+        .reduce((sum, value) => sum.add(Money.fromString(value)), Money.zero())
+        .toString(),
+  );
+  return leaves.map((leaf, index) => {
+    const leafTotalValue = totals[index]!;
+    return {
+      ...leaf,
+      total: leafTotalValue,
+      weight: denominator.isZero()
+        ? null
+        : new Decimal(leafTotalValue).div(denominator).toFixed(6),
+    };
+  });
+}
+
+export function leafTotal(exposure: LeafExposureInput): string {
   return exposure.contributions
     .reduce((sum, c) => sum.add(Money.fromString(c.value)), Money.zero())
     .toString();
 }
 
 export function leafWeight(
-  exposure: LeafExposure,
+  exposure: LeafExposureInput,
   total: string,
 ): string | null {
   const denominator = new Decimal(total);
@@ -97,7 +127,7 @@ export function summarizeExposures(
   let resolvedLeafCount = 0;
 
   for (const exposure of exposures) {
-    const value = Money.fromString(leafTotal(exposure));
+    const value = Money.fromString(exposure.total);
     total = total.add(value);
     if (exposure.leaf.kind === "UNRESOLVED") unresolved = unresolved.add(value);
     else resolvedLeafCount += 1;

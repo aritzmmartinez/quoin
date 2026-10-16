@@ -283,7 +283,7 @@ function Preview({
       </p>
 
       <div className="flex items-center gap-2">
-        <Button onClick={onConfirm} disabled={busy}>
+        <Button variant="primary" onClick={onConfirm} disabled={busy}>
           {busy ? copy.importing : copy.confirm}
         </Button>
         <Button variant="ghost" onClick={onReset}>

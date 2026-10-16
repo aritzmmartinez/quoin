@@ -9,6 +9,7 @@ const TONES = {
 const FRAMES = {
   shell: "min-h-[calc(100dvh-var(--spacing-header)-4rem)]",
   viewport: "min-h-dvh",
+  card: "",
 } as const;
 
 export interface ErrorStateProps {

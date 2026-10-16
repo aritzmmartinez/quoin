@@ -24,6 +24,7 @@ import {
 import { heldValuesByInstrument } from "./portfolio";
 import { buildProjectionSource, type ProjectionSource } from "./projection";
 import { DEFAULT_INFLATION_SERIES } from "./real.server";
+import { createServerTiming, type ServerTiming } from "./server-timing";
 
 export type ProjectionCase = Omit<
   ProjectionInput,
@@ -41,22 +42,31 @@ export interface ProjectionPlan {
 }
 
 export interface ProjectionContext {
+  hasTrades: boolean;
   annualInflation: string | null;
   plan: ProjectionPlan | null;
 }
 
 export async function loadProjectionContext(
   asOf: Date = new Date(),
+  timing: ServerTiming = createServerTiming(),
 ): Promise<ProjectionContext> {
   const priceRepository = new PrismaPriceRepository();
-  const [events, instruments, prices, targets, inflationPoints] =
-    await Promise.all([
-      new PrismaLedgerRepository().list(),
-      new PrismaInstrumentRepository().list(),
-      priceRepository.latest(),
-      new PrismaTargetRepository().list(),
-      new PrismaInflationRepository().list(DEFAULT_INFLATION_SERIES),
-    ]);
+  const events = await timing.time("db-ledger", () =>
+    new PrismaLedgerRepository().list(),
+  );
+  const instruments = await timing.time("db-instruments", () =>
+    new PrismaInstrumentRepository().list(),
+  );
+  const prices = await timing.time("db-prices-latest", () =>
+    priceRepository.latest(),
+  );
+  const targets = await timing.time("db-targets", () =>
+    new PrismaTargetRepository().list(),
+  );
+  const inflationPoints = await timing.time("db-inflation", () =>
+    new PrismaInflationRepository().list(DEFAULT_INFLATION_SERIES),
+  );
 
   const monthlyInflation = averageMonthlyInflation(inflationPoints);
   const annualInflation =
@@ -65,10 +75,13 @@ export async function loadProjectionContext(
       : new Decimal(monthlyInflation).plus(1).pow(12).minus(1).toFixed(6);
 
   const target = getActiveTarget(targets, asOf);
-  if (target === null) return { annualInflation, plan: null };
+  const hasTrades = events.length > 0;
+  if (target === null) return { hasTrades, annualInflation, plan: null };
 
-  const positions = computePositions(events);
-  const marketValues = computeMarketValues(positions, prices, BASE_CURRENCY);
+  const positions = timing.time("positions", () => computePositions(events));
+  const marketValues = timing.time("valuation", () =>
+    computeMarketValues(positions, prices, BASE_CURRENCY),
+  );
   const summary = computePortfolioSummary(positions, marketValues);
   const held = heldValuesByInstrument(positions, marketValues);
 
@@ -90,26 +103,32 @@ export async function loadProjectionContext(
   }
 
   const historyIds = [...new Set([...plannedIds, ...offPlanValues.keys()])];
-  const histories = await Promise.all(
-    historyIds.map((id) => priceRepository.historyFor(id)),
+  const histories = await timing.time("db-history", () =>
+    Promise.all(historyIds.map((id) => priceRepository.historyFor(id))),
   );
 
-  const source = buildProjectionSource(
-    target,
-    new Map(
-      historyIds.map((id, index) => [
-        id,
-        (histories[index] ?? [])
-          .filter((snapshot) => snapshot.currency === BASE_CURRENCY)
-          .map((snapshot) => ({ asOf: snapshot.asOf, price: snapshot.price })),
-      ]),
+  const source = timing.time("projection-source", () =>
+    buildProjectionSource(
+      target,
+      new Map(
+        historyIds.map((id, index) => [
+          id,
+          (histories[index] ?? [])
+            .filter((snapshot) => snapshot.currency === BASE_CURRENCY)
+            .map((snapshot) => ({
+              asOf: snapshot.asOf,
+              price: snapshot.price,
+            })),
+        ]),
+      ),
+      instrumentsById,
+      offPlanValues,
+      asOf,
     ),
-    instrumentsById,
-    offPlanValues,
-    asOf,
   );
 
   return {
+    hasTrades,
     annualInflation,
     plan: {
       target,

@@ -226,14 +226,14 @@ describe("computePortfolioReturns", () => {
       }),
     ];
 
-    expect(computePortfolioReturns(events, [])).toEqual({
+    expect(computePortfolioReturns(events, [])).toMatchObject({
       twr: null,
       mwr: null,
+      period: { since: null },
     });
-    expect(computePortfolioReturns([], [point("2026-01-01", "1000")])).toEqual({
-      twr: null,
-      mwr: null,
-    });
+    expect(
+      computePortfolioReturns([], [point("2026-01-01", "1000")]),
+    ).toMatchObject({ twr: null, mwr: null, period: { since: null } });
   });
 
   it("returns a null MWR when every flow points the same way", () => {
@@ -290,5 +290,64 @@ describe("explainPortfolioTwr", () => {
       .slice(1)
       .reduce((factor, row) => factor * Number(row.ratio), 1);
     expect(withoutTheFirst - 1).toBeCloseTo(0.1, 3);
+  });
+});
+
+describe("in-kind acquisitions", () => {
+  const cash = trade({
+    ts: new Date("2026-01-01"),
+    quantity: "10",
+    grossAmount: "1000",
+  });
+  const reward = (funding: "CASH" | "IN_KIND") =>
+    trade({
+      ts: new Date("2026-07-01"),
+      quantity: "1",
+      grossAmount: "110",
+      price: "110",
+      funding,
+    });
+
+  it("leaves them out of what was contributed, the count and the average", () => {
+    const r = computeReturns(
+      [cash, reward("IN_KIND")],
+      "VWCE",
+      "120",
+      new Date("2027-01-01"),
+    );
+    expect(r.totalInvested).toBe("1000");
+    expect(r.buyCount).toBe(1);
+    expect(r.avgBuyAmount).toBe("1000");
+  });
+
+  it("does not move an instrument's TWR, and lifts its MWR", () => {
+    const now = new Date("2027-01-01");
+    const asCash = computeReturns([cash, reward("CASH")], "VWCE", "120", now);
+    const inKind = computeReturns(
+      [cash, reward("IN_KIND")],
+      "VWCE",
+      "120",
+      now,
+    );
+    expect(inKind.twr).toBe(asCash.twr);
+    expect(Number(inKind.mwr)).toBeGreaterThan(Number(asCash.mwr));
+  });
+
+  it("keeps the portfolio TWR, drops the flow from MWR, and dates the period from the first trade", () => {
+    const series = [
+      point("2026-01-01", "1000"),
+      point("2026-07-01", "1210"),
+      point("2027-01-01", "1320"),
+    ];
+    const first = reward("IN_KIND");
+    const early = { ...first, ts: new Date("2025-12-01") };
+    const asCash = computePortfolioReturns([cash, reward("CASH")], series);
+    const inKind = computePortfolioReturns([cash, reward("IN_KIND")], series);
+
+    expect(inKind.twr).toBe(asCash.twr);
+    expect(Number(inKind.mwr)).toBeGreaterThan(Number(asCash.mwr));
+    expect(
+      computePortfolioReturns([early, cash], series).period.since,
+    ).toBe(new Date("2025-12-01").getTime());
   });
 });

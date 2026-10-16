@@ -28,6 +28,25 @@ describe("parseYahooChart", () => {
     expect(quote?.asOf).toEqual(new Date(1_751_363_100 * 1000));
   });
 
+  it("carries the long name, falling back to the short one", () => {
+    const withNames = (names: Record<string, string>) => ({
+      chart: {
+        result: [{ meta: { ...sample.chart.result[0]!.meta, ...names } }],
+      },
+    });
+
+    expect(
+      parseYahooChart(
+        withNames({ longName: "Synthetic World ETF", shortName: "SYN WLD" }),
+        "VWCE.DE",
+      )?.name,
+    ).toBe("Synthetic World ETF");
+    expect(
+      parseYahooChart(withNames({ shortName: "SYN WLD" }), "VWCE.DE")?.name,
+    ).toBe("SYN WLD");
+    expect(parseYahooChart(sample, "VWCE.DE")).not.toHaveProperty("name");
+  });
+
   it("returns null on a provider error / empty result", () => {
     expect(
       parseYahooChart({ chart: { result: null, error: "Not Found" } }, "NOPE"),

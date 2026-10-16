@@ -5,6 +5,8 @@ interface YahooChartResponse {
     result?: Array<{
       meta?: {
         currency?: string;
+        longName?: string;
+        shortName?: string;
         regularMarketPrice?: number;
         regularMarketTime?: number;
       };
@@ -38,11 +40,16 @@ export function parseYahooChart(json: unknown, symbol: string): Quote | null {
     return null;
   }
 
+  const name = [meta.longName, meta.shortName]
+    .find((n) => typeof n === "string" && n.trim() !== "")
+    ?.trim();
+
   return {
     symbol,
     price: regularMarketPrice.toFixed(6),
     currency,
     asOf: new Date(regularMarketTime * 1000),
+    ...(name ? { name } : {}),
   };
 }
 

@@ -30,3 +30,21 @@ export function filterByRange<T extends { t: number }>(
   const cutoff = now.getTime() - days * 24 * 60 * 60 * 1000;
   return data.filter((d) => d.t >= cutoff);
 }
+
+export type RangedSeries<T> =
+  | { kind: "empty" }
+  | { kind: "outOfRange" }
+  | { kind: "ready"; points: T[] };
+
+export function rangedSeries<T extends { t: number }>(
+  data: readonly T[],
+  range: Range,
+  minPoints: number,
+  now: Date = new Date(),
+): RangedSeries<T> {
+  if (data.length < minPoints) return { kind: "empty" };
+  const points = filterByRange(data, range, now);
+  return points.length < minPoints
+    ? { kind: "outOfRange" }
+    : { kind: "ready", points };
+}

@@ -9,6 +9,7 @@ export function StepperNav({
   canGoBack,
   canGoNext,
   disabled,
+  primary = false,
 }: {
   onPrevious: () => void;
   onNext: () => void;
@@ -16,6 +17,7 @@ export function StepperNav({
   canGoBack: boolean;
   canGoNext: boolean;
   disabled: boolean;
+  primary?: boolean;
 }) {
   const t = useCopy();
   return (
@@ -27,7 +29,11 @@ export function StepperNav({
       >
         {t.ingest.previous}
       </Button>
-      <Button onClick={onNext} disabled={!canGoNext || disabled}>
+      <Button
+        variant={primary ? "primary" : "default"}
+        onClick={onNext}
+        disabled={!canGoNext || disabled}
+      >
         {nextLabel}
       </Button>
     </div>

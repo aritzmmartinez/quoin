@@ -22,6 +22,7 @@ const trade: LedgerEvent = {
   price: "100",
   grossAmount: "150",
   fees: "1",
+  funding: "CASH",
   currency: "EUR",
   fxToBase: "1",
   account: "trade-republic",
@@ -37,6 +38,7 @@ const dividend: LedgerEvent = {
   instrumentId: "US00TEST0020",
   grossAmount: "12.34",
   taxWithheld: "2.34",
+  funding: "CASH",
   currency: "EUR",
   fxToBase: "1",
   account: "trade-republic",
@@ -79,6 +81,25 @@ describe("ledger mappers", () => {
 
   it("round-trips a dividend event unchanged", () => {
     expect(roundTripEvent(dividend)).toEqual(dividend);
+  });
+
+  it("round-trips an in-kind acquisition and its income leg", () => {
+    const buy = { ...trade, funding: "IN_KIND" } as LedgerEvent;
+    const income = { ...dividend, funding: "IN_KIND" } as LedgerEvent;
+    expect(roundTripEvent(buy)).toEqual(buy);
+    expect(roundTripEvent(income)).toEqual(income);
+  });
+
+  it("writes CASH when an event does not say how it was funded", () => {
+    const { funding: _omitted, ...unstated } = trade as LedgerEvent & {
+      funding?: string;
+    };
+    expect(eventToCreateData(unstated as LedgerEvent).funding).toBe("CASH");
+  });
+
+  it("rejects a row with an unknown funding", () => {
+    const row = eventToCreateData(trade) as LedgerEntryRow;
+    expect(() => rowToEvent({ ...row, funding: "GIFT" })).toThrow();
   });
 
   it("round-trips a cash event unchanged", () => {

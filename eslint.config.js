@@ -17,6 +17,14 @@ const APP_LAYER = [
 ];
 const ADAPTERS_LAYER = ["~/adapters", "~/adapters/**"];
 
+const RECHARTS = {
+  name: "recharts",
+  allowTypeImports: true,
+  message:
+    "Recharts is imported only from a *Chart.tsx module. Name the file *Chart, or move the drawing into one.",
+};
+const CHART_MODULE = "**/*Chart";
+
 export default tseslint.config(
   {
     ignores: [
@@ -40,6 +48,58 @@ export default tseslint.config(
     },
   },
 
+  {
+    files: ["app/**/*.{ts,tsx}"],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        { paths: [RECHARTS] },
+      ],
+    },
+  },
+  {
+    files: ["app/components/**/*.{ts,tsx}"],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          paths: [RECHARTS],
+          patterns: [
+            {
+              group: [CHART_MODULE],
+              caseSensitive: true,
+              message:
+                "Only a *Chart module may import another *Chart. A component wrapping a chart is a chart: name it *Chart so it stays out of the barrels.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ["app/components/index.ts", "app/components/*/index.ts"],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          paths: [RECHARTS],
+          patterns: [
+            {
+              group: [CHART_MODULE],
+              caseSensitive: true,
+              message:
+                "A barrel never re-exports a *Chart: it would put Recharts in the chunk every route loads. Import the chart from its own module.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ["app/**/*Chart.tsx"],
+    rules: { "@typescript-eslint/no-restricted-imports": "off" },
+  },
+
   // core: pure domain. Must not import from adapters or app.
   {
     files: ["app/core/**/*.{ts,tsx}"],
@@ -47,6 +107,7 @@ export default tseslint.config(
       "@typescript-eslint/no-restricted-imports": [
         "error",
         {
+          paths: [RECHARTS],
           patterns: [
             {
               group: [...ADAPTERS_LAYER, ...APP_LAYER],
@@ -66,6 +127,7 @@ export default tseslint.config(
       "@typescript-eslint/no-restricted-imports": [
         "error",
         {
+          paths: [RECHARTS],
           patterns: [
             {
               group: APP_LAYER,

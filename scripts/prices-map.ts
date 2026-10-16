@@ -2,6 +2,8 @@ import "dotenv/config";
 
 import { argv, exit } from "node:process";
 
+import Decimal from "decimal.js";
+
 import { YahooMarketDataProvider } from "~/adapters/marketdata";
 import {
   PrismaInstrumentRepository,
@@ -9,35 +11,54 @@ import {
   PrismaPriceRepository,
   prisma,
 } from "~/adapters/persistence";
-import { computePositions } from "~/core/projections";
-import { remapQuoteSymbol } from "~/lib/quote-symbol";
-import { checkSymbol, heldQuantity } from "~/lib/symbol-check";
+import { replaceQuoteHistory } from "~/lib/price-history";
+import { isHistoryRange, rangeSince } from "~/lib/prices-backfill";
+import { clearQuoteSymbol } from "~/lib/quote-symbol";
+import { checkQuoteAgainstLedger } from "~/lib/symbol-check";
 
 const USAGE = `Usage:
-  pnpm prices:map <ISIN>            show the current quote symbol
-  pnpm prices:map <ISIN> <SYMBOL>   set the quote symbol (e.g. VWCE.DE, BTC-EUR)
-  pnpm prices:map <ISIN> --clear    remove the quote symbol`;
+  pnpm prices:map <ISIN>                    show the current quote symbol
+  pnpm prices:map <ISIN> <SYMBOL> [range]   set the symbol and replace the history
+                                            (e.g. VWCE.DE, BTC-EUR; range 1y|2y|5y|10y|max)
+  pnpm prices:map <ISIN> --clear            remove the quote symbol and its prices`;
 
 async function preview(symbol: string, instrumentId: string): Promise<void> {
   try {
-    const [quote] = await new YahooMarketDataProvider().getQuotes([symbol]);
-    if (!quote) {
+    const check = await checkQuoteAgainstLedger(
+      new YahooMarketDataProvider(),
+      await new PrismaLedgerRepository().list(),
+      instrumentId,
+      symbol,
+    );
+    if (!check) {
       console.log(
         `  ⚠ no quote returned for ${symbol} — try another venue (.MI, .PA, .F).`,
       );
       return;
     }
 
-    const events = await new PrismaLedgerRepository().list();
-    const check = checkSymbol(
-      quote,
-      heldQuantity(computePositions(events), instrumentId),
-    );
-
     const stale = check.fresh
       ? ""
       : "  ⚠ STALE timestamp — likely the wrong/illiquid venue";
-    console.log(`  → ${check.price} ${check.currency} @ ${check.asOf}${stale}`);
+    console.log(
+      `  → ${check.name ?? "(no name)"}: ${check.price} ${check.currency} @ ${check.asOf}${stale}`,
+    );
+    for (const trade of check.trades) {
+      const pct = new Decimal(trade.deviation).mul(100).toFixed(1);
+      console.log(
+        `  → ${trade.ts.slice(0, 10)}: traded at ${trade.traded}, closed at ${trade.close} (${pct}%)${trade.off ? "  ⚠" : ""}`,
+      );
+    }
+    if (check.tradesOff) {
+      console.log(
+        "  ⚠ your trades and this symbol's closes disagree: likely the wrong venue or share class.",
+      );
+    }
+    if (check.foreignCurrency) {
+      console.log(
+        `  ⚠ quotes in ${check.foreignCurrency}: only EUR histories are valued, so the history will be refused. Pick the EUR line on another venue.`,
+      );
+    }
     console.log(
       `  → implied value: ${check.quantity} units = ${check.impliedValue} ${check.currency}`,
     );
@@ -72,21 +93,50 @@ async function main(): Promise<void> {
     return;
   }
 
-  const symbol = symbolArg === "--clear" ? null : symbolArg;
+  if (symbolArg === "--clear") {
+    const removed = await clearQuoteSymbol(
+      repo,
+      new PrismaPriceRepository(),
+      id,
+    );
+    console.log(
+      `${instrument.id}  ${instrument.name}
+  quoteSymbol: (cleared), ${removed} price snapshot(s) removed`,
+    );
+    return;
+  }
 
-  const { removed } = await remapQuoteSymbol(
-    repo,
-    new PrismaPriceRepository(),
-    id,
-    symbol,
+  const prices = new PrismaPriceRepository();
+  const rangeArg = argv.slice(2).find((arg) => isHistoryRange(arg));
+  const earliest = (await prices.candleTimes()).get(id)?.[0] ?? null;
+  const range = rangeArg ?? rangeSince(earliest, new Date());
+
+  await preview(symbolArg, id);
+
+  const outcome = await replaceQuoteHistory(
+    {
+      instruments: repo,
+      prices,
+      provider: new YahooMarketDataProvider(),
+    },
+    { instrumentId: id, symbol: symbolArg, range },
   );
-  if (removed > 0) console.log(`Cleared ${removed} old price snapshot(s).`);
+
+  if (!outcome.ok) {
+    const why =
+      outcome.reason === "not-eur"
+        ? `history is in ${outcome.currency}; only EUR histories are valued`
+        : "no daily history returned";
+    console.error(`
+${symbolArg}: ${why}. Nothing was changed.`);
+    exit(1);
+  }
 
   console.log(
-    `${instrument.id}  ${instrument.name}\n  quoteSymbol: ${symbol ?? "(cleared)"}`,
+    `${instrument.id}  ${instrument.name}
+  quoteSymbol: ${symbolArg}
+  ${outcome.removed} old snapshot(s) replaced by ${outcome.written} (${range}, ${outcome.first.slice(0, 10)} → ${outcome.last.slice(0, 10)})${outcome.live ? "" : ", no fresh quote today"}`,
   );
-
-  if (symbol) await preview(symbol, id);
 }
 
 main()

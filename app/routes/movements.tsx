@@ -1,3 +1,4 @@
+import { ArrowLeftRight } from "lucide-react";
 import { useNavigation } from "react-router";
 
 import type { Route } from "./+types/movements";
@@ -6,7 +7,7 @@ import {
   PrismaInstrumentRepository,
   PrismaLedgerRepository,
 } from "~/adapters/persistence";
-import { Card, MovementsTable } from "~/components";
+import { Card, EmptyState, IngestModal, MovementsTable } from "~/components";
 import {
   type Copy,
   copyFromMatches,
@@ -72,14 +73,13 @@ export default function Movements({ loaderData }: Route.ComponentProps) {
         className={`overflow-hidden transition-opacity ${busy ? "opacity-60" : ""}`}
       >
         {info.total === 0 ? (
-          <div className="px-6 py-16 text-center">
-            <div className="text-[15px] font-semibold">
-              {t.movements.emptyScreen.title}
-            </div>
-            <p className="mx-auto mt-1.5 max-w-sm text-[13px] text-muted">
-              {t.movements.emptyScreen.body}
-            </p>
-          </div>
+          <EmptyState
+            icon={ArrowLeftRight}
+            title={t.movements.emptyScreen.title}
+            body={t.movements.emptyScreen.body}
+          >
+            <IngestModal variant="primary" size="md" />
+          </EmptyState>
         ) : (
           <MovementsTable rows={rows} info={info} />
         )}

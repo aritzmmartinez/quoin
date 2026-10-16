@@ -44,6 +44,29 @@ describe("toMovementRows", () => {
     expect(row?.costs).toBe("1.00");
   });
 
+  it("marks both legs of an in-kind acquisition, which together move no cash", () => {
+    const purchase = buy({
+      fees: "0",
+      grossAmount: "0.81",
+      funding: "IN_KIND",
+    });
+    const income = {
+      ...base,
+      id: "e2",
+      ts: new Date("2026-07-14T10:00:00Z"),
+      type: "DIVIDEND",
+      instrumentId: "IE00BK5BQT80",
+      grossAmount: "1.00",
+      taxWithheld: "0.19",
+      funding: "IN_KIND",
+    } as LedgerEvent;
+    const rows = toMovementRows([purchase, income], INSTRUMENTS);
+
+    expect(rows.map((r) => r.inKind)).toEqual([true, true]);
+    expect(netCashFlow(rows)).toBe("0.00");
+    expect(toMovementRows([buy()], INSTRUMENTS)[0]?.inKind).toBe(false);
+  });
+
   it("nets fees out of a sell: the amount is what arrived", () => {
     const [row] = toMovementRows(
       [buy({ type: "SELL", grossAmount: "895.40", fees: "1.00" })],

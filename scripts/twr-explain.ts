@@ -17,10 +17,13 @@ import type { PriceSnapshot } from "~/core/ports";
 import {
   computeCostBasisTimeline,
   computeInvestedVsValueSeries,
+  computeMarketValues,
   computePortfolioInvestedVsValueSeries,
   computePortfolioReturns,
   computePositions,
   explainPortfolioTwr,
+  unpricedOpenIds,
+  withoutInstruments,
   type CostBasisPoint,
   type InvestedVsValuePoint,
   type TwrSubPeriod,
@@ -261,14 +264,20 @@ async function main(): Promise<void> {
   console.log(`Database: ${databasePath() ?? "(unset)"}\n`);
 
   const priceRepository = new PrismaPriceRepository();
-  const [events, instruments, prices] = await Promise.all([
+  const [allEvents, instruments, prices] = await Promise.all([
     new PrismaLedgerRepository().list(),
     new PrismaInstrumentRepository().list(),
     priceRepository.latest(),
   ]);
 
   const names = new Map(instruments.map((i) => [i.id, i.name]));
-  const positions = computePositions(events);
+  const allPositions = computePositions(allEvents);
+  const unpriced = unpricedOpenIds(
+    allPositions,
+    computeMarketValues(allPositions, prices, BASE_CURRENCY),
+  );
+  const events = withoutInstruments(allEvents, unpriced);
+  const positions = allPositions.filter((p) => !unpriced.has(p.instrumentId));
   const heldIds = [...new Set(positions.map((p) => p.instrumentId))];
   const histories = await Promise.all(
     heldIds.map((id) => priceRepository.historyFor(id)),
@@ -306,6 +315,13 @@ async function main(): Promise<void> {
   const returns = computePortfolioReturns(events, series);
   const rows = explainPortfolioTwr(events, series);
 
+  if (unpriced.size > 0) {
+    console.log(
+      `Left out, open with no price (same as Summary): ${[...unpriced]
+        .map((id) => names.get(id) ?? id)
+        .join(", ")}`,
+    );
+  }
   console.log(
     `Instruments traded: ${heldIds.length}` +
       `  |  value points: ${series.length}` +

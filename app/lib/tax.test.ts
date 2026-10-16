@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import type { Instrument, TradeEvent } from "~/core/domain";
+import type { DividendEvent, Instrument, TradeEvent } from "~/core/domain";
+import { computeTaxHistory } from "~/core/tax";
 
 import {
   buildTaxYearView,
+  inKindIncomeOf,
   listTaxYears,
   parseTaxYear,
   TAX_YEAR_PARAM,
@@ -248,5 +250,81 @@ describe("unlistedInstrumentIds", () => {
         instrument("X", "Fondo X"),
       ]),
     ]).toEqual(["BTC"]);
+  });
+});
+
+describe("income received in kind", () => {
+  function reward(ts: string, grossAmount: string, taxWithheld = "0") {
+    const income: DividendEvent = {
+      id: `evt-${seq++}`,
+      ts: new Date(ts),
+      type: "DIVIDEND",
+      instrumentId: "X",
+      grossAmount,
+      taxWithheld,
+      funding: "IN_KIND",
+      currency: "EUR",
+      fxToBase: "1",
+      account: "test",
+      source: "TEST",
+    };
+    return income;
+  }
+
+  const ledger = [
+    trade("BUY", "X", "10", "1000", { ts: "2025-01-10" }),
+    trade("SELL", "X", "5", "400", { ts: "2025-03-10" }),
+    trade("BUY", "X", "2", "160", { ts: "2025-04-01" }),
+    trade("SELL", "X", "4", "480", { ts: "2025-09-01" }),
+  ];
+  const incomes = [
+    reward("2025-02-01T10:00:00Z", "1.00", "0.19"),
+    reward("2025-12-31T23:30:00Z", "2.00", "0.38"),
+  ];
+  const instruments = [instrument("X", "Test ETF", "ETF")];
+
+  it("is read by no tax calculation", () => {
+    expect(
+      computeTaxHistory([...ledger, ...incomes], {
+        unlistedInstrumentIds: new Set(),
+      }),
+    ).toEqual(computeTaxHistory(ledger, { unlistedInstrumentIds: new Set() }));
+
+    const { inKindIncome: _with, ...withIncome } = buildTaxYearView(
+      [...ledger, ...incomes],
+      instruments,
+      2025,
+    );
+    const { inKindIncome: _without, ...withoutIncome } = buildTaxYearView(
+      ledger,
+      instruments,
+      2025,
+    );
+    expect(withIncome).toEqual(withoutIncome);
+  });
+
+  it("is listed for its Madrid fiscal year, with what was withheld", () => {
+    expect(inKindIncomeOf(incomes, 2025)).toEqual({
+      count: 1,
+      gross: "1.00",
+      withheld: "0.19",
+    });
+    expect(inKindIncomeOf(incomes, 2026)).toEqual({
+      count: 1,
+      gross: "2.00",
+      withheld: "0.38",
+    });
+  });
+
+  it("opens a tax year even when nothing was sold in it", () => {
+    expect(listTaxYears([...ledger, ...incomes])).toEqual([2026, 2025]);
+  });
+
+  it("leaves a cash dividend out of the block", () => {
+    const cash = {
+      ...reward("2025-05-01T10:00:00Z", "5"),
+      funding: "CASH" as const,
+    };
+    expect(inKindIncomeOf([cash], 2025).count).toBe(0);
   });
 });

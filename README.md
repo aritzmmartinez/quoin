@@ -73,9 +73,10 @@ docker run -d --name quoin -p 127.0.0.1:3000:3000 -v quoin-data:/app/data --rest
 ```
 
 Then open http://localhost:3000 and bring in your trades with **Import trades** on the
-Portfolio screen: drop the CSV export from Trade Republic or Kraken, exactly as you
-downloaded it, and the wizard takes it through symbols, prices and a summary. The broker
-is detected from the file's columns. Importing the same file again adds nothing.
+Portfolio screen: drop the CSV export from Trade Republic or Kraken (Kraken: BTC only for
+now; other assets are listed as discarded), exactly as you downloaded it, and the wizard
+takes it through symbols, prices and a summary. The broker is detected from the file's
+columns. Importing the same file again adds nothing.
 
 - **Keep the `127.0.0.1:` in `-p`.** Quoin has no login. Publishing the port on every
   interface puts your portfolio on your network, or on the internet if the machine is
@@ -102,22 +103,25 @@ Requirements: Node.js 24+ and pnpm.
 ```bash
 cp .env.example .env    # DATABASE_URL -> data/quoin.sqlite
 pnpm install            # builds better-sqlite3 + generates the Prisma client
-pnpm run db:migrate     # creates the database and the first migration
+pnpm run db:deploy      # creates the database and applies every migration
 pnpm run dev            # http://localhost:5173
 ```
 
 Then open the app and import your trades with **Import trades** on the Portfolio screen,
 as in the Docker section above: the wizard reads the broker export, maps symbols and
-fetches prices without the terminal.
+fetches prices without the terminal. Symbols can be assigned or changed later in the
+Symbol column of **Instruments**, which also downloads an instrument's history again or
+rebuilds every history at once.
 
 The same work, and everything around it, is also available from the command line:
 
 ```bash
 pnpm ingest --broker=trade-republic path/to/export.csv   # CSV -> ledger (idempotent)
 pnpm ingest --broker=kraken path/to/ledgers.csv
-pnpm prices:map <ISIN> <SYMBOL>   # map an instrument to a Yahoo symbol, e.g. VWCE.DE
-pnpm prices:sync                  # fetch quotes for mapped instruments -> price snapshots
+pnpm prices:map <ISIN> <SYMBOL> [range]   # set a Yahoo symbol (e.g. VWCE.DE) and replace the history
+pnpm prices:sync                  # fill missing daily closes and store today’s quote, one price per day
 pnpm prices:backfill [ISIN] [1y|2y|5y|10y|max]   # daily price history (default 5y)
+pnpm prices:rebuild [ISIN]        # download every mapped history again, daily
 pnpm exposure:map                 # list how every instrument resolves for look-through
 pnpm exposure:map <ISIN> <KIND> [LEAF]           # e.g. XS00TEST0003 COMMODITY XAU
 pnpm identity:resolve             # give holdings a canonical id so duplicates merge
@@ -126,8 +130,11 @@ pnpm ipc:sync                     # INE consumer price index (national + Bizkaia
 pnpm target:set [<file>]          # show, or record a version of, the savings plan
 ```
 
-`ingest`, `prices:map`, `prices:sync` and `prices:backfill` do the same work as the
-import wizard, and `ipc:sync` the same as the button in the IPC notice on Summary.
+`ingest`, `prices:sync` and `prices:backfill` do the same work as the import wizard
+(`prices:sync` is also **Refresh prices** on Portfolio),
+`prices:map` and `prices:rebuild` the same as the Symbol column and **Rebuild all
+histories** on Instruments, and `ipc:sync` the same as the button in the IPC notice on
+Summary. Only `prices:map --clear` has no button.
 
 Fund compositions are imported from the **Instruments** screen: drop the issuer's
 holdings CSV onto the fund's row. One parser handles every issuer — the weight column
@@ -136,12 +143,14 @@ language, layout or number format without a rule per provider. There is no comma
 for it on purpose.
 
 Quote symbols and exposure classifications live only in your local database (never in
-the repo), so a public clone never discloses your holdings. Prefer EUR venues (`.DE`,
-`.AS`, `.MC`) to avoid FX for now.
+the repo), so a public clone never discloses your holdings. Only symbols quoted in euros
+are accepted for now (`.DE`, `.AS`, `.MC`…); other currencies come with multi-currency
+support. Use the exchange ticker, not the ISIN: Yahoo answers `<ISIN>.SG` with a current
+price but no daily history.
 
 The opportunity-cost screen replays every contribution into a benchmark ETF, `VWCE.DE`
 by default. Pick another under *Benchmark index* in `/settings` — the list offers
-only instruments you have mapped to a symbol, in the import wizard or with `prices:map`,
+only instruments you have mapped to a symbol, in the import wizard or on Instruments,
 and given EUR price history.
 
 Two databases, on purpose. `data/quoin.sqlite` is the ledger — real trades, and the only
@@ -176,6 +185,7 @@ pnpm run typecheck      # react-router typegen + tsc
 pnpm run lint           # eslint (includes the layer boundaries)
 pnpm run build          # production build
 pnpm run db:generate    # regenerate the Prisma client after a schema change
+pnpm run db:migrate     # development only: create a migration from a schema change
 pnpm run db:studio      # Prisma Studio (GUI to inspect the data)
 pnpm run db:backup      # VACUUM INTO data/backups/, keeping the last 30
 pnpm run db:seed        # synthetic portfolio -> the scratch database
@@ -185,6 +195,22 @@ pnpm projection:converge    # how much the projected range moves between seeds, 
 pnpm test               # Vitest (pure domain / projection / mapper tests)
 pnpm run test:integration   # migrations against a temporary SQLite database
 ```
+
+### Updating
+
+With Docker, see the steps under *With Docker*: a new image backs up the ledger and
+migrates it on its own.
+
+From source, pull the new version, then back up and migrate:
+
+```bash
+pnpm install
+pnpm run db:backup      # snapshot the ledger first
+pnpm run db:deploy      # prisma migrate deploy: apply pending migrations, nothing else
+```
+
+Never update a ledger with `db:migrate`. It is `prisma migrate dev`, meant for writing
+migrations: when it finds the schema out of step, it can offer to reset the database.
 
 ## Architecture
 
@@ -225,9 +251,12 @@ on with decimal.js; data and secrets are never committed.
 - [x] Interface redesign: new palette, mono figures, grouped sidebar, theme setting
 - [x] English interface alongside Spanish, with figures and dates formatted per locale
 - [x] Docker image for amd64 and arm64, published on every release
+- [x] Import onboarding: symbol column on Instruments, in-kind rewards and saveback, gap-free daily prices
 - [ ] Display currency: show every amount converted, with historical rates
 - [ ] Watchlist and trade journal
 - [ ] DCF valuation module
+- [ ] Kraken: every asset, not only BTC
+- [ ] Mobile app
 
 ## License
 
