@@ -86,7 +86,7 @@ async function main(): Promise<void> {
     }
 
     const weekly = report.weekly
-      ? "  ⚠ weekly candles — Yahoo degraded this range; try a shorter one for daily"
+      ? "  ⚠ Yahoo returned weekly candles for this symbol; run prices:rebuild later or check the symbol"
       : "";
     console.log(
       `  ${report.instrumentId}  (${report.symbol})  ${report.written} candle(s)  ${report.first?.slice(0, 10)} → ${report.last?.slice(0, 10)}  ${report.currency}${weekly}`,

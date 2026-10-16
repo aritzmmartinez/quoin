@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-10-17
+
+### Upgrading
+- This release adds a column to the ledger; its migration marks the Kraken rewards already imported as in-kind. The Docker image backs up the ledger and applies the migration on its own when it starts; to keep a snapshot of your own first, run `docker exec quoin npm run db:backup`. From source, run `pnpm db:backup` and then `pnpm db:deploy`.
+- Import your Trade Republic CSV again, covering everything since your first saveback. Saveback income is recorded and its purchases are marked; nothing is duplicated.
+- On Instruments, run Rebuild all histories once if it warns about weekly or monthly prices, or if your price history has gaps older than a week.
+
 ### Added
 - Empty screens offer an Import trades button when importing is the next step.
 - Summary, Allocation and Projection list what they still need, with a button for each pending step.
@@ -14,13 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Download the history of an instrument again from its row, or rebuild every history at once. Old prices are replaced only if new ones arrive, and trades are never touched.
 - Instruments warns when an instrument still has weekly or monthly prices from old downloads.
 - prices:rebuild downloads every mapped history again from the command line.
+- db:deploy applies pending migrations to the ledger when updating from source. db:migrate is for development only.
 - Trade Republic saveback is imported: each one is matched with the purchase it paid for, and a saveback with no single match is listed in the import summary.
 - The tax view lists the year's rewards and saveback, with their tax classification pending verification. They are not added to any tax figure.
 
 ### Changed
 - Kraken rewards and Trade Republic saveback no longer count as contributions: they stay out of Total contributed, the number of contributions, the average amount and the money-weighted return. They keep their market value as cost, and the time-weighted return does not change.
 - Movements shows those purchases as "In-kind purchase" and their income as "Reward".
-- Importing a Trade Republic file again marks the saveback purchases imported before this change.
 - Summary, Allocation and Projection open noticeably faster, especially with years of price history.
 - Charts show a placeholder with hinted axes while the page loads, instead of an empty box. It is announced to screen readers and does not pulse when reduced motion is on.
 - When the range or basis on Summary takes a moment to reload, the portfolio value chart stays on screen dimmed instead of looking frozen.
@@ -29,31 +36,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Target explains what it is for when none is set.
 - The realised result on Summary says it is average cost across all years, and restated when the basis is real; it links to the tax view, where the FIFO result for each year lives.
 - Messages that pointed to a command now point to the button that does the same, when there is one.
-- Refresh prices counts the open and closed positions that still have no symbol.
 - Messages that send you to Instruments say what to do there.
 - Include sold funds, in fund overlap, is a checkbox like See more detail, with its explanation next to it instead of on hover.
-- Refresh prices moves to Portfolio, next to when prices were last updated. Instruments keeps Rebuild all histories, which asks for confirmation in a dialog and shows its progress in a notification.
+- Refresh prices moves to Portfolio, next to when prices were last updated, and counts the open and closed positions that still have no symbol. Instruments keeps Rebuild all histories, which asks for confirmation and shows its progress in a notification.
 - The Composition column on Instruments reads "Company", "Crypto · BTC" or "Not broken down" instead of internal codes.
 - The TER field is shown only for ETFs, ETCs and funds, without a sample value.
-- prices:map downloads the new symbol's history before replacing the old one, and refuses a history that is not in euros.
-- Checking a symbol, in the import wizard or on Instruments, says when it does not quote in euros, and such a symbol cannot be saved.
-- Checking a symbol shows its name on Yahoo and compares your last three trades with the symbol's close on those days, with a warning when they do not match. It works for closed positions too.
+- Changing a symbol downloads the new symbol's history before replacing the old one, and refuses a history that is not in euros. prices:map does the same on the command line.
+- Checking a symbol, in the import wizard or on Instruments, shows its Yahoo name, refuses a symbol that does not quote in euros, and compares your last three trades with its close on those days, with a warning when they do not match. It works for closed positions too.
+- TWR and IRR, on Summary and on an instrument, are both annual over a year or more, TWR with its cumulative figure beside it and IRR with what it amounts to over the period, and the return for the period under a year, each saying since when.
 
 ### Fixed
-- Refresh prices and prices:sync only stored the price of the moment, so every day the app was not opened was left without a price. They now fill the daily closes missing since the last sync, going a week further back to replace earlier same-day prices with the day's close, and keep at most one current price per day. Prices not in euros are refused. Each instrument is synced in turn, with progress shown, and the ones that fail are listed at the end. Gaps older than that week are filled by Rebuild all histories, on Instruments.
+- Refresh prices and prices:sync only stored the price of the moment, so every day the app was not opened was left without a price. They now fill the daily closes missing since the last sync and keep one price per day, refusing prices not in euros. Each instrument is synced in turn with progress shown, and failures are listed at the end. Gaps older than a week are filled by Rebuild all histories.
 - The value total on Portfolio showed in Spanish in the English interface.
 - On an instrument's page, a range with no data in it showed the chart's axes around nothing. It now says the range has no data.
 - Importing a Kraken file showed discarded rows as an internal code ("non-btc: N"). Each reason is now named, listed row by row with asset and date, and BTC swaps, BTC transfers and BTC rewards without a price come with a warning that the BTC position does not include them. ingest prints the same breakdown.
-- The first import of a Kraken file into an empty Quoin left out every BTC reward, because there were no BTC prices yet to value them. The import now values them once its price step has run and says how many it recovered; ingest offers to download the prices and import again. A file with nothing but rewards can now be imported too.
+- The first import of a Kraken file into an empty Quoin left out every BTC reward, because there were no BTC prices yet to value them. The import now values them once its price step has run and says how many it recovered. A file with nothing but rewards can now be imported too. On the command line, ingest offers to download the prices and import again.
 - Long price histories were downloaded as monthly or weekly prices. They are now daily.
-- The price step of the import wizard stored histories in other currencies, which Quoin cannot value. It now leaves them out and says which symbols to change. prices:backfill does the same.
+- The price step of the import wizard stored histories in other currencies, which Quoin cannot value. It now leaves them out and says which symbols to change. prices:backfill does the same on the command line.
 - Summary counted open positions with no price in its chart, TWR and IRR at their last trade price. They are now left out, and the screen says how many and what they cost. Closed positions still count.
-- Summary separates the cost of what you hold, which now includes unpriced positions, from the total contributed, every purchase including what was sold. Portfolio's column and the instrument's chart showed that cost as contributed; they now say cost. An instrument now shows the cost of what you hold beside the total contributed.
-- The cost and value charts, on Summary and on an instrument, now start their amount axis at zero. An instrument's could start well above it, which made its moves look larger than they were.
+- Summary separates the cost of what you hold, unpriced positions included, from the total contributed, which includes what you sold. Portfolio and the instrument page called that cost "contributed"; they now call it cost, and the instrument page shows both.
+- A closed position without a price had no TWR or IRR; it now has both.
+- The cost and value charts, on Summary and on an instrument, now start their amount axis at zero, so small moves no longer look larger than they are.
 - The time axis of an instrument's price chart repeated labels ("Oct 25 Oct 25…") or crowded them. It now uses the same marks as Summary, by day on short ranges.
 - An instrument's price chart on All started at the beginning of its price history, years before the first trade, with the trades squeezed into a corner. All now runs from the first trade to today, for a closed position too. The other ranges are unchanged and the stored history is kept whole.
 - On an instrument's price chart, the average cost line of a closed position dropped to zero after the closing sale and pulled the price axis down with it. The line now ends at that sale and starts again at the next purchase, and it runs up to today while the position is open.
-- TWR and IRR, on Summary and on an instrument, are both annual over a year or more, TWR with its cumulative figure beside it and IRR with what it amounts to over the period, and the return for the period under a year, each saying since when. A closed position without a price now gets its TWR and IRR.
 
 ## [0.11.1] - 2026-10-06
 
@@ -352,7 +358,8 @@ fund holdings must be supplied as CSV rather than the Excel most issuers publish
 Design rationale lives beside the code it explains, in `docs/ARCHITECTURE.md` and in the
 commit history — not here.
 
-[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.11.1...HEAD
+[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/aritzmmartinez/quoin/compare/v0.11.1...v0.12.0
 [0.11.1]: https://github.com/aritzmmartinez/quoin/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/aritzmmartinez/quoin/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/aritzmmartinez/quoin/compare/v0.9.0...v0.10.0
