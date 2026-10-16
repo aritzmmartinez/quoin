@@ -14,18 +14,13 @@ import {
 import { type Range, rangedSeries, useCopy, useFormat } from "~/lib";
 
 import { legendOrder } from "../charts/legend-order";
+import { timeTicks } from "../charts/time-ticks";
 import { useHydrated } from "../charts/use-hydrated";
 import { Card } from "../ui/Card";
 import { ChartSkeleton } from "../ui/ChartSkeleton";
 import { RangeSelector } from "../ui/RangeSelector";
-
-export interface PriceChartDatum {
-  t: number;
-  price: number | null;
-  avgCost: number | null;
-  buy: number | null;
-  sell: number | null;
-}
+import type { PriceChartPoint } from "./price-chart-data";
+import { sinceFirstTrade } from "./since-first-trade";
 
 const LEGEND_ORDER = legendOrder(["price", "avgCost", "buy", "sell"]);
 
@@ -36,18 +31,25 @@ const TOOLTIP_STYLE = {
   fontSize: 12,
 } as const;
 
-export function InstrumentPriceChart({ data }: { data: PriceChartDatum[] }) {
+export function InstrumentPriceChart({ data }: { data: PriceChartPoint[] }) {
   const { formatMoney, formatDate, formatTimeTick } = useFormat();
   const axisEur = (v: number) => formatMoney(String(v), 0);
-  const axisDate = (t: number) => formatTimeTick(t, "month", true);
   const hydrated = useHydrated();
   const [range, setRange] = useState<Range>("all");
 
   const t = useCopy();
   const c = t.instrument.priceChart;
-  // One point is drawable here: a lone trade is a scatter mark.
-  const series = rangedSeries(data, range, 1);
+  const series = rangedSeries(
+    range === "all" ? sinceFirstTrade(data) : data,
+    range,
+    1,
+  );
   const hasPrice = data.some((d) => d.price !== null);
+  const points = series.kind === "ready" ? series.points : [];
+  const { unit, ticks } = timeTicks(
+    points[0]?.t ?? 0,
+    points[points.length - 1]?.t ?? 0,
+  );
 
   return (
     <Card className="mb-6 p-4">
@@ -80,7 +82,16 @@ export function InstrumentPriceChart({ data }: { data: PriceChartDatum[] }) {
               type="number"
               scale="time"
               domain={["dataMin", "dataMax"]}
-              tickFormatter={axisDate}
+              ticks={ticks}
+              tickFormatter={(t: number, index: number) =>
+                formatTimeTick(
+                  t,
+                  unit,
+                  index === 0 || new Date(t).getMonth() === 0,
+                )
+              }
+              minTickGap={24}
+              padding={{ left: 8 }}
               stroke="var(--color-muted)"
               fontSize={11}
               tickLine={false}
@@ -126,7 +137,7 @@ export function InstrumentPriceChart({ data }: { data: PriceChartDatum[] }) {
               strokeWidth={1.25}
               strokeDasharray="4 3"
               dot={false}
-              connectNulls
+              connectNulls={false}
               isAnimationActive={false}
             />
             <Scatter
