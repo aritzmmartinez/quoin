@@ -6,7 +6,7 @@
 #              when no prebuilt binary matches the platform)
 #   build      every dependency, then `react-router build`
 #   prod-deps  production dependencies only, native modules built for the target
-#   runtime    node:24-slim + the two above; no compiler, no pnpm, no source tree
+#   runtime    node:24-trixie-slim + the two above; no compiler, no pnpm, no source tree
 #
 # Built for linux/amd64 and linux/arm64. Each platform runs its own prod-deps stage,
 # so better-sqlite3's binary and Prisma's schema engine always match the image.
@@ -14,13 +14,17 @@
 # The database is never in the image. It lives in the volume at /app/data, and
 # .dockerignore keeps data/, *.sqlite, *.csv and .env out of the build context too.
 
-ARG NODE_VERSION=24
+# Both stages pin the same multi-arch index by digest: builds are reproducible, and
+# Dependabot opens a PR when the tag moves (a Debian or Node patch), which runs the
+# image scan in docker.yml before anything is tagged. The tag stays beside the
+# digest for whoever reads it; Dependabot cannot resolve a FROM built from an ARG.
 
 # openssl is here and in runtime for Prisma, which picks its schema-engine binary by
 # the OpenSSL it finds. Without it, install assumes openssl-1.1.x and downloads the
 # wrong engine; `migrate deploy` then tries to fetch the right one into a
 # node_modules it cannot write to, and the container never starts.
-FROM node:${NODE_VERSION}-slim AS toolchain
+# Node 24.22.0, Debian 13.7 (trixie)
+FROM node:24-trixie-slim@sha256:7f486cabe892bff8fef04c0f7da8dba84a560be3e4e2740b7a86afc57ebec315 AS toolchain
 RUN apt-get update \
  && apt-get install -y --no-install-recommends python3 make g++ openssl \
  && rm -rf /var/lib/apt/lists/*
@@ -40,12 +44,18 @@ RUN pnpm build
 FROM toolchain AS prod-deps
 RUN pnpm install --frozen-lockfile --prod
 
-FROM node:${NODE_VERSION}-slim AS runtime
+# Node 24.22.0, Debian 13.7 (trixie)
+FROM node:24-trixie-slim@sha256:7f486cabe892bff8fef04c0f7da8dba84a560be3e4e2740b7a86afc57ebec315 AS runtime
 # tini as PID 1: forwards SIGTERM to node and reaps zombies, so `docker stop`
 # shuts the server down instead of waiting out the 10s timeout and killing it.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends tini openssl \
  && rm -rf /var/lib/apt/lists/*
+# The base image's npm bundles brace-expansion, undici and http-cache-semantics
+# with known High CVEs; 11.21.1 bundles fixed ones (12.2.0, the current latest,
+# does not). npm is here only for `npm run db:backup`; 0.13.0 drops it.
+RUN npm install -g npm@11.21.1 \
+ && npm cache clean --force
 
 # CHECKPOINT_DISABLE stops the Prisma CLI from phoning home (update check and
 # usage telemetry) on every `migrate` the entrypoint runs. A local-first app should
