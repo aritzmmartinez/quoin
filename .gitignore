@@ -17,6 +17,8 @@
 # User data — NEVER committed (public repo)
 /data/
 *.csv
+*.xlsx
+!/test/fixtures/**/*.xlsx
 *.sqlite
 *.sqlite-*
 *.db

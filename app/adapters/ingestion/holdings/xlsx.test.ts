@@ -1,5 +1,11 @@
+import { readFileSync } from "node:fs";
 import * as XLSX from "xlsx";
 import { describe, expect, it } from "vitest";
+
+import {
+  ISSUER_XLSX,
+  issuerWorkbook,
+} from "../../../../test/fixtures/holdings/issuer-xlsx";
 
 import { HoldingsParseError, parseHoldingsCsv } from "./parse";
 import { xlsxToHoldingsCsv } from "./xlsx";
@@ -93,6 +99,30 @@ describe("xlsxToHoldingsCsv", () => {
     expect(() =>
       xlsxToHoldingsCsv(workbook({ Equities: HOLDINGS, Bonds: HOLDINGS })),
     ).toThrow(/more than one sheet/i);
+  });
+
+  it("reads an issuer-shaped workbook that SheetJS did not write", () => {
+    const file = readFileSync(ISSUER_XLSX);
+    expect(file.equals(issuerWorkbook())).toBe(true);
+
+    const parsed = parseHoldingsCsv(
+      xlsxToHoldingsCsv(new Uint8Array(file).buffer),
+    );
+    expect(parsed.columns.identity).toBe("Ticker");
+    expect(parsed.qualifier).toBe("Location");
+    expect(parsed.asOfHint).toBe("27/07/2026");
+    expect(parsed.weightScale).toBe("100");
+    expect(parsed.holdings).toHaveLength(11);
+    expect(parsed.holdings.map((h) => h.identity)).toEqual(
+      expect.arrayContaining(["SAN.ES", "6857.JP"]),
+    );
+    expect(parsed.holdings[0]).toMatchObject({
+      name: "Alpha Corp",
+      weight: "0.1508",
+    });
+    expect(parsed.covered).toBe("0.975");
+    expect(parsed.residual).toBe("0.025");
+    expect(parsed.foldedRows).toBe(1);
   });
 
   it("rejects a file too large to be a holdings export before parsing", () => {

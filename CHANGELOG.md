@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- In 0.13.0 the image drops npm; back up with `docker exec quoin db-backup` from then on.
+- The Docker image is built on Debian 13 (trixie) instead of Debian 12 (bookworm), pinned by digest.
+
+### Security
+- The image no longer carries any Critical or High vulnerability with a fix available. Docker Scout on 0.12.0 reported 5 Critical and 23 High; this image reports 0 Critical and 3 High, none of them fixable.
+- Fixed in the app's dependencies: proxy-addr 2.0.8, fast-uri 3.1.8, compression 1.8.2, morgan 1.12.1, qs 6.16.1, and mysql2 3.24.4 through Prisma 7.10.1.
+- Excel holdings files are read with SheetJS 0.20.3 from its official CDN, pinned by integrity, which fixes the two High vulnerabilities of 0.18.5, the last version on npm.
+- The image's npm is 11.21.1, whose bundled brace-expansion, undici and http-cache-semantics are fixed.
+- The base image change removes four Critical and ten High in Debian packages (perl, util-linux, openssl).
+- Left, with no fix available anywhere: CVE-2026-85091 in Debian's zlib (High), CVE-2025-45582 in tar (Medium) and 26 Low in Debian packages. Docker Scout also still reports CVE-2023-30533 and CVE-2024-22363 against SheetJS 0.20.3: its source marks every version on npm as affected, while both were fixed in 0.19.3 and 0.20.2, so 0.20.3 is not affected.
+
 ## [0.12.0] - 2026-10-17
 
 ### Upgrading

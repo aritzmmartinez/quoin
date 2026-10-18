@@ -252,6 +252,7 @@ on with decimal.js; data and secrets are never committed.
 - [x] English interface alongside Spanish, with figures and dates formatted per locale
 - [x] Docker image for amd64 and arm64, published on every release
 - [x] Import onboarding: symbol column on Instruments, in-kind rewards and saveback, gap-free daily prices
+- [ ] Docker image without npm: back up with `docker exec quoin db-backup` (0.13.0)
 - [ ] Display currency: show every amount converted, with historical rates
 - [ ] Watchlist and trade journal
 - [ ] DCF valuation module
