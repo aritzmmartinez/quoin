@@ -47,6 +47,11 @@ describe("terInputMatches", () => {
     expect(terInputMatches("  0.22  ", "0.002200")).toBe(true);
   });
 
+  it("matches a stored fraction written with fewer decimals", () => {
+    expect(terInputMatches(terToPercentInput("0.0022"), "0.0022")).toBe(true);
+    expect(terInputMatches("0,25", "0.0022")).toBe(false);
+  });
+
   it("treats an empty input as matching only an absent stored TER", () => {
     expect(terInputMatches("", null)).toBe(true);
     expect(terInputMatches("   ", null)).toBe(true);
