@@ -114,7 +114,7 @@ describe("xlsxToHoldingsCsv", () => {
     expect(parsed.weightScale).toBe("100");
     expect(parsed.holdings).toHaveLength(11);
     expect(parsed.holdings.map((h) => h.identity)).toEqual(
-      expect.arrayContaining(["SAN.ES", "6857.JP"]),
+      expect.arrayContaining(["SAN.ES", "SAN.FR", "6857.JP"]),
     );
     expect(parsed.holdings[0]).toMatchObject({
       name: "Alpha Corp",
