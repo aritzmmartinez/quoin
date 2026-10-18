@@ -24,6 +24,7 @@ const check = (symbol: string, currency = "EUR"): SymbolCheck => ({
   impliedValue: "200",
   closed: false,
   foreignCurrency: currency === "EUR" ? null : currency,
+  dailyHistory: true,
   name: "Synthetic Fund",
   trades: [],
   tradesAsked: 0,
@@ -136,6 +137,20 @@ describe.each(PLACES)("symbol mapper in $place", ({ initial, stored }) => {
     expect(isVerified(usd)).toBe(true);
     expect(usd.check?.foreignCurrency).toBe("USD");
     expect(canSave(usd, stored)).toBe(false);
+  });
+
+  it("verifies a symbol with no daily history but never lets it be saved", () => {
+    const sg = run(
+      initialMapper(initial),
+      { type: "edit", symbol: "XS00TEST0001.SG" },
+      { type: "verify" },
+      {
+        type: "verified",
+        check: { ...check("XS00TEST0001.SG"), dailyHistory: false },
+      },
+    );
+    expect(isVerified(sg)).toBe(true);
+    expect(canSave(sg, stored)).toBe(false);
   });
 
   it("does not verify an empty symbol", () => {

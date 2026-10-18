@@ -7,13 +7,19 @@ import {
   type LedgerEvent,
   type TradeEvent,
 } from "~/core/domain";
-import type { HistorySpan, MarketDataProvider, Quote } from "~/core/ports";
+import type {
+  HistoryRange,
+  HistorySpan,
+  MarketDataProvider,
+  Quote,
+} from "~/core/ports";
 import { computePositions } from "~/core/projections";
 
 export const TRADE_CHECKS = 3;
 export const TRADE_DEVIATION_LIMIT = "0.1";
 const LOOKBACK_MS = 7 * 86_400_000;
 const REWARD_NOTE = "kraken-reward";
+export const DAILY_HISTORY_PROBE: HistoryRange = "1y";
 
 export interface TradeMark {
   ts: Date;
@@ -39,6 +45,7 @@ export interface SymbolCheck {
   impliedValue: string;
   closed: boolean;
   foreignCurrency: string | null;
+  dailyHistory: boolean;
   trades: TradeComparison[];
   tradesAsked: number;
   tradesOff: boolean;
@@ -50,6 +57,7 @@ export function checkSymbol(
   now?: Date,
   trades: TradeComparison[] = [],
   tradesAsked = trades.length,
+  dailyHistory = true,
 ): SymbolCheck {
   const held = new Decimal(quantity);
 
@@ -64,6 +72,7 @@ export function checkSymbol(
     impliedValue: new Decimal(quote.price).mul(held).toFixed(2),
     closed: held.isZero(),
     foreignCurrency: foreignCurrency([quote]),
+    dailyHistory,
     trades,
     tradesAsked,
     tradesOff: tradesDisagree(trades),
@@ -159,15 +168,16 @@ export async function checkQuoteAgainstLedger(
   symbol: string,
   now?: Date,
 ): Promise<SymbolCheck | null> {
-  const [quote] = await provider.getQuotes([symbol]);
+  const quote = await provider.getQuote(symbol);
   if (!quote) return null;
 
+  const foreign = foreignCurrency([quote]) !== null;
   const marks = recentTradeMarks(events, instrumentId);
   const span = tradeSpan(marks);
   const candles =
-    span && !foreignCurrency([quote])
-      ? await provider.getHistory(symbol, span)
-      : [];
+    span && !foreign ? await provider.getHistory(symbol, span) : [];
+  const dailyHistory =
+    foreign || candles.length > 0 || (await hasDailyHistory(provider, symbol));
 
   return checkSymbol(
     quote,
@@ -175,7 +185,15 @@ export async function checkQuoteAgainstLedger(
     now,
     compareTrades(marks, candles),
     marks.length,
+    dailyHistory,
   );
+}
+
+export async function hasDailyHistory(
+  provider: MarketDataProvider,
+  symbol: string,
+): Promise<boolean> {
+  return (await provider.getHistory(symbol, DAILY_HISTORY_PROBE)).length > 0;
 }
 
 export function heldQuantity(

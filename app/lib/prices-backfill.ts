@@ -1,6 +1,7 @@
 import { foreignCurrency } from "~/core/domain";
 import {
   HISTORY_RANGE_DAYS,
+  MarketDataUnavailableError,
   type HistoryRange,
   type MarketDataProvider,
   type PriceRepository,
@@ -34,10 +35,7 @@ export function widerRange(a: HistoryRange, b: HistoryRange): HistoryRange {
   return HISTORY_RANGES.indexOf(a) >= HISTORY_RANGES.indexOf(b) ? a : b;
 }
 
-export function rangeSince(
-  earliest: Date | null,
-  now: Date,
-): HistoryRange {
+export function rangeSince(earliest: Date | null, now: Date): HistoryRange {
   return earliest === null
     ? DEFAULT_HISTORY_RANGE
     : widerRange(DEFAULT_HISTORY_RANGE, rangeCovering(earliest, now));
@@ -72,6 +70,7 @@ export interface BackfillReport {
   currency: string | null;
   foreignCurrency: string | null;
   weekly: boolean;
+  unavailable: string | null;
 }
 
 export interface BackfillTarget {
@@ -106,6 +105,7 @@ function reportOf(
     currency: quotes[0]?.currency ?? null,
     foreignCurrency: null,
     weekly: medianGapDays(quotes) >= 4,
+    unavailable: null,
   };
 }
 
@@ -142,7 +142,12 @@ export async function backfillInstruments(
 ): Promise<BackfillReport[]> {
   const reports: BackfillReport[] = [];
   for (const target of targets) {
-    reports.push(await backfillInstrument(provider, prices, target, range));
+    try {
+      reports.push(await backfillInstrument(provider, prices, target, range));
+    } catch (error) {
+      if (!(error instanceof MarketDataUnavailableError)) throw error;
+      reports.push({ ...reportOf(target, [], 0), unavailable: error.message });
+    }
   }
   return reports;
 }

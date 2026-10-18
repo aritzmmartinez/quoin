@@ -1,14 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import type { Instrument } from "~/core/domain";
-import type {
-  HistoryRange,
-  InstrumentRepository,
-  MarketDataProvider,
-  PriceRepository,
-  PriceSnapshot,
-  Quote,
-  ReplaceHistoryOptions,
+import {
+  MarketDataUnavailableError,
+  type HistoryRange,
+  type InstrumentRepository,
+  type MarketDataProvider,
+  type PriceRepository,
+  type PriceSnapshot,
+  type Quote,
+  type ReplaceHistoryOptions,
 } from "~/core/ports";
 
 import { es } from "./i18n";
@@ -92,8 +93,7 @@ function provider(
 ): MarketDataProvider {
   return {
     source: "YAHOO",
-    getQuotes: async (symbols) =>
-      live.filter((q) => symbols.includes(q.symbol)),
+    getQuote: async (symbol) => live.find((q) => q.symbol === symbol) ?? null,
     getHistory: async (symbol: string, _range: HistoryRange) => {
       const answer = history[symbol] ?? [];
       if (answer instanceof Error) throw answer;
@@ -131,16 +131,30 @@ describe("replaceQuoteHistory", () => {
     expect(state.symbol).toBe("AAA.DE");
   });
 
-  it("leaves every candle alone when the provider fails outright", async () => {
+  it("leaves every candle alone and rethrows when the provider cannot answer", async () => {
+    const { state, instruments, prices } = store(COARSE_OLD);
+    const unavailable = new MarketDataUnavailableError("AAA.DE", 429);
+
+    await expect(
+      replaceQuoteHistory(
+        {
+          instruments,
+          prices,
+          provider: provider({ "AAA.DE": unavailable }),
+          now: NOW,
+        },
+        { instrumentId: INSTRUMENT.id, symbol: "AAA.DE", range: "5y" },
+      ),
+    ).rejects.toBe(unavailable);
+    expect(state.replaced).toBe(0);
+    expect(state.rows).toEqual(COARSE_OLD);
+  });
+
+  it("calls an empty answer no history, without touching anything", async () => {
     const { state, instruments, prices } = store(COARSE_OLD);
 
     const outcome = await replaceQuoteHistory(
-      {
-        instruments,
-        prices,
-        provider: provider({ "AAA.DE": new Error("rate limited") }),
-        now: NOW,
-      },
+      { instruments, prices, provider: provider({ "AAA.DE": [] }), now: NOW },
       { instrumentId: INSTRUMENT.id, symbol: "AAA.DE", range: "5y" },
     );
 
@@ -329,6 +343,7 @@ describe("replaceQuoteHistories", () => {
         provider: provider({
           "AAA.DE": DAILY_NEW("AAA.DE"),
           "BAD.DE": new Error("boom"),
+          "BUSY.DE": new MarketDataUnavailableError("BUSY.DE", 503),
           "CCC.DE": DAILY_NEW("CCC.DE"),
         }),
         now: NOW,
@@ -337,6 +352,8 @@ describe("replaceQuoteHistories", () => {
         { instrumentId: INSTRUMENT.id, symbol: "AAA.DE", range: "5y" },
         { instrumentId: "MISSING", symbol: "BAD.DE", range: "5y" },
         { instrumentId: INSTRUMENT.id, symbol: "BAD.DE", range: "5y" },
+        { instrumentId: INSTRUMENT.id, symbol: "BUSY.DE", range: "5y" },
+        { instrumentId: INSTRUMENT.id, symbol: "NONE.DE", range: "5y" },
         { instrumentId: INSTRUMENT.id, symbol: "CCC.DE", range: "5y" },
       ],
       (_outcome, index) => seen.push(index),
@@ -345,16 +362,18 @@ describe("replaceQuoteHistories", () => {
     expect(outcomes.map((o) => (o.ok ? "ok" : o.reason))).toEqual([
       "ok",
       "failed",
+      "failed",
+      "unavailable",
       "no-history",
       "ok",
     ]);
-    expect(seen).toEqual([0, 1, 2, 3]);
+    expect(seen).toEqual([0, 1, 2, 3, 4, 5]);
   });
 });
 
 describe("replaceFailureMessage", () => {
   const failure = (
-    reason: "no-history" | "not-eur" | "failed",
+    reason: "no-history" | "not-eur" | "unavailable" | "failed",
     currency: string | null = null,
   ): Extract<ReplaceOutcome, { ok: false }> => ({
     ok: false,
@@ -371,6 +390,9 @@ describe("replaceFailureMessage", () => {
     );
     expect(replaceFailureMessage(es, failure("failed"))).toBe(
       es.instruments.history.failed,
+    );
+    expect(replaceFailureMessage(es, failure("unavailable"))).toBe(
+      es.common.marketDataUnavailable,
     );
   });
 });

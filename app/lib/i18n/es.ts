@@ -66,6 +66,7 @@ const EXPOSURE_KIND_LABELS: Record<ExposureKind, string> = {
 export const es = {
   common: {
     close: "Cerrar",
+    marketDataUnavailable: "No se ha podido consultar Yahoo. Inténtalo de nuevo.",
   },
   notFound: {
     title: "Página no encontrada",
@@ -658,6 +659,8 @@ export const es = {
         "Tus operaciones y los cierres de este símbolo no cuadran: casi siempre es otra plaza u otra clase del fondo. Prueba otra cotización antes de guardar.",
       noTrades:
         "No hay cierres de este símbolo en las fechas de tus operaciones, así que no se pueden comparar.",
+      noDailyHistory:
+        "Yahoo no tiene histórico diario de este símbolo. Busca su ticker en una bolsa en euros (.DE, .AS…).",
       notEur: (currency: string): string =>
         `Este símbolo cotiza en ${currency}. Hoy Quoin solo valora históricos en euros: elige la cotización en euros del mismo fondo en otra plaza (.DE, .MI, .PA, .AS).`,
       hasHistory:
@@ -718,6 +721,8 @@ export const es = {
         count === 1
           ? "1 símbolo ha devuelto una cotización antigua: revisa la plaza."
           : `${count} símbolos han devuelto cotizaciones antiguas: revisa las plazas.`,
+      unavailable: (names: string): string =>
+        `No se ha podido consultar Yahoo para ${names}. Inténtalo de nuevo con «Refrescar precios» en Cartera.`,
     },
   },
   holdings: {
@@ -796,6 +801,8 @@ export const es = {
     saved: "Guardado",
     closed: "Cerrada",
     noSymbol: "Sin símbolo",
+    noDailyHistory:
+      "Este símbolo no tiene histórico diario. Vuelve a descargarlo o cambia el símbolo por su ticker en una bolsa en euros.",
     obsoleteVenues:
       "Esta composición se importó con códigos de país antiguos y no se fusiona con otros fondos. Vuelve a soltar su archivo en esta fila.",
     resolves: RESOLVES_LABELS,
@@ -820,7 +827,7 @@ export const es = {
       noLive:
         "Yahoo no ha dado cotización de hoy: pulsa «Refrescar precios» en Cartera más tarde.",
       noHistory: (symbol: string): string =>
-        `Yahoo no ha devuelto histórico para ${symbol}. No se ha tocado nada.`,
+        `Yahoo no tiene histórico diario de ${symbol}. Busca su ticker en una bolsa en euros (.DE, .AS…). No se ha tocado nada.`,
       notEur: (symbol: string, currency: string): string =>
         `El histórico de ${symbol} viene en ${currency}. Hoy Quoin solo valora históricos en euros, así que no se ha tocado nada.`,
       failed: "La descarga ha fallado. No se ha tocado nada.",
@@ -857,6 +864,7 @@ export const es = {
         "no-quote": "sin respuesta",
         stale: "cotización caducada",
         "not-eur": "no cotiza en euros",
+        unavailable: "no se ha podido consultar Yahoo",
         error: "error inesperado",
       },
       unmappedOpen: (count: number): string =>

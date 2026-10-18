@@ -152,6 +152,9 @@ function CheckDetail({ check }: { check: SymbolCheck }) {
           {copy.notEur(check.foreignCurrency)}
         </p>
       )}
+      {!check.dailyHistory && (
+        <p className="mt-1 text-negative">{copy.noDailyHistory}</p>
+      )}
       {!check.fresh && <p className="mt-1 text-negative">{copy.stale}</p>}
 
       {check.trades.length > 0 && (
@@ -179,6 +182,7 @@ function CheckDetail({ check }: { check: SymbolCheck }) {
       )}
       {check.tradesAsked > 0 &&
         check.trades.length === 0 &&
+        check.dailyHistory &&
         !check.foreignCurrency && (
           <p className="mt-1 text-muted">{copy.noTrades}</p>
         )}

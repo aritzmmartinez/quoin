@@ -60,6 +60,7 @@ export function canSave(state: MapperState, stored: string | null): boolean {
   return (
     isVerified(state) &&
     state.check?.foreignCurrency === null &&
+    state.check.dailyHistory &&
     state.busy === null &&
     trimmedSymbol(state) !== stored
   );
