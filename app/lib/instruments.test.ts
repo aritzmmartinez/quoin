@@ -194,6 +194,35 @@ describe("toInstrumentListItems history", () => {
   });
 });
 
+describe("toInstrumentListItems obsolete venues", () => {
+  it("flags a fund whose holdings carry a retired country code", () => {
+    const row = (instrumentId: string, identity: string) => ({
+      instrumentId,
+      identity,
+      identityKind: "TICKER" as const,
+      name: "Alpha SA",
+      weight: "0.5",
+      asOf: new Date("2026-07-27T00:00:00.000Z"),
+    });
+    const items = toInstrumentListItems(
+      [
+        instrument({ id: "OLD", name: "OLD" }),
+        instrument({ id: "NEW", name: "NEW" }),
+      ],
+      [],
+      new Map(),
+      new Map([
+        ["OLD", [row("OLD", "SAN.FX")]],
+        ["NEW", [row("NEW", "SAN.FR")]],
+      ]),
+    );
+    const byId = new Map(items.map((i) => [i.id, i]));
+
+    expect(byId.get("OLD")?.obsoleteVenues).toBe(true);
+    expect(byId.get("NEW")?.obsoleteVenues).toBe(false);
+  });
+});
+
 describe("needsMapping", () => {
   it("lists only instruments riding the type default into UNRESOLVED", () => {
     const items = toInstrumentListItems(

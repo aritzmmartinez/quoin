@@ -796,6 +796,8 @@ export const es = {
     saved: "Guardado",
     closed: "Cerrada",
     noSymbol: "Sin símbolo",
+    obsoleteVenues:
+      "Esta composición se importó con códigos de país antiguos y no se fusiona con otros fondos. Vuelve a soltar su archivo en esta fila.",
     resolves: RESOLVES_LABELS,
     history: {
       title: "Símbolo e histórico",

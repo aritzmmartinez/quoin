@@ -414,6 +414,24 @@ no code; if you find yourself adding `if (issuer === ...)`, the design has faile
 - **`EtfHolding` is replace-only**, unlike append-only `PriceSnapshot`. A holdings file is a
   snapshot of what a fund holds today, not an event that happened; appending would keep
   constituents that have left the index.
+- **Venue codes are canonical, and a bare code is rewritten only when it names a country.**
+  `canonicalRegion` maps CLDR's retired codes to current ones (`FX`→`FR`, `UK`→`GB`,
+  `SU`→`RU`) through `Intl.getCanonicalLocales`. The name index needs it: it kept the
+  last code sharing a name, so "France" was stored as `FX` and never merged with an
+  issuer writing `FR`. A two-letter value goes through it only if `Intl.DisplayNames`
+  names it in some locale, because Bloomberg exchange codes share the space with ISO:
+  `CT` (Toronto) and `JT` (Tokyo) are also retired CLDR codes for Kiribati and US
+  minor islands, unnamed, so they stay as written. Known gap: `BU` is named (Myanmar)
+  and may be Bloomberg's code for Bulgaria; an exchange column carrying it would be
+  rewritten to `MM`. A test pins every rewrite ICU makes, so a Node upgrade that
+  changes the table fails there.
+- **The "obsolete country codes" notice on Instruments is temporary.** Holdings stored
+  before the fix keep keys like `SAN.FX`; `hasObsoleteVenue` flags the fund at read and
+  the notice clears when its file is dropped again (`EtfHolding` is replace-only).
+  There is no migration on purpose: the original country text is not stored, a rewrite
+  can collide on `@@unique([instrumentId, identity])`, and the `SecurityIdentity` rows
+  were resolved without an exchange filter. Orphaned identities are harmless. Remove
+  the notice from v0.14.0 on: nothing can store a retired code any more.
 - **Several detector thresholds scale with file size.** A column is rejected as "not
   categorical" above 90% distinct values, which is right for four thousand rows and
   meaningless for four. It self-limits — a tiny fund cannot have ticker collisions — but
