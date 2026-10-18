@@ -95,6 +95,7 @@ jobs:
           only-severities: critical,high
           only-fixed: true
           exit-code: true
+          write-comment: false
           dockerhub-user: ${{ secrets.DOCKERHUB_USERNAME }}
           dockerhub-password: ${{ secrets.DOCKERHUB_TOKEN }}
 
