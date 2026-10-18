@@ -7,12 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-10-18
+
 ### Upgrading
+- This release has no database migration. The Docker image finds nothing to apply when it starts, so it takes no backup; from source, `pnpm db:deploy` has nothing to do.
 - If a fund's composition file names countries in full ("France", "United Kingdom") rather than by code, its holdings were stored under obsolete country codes and did not merge with the same companies from other funds. Instruments marks those funds: drop their composition file on the row again. Nothing else needs to be re-imported.
 - Instruments marks a symbol that has no daily history, such as an ISIN with a .SG suffix: download its history again, or change it to the fund's ticker on a euro exchange (.DE, .AS…).
+- From 0.13.0 the Docker image no longer carries npm: back up with `docker exec quoin db-backup` instead of `docker exec quoin npm run db:backup`. This release still ships npm, so both work until then.
 
 ### Changed
-- In 0.13.0 the image drops npm; back up with `docker exec quoin db-backup` from then on.
 - The Docker image is built on Debian 13 (trixie) instead of Debian 12 (bookworm), pinned by digest.
 
 ### Fixed
@@ -380,7 +383,8 @@ fund holdings must be supplied as CSV rather than the Excel most issuers publish
 Design rationale lives beside the code it explains, in `docs/ARCHITECTURE.md` and in the
 commit history — not here.
 
-[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.12.1...HEAD
+[0.12.1]: https://github.com/aritzmmartinez/quoin/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/aritzmmartinez/quoin/compare/v0.11.1...v0.12.0
 [0.11.1]: https://github.com/aritzmmartinez/quoin/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/aritzmmartinez/quoin/compare/v0.10.0...v0.11.0
