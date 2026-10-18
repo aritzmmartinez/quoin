@@ -12,6 +12,7 @@ import type { EtfHolding } from "~/core/ports";
 import type { MarketValue, Position } from "~/core/projections";
 
 import { isCoarseSeries } from "./coarse-candles";
+import { hasObsoleteVenue } from "./obsolete-venues";
 
 export interface InstrumentListItem {
   id: string;
@@ -31,6 +32,7 @@ export interface InstrumentListItem {
   holdingsCount: number;
   holdingsCovered: string | null;
   holdingsAsOf: string | null;
+  obsoleteVenues: boolean;
   historyStart: string | null;
   coarseHistory: boolean;
 }
@@ -84,6 +86,7 @@ export function toInstrumentListItems(
       holdingsCount: composition.length,
       holdingsCovered: composition.length > 0 ? covered.toString() : null,
       holdingsAsOf: composition[0]?.asOf.toISOString() ?? null,
+      obsoleteVenues: hasObsoleteVenue(composition),
       historyStart: times[0]?.toISOString() ?? null,
       coarseHistory: isCoarseSeries(times),
     };

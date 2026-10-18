@@ -793,6 +793,8 @@ export const en: Copy = {
     saved: "Saved",
     closed: "Closed",
     noSymbol: "No symbol",
+    obsoleteVenues:
+      "This composition was imported under obsolete country codes and does not merge with other funds. Drop its file on this row again.",
     resolves: RESOLVES_LABELS,
     history: {
       title: "Symbol and history",

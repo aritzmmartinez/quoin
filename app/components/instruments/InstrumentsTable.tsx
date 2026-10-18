@@ -229,6 +229,12 @@ function InstrumentRow({ item }: { item: InstrumentListItem }) {
         </span>
       </div>
 
+      {item.obsoleteVenues && !uploading && (
+        <p className="px-gutter pb-3 text-[12px] text-body">
+          {copy.obsoleteVenues}
+        </p>
+      )}
+
       {mapping && <SymbolPanel item={item} />}
 
       {uploading && (

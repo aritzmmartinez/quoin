@@ -7,9 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Upgrading
+- If a fund's composition file names countries in full ("France", "United Kingdom") rather than by code, its holdings were stored under obsolete country codes and did not merge with the same companies from other funds. Instruments marks those funds: drop their composition file on the row again. Nothing else needs to be re-imported.
+
 ### Changed
 - In 0.13.0 the image drops npm; back up with `docker exec quoin db-backup` from then on.
 - The Docker image is built on Debian 13 (trixie) instead of Debian 12 (bookworm), pinned by digest.
+
+### Fixed
+- Holdings named by country in full stored some countries under obsolete codes: France as FX, the United Kingdom as UK, Russia as SU and Serbia as YU, among others. Those holdings did not merge with the same companies listed by code in other funds, and their currency could show as unknown. Country codes are now always the current ones, whether the file writes the name or the code.
 
 ### Security
 - The image no longer carries any Critical or High vulnerability with a fix available. Docker Scout on 0.12.0 reported 5 Critical and 23 High; this image reports 0 Critical and 3 High, none of them fixable.
