@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Holdings named by country in full stored some countries under obsolete codes: France as FX, the United Kingdom as UK, Russia as SU and Serbia as YU, among others. Those holdings did not merge with the same companies listed by code in other funds, and their currency could show as unknown. Country codes are now always the current ones, whether the file writes the name or the code.
+- On Instruments, a row whose TER was stored with fewer decimals than the screen writes looked edited as soon as the page loaded, with Save enabled.
 
 ### Security
 - The image no longer carries any Critical or High vulnerability with a fix available. Docker Scout on 0.12.0 reported 5 Critical and 23 High; this image reports 0 Critical and 3 High, none of them fixable.
