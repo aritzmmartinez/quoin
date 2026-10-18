@@ -13,11 +13,7 @@ import {
   PrismaLedgerRepository,
   PrismaPriceRepository,
 } from "~/adapters/persistence";
-import {
-  Card,
-  InstrumentsTable,
-  RebuildHistories,
-} from "~/components";
+import { Card, InstrumentsTable, RebuildHistories } from "~/components";
 import {
   BASE_CURRENCY,
   KINDS_NEEDING_LEAF,
@@ -50,13 +46,14 @@ export const handle = { title: (t: Copy) => t.instruments.title };
 
 export async function loader({ request }: Route.LoaderArgs) {
   const priceRepository = new PrismaPriceRepository();
-  const [events, instruments, prices, holdings, candleTimes] =
+  const [events, instruments, prices, holdings, candleTimes, dailyHistoryIds] =
     await Promise.all([
       new PrismaLedgerRepository().list(),
       new PrismaInstrumentRepository().list(),
       priceRepository.latest(),
       new PrismaHoldingsRepository().all(),
       priceRepository.candleTimes(),
+      priceRepository.dailyHistoryIds(),
     ]);
 
   const positions = computePositions(events);
@@ -69,6 +66,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     holdings,
     tag,
     candleTimes,
+    dailyHistoryIds,
   );
 
   return { items, unmapped: needsMapping(items).length };

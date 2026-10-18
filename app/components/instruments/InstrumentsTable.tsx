@@ -229,6 +229,12 @@ function InstrumentRow({ item }: { item: InstrumentListItem }) {
         </span>
       </div>
 
+      {item.noDailyHistory && !mapping && (
+        <p className="px-gutter pb-3 text-[12px] text-body">
+          {copy.noDailyHistory}
+        </p>
+      )}
+
       {item.obsoleteVenues && !uploading && (
         <p className="px-gutter pb-3 text-[12px] text-body">
           {copy.obsoleteVenues}

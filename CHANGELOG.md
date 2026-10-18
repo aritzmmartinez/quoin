@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Upgrading
 - If a fund's composition file names countries in full ("France", "United Kingdom") rather than by code, its holdings were stored under obsolete country codes and did not merge with the same companies from other funds. Instruments marks those funds: drop their composition file on the row again. Nothing else needs to be re-imported.
+- Instruments marks a symbol that has no daily history, such as an ISIN with a .SG suffix: download its history again, or change it to the fund's ticker on a euro exchange (.DE, .AS…).
 
 ### Changed
 - In 0.13.0 the image drops npm; back up with `docker exec quoin db-backup` from then on.
@@ -16,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Holdings named by country in full stored some countries under obsolete codes: France as FX, the United Kingdom as UK, Russia as SU and Serbia as YU, among others. Those holdings did not merge with the same companies listed by code in other funds, and their currency could show as unknown. Country codes are now always the current ones, whether the file writes the name or the code.
+- Checking a symbol, in the import wizard or on Instruments, refuses one Yahoo quotes but has no daily history for, such as an ISIN with a .SG suffix, which left the instrument with no chart. A symbol with a history but no close on the dates of your trades can still be saved, as before.
+- A rate limit or an outage at Yahoo no longer reads as "no history" or "no price": checking, saving and downloading say Yahoo could not be reached and to try again. Refresh prices and Rebuild all histories name the instruments affected, and the import wizard carries on with the rest instead of stopping.
 - On Instruments, a row whose TER was stored with fewer decimals than the screen writes looked edited as soon as the page loaded, with Save enabled.
 
 ### Security

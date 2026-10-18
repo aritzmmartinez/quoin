@@ -35,6 +35,7 @@ export interface InstrumentListItem {
   obsoleteVenues: boolean;
   historyStart: string | null;
   coarseHistory: boolean;
+  noDailyHistory: boolean;
 }
 
 export function toInstrumentListItems(
@@ -44,6 +45,7 @@ export function toInstrumentListItems(
   holdings: ReadonlyMap<string, EtfHolding[]> = new Map(),
   tag = "es-ES",
   candleTimes: ReadonlyMap<string, readonly Date[]> = new Map(),
+  dailyHistoryIds: ReadonlySet<string> = new Set(),
 ): InstrumentListItem[] {
   const held = new Map<string, Decimal>();
   const valued = new Map<string, Decimal>();
@@ -89,6 +91,8 @@ export function toInstrumentListItems(
       obsoleteVenues: hasObsoleteVenue(composition),
       historyStart: times[0]?.toISOString() ?? null,
       coarseHistory: isCoarseSeries(times),
+      noDailyHistory:
+        instrument.quoteSymbol != null && !dailyHistoryIds.has(instrument.id),
     };
   });
 
