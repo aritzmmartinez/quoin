@@ -370,7 +370,7 @@ layer.
 React Router 8 (SSR) · React 19 · strict TypeScript (`noUncheckedIndexedAccess`) ·
 Tailwind v4 · Lucide · Zod · Recharts · Papa Parse ·
 SQLite + Prisma 7 (better-sqlite3 adapter) · decimal.js · Vitest ·
-Docker (`node:24-slim`, amd64 + arm64).
+Docker (`node:24-trixie-slim`, amd64 + arm64).
 
 No form library, and no component library either. Every mutation is a native React Router
 `action` — five of them: the savings plan, the instruments screen, and the three endpoints

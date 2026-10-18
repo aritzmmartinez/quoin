@@ -317,6 +317,14 @@ whose compositions get imported *is* the portfolio. A parser test using the real
 and Amundi exports would disclose which funds are held, as surely as committing a
 `quoteSymbol` would. Copy the shape, invent the data.
 
+The shape of a real `.xlsx` is in `test/fixtures/holdings/issuer.xlsx`, written as raw
+OOXML by `issuer-xlsx.ts` beside it, not by SheetJS: a fixture the reader also wrote
+proves only that it agrees with itself. Real exports go in `data/fixtures/holdings/`,
+gitignored, where `xlsx.exports.test.ts` reads them locally and skips under `CI`. It
+names a file by position only — keep it that way: a file name, a sheet name or a
+holding in a failure message discloses the fund as surely as committing the file.
+`*.xlsx` is gitignored except under `test/fixtures/`.
+
 Ingestion must never write those columns. This is enforced by the type, not by
 convention — `InstrumentWriteData` is `Omit<InstrumentRow, "quoteSymbol" | "exposureKind" |
 "exposureLeafId" | "ter" | "hedgedToBase" | "thesis">`. Ingestion upserts **every**
@@ -1137,7 +1145,7 @@ The image is **public**. Everything below was found by running it, not by readin
 - **`.dockerignore` is a privacy boundary.** It excludes `data/`, `*.sqlite`, `*.csv`,
   `*.xlsx` and `.env*` even though no `COPY` names them, because one `COPY . .` would
   otherwise publish the portfolio. Keep it in step with `.gitignore`'s user-data block.
-- **`openssl` must be in both the toolchain and runtime stages.** `node:24-slim` has none,
+- **`openssl` must be in both the toolchain and runtime stages.** `node:24-trixie-slim` has none,
   and Prisma picks its schema-engine binary by the OpenSSL it detects. Without it, install
   downloads the `openssl-1.1.x` engine, `migrate deploy` then tries to fetch the right one
   into a root-owned `node_modules`, and the container never starts.
@@ -1160,6 +1168,24 @@ The image is **public**. Everything below was found by running it, not by readin
   has no pnpm). Every other command has a screen, except the CLI-only destructive options
   above (`ipc:sync --force-rebase`, `prices:map --clear`). Adding one means copying its script and
   every file it imports, and `~/` imports need the tsconfig and `app/` too.
+- **npm stays in the runtime only for `npm run db:backup`, pinned at 11.21.1.** The
+  base image's npm bundles brace-expansion, undici and http-cache-semantics with High
+  CVEs, and so does npm 12.2.0 (latest at the time) — "upgrade to latest" reintroduces
+  them. 0.13.0 removes npm, npx, corepack and yarn and ships a `db-backup` wrapper
+  instead; the entrypoint and the README move with it.
+- **Both `FROM` lines pin `node:24-trixie-slim@sha256:…`** with a `Node x.y.z, Debian n`
+  comment beside them. No `ARG` in a `FROM`: Dependabot cannot resolve it and stops
+  opening the digest PRs that bring Debian fixes. Its PR does not update the comment.
+- **`docker.yml` fails on a Critical or High with a fix (`only-fixed`), not on every
+  one.** A CVE with no fix anywhere would leave the pipeline red with nothing to do.
+  Dependabot's PRs run with Dependabot's secrets, not the repository's, so the scan
+  needs a read-only Docker Hub token in Settings → Secrets → Dependabot, never the
+  publishing one. Without it every one of its PRs fails at the login.
+- **`xlsx` is a tarball from cdn.sheetjs.com**, pinned by the lockfile's integrity;
+  npm's last release is 0.18.5 and vulnerable. Dependabot ignores it, so a bump is by
+  hand. Scout still lists two High against 0.20.3 because its source marks `>=0`; both
+  were fixed in 0.19.3 and 0.20.2. Do not chase them by swapping the library — what
+  `sheet_to_csv` renders is what the weight-scale detection reads.
 
 ## Working agreement
 
