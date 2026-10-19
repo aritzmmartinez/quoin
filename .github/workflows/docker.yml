@@ -28,6 +28,11 @@ on:
       - Dockerfile
       - .dockerignore
       - docker-entrypoint.sh
+      - db-backup.sh
+      - scripts/db-backup.ts
+      - scripts/lib/db-target.ts
+      - scripts/lib/backup-names.ts
+      - scripts/lib/backup-verify.ts
       - package.json
       - pnpm-lock.yaml
       - pnpm-workspace.yaml

@@ -1191,7 +1191,7 @@ The image is **public**. Everything below was found by running it, not by readin
   Backing up on every start would rotate the 30-file window out during a restart loop.
   A failed backup stops the start: an unbackupable ledger is never migrated.
 - **`prisma` and `tsx` are `dependencies`, not `devDependencies`.** The runtime stage installs
-  `--prod`, and it needs `prisma migrate deploy` and `tsx` for `db:backup`. Move either back
+  `--prod`, and it needs `prisma migrate deploy` and `tsx` for `db-backup`. Move either back
   and the image builds fine and fails at start.
 - **`*.sh` is forced to LF by `.gitattributes`.** With `core.autocrlf=true` a Windows
   checkout hands `sh` a `\r` on every line.
@@ -1199,15 +1199,10 @@ The image is **public**. Everything below was found by running it, not by readin
   an amd64 runner it took over 25 minutes, nearly all of it `vite build`. Each platform
   pushes by digest and a `merge` job joins them; do not fold the matrix back into one
   `platforms: linux/amd64,linux/arm64` build to "simplify" it.
-- **Only `db:backup` ships as a CLI** (`docker exec quoin npm run db:backup`; the image
-  has no pnpm). Every other command has a screen, except the CLI-only destructive options
-  above (`ipc:sync --force-rebase`, `prices:map --clear`). Adding one means copying its script and
-  every file it imports, and `~/` imports need the tsconfig and `app/` too.
-- **npm stays in the runtime only for `npm run db:backup`, pinned at 11.21.1.** The
-  base image's npm bundles brace-expansion, undici and http-cache-semantics with High
-  CVEs, and so does npm 12.2.0 (latest at the time) — "upgrade to latest" reintroduces
-  them. 0.13.0 removes npm, npx, corepack and yarn and ships a `db-backup` wrapper
-  instead; the entrypoint and the README move with it.
+- **The image carries no npm, npx, corepack, yarn or pnpm, and its only CLI is
+  `db-backup`** (`docker exec quoin db-backup`, `db-backup.sh`), which calls tsx directly.
+  Adding another command to the image means copying its script and every file it
+  imports, and `~/` imports need the tsconfig and `app/` too.
 - **Both `FROM` lines pin `node:24-trixie-slim@sha256:…`** with a `Node x.y.z, Debian n`
   comment beside them. No `ARG` in a `FROM`: Dependabot cannot resolve it and stops
   opening the digest PRs that bring Debian fixes. Its PR does not update the comment.

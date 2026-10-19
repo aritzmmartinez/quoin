@@ -51,11 +51,9 @@ FROM node:24-trixie-slim@sha256:7f486cabe892bff8fef04c0f7da8dba84a560be3e4e2740b
 RUN apt-get update \
  && apt-get install -y --no-install-recommends tini openssl \
  && rm -rf /var/lib/apt/lists/*
-# The base image's npm bundles brace-expansion, undici and http-cache-semantics
-# with known High CVEs; 11.21.1 bundles fixed ones (12.2.0, the current latest,
-# does not). npm is here only for `npm run db:backup`; 0.13.0 drops it.
-RUN npm install -g npm@11.21.1 \
- && npm cache clean --force
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+           /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+           /opt/yarn-v* /usr/local/bin/yarn /usr/local/bin/yarnpkg
 
 # CHECKPOINT_DISABLE stops the Prisma CLI from phoning home (update check and
 # usage telemetry) on every `migrate` the entrypoint runs. A local-first app should
@@ -70,13 +68,14 @@ ENV NODE_ENV=production \
 WORKDIR /app
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=build /app/build ./build
-# `migrate deploy` at start, and `db:backup` through `docker exec`. Only the backup
+# `migrate deploy` at start, and `db-backup` through `docker exec`. Only the backup
 # script is shipped: the other CLI commands have a button in the app.
 COPY package.json prisma.config.ts ./
 COPY prisma ./prisma
 COPY scripts/db-backup.ts ./scripts/
 COPY scripts/lib/db-target.ts scripts/lib/backup-names.ts scripts/lib/backup-verify.ts ./scripts/lib/
 COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/
+COPY --chmod=755 db-backup.sh /usr/local/bin/db-backup
 
 RUN mkdir -p data && chown node:node data
 USER node

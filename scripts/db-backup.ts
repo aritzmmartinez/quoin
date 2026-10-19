@@ -30,7 +30,11 @@ const BACKUP_DIR = resolve(PROJECT_ROOT, "data/backups");
 
 const USAGE = `Usage:
   pnpm db:backup           snapshot the live ledger (${relative(PROJECT_ROOT, realDatabasePath())})
-  pnpm db:backup <FILE>    snapshot another SQLite file`;
+  pnpm db:backup <FILE>    snapshot another SQLite file
+
+In the Docker image:
+  docker exec quoin db-backup
+  docker exec quoin db-backup <FILE>`;
 
 function sqlLiteral(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
