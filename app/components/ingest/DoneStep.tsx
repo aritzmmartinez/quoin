@@ -48,6 +48,11 @@ export function DoneStep({
         {fill && fill.stale > 0 && (
           <li className="text-negative">{copy.staleWarning(fill.stale)}</li>
         )}
+        {fill && fill.unavailable.length > 0 && (
+          <li className="text-negative">
+            {copy.unavailable(fill.unavailable.join(", "))}
+          </li>
+        )}
         {unmapped > 0 && <li>{copy.unmapped(unmapped)}</li>}
         {unmapped > 0 && <li>{t.ingest.closeConfirm.hint}</li>}
       </ul>

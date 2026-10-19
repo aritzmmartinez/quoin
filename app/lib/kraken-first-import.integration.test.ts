@@ -68,21 +68,19 @@ function dailyCandles(): Quote[] {
 
 const provider: MarketDataProvider = {
   source: "FAKE",
-  getQuotes: async () => [],
+  getQuote: async () => null,
   getHistory: async (symbol: string, _range: HistoryRange) =>
     symbol === "BTC-EUR" ? dailyCandles() : [],
 };
 
 const btcQuote: MarketDataProvider = {
   source: "FAKE",
-  getQuotes: async () => [
-    {
-      symbol: "BTC-EUR",
-      price: "90000",
-      currency: "EUR",
-      asOf: new Date(),
-    },
-  ],
+  getQuote: async () => ({
+    symbol: "BTC-EUR",
+    price: "90000",
+    currency: "EUR",
+    asOf: new Date(),
+  }),
   getHistory: async () => [],
 };
 
@@ -254,7 +252,7 @@ function candles(dates: readonly Date[], price: (date: Date) => string): Quote[]
 function providerOf(quotes: Quote[]): MarketDataProvider {
   return {
     source: "FAKE",
-    getQuotes: async () => [],
+    getQuote: async () => null,
     getHistory: async (symbol: string) => (symbol === "BTC-EUR" ? quotes : []),
   };
 }

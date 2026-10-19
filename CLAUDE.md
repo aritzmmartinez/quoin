@@ -163,6 +163,15 @@ This has caused misdirected generation more than once:
 - Stale-quote protection lives at the **write** boundary, not the read: `isFreshQuote`
   discards quotes whose market timestamp is older than 7 days, and it applies **only** to
   `prices:sync`. Yahoo serves stale candles on illiquid venues.
+- **An unknown symbol is an empty answer; an unanswered request throws.** The provider
+  returns `null` / `[]` for a 200 without data and for Yahoo's "no such symbol" — a 404
+  with `chart.error.code: "Not Found"`, measured 2026-10-18. Any other status (400, 401,
+  403, 429, 5xx), a network failure or a body that is not JSON throws
+  `MarketDataUnavailableError`, carrying the status or the cause. Swallowing those, as the
+  provider once did, turns a rate limit into "this symbol has no history" and refuses a
+  good symbol. Callers keep going past one: sync reports `unavailable`, the wizard's fill
+  and "Rebuild all histories" carry on and name it, `api/ingest` answers 503 and logs it.
+  The port is `getQuote(symbol)`, one symbol, because no caller ever asked for two.
 - **`range=max` is not daily, whatever `interval` says.** Measured 2026-10-08: Yahoo
   answers `interval=1d&range=max` with monthly candles for a crypto pair and weekly ones
   for an ETF, each dated at the start of its period but carrying the period's last close — a
@@ -317,6 +326,14 @@ whose compositions get imported *is* the portfolio. A parser test using the real
 and Amundi exports would disclose which funds are held, as surely as committing a
 `quoteSymbol` would. Copy the shape, invent the data.
 
+The shape of a real `.xlsx` is in `test/fixtures/holdings/issuer.xlsx`, written as raw
+OOXML by `issuer-xlsx.ts` beside it, not by SheetJS: a fixture the reader also wrote
+proves only that it agrees with itself. Real exports go in `data/fixtures/holdings/`,
+gitignored, where `xlsx.exports.test.ts` reads them locally and skips under `CI`. It
+names a file by position only — keep it that way: a file name, a sheet name or a
+holding in a failure message discloses the fund as surely as committing the file.
+`*.xlsx` is gitignored except under `test/fixtures/`.
+
 Ingestion must never write those columns. This is enforced by the type, not by
 convention — `InstrumentWriteData` is `Omit<InstrumentRow, "quoteSymbol" | "exposureKind" |
 "exposureLeafId" | "ter" | "hedgedToBase" | "thesis">`. Ingestion upserts **every**
@@ -336,7 +353,15 @@ ISIN itself, and always sanity-check the price magnitude.
 
 - **Never map an ISIN as a `quoteSymbol`** (e.g. `XS00TEST0003.SG`). Yahoo resolves the
   ISIN to a quote, but has no historical series under that key — `timestamps` and `closes`
-  come back `null` and `backfill` returns 0 candles. Use the venue ticker.
+  come back `null` and `backfill` returns 0 candles. Use the venue ticker. **The symbol
+  check refuses it**: no daily candle within `DAILY_HISTORY_PROBE` (1y — `max` would
+  download a good symbol's whole history to check it) means `dailyHistory: false`,
+  `canSave` refuses and `assignQuoteSymbol` refuses `no-history` on the server. Nothing
+  in Quoin ever proposed `.SG`; the wizard's field starts empty. Instruments flags a
+  symbol already stored with no candle through `dailyHistoryIds`, which skips
+  `YAHOO_LIVE` rows. `historyStart` counts them on purpose: `SymbolPanel` reads it to
+  choose between assigning and replacing, and `assignQuoteSymbol` refuses any instrument
+  with a price.
 - **Verify the price magnitude, not just the currency.** Several symbols quote in EUR and
   pass the currency filter yet are a different fund tracking the same index, or the same
   fund with a different entitlement per certificate — observed at 5.5x, 0.5x and 0.4x the
@@ -406,6 +431,24 @@ no code; if you find yourself adding `if (issuer === ...)`, the design has faile
 - **`EtfHolding` is replace-only**, unlike append-only `PriceSnapshot`. A holdings file is a
   snapshot of what a fund holds today, not an event that happened; appending would keep
   constituents that have left the index.
+- **Venue codes are canonical, and a bare code is rewritten only when it names a country.**
+  `canonicalRegion` maps CLDR's retired codes to current ones (`FX`→`FR`, `UK`→`GB`,
+  `SU`→`RU`) through `Intl.getCanonicalLocales`. The name index needs it: it kept the
+  last code sharing a name, so "France" was stored as `FX` and never merged with an
+  issuer writing `FR`. A two-letter value goes through it only if `Intl.DisplayNames`
+  names it in some locale, because Bloomberg exchange codes share the space with ISO:
+  `CT` (Toronto) and `JT` (Tokyo) are also retired CLDR codes for Kiribati and US
+  minor islands, unnamed, so they stay as written. Known gap: `BU` is named (Myanmar)
+  and may be Bloomberg's code for Bulgaria; an exchange column carrying it would be
+  rewritten to `MM`. A test pins every rewrite ICU makes, so a Node upgrade that
+  changes the table fails there.
+- **The "obsolete country codes" notice on Instruments is temporary.** Holdings stored
+  before the fix keep keys like `SAN.FX`; `hasObsoleteVenue` flags the fund at read and
+  the notice clears when its file is dropped again (`EtfHolding` is replace-only).
+  There is no migration on purpose: the original country text is not stored, a rewrite
+  can collide on `@@unique([instrumentId, identity])`, and the `SecurityIdentity` rows
+  were resolved without an exchange filter. Orphaned identities are harmless. Remove
+  the notice from v0.14.0 on: nothing can store a retired code any more.
 - **Several detector thresholds scale with file size.** A column is rejected as "not
   categorical" above 90% distinct values, which is right for four thousand rows and
   meaningless for four. It self-limits — a tiny fund cannot have ticker collisions — but
@@ -1137,7 +1180,7 @@ The image is **public**. Everything below was found by running it, not by readin
 - **`.dockerignore` is a privacy boundary.** It excludes `data/`, `*.sqlite`, `*.csv`,
   `*.xlsx` and `.env*` even though no `COPY` names them, because one `COPY . .` would
   otherwise publish the portfolio. Keep it in step with `.gitignore`'s user-data block.
-- **`openssl` must be in both the toolchain and runtime stages.** `node:24-slim` has none,
+- **`openssl` must be in both the toolchain and runtime stages.** `node:24-trixie-slim` has none,
   and Prisma picks its schema-engine binary by the OpenSSL it detects. Without it, install
   downloads the `openssl-1.1.x` engine, `migrate deploy` then tries to fetch the right one
   into a root-owned `node_modules`, and the container never starts.
@@ -1160,6 +1203,24 @@ The image is **public**. Everything below was found by running it, not by readin
   has no pnpm). Every other command has a screen, except the CLI-only destructive options
   above (`ipc:sync --force-rebase`, `prices:map --clear`). Adding one means copying its script and
   every file it imports, and `~/` imports need the tsconfig and `app/` too.
+- **npm stays in the runtime only for `npm run db:backup`, pinned at 11.21.1.** The
+  base image's npm bundles brace-expansion, undici and http-cache-semantics with High
+  CVEs, and so does npm 12.2.0 (latest at the time) — "upgrade to latest" reintroduces
+  them. 0.13.0 removes npm, npx, corepack and yarn and ships a `db-backup` wrapper
+  instead; the entrypoint and the README move with it.
+- **Both `FROM` lines pin `node:24-trixie-slim@sha256:…`** with a `Node x.y.z, Debian n`
+  comment beside them. No `ARG` in a `FROM`: Dependabot cannot resolve it and stops
+  opening the digest PRs that bring Debian fixes. Its PR does not update the comment.
+- **`docker.yml` fails on a Critical or High with a fix (`only-fixed`), not on every
+  one.** A CVE with no fix anywhere would leave the pipeline red with nothing to do.
+  Dependabot's PRs run with Dependabot's secrets, not the repository's, so the scan
+  needs a read-only Docker Hub token in Settings → Secrets → Dependabot, never the
+  publishing one. Without it every one of its PRs fails at the login.
+- **`xlsx` is a tarball from cdn.sheetjs.com**, pinned by the lockfile's integrity;
+  npm's last release is 0.18.5 and vulnerable. Dependabot ignores it, so a bump is by
+  hand. Scout still lists two High against 0.20.3 because its source marks `>=0`; both
+  were fixed in 0.19.3 and 0.20.2. Do not chase them by swapping the library — what
+  `sheet_to_csv` renders is what the weight-scale detection reads.
 
 ## Working agreement
 

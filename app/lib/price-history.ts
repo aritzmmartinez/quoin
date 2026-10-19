@@ -1,12 +1,13 @@
 import { isFreshQuote } from "~/adapters/marketdata";
 import { foreignCurrency } from "~/core/domain";
-import type {
-  HistoryRange,
-  InstrumentRepository,
-  MarketDataProvider,
-  PriceRepository,
-  PriceSnapshot,
-  Quote,
+import {
+  MarketDataUnavailableError,
+  type HistoryRange,
+  type InstrumentRepository,
+  type MarketDataProvider,
+  type PriceRepository,
+  type PriceSnapshot,
+  type Quote,
 } from "~/core/ports";
 import { liveSource } from "~/core/prices";
 
@@ -26,7 +27,11 @@ export interface ReplaceHistoryRequest {
   range: HistoryRange;
 }
 
-export type ReplaceFailure = "no-history" | "not-eur" | "failed";
+export type ReplaceFailure =
+  | "no-history"
+  | "not-eur"
+  | "unavailable"
+  | "failed";
 
 export type ReplaceOutcome =
   | {
@@ -61,13 +66,12 @@ async function liveQuote(
   after: Date,
   now: Date,
 ): Promise<Quote | null> {
-  let quotes: Quote[];
+  let quote: Quote | null;
   try {
-    quotes = await provider.getQuotes([symbol]);
+    quote = await provider.getQuote(symbol);
   } catch {
     return null;
   }
-  const quote = quotes.find((q) => q.symbol === symbol);
   if (!quote) return null;
   if (foreignCurrency([quote])) return null;
   if (!isFreshQuote(quote, now)) return null;
@@ -89,12 +93,7 @@ export async function replaceQuoteHistory(
   const failure = (reason: ReplaceFailure, currency: string | null = null) =>
     ({ ok: false, instrumentId, symbol, reason, currency }) as const;
 
-  let history: Quote[];
-  try {
-    history = dailyCandles(await provider.getHistory(symbol, range));
-  } catch {
-    return failure("no-history");
-  }
+  const history = dailyCandles(await provider.getHistory(symbol, range));
 
   const first = history[0];
   const last = history[history.length - 1];
@@ -141,11 +140,12 @@ export async function replaceQuoteHistories(
   onEach?: (outcome: ReplaceOutcome, index: number) => void,
 ): Promise<ReplaceOutcome[]> {
   return inTurn(requests, (request) => replaceQuoteHistory(deps, request), {
-    onError: (_error, request): ReplaceOutcome => ({
+    onError: (error, request): ReplaceOutcome => ({
       ok: false,
       instrumentId: request.instrumentId,
       symbol: request.symbol,
-      reason: "failed",
+      reason:
+        error instanceof MarketDataUnavailableError ? "unavailable" : "failed",
       currency: null,
     }),
     ...(onEach ? { onEach } : {}),
@@ -162,6 +162,8 @@ export function replaceFailureMessage(
       return copy.noHistory(outcome.symbol);
     case "not-eur":
       return copy.notEur(outcome.symbol, outcome.currency ?? "?");
+    case "unavailable":
+      return t.common.marketDataUnavailable;
     case "failed":
       return copy.failed;
   }

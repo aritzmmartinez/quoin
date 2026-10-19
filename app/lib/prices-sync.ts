@@ -1,11 +1,12 @@
 import { isFreshQuote } from "~/adapters/marketdata";
 import { dayOf, shiftDay } from "~/core/calendar";
 import { foreignCurrency, type Instrument } from "~/core/domain";
-import type {
-  MarketDataProvider,
-  PriceRepository,
-  PriceSnapshot,
-  Quote,
+import {
+  MarketDataUnavailableError,
+  type MarketDataProvider,
+  type PriceRepository,
+  type PriceSnapshot,
+  type Quote,
 } from "~/core/ports";
 import { liveSource } from "~/core/prices";
 
@@ -38,7 +39,12 @@ export function toSyncTargets(
   return { targets, unmapped };
 }
 
-export type SyncProblem = "no-quote" | "stale" | "not-eur" | "error";
+export type SyncProblem =
+  | "no-quote"
+  | "stale"
+  | "not-eur"
+  | "unavailable"
+  | "error";
 
 export interface InstrumentSync {
   instrumentId: string;
@@ -110,9 +116,7 @@ export async function syncInstrumentPrices(
     return result({ inserted: 0, corrected: 0, live: false }, "not-eur");
   }
 
-  const quote = (await provider.getQuotes([target.quoteSymbol])).find(
-    (q) => q.symbol === target.quoteSymbol,
-  );
+  const quote = await provider.getQuote(target.quoteSymbol);
   let problem: SyncProblem | null = null;
   let live: PriceSnapshot | null = null;
   if (!quote) problem = "no-quote";
@@ -128,14 +132,21 @@ export async function syncInstrumentPrices(
   return result(written, problem);
 }
 
-export function failedSync(target: Pick<SyncTarget, "id" | "name">): InstrumentSync {
+export function syncProblemOf(error: unknown): SyncProblem {
+  return error instanceof MarketDataUnavailableError ? "unavailable" : "error";
+}
+
+export function failedSync(
+  target: Pick<SyncTarget, "id" | "name">,
+  problem: SyncProblem = "error",
+): InstrumentSync {
   return {
     instrumentId: target.id,
     name: target.name,
     inserted: 0,
     corrected: 0,
     live: false,
-    problem: "error",
+    problem,
   };
 }
 
@@ -160,7 +171,9 @@ export function priceSyncToast(
 ): PriceSyncToast {
   const copy = t.instruments.sync;
   const failures = steps.flatMap((step) =>
-    step.problem ? [{ name: step.name, reason: copy.problem[step.problem] }] : [],
+    step.problem
+      ? [{ name: step.name, reason: copy.problem[step.problem] }]
+      : [],
   );
   const inserted = steps.reduce((sum, step) => sum + step.inserted, 0);
 

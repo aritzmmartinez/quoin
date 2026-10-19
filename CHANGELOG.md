@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-10-18
+
+### Upgrading
+- This release has no database migration. The Docker image finds nothing to apply when it starts, so it takes no backup; from source, `pnpm db:deploy` has nothing to do.
+- If a fund's composition file names countries in full ("France", "United Kingdom") rather than by code, its holdings were stored under obsolete country codes and did not merge with the same companies from other funds. Instruments marks those funds: drop their composition file on the row again. Nothing else needs to be re-imported.
+- Instruments marks a symbol that has no daily history, such as an ISIN with a .SG suffix: download its history again, or change it to the fund's ticker on a euro exchange (.DE, .AS…).
+- From 0.13.0 the Docker image no longer carries npm: back up with `docker exec quoin db-backup` instead of `docker exec quoin npm run db:backup`. This release still ships npm, so both work until then.
+
+### Changed
+- The Docker image is built on Debian 13 (trixie) instead of Debian 12 (bookworm), pinned by digest.
+
+### Fixed
+- Holdings named by country in full stored some countries under obsolete codes: France as FX, the United Kingdom as UK, Russia as SU and Serbia as YU, among others. Those holdings did not merge with the same companies listed by code in other funds, and their currency could show as unknown. Country codes are now always the current ones, whether the file writes the name or the code.
+- Checking a symbol, in the import wizard or on Instruments, refuses one Yahoo quotes but has no daily history for, such as an ISIN with a .SG suffix, which left the instrument with no chart. A symbol with a history but no close on the dates of your trades can still be saved, as before.
+- A rate limit or an outage at Yahoo no longer reads as "no history" or "no price": checking, saving and downloading say Yahoo could not be reached and to try again. Refresh prices and Rebuild all histories name the instruments affected, and the import wizard carries on with the rest instead of stopping.
+- On Instruments, a row whose TER was stored with fewer decimals than the screen writes looked edited as soon as the page loaded, with Save enabled.
+
+### Security
+- The image no longer carries any Critical or High vulnerability with a fix available. Docker Scout on 0.12.0 reported 5 Critical and 23 High; this image reports 0 Critical and 3 High, none of them fixable.
+- Fixed in the app's dependencies: proxy-addr 2.0.8, fast-uri 3.1.8, compression 1.8.2, morgan 1.12.1, qs 6.16.1, and mysql2 3.24.4 through Prisma 7.10.1.
+- Excel holdings files are read with SheetJS 0.20.3 from its official CDN, pinned by integrity, which fixes the two High vulnerabilities of 0.18.5, the last version on npm.
+- The image's npm is 11.21.1, whose bundled brace-expansion, undici and http-cache-semantics are fixed.
+- The base image change removes four Critical and ten High in Debian packages (perl, util-linux, openssl).
+- Left, with no fix available anywhere: CVE-2026-85091 in Debian's zlib (High), CVE-2025-45582 in tar (Medium) and 26 Low in Debian packages. Docker Scout also still reports CVE-2023-30533 and CVE-2024-22363 against SheetJS 0.20.3: its source marks every version on npm as affected, while both were fixed in 0.19.3 and 0.20.2, so 0.20.3 is not affected.
+
 ## [0.12.0] - 2026-10-17
 
 ### Upgrading
@@ -358,7 +383,8 @@ fund holdings must be supplied as CSV rather than the Excel most issuers publish
 Design rationale lives beside the code it explains, in `docs/ARCHITECTURE.md` and in the
 commit history — not here.
 
-[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.12.1...HEAD
+[0.12.1]: https://github.com/aritzmmartinez/quoin/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/aritzmmartinez/quoin/compare/v0.11.1...v0.12.0
 [0.11.1]: https://github.com/aritzmmartinez/quoin/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/aritzmmartinez/quoin/compare/v0.10.0...v0.11.0

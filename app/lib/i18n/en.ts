@@ -70,6 +70,7 @@ const EXPOSURE_KIND_LABELS: Record<ExposureKind, string> = {
 export const en: Copy = {
   common: {
     close: "Close",
+    marketDataUnavailable: "Yahoo could not be reached. Try again.",
   },
   notFound: {
     title: "Page not found",
@@ -659,6 +660,8 @@ export const en: Copy = {
         "Your trades and this symbol's closes do not match: it is almost always another venue or another class of the fund. Try another quote before saving.",
       noTrades:
         "This symbol has no closes on the dates of your trades, so they cannot be compared.",
+      noDailyHistory:
+        "Yahoo has no daily history for this symbol. Look for its ticker on a euro exchange (.DE, .AS…).",
       notEur: (currency: string): string =>
         `This symbol quotes in ${currency}. Quoin only values euro histories today: choose the euro line of the same fund on another venue (.DE, .MI, .PA, .AS).`,
       hasHistory:
@@ -715,6 +718,8 @@ export const en: Copy = {
         count === 1
           ? "1 symbol returned an old quote: check the venue."
           : `${count} symbols returned old quotes: check the venues.`,
+      unavailable: (names: string): string =>
+        `Yahoo could not be reached for ${names}. Try again with Refresh prices on Portfolio.`,
     },
   },
   holdings: {
@@ -793,6 +798,10 @@ export const en: Copy = {
     saved: "Saved",
     closed: "Closed",
     noSymbol: "No symbol",
+    noDailyHistory:
+      "This symbol has no daily history. Download it again or change the symbol to its ticker on a euro exchange.",
+    obsoleteVenues:
+      "This composition was imported under obsolete country codes and does not merge with other funds. Drop its file on this row again.",
     resolves: RESOLVES_LABELS,
     history: {
       title: "Symbol and history",
@@ -814,7 +823,7 @@ export const en: Copy = {
           : `${count} prices saved from ${first}.`,
       noLive: "Yahoo returned no quote for today: press “Refresh prices” in Portfolio later.",
       noHistory: (symbol: string): string =>
-        `Yahoo returned no history for ${symbol}. Nothing was changed.`,
+        `Yahoo has no daily history for ${symbol}. Look for its ticker on a euro exchange (.DE, .AS…). Nothing was changed.`,
       notEur: (symbol: string, currency: string): string =>
         `The history of ${symbol} is in ${currency}. Quoin only values euro histories today, so nothing was changed.`,
       failed: "The download failed. Nothing was changed.",
@@ -851,6 +860,7 @@ export const en: Copy = {
         "no-quote": "no answer",
         stale: "stale quote",
         "not-eur": "not quoted in euros",
+        unavailable: "Yahoo could not be reached",
         error: "unexpected error",
       },
       unmappedOpen: (count: number): string =>

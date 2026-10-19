@@ -1,4 +1,4 @@
-import { planDailyWrite } from "~/core/prices";
+import { liveSource, planDailyWrite } from "~/core/prices";
 import type {
   DailyWriteCount,
   PriceRepository,
@@ -39,7 +39,8 @@ export class PrismaPriceRepository implements PriceRepository {
     live: PriceSnapshot | null,
   ): Promise<DailyWriteCount> {
     const incoming = live ? [...candles, live] : candles;
-    if (incoming.length === 0) return { inserted: 0, corrected: 0, live: false };
+    if (incoming.length === 0)
+      return { inserted: 0, corrected: 0, live: false };
     const earliest = Math.min(...incoming.map((s) => s.asOf.getTime()));
 
     return prisma.$transaction(async (tx) => {
@@ -55,7 +56,9 @@ export class PrismaPriceRepository implements PriceRepository {
       });
       const plan = planDailyWrite(stored, candles, live);
       if (plan.remove.length > 0) {
-        await tx.priceSnapshot.deleteMany({ where: { id: { in: plan.remove } } });
+        await tx.priceSnapshot.deleteMany({
+          where: { id: { in: plan.remove } },
+        });
       }
       for (const s of plan.write) {
         await tx.priceSnapshot.upsert({
@@ -188,6 +191,15 @@ export class PrismaPriceRepository implements PriceRepository {
       if (row._min.asOf) starts.set(row.instrumentId, row._min.asOf);
     }
     return starts;
+  }
+
+  async dailyHistoryIds(): Promise<Set<string>> {
+    const rows = await prisma.priceSnapshot.findMany({
+      where: { NOT: { source: { endsWith: liveSource("") } } },
+      select: { instrumentId: true },
+      distinct: ["instrumentId"],
+    });
+    return new Set(rows.map((row) => row.instrumentId));
   }
 
   async candleTimes(): Promise<Map<string, Date[]>> {

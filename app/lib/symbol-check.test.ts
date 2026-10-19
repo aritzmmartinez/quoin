@@ -11,6 +11,7 @@ import type {
 import {
   checkQuoteAgainstLedger,
   checkSymbol,
+  DAILY_HISTORY_PROBE,
   compareTrades,
   heldQuantity,
   recentTradeMarks,
@@ -213,9 +214,7 @@ describe("tradesDisagree", () => {
   });
 
   it("tolerates one odd trade among ones that match", () => {
-    expect(tradesDisagree([row("0.3"), row("0.01"), row("-0.02")])).toBe(
-      false,
-    );
+    expect(tradesDisagree([row("0.3"), row("0.01"), row("-0.02")])).toBe(false);
   });
 
   it("says nothing without a comparison", () => {
@@ -226,17 +225,17 @@ describe("tradesDisagree", () => {
 describe("checkQuoteAgainstLedger", () => {
   function provider(
     live: Quote | null,
-    history: Quote[],
+    history: Quote[] | ((range: HistoryRange | HistorySpan) => Quote[]),
   ): { provider: MarketDataProvider; asked: (HistoryRange | HistorySpan)[] } {
     const asked: (HistoryRange | HistorySpan)[] = [];
     return {
       asked,
       provider: {
         source: "FAKE",
-        getQuotes: async () => (live ? [live] : []),
+        getQuote: async () => live,
         getHistory: async (_symbol, range) => {
           asked.push(range);
-          return history;
+          return typeof history === "function" ? history(range) : history;
         },
       },
     };
@@ -267,11 +266,51 @@ describe("checkQuoteAgainstLedger", () => {
     ]);
   });
 
-  it("does not download any history without trades or for a quote outside euros", async () => {
-    const none = provider(live, []);
-    await checkQuoteAgainstLedger(none.provider, [], ID, "TEST.DE");
-    expect(none.asked).toEqual([]);
+  it("without trades asks only whether a daily history exists", async () => {
+    const none = provider(live, [close("2026-10-07T07:00:00Z", "25.00")]);
+    const check = await checkQuoteAgainstLedger(
+      none.provider,
+      [],
+      ID,
+      "TEST.DE",
+    );
+    expect(none.asked).toEqual([DAILY_HISTORY_PROBE]);
+    expect(check?.dailyHistory).toBe(true);
+  });
 
+  it("refuses a symbol Yahoo quotes but has no daily candle for", async () => {
+    const sg = provider(live, []);
+    const check = await checkQuoteAgainstLedger(
+      sg.provider,
+      [trade("2025-07-31T10:00:00Z", "1", "23.91")],
+      ID,
+      "XS00TEST0001.SG",
+    );
+
+    expect(check?.dailyHistory).toBe(false);
+    expect(sg.asked).toHaveLength(2);
+    expect(sg.asked[1]).toBe(DAILY_HISTORY_PROBE);
+  });
+
+  it("keeps a history with no candle on the trade dates apart from no history", async () => {
+    const recentOnly = provider(live, (range) =>
+      range === DAILY_HISTORY_PROBE
+        ? [close("2026-10-07T07:00:00Z", "25.00")]
+        : [],
+    );
+    const check = await checkQuoteAgainstLedger(
+      recentOnly.provider,
+      [trade("2019-07-31T10:00:00Z", "1", "23.91")],
+      ID,
+      "TEST.DE",
+    );
+
+    expect(check?.dailyHistory).toBe(true);
+    expect(check?.tradesAsked).toBe(1);
+    expect(check?.trades).toEqual([]);
+  });
+
+  it("does not ask for any history for a quote outside euros", async () => {
     const usd = provider({ ...live, currency: "USD" }, []);
     const check = await checkQuoteAgainstLedger(
       usd.provider,

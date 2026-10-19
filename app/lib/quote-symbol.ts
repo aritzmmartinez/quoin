@@ -5,9 +5,11 @@ import type {
   PriceRepository,
 } from "~/core/ports";
 
+import { hasDailyHistory } from "./symbol-check";
+
 export type AssignResult =
   | { ok: true }
-  | { ok: false; reason: "has-history" | "no-quote" }
+  | { ok: false; reason: "has-history" | "no-quote" | "no-history" }
   | { ok: false; reason: "not-eur"; currency: string };
 
 export async function assignQuoteSymbol(
@@ -25,10 +27,13 @@ export async function assignQuoteSymbol(
     return { ok: false, reason: "has-history" };
   }
 
-  const [quote] = await provider.getQuotes([symbol]);
+  const quote = await provider.getQuote(symbol);
   if (!quote) return { ok: false, reason: "no-quote" };
   const foreign = foreignCurrency([quote]);
   if (foreign) return { ok: false, reason: "not-eur", currency: foreign };
+  if (!(await hasDailyHistory(provider, symbol))) {
+    return { ok: false, reason: "no-history" };
+  }
 
   if (changes) await instruments.setQuoteSymbol(id, symbol);
   return { ok: true };

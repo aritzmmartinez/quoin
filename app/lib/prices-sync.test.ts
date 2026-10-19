@@ -3,12 +3,13 @@ import { describe, expect, it } from "vitest";
 import { es } from "./i18n";
 
 import { MAX_QUOTE_AGE_MS } from "~/adapters/marketdata";
-import type {
-  HistorySpan,
-  MarketDataProvider,
-  PriceRepository,
-  PriceSnapshot,
-  Quote,
+import {
+  MarketDataUnavailableError,
+  type HistorySpan,
+  type MarketDataProvider,
+  type PriceRepository,
+  type PriceSnapshot,
+  type Quote,
 } from "~/core/ports";
 import { planDailyWrite } from "~/core/prices";
 
@@ -19,6 +20,7 @@ import {
   splitUnmapped,
   SYNC_OVERLAP_DAYS,
   syncInstrumentPrices,
+  syncProblemOf,
   toSyncTargets,
   type SyncTarget,
 } from "./prices-sync";
@@ -88,7 +90,7 @@ function yahoo(
 ): MarketDataProvider {
   return {
     source: "YAHOO",
-    getQuotes: async (symbols) => live.filter((x) => symbols.includes(x.symbol)),
+    getQuote: async (symbol) => live.find((x) => x.symbol === symbol) ?? null,
     getHistory: async (symbol, range) => {
       const span = range as HistorySpan;
       spans.push(span);
@@ -392,6 +394,33 @@ describe("syncing instruments in turn", () => {
     expect(toast.message).toBe(es.instruments.sync.done(2, 3));
     expect(toast.failures).toEqual([
       { name: "Broken", reason: es.instruments.sync.problem.error },
+    ]);
+  });
+
+  it("names a provider that could not answer apart from any other error", async () => {
+    const { prices } = memory();
+    const busy: MarketDataProvider = {
+      source: "YAHOO",
+      getQuote: async (symbol) => {
+        throw new MarketDataUnavailableError(symbol, 429);
+      },
+      getHistory: async () => [],
+    };
+    const deps = { prices, provider: busy, now: at("2026-10-15T08:05Z") };
+
+    await expect(syncInstrumentPrices(deps, ETF)).rejects.toBeInstanceOf(
+      MarketDataUnavailableError,
+    );
+    const steps = await inTurn(
+      [ETF],
+      (target) => syncInstrumentPrices(deps, target),
+      { onError: (error, target) => failedSync(target, syncProblemOf(error)) },
+    );
+
+    expect(steps.map((s) => s.problem)).toEqual(["unavailable"]);
+    expect(syncProblemOf(new Error("boom"))).toBe("error");
+    expect(priceSyncToast(es, steps, { open: 0, closed: 0 }).failures).toEqual([
+      { name: "Fund A", reason: es.instruments.sync.problem.unavailable },
     ]);
   });
 });

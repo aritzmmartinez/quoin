@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Route } from "./+types/ingest";
 
 import type { Broker, ImportSummary } from "~/adapters/ingestion";
+import { MarketDataUnavailableError } from "~/core/ports";
 import { isHistoryRange } from "~/lib/prices-backfill";
 import {
   IngestError,
@@ -144,6 +145,15 @@ export async function action({ request }: Route.ActionArgs) {
     }
   } catch (error) {
     if (error instanceof IngestError) return fail(error.message);
+    if (error instanceof MarketDataUnavailableError) {
+      console.error(
+        "Yahoo could not be reached",
+        error.symbol,
+        error.status,
+        error.cause,
+      );
+      return fail(t.common.marketDataUnavailable, 503);
+    }
     console.error("Ingest action failed", error);
     return fail(t.ingest.failed, 500);
   }

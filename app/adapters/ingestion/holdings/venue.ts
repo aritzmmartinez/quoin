@@ -15,10 +15,16 @@ const LOCALES = ["en", "es", "de", "fr", "it", "nl", "pt"] as const;
 
 const ISO2 = /^[A-Z]{2}$/;
 
-let reverseIndex: Map<string, string> | null = null;
+interface Regions {
+  byName: Map<string, string>;
+  named: Set<string>;
+}
 
-function buildReverseIndex(): Map<string, string> {
-  const index = new Map<string, string>();
+let regions: Regions | null = null;
+
+function buildRegions(): Regions {
+  const byName = new Map<string, string>();
+  const named = new Set<string>();
 
   for (const locale of LOCALES) {
     let names: Intl.DisplayNames;
@@ -39,12 +45,31 @@ function buildReverseIndex(): Map<string, string> {
         }
         // An unassigned code returns itself rather than throwing.
         if (!name || name === code) continue;
-        index.set(fold(name), code);
+        named.add(code);
+        byName.set(fold(name), canonicalRegion(code));
       }
     }
   }
 
-  return index;
+  return { byName, named };
+}
+
+export function canonicalRegion(code: string): string {
+  try {
+    const [tag] = Intl.getCanonicalLocales(`und-${code}`);
+    return (tag && new Intl.Locale(tag).region) ?? code;
+  } catch {
+    return code;
+  }
+}
+
+function canonicalCode(code: string): string {
+  regions ??= buildRegions();
+  return regions.named.has(code) ? canonicalRegion(code) : code;
+}
+
+export function isObsoleteRegion(code: string): boolean {
+  return ISO2.test(code) && canonicalCode(code) !== code;
 }
 
 /** Case, accents and punctuation vary; the country does not. */
@@ -66,10 +91,10 @@ function fold(raw: string): string {
 export function toCountryCode(raw: string): string | null {
   const text = raw.trim();
   if (text === "") return null;
-  if (ISO2.test(text)) return text;
+  if (ISO2.test(text)) return canonicalCode(text);
 
-  reverseIndex ??= buildReverseIndex();
-  return reverseIndex.get(fold(text)) ?? null;
+  regions ??= buildRegions();
+  return regions.byName.get(fold(text)) ?? null;
 }
 
 /** Normalised when we can, verbatim when we cannot. Never empty. */

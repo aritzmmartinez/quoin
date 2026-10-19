@@ -4,7 +4,11 @@ import { exit } from "node:process";
 
 import { prisma } from "~/adapters/persistence";
 import { inTurn } from "~/lib/in-turn";
-import { failedSync, syncInstrumentPrices } from "~/lib/prices-sync";
+import {
+  failedSync,
+  syncInstrumentPrices,
+  syncProblemOf,
+} from "~/lib/prices-sync";
 import { defaultDeps, syncTargets } from "~/lib/prices-sync.server";
 
 async function main(): Promise<void> {
@@ -35,7 +39,7 @@ async function main(): Promise<void> {
         console.error(
           `  ${target.id}  failed: ${error instanceof Error ? error.message : String(error)}`,
         );
-        return failedSync(target);
+        return failedSync(target, syncProblemOf(error));
       },
       onEach: (step, index) => {
         const symbol = targets[index]?.quoteSymbol ?? "?";

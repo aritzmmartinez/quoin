@@ -54,5 +54,10 @@ export function terInputMatches(
   const trimmed = input.trim();
   if (trimmed === "") return stored == null || stored === "";
   const parsed = terPercentSchema.safeParse(trimmed);
-  return parsed.success && parsed.data === stored;
+  if (!parsed.success || stored == null || stored === "") return false;
+  try {
+    return new Decimal(parsed.data).eq(stored);
+  } catch {
+    return false;
+  }
 }

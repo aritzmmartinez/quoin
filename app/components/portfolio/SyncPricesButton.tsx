@@ -27,7 +27,7 @@ async function syncOne(target: SyncPricesTarget): Promise<InstrumentSync> {
     body: new URLSearchParams({ instrumentId: target.id }),
   });
   const body = (await response.json()) as PriceSyncResponse;
-  if (!body.ok) return failedSync(target);
+  if (!body.ok) return failedSync(target, body.problem);
   const { ok: _ok, ...sync } = body;
   return sync;
 }

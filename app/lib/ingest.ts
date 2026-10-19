@@ -25,6 +25,7 @@ export interface PriceFillResult {
   stale: number;
   noQuote: number;
   notEur: number;
+  unavailable: string[];
 }
 
 export function unpricedRewards(summary: ImportSummary): number {

@@ -29,6 +29,7 @@ import { inTurn } from "./in-turn";
 import {
   failedSync,
   syncInstrumentPrices,
+  syncProblemOf,
   type SyncProblem,
 } from "./prices-sync";
 import { replaceQuoteHistory, type ReplaceOutcome } from "./price-history";
@@ -146,6 +147,8 @@ export async function mapQuoteSymbol(
       throw new IngestError(t.ingest.map.noQuote(symbol));
     case "not-eur":
       throw new IngestError(t.ingest.map.notEur(result.currency));
+    case "no-history":
+      throw new IngestError(t.ingest.map.noDailyHistory);
   }
 }
 
@@ -186,14 +189,34 @@ export async function fillPrices(
     range,
   );
 
+  for (const report of backfilled) {
+    if (report.unavailable) {
+      console.error(
+        "Price backfill failed",
+        report.instrumentId,
+        report.unavailable,
+      );
+    }
+  }
   const refused = new Set(
     backfilled.filter((r) => r.foreignCurrency).map((r) => r.instrumentId),
   );
-  const synced = await inTurn(
-    targets.filter((t) => !refused.has(t.id)),
-    (target) => syncInstrumentPrices({ prices, provider }, target),
-    { onError: (_error, target) => failedSync(target) },
+  const unreachable = new Set(
+    backfilled.filter((r) => r.unavailable).map((r) => r.instrumentId),
   );
+  const synced = await inTurn(
+    targets.filter((t) => !refused.has(t.id) && !unreachable.has(t.id)),
+    (target) => syncInstrumentPrices({ prices, provider }, target),
+    {
+      onError: (error, target) => {
+        console.error("Price sync failed", target.id, error);
+        return failedSync(target, syncProblemOf(error));
+      },
+    },
+  );
+  for (const step of synced) {
+    if (step.problem === "unavailable") unreachable.add(step.instrumentId);
+  }
   const count = (problem: SyncProblem) =>
     synced.filter((s) => s.problem === problem).length;
 
@@ -204,5 +227,8 @@ export async function fillPrices(
     stale: count("stale"),
     noQuote: count("no-quote"),
     notEur: refused.size + count("not-eur"),
+    unavailable: targets
+      .filter((t) => unreachable.has(t.id))
+      .map((t) => t.name),
   };
 }

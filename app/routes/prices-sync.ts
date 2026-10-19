@@ -1,4 +1,8 @@
-import type { InstrumentSync } from "~/lib/prices-sync";
+import {
+  syncProblemOf,
+  type InstrumentSync,
+  type SyncProblem,
+} from "~/lib/prices-sync";
 import { syncInstrument } from "~/lib/prices-sync.server";
 
 import type { Route } from "./+types/prices-sync";
@@ -21,10 +25,13 @@ export async function action({ request }: Route.ActionArgs) {
     return Response.json({ ok: true, ...sync } satisfies PriceSyncResponse);
   } catch (error) {
     console.error("Price sync failed", instrumentId, error);
-    return Response.json({ ok: false } satisfies PriceSyncResponse, {
-      status: 500,
+    const problem = syncProblemOf(error);
+    return Response.json({ ok: false, problem } satisfies PriceSyncResponse, {
+      status: problem === "unavailable" ? 503 : 500,
     });
   }
 }
 
-export type PriceSyncResponse = ({ ok: true } & InstrumentSync) | { ok: false };
+export type PriceSyncResponse =
+  | ({ ok: true } & InstrumentSync)
+  | { ok: false; problem?: SyncProblem };
