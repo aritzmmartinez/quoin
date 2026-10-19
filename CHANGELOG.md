@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- The Docker image no longer carries npm, npx, corepack or yarn. Back up by hand with `docker exec quoin db-backup`; `docker exec quoin npm run db:backup` no longer works.
+
 ## [0.12.1] - 2026-10-18
 
 ### Upgrading

@@ -85,12 +85,12 @@ columns. Importing the same file again adds nothing.
   container keeps it. Removing the volume deletes it.
 - **Every start applies pending migrations.** When a new image brings migrations and a
   ledger already exists, it is backed up first.
-- **Back up by hand** with `docker exec quoin npm run db:backup`. Snapshots go to
+- **Back up by hand** with `docker exec quoin db-backup`. Snapshots go to
   `data/backups/` inside the same volume, so copy them off it to protect against losing
   the volume: `docker cp quoin:/app/data/backups ./quoin-backups`.
 - **OpenFIGI key:** pass `-e OPENFIGI_API_KEY=…` to `docker run` if you have one.
 
-Everything else runs from the app's screens. Apart from `db:backup`, the CLI commands
+Everything else runs from the app's screens. Apart from `db-backup`, the CLI commands
 below are not in the image: with Docker, the wizard is the way to import.
 
 To update: `docker pull aritzmmartinez/quoin:latest`, then `docker rm -f quoin` and run
@@ -252,7 +252,7 @@ on with decimal.js; data and secrets are never committed.
 - [x] English interface alongside Spanish, with figures and dates formatted per locale
 - [x] Docker image for amd64 and arm64, published on every release
 - [x] Import onboarding: symbol column on Instruments, in-kind rewards and saveback, gap-free daily prices
-- [ ] Docker image without npm: back up with `docker exec quoin db-backup` (0.13.0)
+- [x] Docker image without npm: back up with `docker exec quoin db-backup` (0.13.0)
 - [ ] Display currency: show every amount converted, with historical rates
 - [ ] Watchlist and trade journal
 - [ ] DCF valuation module
