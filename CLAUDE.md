@@ -163,6 +163,15 @@ This has caused misdirected generation more than once:
 - Stale-quote protection lives at the **write** boundary, not the read: `isFreshQuote`
   discards quotes whose market timestamp is older than 7 days, and it applies **only** to
   `prices:sync`. Yahoo serves stale candles on illiquid venues.
+- **An unknown symbol is an empty answer; an unanswered request throws.** The provider
+  returns `null` / `[]` for a 200 without data and for Yahoo's "no such symbol" — a 404
+  with `chart.error.code: "Not Found"`, measured 2026-10-18. Any other status (400, 401,
+  403, 429, 5xx), a network failure or a body that is not JSON throws
+  `MarketDataUnavailableError`, carrying the status or the cause. Swallowing those, as the
+  provider once did, turns a rate limit into "this symbol has no history" and refuses a
+  good symbol. Callers keep going past one: sync reports `unavailable`, the wizard's fill
+  and "Rebuild all histories" carry on and name it, `api/ingest` answers 503 and logs it.
+  The port is `getQuote(symbol)`, one symbol, because no caller ever asked for two.
 - **`range=max` is not daily, whatever `interval` says.** Measured 2026-10-08: Yahoo
   answers `interval=1d&range=max` with monthly candles for a crypto pair and weekly ones
   for an ETF, each dated at the start of its period but carrying the period's last close — a
@@ -344,7 +353,15 @@ ISIN itself, and always sanity-check the price magnitude.
 
 - **Never map an ISIN as a `quoteSymbol`** (e.g. `XS00TEST0003.SG`). Yahoo resolves the
   ISIN to a quote, but has no historical series under that key — `timestamps` and `closes`
-  come back `null` and `backfill` returns 0 candles. Use the venue ticker.
+  come back `null` and `backfill` returns 0 candles. Use the venue ticker. **The symbol
+  check refuses it**: no daily candle within `DAILY_HISTORY_PROBE` (1y — `max` would
+  download a good symbol's whole history to check it) means `dailyHistory: false`,
+  `canSave` refuses and `assignQuoteSymbol` refuses `no-history` on the server. Nothing
+  in Quoin ever proposed `.SG`; the wizard's field starts empty. Instruments flags a
+  symbol already stored with no candle through `dailyHistoryIds`, which skips
+  `YAHOO_LIVE` rows. `historyStart` counts them on purpose: `SymbolPanel` reads it to
+  choose between assigning and replacing, and `assignQuoteSymbol` refuses any instrument
+  with a price.
 - **Verify the price magnitude, not just the currency.** Several symbols quote in EUR and
   pass the currency filter yet are a different fund tracking the same index, or the same
   fund with a different entitlement per certificate — observed at 5.5x, 0.5x and 0.4x the

@@ -52,7 +52,7 @@ const DAILY = (symbol: string) =>
 function provider(history: Quote[], live: Quote[] = []): MarketDataProvider {
   return {
     source: "YAHOO",
-    getQuotes: async () => live,
+    getQuote: async (symbol) => live.find((q) => q.symbol === symbol) ?? null,
     getHistory: async (_symbol: string, _range: HistoryRange) => history,
   };
 }

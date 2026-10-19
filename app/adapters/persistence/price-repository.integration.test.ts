@@ -374,3 +374,18 @@ describe("PrismaPriceRepository.saveDaily (integration)", () => {
     expect(await priceRepo.lastAsOf("XS00TEST0003")).toBeNull();
   });
 });
+
+describe("PrismaPriceRepository.dailyHistoryIds (integration)", () => {
+  it("counts daily candles and never live quotes alone", async () => {
+    const row = (instrumentId: string, asOf: string, source: string) =>
+      prisma.priceSnapshot.create({
+        data: { instrumentId, price: "10", currency: "EUR", asOf: new Date(asOf), source },
+      });
+    await row("XS00TEST0001", "2026-10-14T07:00:00Z", "YAHOO");
+    await row("XS00TEST0001", "2026-10-15T14:00:00Z", "YAHOO_LIVE");
+    await row("XS00TEST0002", "2026-10-14T14:00:00Z", "YAHOO_LIVE");
+    await row("XS00TEST0002", "2026-10-15T14:00:00Z", "YAHOO_LIVE");
+
+    expect(await priceRepo.dailyHistoryIds()).toEqual(new Set(["XS00TEST0001"]));
+  });
+});

@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import type { Instrument } from "~/core/domain";
-import type {
-  InstrumentRepository,
-  MarketDataProvider,
-  PriceRepository,
-  PriceSnapshot,
-  ReplaceHistoryOptions,
+import {
+  MarketDataUnavailableError,
+  type InstrumentRepository,
+  type MarketDataProvider,
+  type PriceRepository,
+  type PriceSnapshot,
+  type ReplaceHistoryOptions,
 } from "~/core/ports";
 
 import { assignQuoteSymbol, clearQuoteSymbol } from "./quote-symbol";
@@ -35,18 +36,25 @@ const SNAPSHOT: PriceSnapshot = {
 function quoting(currency: string | null): MarketDataProvider {
   return {
     source: "FAKE",
-    getQuotes: async (symbols) =>
+    getQuote: async (symbol) =>
       currency === null
-        ? []
-        : symbols.map((symbol) => ({
+        ? null
+        : {
             symbol,
             price: "100",
             currency,
             asOf: new Date("2026-10-08T14:00:00Z"),
-          })),
-    getHistory: async () => [],
+          },
+    getHistory: async () => (currency === null ? [] : [SNAPSHOT_QUOTE]),
   };
 }
+
+const SNAPSHOT_QUOTE = {
+  symbol: "NEW.DE",
+  price: "100",
+  currency: "EUR",
+  asOf: new Date("2026-10-07T07:00:00Z"),
+};
 
 const EUR = quoting("EUR");
 
@@ -77,6 +85,38 @@ function fakes(stored: Instrument | null, history: PriceSnapshot[] = []) {
 }
 
 describe("assignQuoteSymbol", () => {
+  it("refuses a symbol Yahoo quotes but has no daily history for", async () => {
+    const { calls, instruments, prices } = fakes(INSTRUMENT);
+    const sg: MarketDataProvider = { ...EUR, getHistory: async () => [] };
+
+    const result = await assignQuoteSymbol(
+      instruments,
+      prices,
+      sg,
+      INSTRUMENT.id,
+      "XS00TEST0001.SG",
+    );
+
+    expect(result).toEqual({ ok: false, reason: "no-history" });
+    expect(calls).toEqual([]);
+  });
+
+  it("stores nothing when Yahoo cannot be asked, and says so by throwing", async () => {
+    const { calls, instruments, prices } = fakes(INSTRUMENT);
+    const busy: MarketDataProvider = {
+      source: "FAKE",
+      getQuote: async (symbol) => {
+        throw new MarketDataUnavailableError(symbol, 503);
+      },
+      getHistory: async () => [],
+    };
+
+    await expect(
+      assignQuoteSymbol(instruments, prices, busy, INSTRUMENT.id, "NEW.DE"),
+    ).rejects.toBeInstanceOf(MarketDataUnavailableError);
+    expect(calls).toEqual([]);
+  });
+
   it("stores a first symbol on an instrument with no prices", async () => {
     const { calls, instruments, prices } = fakes(INSTRUMENT);
 

@@ -194,6 +194,30 @@ describe("toInstrumentListItems history", () => {
   });
 });
 
+describe("toInstrumentListItems daily history", () => {
+  it("flags a symbol with no stored daily candle, live quotes or not", () => {
+    const items = toInstrumentListItems(
+      [
+        instrument({ id: "SG", name: "SG", quoteSymbol: "XS00TEST0001.SG" }),
+        instrument({ id: "OK", name: "OK", quoteSymbol: "AAA.DE" }),
+        instrument({ id: "NONE", name: "NONE", quoteSymbol: null }),
+      ],
+      [],
+      new Map(),
+      new Map(),
+      "es-ES",
+      new Map([["SG", [new Date("2026-10-15T14:00:00Z")]]]),
+      new Set(["OK"]),
+    );
+    const byId = new Map(items.map((i) => [i.id, i]));
+
+    expect(byId.get("SG")?.noDailyHistory).toBe(true);
+    expect(byId.get("SG")?.historyStart).not.toBeNull();
+    expect(byId.get("OK")?.noDailyHistory).toBe(false);
+    expect(byId.get("NONE")?.noDailyHistory).toBe(false);
+  });
+});
+
 describe("toInstrumentListItems obsolete venues", () => {
   it("flags a fund whose holdings carry a retired country code", () => {
     const row = (instrumentId: string, identity: string) => ({

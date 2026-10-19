@@ -39,7 +39,12 @@ const first = summary({
       reward("2026-03-15T05:52:00.000Z"),
     ],
     "unmodelled-asset": [
-      { date: "2026-01-11T05:52:10.000Z", type: "earn", subtype: "reward", instrument: "SOL" },
+      {
+        date: "2026-01-11T05:52:10.000Z",
+        type: "earn",
+        subtype: "reward",
+        instrument: "SOL",
+      },
     ],
   },
 });
@@ -69,7 +74,9 @@ describe("mergeRewardRetry", () => {
       imported: 6,
       duplicates: 2,
       discarded: { "unmodelled-asset": 1 },
-      discardedDetails: { "unmodelled-asset": first.discardedDetails["unmodelled-asset"] },
+      discardedDetails: {
+        "unmodelled-asset": first.discardedDetails["unmodelled-asset"],
+      },
     });
 
     const merged = mergeRewardRetry(first, retry);
@@ -108,6 +115,7 @@ describe("retryAfterFill", () => {
     currency: "EUR",
     foreignCurrency: null,
     weekly: false,
+    unavailable: null,
   });
   const fill = (backfilled: ReturnType<typeof report>[]) => ({
     backfilled,
@@ -116,6 +124,7 @@ describe("retryAfterFill", () => {
     stale: 0,
     noQuote: 0,
     notEur: 0,
+    unavailable: [],
   });
 
   it("retries only once the reward's instrument got candles", () => {
@@ -125,7 +134,9 @@ describe("retryAfterFill", () => {
   it("does not retry when the price step wrote nothing for it", () => {
     expect(retryAfterFill(first, fill([]))).toBe(false);
     expect(retryAfterFill(first, fill([report("BTC", 0)]))).toBe(false);
-    expect(retryAfterFill(first, fill([report("IE00TEST0001", 90)]))).toBe(false);
+    expect(retryAfterFill(first, fill([report("IE00TEST0001", 90)]))).toBe(
+      false,
+    );
     expect(retryAfterFill(first, null)).toBe(false);
   });
 
@@ -183,9 +194,9 @@ describe("importAction", () => {
   });
 
   it("offers to value the rewards when nothing is new but some still lack a price", () => {
-    expect(
-      importAction({ ...first, imported: 0, duplicates: 8 }),
-    ).toBe("value-rewards");
+    expect(importAction({ ...first, imported: 0, duplicates: 8 })).toBe(
+      "value-rewards",
+    );
   });
 
   it("has nothing to do when nothing is new and no reward is pending", () => {

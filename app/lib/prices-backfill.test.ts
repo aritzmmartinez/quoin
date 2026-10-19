@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import type {
-  HistoryRange,
-  MarketDataProvider,
-  PriceRepository,
-  PriceSnapshot,
-  Quote,
+import {
+  MarketDataUnavailableError,
+  type HistoryRange,
+  type MarketDataProvider,
+  type PriceRepository,
+  type PriceSnapshot,
+  type Quote,
 } from "~/core/ports";
 
 import {
@@ -26,7 +27,7 @@ function fakeProvider(history: Record<string, Quote[]>): {
   const asked: string[] = [];
   const provider: MarketDataProvider = {
     source: "FAKE",
-    getQuotes: async () => [],
+    getQuote: async () => null,
     getHistory: async (symbol: string, _range: HistoryRange) => {
       asked.push(symbol);
       return history[symbol] ?? [];
@@ -167,6 +168,49 @@ describe("backfillInstruments", () => {
 
     expect(asked).toEqual(["AAA.DE", "BBB.DE"]);
     expect(reports).toHaveLength(2);
+  });
+
+  it("carries on past a provider that cannot answer and says so", async () => {
+    const { provider } = fakeProvider({
+      "BBB.DE": [quote("2026-01-05", "20")],
+    });
+    const busy: MarketDataProvider = {
+      ...provider,
+      getHistory: async (symbol, range) => {
+        if (symbol === "AAA.DE") {
+          throw new MarketDataUnavailableError(symbol, 429);
+        }
+        return provider.getHistory(symbol, range);
+      },
+    };
+    const { prices } = fakeRepository();
+
+    const [first, second] = await backfillInstruments(
+      busy,
+      prices,
+      [
+        { id: "XS00TEST0001", quoteSymbol: "AAA.DE" },
+        { id: "XS00TEST0002", quoteSymbol: "BBB.DE" },
+      ],
+      "1y",
+    );
+
+    expect(first).toMatchObject({ written: 0, unavailable: expect.stringContaining("429") });
+    expect(second).toMatchObject({ written: 1, unavailable: null });
+  });
+
+  it("keeps an empty answer apart from one that could not be asked", async () => {
+    const { provider } = fakeProvider({});
+    const { prices } = fakeRepository();
+
+    const [report] = await backfillInstruments(
+      provider,
+      prices,
+      [{ id: "XS00TEST0001", quoteSymbol: "NONE.DE" }],
+      "1y",
+    );
+
+    expect(report).toMatchObject({ written: 0, first: null, unavailable: null });
   });
 });
 
