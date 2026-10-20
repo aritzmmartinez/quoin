@@ -4,11 +4,8 @@ import { argv, exit } from "node:process";
 
 import { prisma } from "~/adapters/persistence";
 import { currencyCodeSchema } from "~/core/domain";
+import { describeFailure } from "~/lib/describe-failure";
 import { runFxSync } from "~/lib/fx-sync.server";
-
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 async function main(): Promise<void> {
   const codes = argv.slice(2);
@@ -53,7 +50,7 @@ async function main(): Promise<void> {
         break;
       case "unavailable":
         console.log(
-          `${outcome.quote}: not answered — ${messageOf(outcome.error)}`,
+          `${outcome.quote}: not answered — ${describeFailure(outcome.error)}`,
         );
         break;
     }
@@ -65,7 +62,7 @@ async function main(): Promise<void> {
 
 main()
   .catch((error: unknown) => {
-    console.error("\nFX sync failed:", messageOf(error));
+    console.error("\nFX sync failed:", describeFailure(error));
     exit(1);
   })
   .finally(() => prisma.$disconnect());
