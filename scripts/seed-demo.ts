@@ -512,7 +512,13 @@ async function main(): Promise<void> {
   );
 
   const ledger = buildLedger(anchor, seriesById);
-  await prisma.ledgerEntry.createMany({ data: ledger });
+  await prisma.ledgerEntry.createMany({
+    data: ledger.map((row) => ({
+      ...row,
+      originalAmount: row.grossAmount,
+      originalCurrency: row.currency,
+    })),
+  });
 
   let snapshots = 0;
   for (const [instrumentId, series] of seriesById) {

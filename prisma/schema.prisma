@@ -67,6 +67,20 @@ model LedgerEntry {
   currency String // operation currency (ISO 4217)
   fxToBase String  @default("1") // rate to EUR at operation time
 
+  /// How `grossAmount` (in `currency`) becomes euros, frozen when the row is
+  /// booked: IDENTITY | BROKER | ECB | MARKET | MANUAL, CHECK-constrained to those
+  /// values in migration SQL. Which source fits which currency and rate is the
+  /// domain's rule, enforced when a row is written (`ledgerEventWriteSchema`), not
+  /// here: older ledgers may hold rows that break it.
+  fxSource    String  @default("IDENTITY")
+  fxDate      String? // "YYYY-MM-DD", the source's day for `fxRate`
+  fxRate      String? // the rate exactly as published
+  fxDirection String? // QUOTE_PER_BASE (the ECB's: currency per euro) | BASE_PER_QUOTE
+  /// The amount and currency the broker quoted the operation in, when it settled
+  /// in another one. Informational: nothing fiscal reads them.
+  originalAmount   String?
+  originalCurrency String?
+
   /// CASH | IN_KIND — CHECK-constrained in migration SQL, same reason as `type`.
   /// IN_KIND on a BUY: units that arrived without money leaving the bank (a
   /// Kraken reward, a Trade Republic saveback). On a DIVIDEND: that income's leg.

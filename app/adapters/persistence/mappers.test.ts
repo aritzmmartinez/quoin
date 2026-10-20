@@ -13,6 +13,15 @@ function roundTripEvent(event: LedgerEvent): LedgerEvent {
   return rowToEvent(eventToCreateData(event));
 }
 
+const identity = (amount: string) => ({
+  fxSource: "IDENTITY" as const,
+  fxDate: null,
+  fxRate: null,
+  fxDirection: null,
+  originalAmount: amount,
+  originalCurrency: "EUR",
+});
+
 const trade: LedgerEvent = {
   id: "e1",
   ts: new Date("2025-01-01"),
@@ -25,6 +34,7 @@ const trade: LedgerEvent = {
   funding: "CASH",
   currency: "EUR",
   fxToBase: "1",
+  ...identity("150"),
   account: "trade-republic",
   source: "TR_CSV",
   externalId: "abc-123",
@@ -41,6 +51,7 @@ const dividend: LedgerEvent = {
   funding: "CASH",
   currency: "EUR",
   fxToBase: "1",
+  ...identity("12.34"),
   account: "trade-republic",
   source: "TR_CSV",
   externalId: "div-1",
@@ -54,6 +65,7 @@ const cash: LedgerEvent = {
   grossAmount: "500",
   currency: "EUR",
   fxToBase: "1",
+  ...identity("500"),
   account: "trade-republic",
   source: "TR_CSV",
   externalId: "dep-1",
@@ -103,6 +115,41 @@ describe("ledger mappers", () => {
 
   it("round-trips a cash event unchanged", () => {
     expect(roundTripEvent(cash)).toEqual(cash);
+  });
+
+  it("books an event that states no conversion as already in euros", () => {
+    const {
+      fxSource: _source,
+      fxDate: _date,
+      fxRate: _rate,
+      fxDirection: _direction,
+      originalAmount: _amount,
+      originalCurrency: _currency,
+      ...unstated
+    } = trade;
+    expect(eventToCreateData(unstated as LedgerEvent)).toMatchObject(
+      identity("150"),
+    );
+  });
+
+  it("round-trips a converted event with the rate it was booked at", () => {
+    const converted = {
+      ...trade,
+      currency: "USD",
+      fxSource: "ECB",
+      fxDate: "2026-04-02",
+      fxRate: "1.1525",
+      fxDirection: "QUOTE_PER_BASE",
+      originalAmount: "150",
+      originalCurrency: "USD",
+    } as LedgerEvent;
+    expect(roundTripEvent(converted)).toEqual(converted);
+  });
+
+  it("rejects a row with an unknown conversion source or direction", () => {
+    const row = eventToCreateData(trade) as LedgerEntryRow;
+    expect(() => rowToEvent({ ...row, fxSource: "GUESS" })).toThrow();
+    expect(() => rowToEvent({ ...row, fxDirection: "SIDEWAYS" })).toThrow();
   });
 
   it("rejects a corrupt row (BUY without quantity)", () => {

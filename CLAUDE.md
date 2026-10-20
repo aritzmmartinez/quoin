@@ -968,6 +968,19 @@ adding it in **both** places, in the same change.
   is the measured case: `migrate dev` generated a rebuild for a plain new column, so it was
   written with `--create-only` as `ADD COLUMN`. `funding` has its own CHECK
   (`CASH | IN_KIND`), same reason as `type`.
+- **Which `fxSource` fits which row is the domain's rule, checked at write, and never a
+  database CHECK.** `ledgerEventWriteSchema` (called by `eventToCreateData`, the only
+  ledger write path) allows `IDENTITY` only for a row in EUR with no `fxRate`,
+  `fxDirection` or `fxDate`, and any other source only for a row in another currency
+  with all three — so nothing new can count a foreign amount one-to-one, as the Kraken
+  mapper once did. The migration CHECKs only the values of `fxSource` and `fxDirection`.
+  A CHECK naming `currency` was written and withdrawn: an existing row that breaks it
+  makes the `ADD COLUMN` itself fail, and ledgers outside this one hold Kraken USD
+  deposits booked at 1:1 before `foreign-fiat` existed — that container would never
+  start. An integration test applies the migration over such a row. Reads stay lenient
+  (`ledgerEventSchema`), the `LedgerEntry.type` lesson: an old row that breaks the rule is
+  read, and `toBase` treats it as having no rate rather than throwing. `originalAmount`
+  and `originalCurrency` are informational and constrained by nothing.
 
 ## CSV ingestion
 

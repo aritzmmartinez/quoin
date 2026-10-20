@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   ledgerEventSchema,
+  ledgerEventWriteSchema,
   decimalString,
   instrumentSchema,
   thesisSchema,
@@ -89,5 +90,65 @@ describe("thesis", () => {
     expect(() =>
       instrumentSchema.parse({ ...baseInstrument, thesis: "SPECULATIVE" }),
     ).toThrow();
+  });
+});
+
+describe("ledgerEventWriteSchema", () => {
+  const converted = {
+    currency: "USD",
+    fxSource: "ECB" as const,
+    fxDate: "2026-04-02",
+    fxRate: "1.1525",
+    fxDirection: "QUOTE_PER_BASE" as const,
+  };
+
+  it("accepts a euro amount that states no conversion", () => {
+    expect(ledgerEventWriteSchema.safeParse(baseTrade).success).toBe(true);
+  });
+
+  it("accepts a euro amount booked explicitly as it stands", () => {
+    expect(
+      ledgerEventWriteSchema.safeParse({ ...baseTrade, fxSource: "IDENTITY" })
+        .success,
+    ).toBe(true);
+  });
+
+  it("accepts an amount in another currency with its rate, direction and day", () => {
+    expect(
+      ledgerEventWriteSchema.safeParse({ ...baseTrade, ...converted }).success,
+    ).toBe(true);
+  });
+
+  it.each([
+    ["in another currency counted one-to-one", { currency: "USD" }],
+    ["already in euros with a rate", { fxRate: "1.1525" }],
+    ["in euros claiming a conversion", { ...converted, currency: "EUR" }],
+    ["converted with no rate", { ...converted, fxRate: null }],
+    ["converted with no direction", { ...converted, fxDirection: null }],
+    ["converted with no day", { ...converted, fxDate: null }],
+    ["converted at a rate that is not positive", { ...converted, fxRate: "0" }],
+    [
+      "converted on a day that is not a date",
+      { ...converted, fxDate: "2026-02-30" },
+    ],
+  ])("refuses an event %s", (_case, over) => {
+    expect(
+      ledgerEventWriteSchema.safeParse({ ...baseTrade, ...over }).success,
+    ).toBe(false);
+  });
+
+  it.each([
+    ["an unknown source", { ...converted, fxSource: "GUESS" }],
+    ["an unknown direction", { ...converted, fxDirection: "SIDEWAYS" }],
+  ])("refuses %s, at read as well as at write", (_case, over) => {
+    const event = { ...baseTrade, ...over };
+    expect(ledgerEventSchema.safeParse(event).success).toBe(false);
+    expect(ledgerEventWriteSchema.safeParse(event).success).toBe(false);
+  });
+
+  it("still reads an old row that breaks the rule, so one bad row cannot take down the ledger", () => {
+    const old = { ...baseTrade, currency: "USD", fxSource: "IDENTITY" };
+    expect(ledgerEventSchema.safeParse(old).success).toBe(true);
+    expect(ledgerEventWriteSchema.safeParse(old).success).toBe(false);
   });
 });
