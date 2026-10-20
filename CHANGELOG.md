@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Upgrading
+- This release's migration cannot be read by an earlier version: once it is applied, an older image no longer opens the database. The Docker image backs up the ledger to `data/backups` before migrating; to go back, stop the container, restore that snapshot and start the older image. From source, run `pnpm db:backup` before `pnpm db:deploy`.
+
 ### Removed
 - The Docker image no longer carries npm, npx, corepack or yarn. Back up by hand with `docker exec quoin db-backup`; `docker exec quoin npm run db:backup` no longer works.
 
