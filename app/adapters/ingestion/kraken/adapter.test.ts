@@ -250,6 +250,11 @@ describe("KrakenCsvAdapter discards", () => {
   it("flags exactly the reasons that leave a modelled position wrong", () => {
     expect(
       DISCARD_REASONS.filter((reason) => AFFECTS_POSITION[reason]),
-    ).toEqual(["crypto-swap", "crypto-transfer", "reward-unpriced"]);
+    ).toEqual([
+      "crypto-swap",
+      "crypto-transfer",
+      "reward-unpriced",
+      "foreign-fiat",
+    ]);
   });
 });

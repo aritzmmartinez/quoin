@@ -10,6 +10,7 @@ const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
   "crypto-swap": "Intercambios con BTC",
   "crypto-transfer": "Transferencias de BTC",
   "reward-unpriced": "Recompensas de BTC sin precio",
+  "foreign-fiat": "Compras y ventas de BTC en otra divisa",
   "unmodelled-asset": "Activos que Quoin no modela",
   "card-spending": "Pagos con tarjeta",
   "saveback-unpaired": "Saveback sin compra emparejada",
@@ -21,6 +22,7 @@ const DISCARD_REASON_HELP: Record<DiscardReason, string | null> = {
   "crypto-transfer": null,
   "reward-unpriced":
     "No hay precio de BTC de esas fechas, así que estas recompensas no se han registrado y tu posición de BTC no las incluye. En Instrumentos, abre el símbolo de BTC y pulsa «Volver a descargar el histórico» con un rango que llegue a esas fechas. Después vuelve a importar este mismo fichero: lo ya registrado no se duplica.",
+  "foreign-fiat": null,
   "unmodelled-asset": null,
   "card-spending": null,
   "saveback-unpaired":

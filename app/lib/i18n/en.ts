@@ -12,6 +12,7 @@ const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
   "crypto-swap": "Swaps involving BTC",
   "crypto-transfer": "BTC transfers",
   "reward-unpriced": "BTC rewards without a price",
+  "foreign-fiat": "BTC trades in another currency",
   "unmodelled-asset": "Assets Quoin does not model",
   "card-spending": "Card payments",
   "saveback-unpaired": "Saveback with no paired purchase",
@@ -23,6 +24,7 @@ const DISCARD_REASON_HELP: Record<DiscardReason, string | null> = {
   "crypto-transfer": null,
   "reward-unpriced":
     "There is no BTC price for those dates, so these rewards were not recorded and your BTC position does not include them. In Instruments, open BTC's symbol and use “Download the history again” with a range that reaches those dates. Then import this same file again: what is already recorded is not duplicated.",
+  "foreign-fiat": null,
   "unmodelled-asset": null,
   "card-spending": null,
   "saveback-unpaired":

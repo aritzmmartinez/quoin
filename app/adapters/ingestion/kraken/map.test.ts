@@ -80,6 +80,121 @@ describe("Kraken mapGroup", () => {
     expect(item!.kind === "domain" && item!.event.type).toBe("DEPOSIT");
   });
 
+  it("sets aside a BTC purchase paid in another fiat instead of booking it in EUR", () => {
+    const result = mapGroup([
+      row({
+        refid: "F1",
+        type: "spend",
+        subclass: "fiat",
+        asset: "USD",
+        amount: "-150",
+        fee: "1.5",
+      }),
+      row({
+        refid: "F1",
+        type: "receive",
+        subclass: "crypto",
+        asset: "BTC",
+        amount: "0.003",
+      }),
+    ]);
+    expect(result).toEqual([
+      {
+        kind: "discard",
+        reason: "foreign-fiat",
+        detail: {
+          date: "2025-11-13T18:04:48.000Z",
+          type: "receive",
+          subtype: null,
+          instrument: "USD → BTC",
+        },
+      },
+    ]);
+  });
+
+  it("sets aside a BTC sale received in another fiat", () => {
+    const result = mapGroup([
+      row({
+        refid: "F2",
+        type: "spend",
+        subclass: "crypto",
+        asset: "BTC",
+        amount: "-0.003",
+      }),
+      row({
+        refid: "F2",
+        type: "receive",
+        subclass: "fiat",
+        asset: "USD",
+        amount: "180",
+      }),
+    ]);
+    expect(result).toEqual([
+      {
+        kind: "discard",
+        reason: "foreign-fiat",
+        detail: {
+          date: "2025-11-13T18:04:48.000Z",
+          type: "receive",
+          subtype: null,
+          instrument: "BTC → USD",
+        },
+      },
+    ]);
+  });
+
+  it.each(["deposit", "withdrawal"])(
+    "sets aside a %s in another fiat as an asset it does not model",
+    (type) => {
+      const result = mapGroup([
+        row({ refid: "F3", type, asset: "USD", amount: "500" }),
+      ]);
+      expect(result).toEqual([
+        {
+          kind: "discard",
+          reason: "unmodelled-asset",
+          detail: {
+            date: "2025-11-13T18:04:48.000Z",
+            type,
+            subtype: null,
+            instrument: "USD",
+          },
+        },
+      ]);
+    },
+  );
+
+  it("treats a stablecoin as crypto, not as fiat", () => {
+    const result = mapGroup([
+      row({
+        refid: "F4",
+        type: "spend",
+        subclass: "stable_coin",
+        asset: "USDG",
+        amount: "-150",
+      }),
+      row({
+        refid: "F4",
+        type: "receive",
+        subclass: "crypto",
+        asset: "BTC",
+        amount: "0.003",
+      }),
+    ]);
+    expect(result).toEqual([
+      {
+        kind: "discard",
+        reason: "crypto-swap",
+        detail: {
+          date: "2025-11-13T18:04:48.000Z",
+          type: "receive",
+          subtype: null,
+          instrument: "USDG → BTC",
+        },
+      },
+    ]);
+  });
+
   const rewardRow = (over: Partial<KrakenRow> = {}) =>
     row({
       refid: "RW1",

@@ -4,6 +4,7 @@ import {
   Money,
   cashEventSchema,
   dividendEventSchema,
+  foreignCurrency,
   instrumentSchema,
   tradeEventSchema,
   type Instrument,
@@ -82,6 +83,10 @@ function isFiat(row: KrakenRow): boolean {
   return row.subclass === "fiat";
 }
 
+function isForeignFiat(row: KrakenRow): boolean {
+  return isFiat(row) && foreignCurrency([{ currency: row.asset }]) !== null;
+}
+
 function isBtc(row: KrakenRow): boolean {
   return row.asset === "BTC";
 }
@@ -109,11 +114,19 @@ export function mapGroup(
   const receive = rows.find((r) => r.type === "receive");
 
   if (spend && receive) {
-    if (isBtc(receive) && isFiat(spend))
-      return [trade(refid, "BUY", spend, receive)];
-    if (isBtc(spend) && isFiat(receive))
-      return [trade(refid, "SELL", receive, spend)];
     const pair = `${spend.asset} → ${receive.asset}`;
+    if (isBtc(receive) && isFiat(spend))
+      return [
+        isForeignFiat(spend)
+          ? discard("foreign-fiat", receive, pair)
+          : trade(refid, "BUY", spend, receive),
+      ];
+    if (isBtc(spend) && isFiat(receive))
+      return [
+        isForeignFiat(receive)
+          ? discard("foreign-fiat", receive, pair)
+          : trade(refid, "SELL", receive, spend),
+      ];
     return [
       discard(
         isBtc(spend) || isBtc(receive) ? "crypto-swap" : "unmodelled-asset",
@@ -130,7 +143,13 @@ export function mapGroup(
       case "withdrawal":
         if (isFiat(row))
           return [
-            cash(refid, row, row.type === "deposit" ? "DEPOSIT" : "WITHDRAWAL"),
+            isForeignFiat(row)
+              ? discard("unmodelled-asset", row)
+              : cash(
+                  refid,
+                  row,
+                  row.type === "deposit" ? "DEPOSIT" : "WITHDRAWAL",
+                ),
           ];
         return [
           discard(isBtc(row) ? "crypto-transfer" : "unmodelled-asset", row),
