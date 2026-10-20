@@ -117,6 +117,16 @@ function isCalendarDay(value: string): boolean {
   }
 }
 
+export function isUnconvertedForeign(event: LedgerEvent): boolean {
+  return (
+    (event.fxSource ?? "IDENTITY") === "IDENTITY" &&
+    event.currency !== BASE_CURRENCY &&
+    event.fxRate == null &&
+    event.fxDirection == null &&
+    event.fxDate == null
+  );
+}
+
 export const ledgerEventWriteSchema = ledgerEventSchema.superRefine(
   (event, ctx) => {
     const source = event.fxSource ?? "IDENTITY";

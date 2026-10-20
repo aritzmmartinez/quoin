@@ -5,6 +5,7 @@ import type { ImportSummary } from "~/adapters/ingestion";
 import {
   type DiscardGroup as Group,
   discardGroups,
+  discardTypeLabel,
   useCopy,
   useFormat,
 } from "~/lib";
@@ -20,7 +21,8 @@ function Row({ label, value }: { label: string; value: string }) {
 
 function DiscardGroup({ group, pending }: { group: Group; pending: boolean }) {
   const { formatDate } = useFormat();
-  const copy = useCopy().ingest.summary;
+  const t = useCopy();
+  const copy = t.ingest.summary;
   const { reason, details } = group;
   const warn = group.affectsPosition && !pending;
   const help = pending ? copy.pendingPriceNote : copy.reasonHelp[reason];
@@ -52,7 +54,8 @@ function DiscardGroup({ group, pending }: { group: Group; pending: boolean }) {
             className="flex justify-between gap-3 border-b border-border py-1.5 text-[12px] last:border-b-0"
           >
             <span className="min-w-0 truncate">
-              {row.instrument ?? copy.noInstrument} · {row.type}
+              {row.instrument ?? copy.noInstrument} ·{" "}
+              {discardTypeLabel(t, row.type)}
               {row.subtype ? ` / ${row.subtype}` : ""}
             </span>
             <span className="shrink-0 tabular-nums text-muted">

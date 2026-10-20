@@ -903,7 +903,9 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
   `crypto-swap` (BTC ↔ another crypto, in either direction — a `stable_coin` is crypto,
   not fiat), `crypto-transfer` (BTC on-chain in or out), `foreign-fiat` (BTC bought or
   sold against a fiat that is not `BASE_CURRENCY`, which used to be booked as EUR at
-  1:1) and `reward-unpriced` each leave the BTC position wrong, and
+  1:1; any adapter's unconverted foreign event lands here too, see *CSV ingestion*, so
+  its label and help name no asset) and `reward-unpriced` each leave the BTC position
+  wrong, and
   `AFFECTS_POSITION` flags them so the wizard and `pnpm ingest` warn. Every Kraken discard
   carries a per-group detail (date, type, subtype, asset or pair — never amounts).
   `DiscardReason` is a union and its labels are `Record<DiscardReason, string>` in both
@@ -998,6 +1000,16 @@ and are applied defensively to every adapter:
 2. a pre-validation filter dropping any row without a `type` field
 
 Append is idempotent: dedup by `source` + `externalId`.
+
+**`BatchBuilder` applies `ledgerEventWriteSchema` while planning, for every adapter.** An
+event in another currency with no conversion is set aside as `foreign-fiat` — the whole
+operation, so a saveback pair is never cut in half — and the rest of the file imports;
+the preview goes through the same plan, so it says the same. Any other break of the rule
+is a bug in the adapter: `build()` throws `InvalidLedgerEventError` (date, type, currency,
+never amounts), which `api/ingest` turns into a 400 before anything is written,
+instruments included. It throws from `build()`, outside the adapters' per-row `try`,
+because those count an exception as one bad row and carry on. `eventToCreateData` still
+validates as the last line.
 
 ## URL as state
 

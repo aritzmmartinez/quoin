@@ -20,7 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Docker image no longer carries npm, npx, corepack or yarn. Back up by hand with `docker exec quoin db-backup`; `docker exec quoin npm run db:backup` no longer works.
 
 ### Fixed
-- A Kraken BTC purchase or sale against a fiat currency other than the euro was recorded as if the amount were in euros. It is now set aside as "BTC trades in another currency", listed row by row and flagged as leaving the BTC position incomplete. Deposits and withdrawals in another fiat currency are set aside as an asset Quoin does not model instead of counting as euro movements.
+- A Kraken BTC purchase or sale against a fiat currency other than the euro was recorded as if the amount were in euros. It is now set aside as "Trades in another currency", listed row by row and flagged as leaving the BTC position incomplete. Deposits and withdrawals in another fiat currency are set aside as an asset Quoin does not model instead of counting as euro movements.
+- A Trade Republic row in a currency other than the euro would have been recorded as if its amount were in euros. Any import now sets such a row aside as "Trades in another currency", listed with its date, and imports the rest of the file; the preview shows the same.
 - On Opportunity cost, the notice for purchases older than the benchmark's history sent you to a command-line tool the Docker image does not carry. It now points to downloading the history again from Instruments, with a range that reaches those purchases.
 
 ## [0.12.1] - 2026-10-18

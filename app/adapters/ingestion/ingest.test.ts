@@ -3,7 +3,12 @@ import { describe, it, expect } from "vitest";
 import type { LedgerEvent } from "~/core/domain";
 import { ledgerDedupKey } from "~/core/ports";
 
-import { BatchBuilder, previewBatch, type MappedBatch } from "./ingest";
+import {
+  BatchBuilder,
+  InvalidLedgerEventError,
+  previewBatch,
+  type MappedBatch,
+} from "./ingest";
 
 function event(externalId: string): LedgerEvent {
   return {
@@ -101,5 +106,84 @@ describe("counting by operation", () => {
     expect(
       summary.imported + summary.duplicates + discarded + summary.errors,
     ).toBe(summary.total);
+  });
+});
+
+describe("events the ledger cannot book as they stand", () => {
+  const usd = (externalId: string): LedgerEvent => ({
+    ...event(externalId),
+    ts: new Date("2025-11-13T23:30:00Z"),
+    currency: "USD",
+  });
+
+  it("sets aside an amount in another currency with no conversion, and keeps the rest", () => {
+    const builder = new BatchBuilder();
+    builder.add({ kind: "domain", instrument: null, event: event("a") });
+    builder.add({ kind: "domain", instrument: null, event: usd("b") });
+    const b = builder.build(2);
+
+    expect(b.events.map((e) => e.externalId)).toEqual(["a"]);
+    expect(b.discarded).toEqual({ "foreign-fiat": 1 });
+    expect(b.discardedDetails["foreign-fiat"]).toEqual([
+      {
+        date: "2025-11-13T23:30:00.000Z",
+        type: "DEPOSIT",
+        subtype: null,
+        instrument: "USD",
+      },
+    ]);
+  });
+
+  it("names the instrument and the currency when the event has one", () => {
+    const builder = new BatchBuilder();
+    builder.add({
+      kind: "domain",
+      instrument: {
+        id: "US00TEST0001",
+        name: "Synthetic Stock",
+        type: "STOCK",
+        thesis: "CORE",
+      },
+      event: usd("b"),
+    });
+
+    expect(
+      builder.build(1).discardedDetails["foreign-fiat"]?.[0]?.instrument,
+    ).toBe("Synthetic Stock (USD)");
+  });
+
+  it("sets aside a whole operation when one of its rows is foreign, counting it once", () => {
+    const builder = new BatchBuilder();
+    builder.addOperation([
+      { kind: "domain", instrument: null, event: event("p") },
+      { kind: "domain", instrument: null, event: usd("p:income") },
+    ]);
+    const b = builder.build(1);
+
+    expect(b.events).toEqual([]);
+    expect(b.discarded).toEqual({ "foreign-fiat": 1 });
+  });
+
+  it("refuses the whole batch on any other break of the rule, naming the row by its Madrid day", () => {
+    const builder = new BatchBuilder();
+    builder.add({ kind: "domain", instrument: null, event: event("a") });
+    builder.add({
+      kind: "domain",
+      instrument: null,
+      event: { ...usd("b"), fxSource: "ECB" },
+    });
+
+    let error: unknown;
+    try {
+      builder.build(2);
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(InvalidLedgerEventError);
+    expect(error).toMatchObject({
+      date: "2025-11-14",
+      type: "DEPOSIT",
+      currency: "USD",
+    });
   });
 });
