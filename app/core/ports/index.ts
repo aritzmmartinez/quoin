@@ -7,3 +7,4 @@ export * from "./holdings-repository";
 export * from "./security-identity-resolver";
 export * from "./security-identity-repository";
 export * from "./target-repository";
+export * from "./fx-repository";

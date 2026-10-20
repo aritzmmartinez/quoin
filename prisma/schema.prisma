@@ -148,6 +148,35 @@ model InflationSync {
   checkedAt DateTime
 }
 
+/// A published exchange rate: units of `quote` per one `base`, for one day,
+/// exactly as the source printed it.
+///
+/// A cache, not a fact of the portfolio: every ledger row freezes the rate it
+/// was booked at, so nothing already computed reads from here. A rate that
+/// arrives different for a day already stored is still refused and reported,
+/// never overwritten: the cache must not change in silence, and the next
+/// import would book at the new figure.
+model FxRate {
+  id     String @id @default(uuid())
+  base   String // "EUR"
+  quote  String // "USD", or a stablecoin code: not limited to ISO 4217
+  day    String // "YYYY-MM-DD", the source's reference date
+  rate   String // decimal string, never a float
+  source String // "ECB"
+
+  createdAt DateTime @default(now())
+
+  @@unique([source, base, quote, day])
+  @@index([quote])
+}
+
+/// When each rate series was last asked for, found anything or not. Same
+/// reason as InflationSync.
+model FxSync {
+  series    String   @id // "ECB:EUR:USD"
+  checkedAt DateTime
+}
+
 // A fund's published composition.
 //
 // Unlike PriceSnapshot, this is REPLACE-only, not append-only: a holdings file is
