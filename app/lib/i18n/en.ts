@@ -6,6 +6,7 @@ import type {
   Thesis,
 } from "~/core/domain";
 
+import type { ExcludedNotice } from "./es";
 import type { Copy } from "./types";
 
 const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
@@ -1301,13 +1302,18 @@ export const en: Copy = {
       benchmark: "Counterfactual",
       difference: "Difference",
     },
-    truncated: (
-      symbol: string,
-      date: string,
-      count: number,
-      amount: string,
-    ): string =>
-      `${symbol}'s history starts on ${date}. ${count} ${count === 1 ? "earlier purchase" : "earlier purchases"} (${amount}) buy nothing in the counterfactual, because interpolating a price nobody published would be inventing it, but they still count in the real portfolio: the difference favours it by that much. Extend the history with pnpm prices:backfill.`,
+    truncated: (n: ExcludedNotice): string => {
+      const one = n.count === 1;
+      return `${n.symbol}'s history starts on ${n.day}. ${n.count} ${one ? "earlier purchase" : "earlier purchases"} (${n.amount}) ${one ? "buys" : "buy"} nothing in the counterfactual: interpolating a price nobody published would be inventing it. ${one ? "It still counts" : "They still count"} in the real portfolio, so the difference favours it by that much. Open ${n.symbol} in ${n.instruments}, pick a range that reaches ${one ? "that purchase" : "those purchases"} and use “${n.redownload}”.`;
+    },
+    stale: (n: ExcludedNotice): string => {
+      const one = n.count === 1;
+      return `${n.symbol}'s last close is from ${n.day}. ${n.count} ${one ? "purchase" : "purchases"} made more than a week after that close (${n.amount}) ${one ? "buys" : "buy"} nothing in the counterfactual. ${one ? "It still counts" : "They still count"} in the real portfolio, so the difference favours it by that much. Use “${n.refresh}” in ${n.portfolio}. If you don't see the button, open ${n.symbol} in ${n.instruments} and use “${n.redownload}”.`;
+    },
+    gaps: (n: Omit<ExcludedNotice, "day">): string => {
+      const one = n.count === 1;
+      return `${n.count} ${one ? "purchase falls" : "purchases fall"} in a gap of more than a week with no ${n.symbol} close (${n.amount}). ${one ? "It buys" : "They buy"} nothing in the counterfactual. ${one ? "It still counts" : "They still count"} in the real portfolio, so the difference favours it by that much. Open ${n.symbol} in ${n.instruments} and use “${n.redownload}”. If the gap remains, Yahoo has no data for those sessions.`;
+    },
     unpriced: (names: string): string =>
       `No usable price: ${names}. They are excluded from both sides, because counting their cost without their value would invent a loss.`,
     unmapped: (symbol: string): string =>

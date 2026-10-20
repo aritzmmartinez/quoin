@@ -14,6 +14,7 @@ import type {
   Quote,
 } from "~/core/ports";
 import { computePositions } from "~/core/projections";
+import { atOrBefore } from "~/core/series";
 
 export const TRADE_CHECKS = 3;
 export const TRADE_DEVIATION_LIMIT = "0.1";
@@ -123,15 +124,18 @@ export function compareTrades(
   marks: readonly TradeMark[],
   candles: readonly Quote[],
 ): TradeComparison[] {
-  const sorted = [...candles].sort(
-    (a, b) => a.asOf.getTime() - b.asOf.getTime(),
-  );
+  const asOfTime = (quote: Quote) => quote.asOf.getTime();
+  const sorted = [...candles].sort((a, b) => asOfTime(a) - asOfTime(b));
   const limit = new Decimal(TRADE_DEVIATION_LIMIT);
 
   return marks.flatMap((mark) => {
-    const at = mark.ts.getTime();
-    const candle = sorted.filter((c) => c.asOf.getTime() <= at).at(-1);
-    if (!candle || at - candle.asOf.getTime() > LOOKBACK_MS) return [];
+    const candle = atOrBefore(
+      sorted,
+      asOfTime,
+      mark.ts.getTime(),
+      LOOKBACK_MS,
+    );
+    if (!candle) return [];
 
     const deviation = new Decimal(candle.price).div(mark.price).minus(1);
     return [
