@@ -10,6 +10,8 @@ updates:
         update-types: [minor, patch]
     ignore:
       - dependency-name: xlsx
+      - dependency-name: "@types/node"
+        update-types: [version-update:semver-major]
 
   - package-ecosystem: docker
     directory: /
