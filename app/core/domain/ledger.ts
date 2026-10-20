@@ -28,7 +28,6 @@ export const instrumentSchema = z.object({
   id: z.string().min(1),
   name: z.string(),
   type: instrumentTypeSchema,
-  currency: z.string(),
   assetClass: z.string().nullish(),
   quoteSymbol: z.string().nullish(),
   exposureKind: exposureKindSchema.nullish(),

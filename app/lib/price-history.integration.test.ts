@@ -23,7 +23,6 @@ const instrument: Instrument = {
   id: ID,
   name: "Synthetic Accumulating Fund",
   type: "ETF",
-  currency: "EUR",
   quoteSymbol: "OLD.DE",
   thesis: "CORE",
 };

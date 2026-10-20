@@ -71,7 +71,6 @@ const BTC: Instrument = instrumentSchema.parse({
   id: "BTC",
   name: "Bitcoin",
   type: "CRYPTO",
-  currency: "EUR",
   assetClass: "crypto",
 });
 

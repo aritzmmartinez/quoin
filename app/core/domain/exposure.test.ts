@@ -13,7 +13,6 @@ const fund = (over: Partial<Instrument> = {}): Instrument => ({
   id: "IE00TEST0021",
   name: "Test World Equity",
   type: "ETF",
-  currency: "EUR",
   assetClass: "FUND",
   quoteSymbol: null,
   exposureKind: "EQUITY_FUND",

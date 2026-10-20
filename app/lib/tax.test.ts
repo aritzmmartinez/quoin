@@ -42,7 +42,7 @@ function instrument(
   name: string,
   type: Instrument["type"] = "STOCK",
 ): Instrument {
-  return { id, name, type, currency: "EUR", thesis: "CORE" };
+  return { id, name, type, thesis: "CORE" };
 }
 
 describe("listTaxYears", () => {

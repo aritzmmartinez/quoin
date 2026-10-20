@@ -8,7 +8,6 @@ const instrument = (id: string, name: string): Instrument => ({
   id,
   name,
   type: "ETF",
-  currency: "EUR",
   assetClass: "FUND",
   quoteSymbol: null,
   exposureKind: null,

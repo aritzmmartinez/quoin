@@ -32,7 +32,6 @@ describe("mapRow", () => {
       id: "IE00TEST0001",
       name: "Test ETF",
       type: "ETF",
-      currency: "EUR",
       assetClass: "FUND",
       thesis: "CORE",
     });

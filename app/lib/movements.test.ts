@@ -9,7 +9,6 @@ const INSTRUMENTS: Instrument[] = [
     id: "IE00BK5BQT80",
     name: "FTSE All-World",
     type: "ETF",
-    currency: "EUR",
     assetClass: "Equity",
     quoteSymbol: null,
     thesis: "CORE",
