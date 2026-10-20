@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - A Kraken BTC purchase or sale against a fiat currency other than the euro was recorded as if the amount were in euros. It is now set aside as "Trades in another currency", listed row by row and flagged as leaving the BTC position incomplete. Deposits and withdrawals in another fiat currency are set aside as an asset Quoin does not model instead of counting as euro movements.
 - A Trade Republic row in a currency other than the euro would have been recorded as if its amount were in euros. Any import now sets such a row aside as "Trades in another currency", listed with its date, and imports the rest of the file; the preview shows the same.
+- A ledger entry in another currency with no exchange rate to euros was counted as if its amount were in euros. Such entries can exist from imports made before the fixes above. They are now left out of every figure: an instrument with a trade like that is left out whole and named on Portfolio and Summary, and on the tax view of Realized with a notice to check it before using the figures, since its sales are not in the calculation. Movements still lists the entry, with "No exchange rate" instead of an amount, and leaves it out of the net cash flow.
 - On Opportunity cost, the notice for purchases older than the benchmark's history sent you to a command-line tool the Docker image does not carry. It now points to downloading the history again from Instruments, with a range that reaches those purchases.
 
 ## [0.12.1] - 2026-10-18

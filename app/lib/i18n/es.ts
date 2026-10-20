@@ -81,6 +81,12 @@ export const es = {
   common: {
     close: "Cerrar",
     marketDataUnavailable: "No se ha podido consultar Yahoo. Inténtalo de nuevo.",
+    noRateExcluded: (names: readonly string[]): string => {
+      const one = names.length === 1;
+      return `Sin tipo de cambio: ${names.join(", ")}. ${one ? "Tiene" : "Tienen"} operaciones en otra divisa que no se han podido convertir a euros, así que ${one ? "queda" : "quedan"} fuera de todas las cifras: un tipo inventado daría un coste y un valor falsos. Las operaciones siguen en Movimientos.`;
+    },
+    noRateTax: (names: string): string =>
+      `Sin tipo de cambio: ${names}. Sus operaciones no se han podido convertir a euros y no entran en este cálculo. Revísalo antes de usar estas cifras en la declaración.`,
   },
   notFound: {
     title: "Página no encontrada",
@@ -1082,6 +1088,9 @@ export const es = {
     },
     amountHint:
       "El importe es el flujo de caja real: comisiones incluidas y retenciones descontadas.",
+    noRateLabel: "sin tipo",
+    noRate: (currency: string): string =>
+      `Esta operación está en ${currency} y no tiene tipo de cambio a euros, así que no se ha podido valorar y no cuenta en ninguna cifra.`,
   },
   portfolio: {
     title: "Cartera",

@@ -7,7 +7,7 @@ import type {
   TradeEvent,
 } from "~/core/domain";
 import { Money, isInKind, type DividendEvent } from "~/core/domain";
-import { toBase } from "~/core/fx";
+import { baseOf, bookable, unconvertibleInstrumentIds } from "~/core/fx";
 import {
   WASH_SALE_WINDOW_MONTHS,
   carryforwardFrom,
@@ -22,6 +22,7 @@ import {
   type Territory,
 } from "~/core/tax";
 
+import { namesOf } from "./opportunity-cost";
 import { REALIZED_VIEW_PARAM } from "./realized";
 
 function isSellTrade(event: LedgerEvent): event is TradeEvent {
@@ -30,6 +31,13 @@ function isSellTrade(event: LedgerEvent): event is TradeEvent {
 
 function isInKindIncome(event: LedgerEvent): event is DividendEvent {
   return event.type === "DIVIDEND" && isInKind(event);
+}
+
+export function taxExclusions(
+  events: readonly LedgerEvent[],
+  instruments: readonly Instrument[],
+): string[] {
+  return namesOf(unconvertibleInstrumentIds(events), instruments);
 }
 
 export function listTaxYears(events: readonly LedgerEvent[]): number[] {
@@ -150,17 +158,17 @@ export function inKindIncomeOf(
   events: readonly LedgerEvent[],
   year: number,
 ): TaxInKindIncome {
-  const received = events.filter(
+  const received = bookable(events).filter(
     (e): e is DividendEvent => isInKindIncome(e) && fiscalYearOf(e.ts) === year,
   );
   return {
     count: received.length,
     gross: sum(
-      received.map((e) => toBase(e, "grossAmount").toString()),
+      received.map((e) => baseOf(e, "grossAmount").toString()),
       2,
     ),
     withheld: sum(
-      received.map((e) => toBase(e, "taxWithheld").toString()),
+      received.map((e) => baseOf(e, "taxWithheld").toString()),
       2,
     ),
   };

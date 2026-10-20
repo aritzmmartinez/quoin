@@ -75,6 +75,12 @@ export const en: Copy = {
   common: {
     close: "Close",
     marketDataUnavailable: "Yahoo could not be reached. Try again.",
+    noRateExcluded: (names: readonly string[]): string => {
+      const one = names.length === 1;
+      return `No exchange rate: ${names.join(", ")}. ${one ? "It has" : "They have"} trades in another currency that could not be converted to euros, so ${one ? "it is" : "they are"} left out of every figure: an invented rate would give a false cost and value. The trades are still in Movements.`;
+    },
+    noRateTax: (names: string): string =>
+      `No exchange rate: ${names}. Their trades could not be converted to euros and are not part of this calculation. Check them before using these figures in a tax return.`,
   },
   notFound: {
     title: "Page not found",
@@ -1071,6 +1077,9 @@ export const en: Copy = {
     },
     amountHint:
       "The amount is the real cash flow: fees included and withholdings deducted.",
+    noRateLabel: "no rate",
+    noRate: (currency: string): string =>
+      `This entry is in ${currency} and has no exchange rate to euros, so it could not be valued and counts in no figure.`,
   },
   portfolio: {
     title: "Portfolio",

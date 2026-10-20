@@ -173,3 +173,14 @@ describe("computePositions (AVCO)", () => {
     expect(p.costBasis).toBe("1000");
   });
 });
+
+describe("an instrument with a trade it cannot convert to euros", () => {
+  it("has no position at all, rather than one costed at 1:1", () => {
+    const positions = computePositions([
+      trade("BUY", "IE00TEST0001", "10", "1000"),
+      trade("BUY", "US00TEST0002", "5", "500"),
+      { ...trade("BUY", "US00TEST0002", "5", "500"), currency: "USD" },
+    ]);
+    expect(positions.map((p) => p.instrumentId)).toEqual(["IE00TEST0001"]);
+  });
+});

@@ -981,8 +981,9 @@ adding it in **both** places, in the same change.
   deposits booked at 1:1 before `foreign-fiat` existed — that container would never
   start. An integration test applies the migration over such a row. Reads stay lenient
   (`ledgerEventSchema`), the `LedgerEntry.type` lesson: an old row that breaks the rule is
-  read, and `toBase` counts it 1:1, as `fxToBase` did, rather than throwing. `originalAmount`
-  and `originalCurrency` are informational and constrained by nothing.
+  read, and `toBase` answers it with an explicit `no-rate` rather than throwing or counting
+  it 1:1. `originalAmount` and `originalCurrency` are informational and constrained by
+  nothing.
 - **Every ledger amount reaches euros through `toBase(event, field)` in `core/fx`**, never
   a multiplication at the call site. `IDENTITY` returns the amount untouched — a Kraken
   reward worth a fraction of a cent keeps it. A converted amount divides by `fxRate`
@@ -990,7 +991,19 @@ adding it in **both** places, in the same change.
   and is rounded to the cent, `ROUND_HALF_UP`, field by field — dividing by the
   published rate is exact up to that rounding, where storing its inverse was not, which
   is why `fxToBase` was dropped.
-
+- **A row with no rate is excluded and named, never valued at 1:1** — the `unpricedCount`
+  rule, one step earlier. `toBase` returns `{ ok: false, reason: "no-rate" }` for an
+  `IDENTITY` row not in EUR or a conversion missing its rate or direction. `bookable`
+  drops **every** row of an instrument with a trade like that — dropping one trade would
+  unbalance AVCO and FIFO — and a dividend or cash row like that alone. Every core entry
+  point that values the ledger runs it itself (`walkAvco`, `sortTrades` and so FIFO and
+  the tax history, the cost line, contributions, TWR/MWR, the opportunity cost, in-kind
+  income), so no screen can forget it; they then read amounts through `baseOf`, which
+  throws only if that invariant is broken. What is excluded is named: Portfolio and
+  Summary through `unconvertibleInstrumentIds`; the tax view of `/realized` and
+  `pnpm tax:explain` through `taxExclusions`, because a holding missing from a tax
+  report in silence is the worst place for it; Movements keeps the row with "—" and
+  "No exchange rate" instead of an amount, and leaves it out of the net cash flow.
 ## CSV ingestion
 
 **The broker is detected from the header row, never from the filename and never by

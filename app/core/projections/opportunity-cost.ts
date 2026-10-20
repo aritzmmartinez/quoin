@@ -8,7 +8,7 @@ import {
   type TradeEvent,
 } from "../domain";
 import { dayOf } from "../calendar";
-import { toBase } from "../fx";
+import { baseOf, bookable } from "../fx";
 import type { PriceSnapshot } from "../ports";
 import { onOrBeforeDay } from "../series";
 import type { PriceLike } from "./market-value";
@@ -140,7 +140,7 @@ export function computeOpportunityCost(
     );
   }
 
-  const trades = events
+  const trades = bookable(events)
     .filter(isTrade)
     .slice()
     .sort((a, b) => a.ts.getTime() - b.ts.getTime());
@@ -167,8 +167,8 @@ export function computeOpportunityCost(
       buckets.set(trade.instrumentId, bucket);
     }
 
-    const gross = toBase(trade, "grossAmount");
-    const fees = toBase(trade, "fees");
+    const gross = baseOf(trade, "grossAmount");
+    const fees = baseOf(trade, "fees");
     const t = trade.ts.getTime();
 
     if (trade.type === "SELL") {

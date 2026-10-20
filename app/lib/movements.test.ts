@@ -197,3 +197,28 @@ describe("netCashFlow", () => {
     expect(netCashFlow([])).toBe("0.00");
   });
 });
+
+describe("a row with no rate to euros", () => {
+  it("shows no amount, no costs and no price, and says why", () => {
+    const [row] = toMovementRows(
+      [buy({ currency: "USD", fees: "2" })],
+      INSTRUMENTS,
+    );
+    expect(row).toMatchObject({
+      amount: null,
+      costs: null,
+      price: null,
+      quantity: "10",
+      currency: "USD",
+      noRate: true,
+    });
+  });
+
+  it("is left out of the net cash flow instead of counted at 1:1", () => {
+    const rows = toMovementRows(
+      [buy({ id: "b1" }), buy({ id: "b2", currency: "USD" })],
+      INSTRUMENTS,
+    );
+    expect(netCashFlow(rows)).toBe("-896.40");
+  });
+});

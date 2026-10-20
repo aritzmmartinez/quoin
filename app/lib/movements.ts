@@ -5,9 +5,8 @@ import {
   type Instrument,
   type LedgerEvent,
   type LedgerEventType,
-  type Money,
 } from "~/core/domain";
-import { toBase } from "~/core/fx";
+import { hasRate, toBase } from "~/core/fx";
 
 export interface MovementRow {
   id: string;
@@ -18,8 +17,10 @@ export interface MovementRow {
   instrumentName: string | null;
   quantity: string | null;
   price: string | null;
-  costs: string;
-  amount: string;
+  costs: string | null;
+  amount: string | null;
+  currency: string;
+  noRate: boolean;
 }
 
 const OUTFLOWS: ReadonlySet<LedgerEventType> = new Set<LedgerEventType>([
@@ -27,20 +28,24 @@ const OUTFLOWS: ReadonlySet<LedgerEventType> = new Set<LedgerEventType>([
   "WITHDRAWAL",
 ]);
 
-function inBase(money: Money): Decimal {
-  return new Decimal(money.toString());
+function inBase<E extends LedgerEvent>(
+  event: E,
+  field: Parameters<typeof toBase<E>>[1],
+): Decimal {
+  const result = toBase(event, field);
+  return result.ok ? new Decimal(result.amount.toString()) : new Decimal(0);
 }
 
 function signedAmount(event: LedgerEvent, costs: Decimal): Decimal {
-  const gross = inBase(toBase(event, "grossAmount"));
+  const gross = inBase(event, "grossAmount");
   const signed = OUTFLOWS.has(event.type) ? gross.negated() : gross;
   return signed.minus(costs);
 }
 
 function costsOf(event: LedgerEvent): Decimal {
   if (event.type === "BUY" || event.type === "SELL")
-    return inBase(toBase(event, "fees"));
-  if (event.type === "DIVIDEND") return inBase(toBase(event, "taxWithheld"));
+    return inBase(event, "fees");
+  if (event.type === "DIVIDEND") return inBase(event, "taxWithheld");
   return new Decimal(0);
 }
 
@@ -53,6 +58,7 @@ export function toMovementRows(
   return [...events]
     .sort((a, b) => b.ts.getTime() - a.ts.getTime())
     .map((event) => {
+      const rated = hasRate(event);
       const costs = costsOf(event);
       const isTrade = event.type === "BUY" || event.type === "SELL";
       const instrumentId = "instrumentId" in event ? event.instrumentId : null;
@@ -62,9 +68,10 @@ export function toMovementRows(
       if (isTrade) {
         const qty = new Decimal(event.quantity);
         quantity = qty.toFixed();
-        price = qty.isZero()
-          ? null
-          : inBase(toBase(event, "grossAmount")).div(qty).toString();
+        price =
+          qty.isZero() || !rated
+            ? null
+            : inBase(event, "grossAmount").div(qty).toString();
       }
 
       return {
@@ -78,14 +85,19 @@ export function toMovementRows(
           : null,
         quantity,
         price,
-        costs: costs.toFixed(2),
-        amount: signedAmount(event, costs).toFixed(2),
+        costs: rated ? costs.toFixed(2) : null,
+        amount: rated ? signedAmount(event, costs).toFixed(2) : null,
+        currency: event.currency,
+        noRate: !rated,
       };
     });
 }
 
 export function netCashFlow(rows: readonly MovementRow[]): string {
   return rows
-    .reduce((sum, r) => sum.plus(new Decimal(r.amount)), new Decimal(0))
+    .reduce(
+      (sum, r) => (r.amount === null ? sum : sum.plus(new Decimal(r.amount))),
+      new Decimal(0),
+    )
     .toFixed(2);
 }

@@ -8,6 +8,7 @@ import {
   inKindIncomeOf,
   listTaxYears,
   parseTaxYear,
+  taxExclusions,
   TAX_YEAR_PARAM,
   unlistedInstrumentIds,
 } from "./tax";
@@ -324,5 +325,25 @@ describe("income received in kind", () => {
       funding: "CASH" as const,
     };
     expect(inKindIncomeOf([cash], 2025).count).toBe(0);
+  });
+});
+
+describe("taxExclusions", () => {
+  it("names every instrument the FIFO left out for want of a rate", () => {
+    const events = [
+      trade("BUY", "IE00TEST0001", "1", "100"),
+      { ...trade("BUY", "US00TEST0002", "1", "100"), currency: "USD" },
+    ];
+    expect(
+      taxExclusions(events, [
+        instrument("IE00TEST0001", "Synthetic Fund"),
+        instrument("US00TEST0002", "Synthetic Stock"),
+      ]),
+    ).toEqual(["Synthetic Stock"]);
+  });
+
+  it("names nothing when every trade has a rate", () => {
+    const events = [trade("BUY", "IE00TEST0001", "1", "100")];
+    expect(taxExclusions(events, [])).toEqual([]);
   });
 });
