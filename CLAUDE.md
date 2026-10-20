@@ -195,6 +195,13 @@ This has caused misdirected generation more than once:
   sync's. Run backfill first and sync second — the requirement is that **both** run;
   ending on the sync just means the last row written is also the newest in time.
 - `PriceSnapshot` is idempotent via `@@unique([instrumentId, asOf])`.
+- **"The last value at or before" is one function: `lastOnOrBefore` in `core/series`**,
+  with `atOrBefore` (instants) and `onOrBeforeDay` (Madrid days) over it. The caller
+  sets the maximum age; the series must be ascending by its key, and an unsorted one
+  returns a wrong value without an error. Kraken rewards, the symbol check and the
+  opportunity cost go through it; write a new lookup through it, never as a fresh loop.
+  The sweeps that carry a last value forward (`computeInvestedVsValueSeries`, the
+  portfolio merge) are not lookups and stay as they are.
 - **A sync fills gaps, then writes at most one live row per Madrid day.** `prices:sync` and
   "Refresh prices" share `syncInstrumentPrices`, one instrument at a time (`inTurn` on the
   client, as "Rebuild all"). It asks Yahoo for daily candles from the Madrid day of the

@@ -10,6 +10,7 @@ import {
   type Instrument,
 } from "~/core/domain";
 import type { PriceSnapshot } from "~/core/ports";
+import { atOrBefore } from "~/core/series";
 
 import type { DiscardReason, MappedItem } from "../ingest";
 import type { KrakenRow } from "./row";
@@ -37,7 +38,9 @@ function unsupported(row: KrakenRow): MappedItem {
 
 export type PriceAt = (instrumentId: string, ts: Date) => string | null;
 
-const MAX_PRICE_AGE_DAYS = 7;
+const MAX_PRICE_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+const asOfTime = (snapshot: PriceSnapshot) => snapshot.asOf.getTime();
 
 export function priceLookupFrom(snapshots: readonly PriceSnapshot[]): PriceAt {
   const byInstrument = new Map<string, PriceSnapshot[]>();
@@ -47,23 +50,16 @@ export function priceLookupFrom(snapshots: readonly PriceSnapshot[]): PriceAt {
     byInstrument.set(snapshot.instrumentId, list);
   }
   for (const list of byInstrument.values()) {
-    list.sort((a, b) => a.asOf.getTime() - b.asOf.getTime());
+    list.sort((a, b) => asOfTime(a) - asOfTime(b));
   }
 
   return (instrumentId, ts) => {
     const history = byInstrument.get(instrumentId);
     if (!history) return null;
-
-    let candidate: PriceSnapshot | null = null;
-    for (const snapshot of history) {
-      if (snapshot.asOf.getTime() > ts.getTime()) break;
-      candidate = snapshot;
-    }
-    if (!candidate) return null;
-
-    const ageDays =
-      (ts.getTime() - candidate.asOf.getTime()) / (24 * 60 * 60 * 1000);
-    return ageDays > MAX_PRICE_AGE_DAYS ? null : candidate.price;
+    return (
+      atOrBefore(history, asOfTime, ts.getTime(), MAX_PRICE_AGE_MS)?.price ??
+      null
+    );
   };
 }
 
