@@ -21,6 +21,7 @@ import {
   InfoHint,
 } from "~/components";
 import { buttonClass } from "~/components/ui/Button";
+import type { ExcludedPurchases } from "~/core/projections";
 import {
   type Copy,
   copyFromMatches,
@@ -76,7 +77,25 @@ export async function loader({ request }: Route.LoaderArgs) {
     rows: toOpportunityRows(result.lines, instruments),
     unpriced: namesOf(result.unpricedInstrumentIds, instruments),
     truncated: result.truncated,
+    stale: result.stale,
+    gaps: result.gaps,
   };
+}
+
+function ExcludedNotice<T extends ExcludedPurchases>({
+  excluded,
+  text,
+}: {
+  excluded: T | null;
+  text: (excluded: T, amount: string) => string;
+}) {
+  const { formatMoney } = useFormat();
+  if (!excluded) return null;
+  return (
+    <Explainer tone="notice" className="mt-2">
+      {text(excluded, formatMoney(excluded.amount))}
+    </Explainer>
+  );
 }
 
 export default function OpportunityCost({ loaderData }: Route.ComponentProps) {
@@ -105,7 +124,15 @@ export default function OpportunityCost({ loaderData }: Route.ComponentProps) {
     );
   }
 
-  const { symbol, totals, rows, unpriced, truncated } = loaderData;
+  const { symbol, totals, rows, unpriced, truncated, stale, gaps } =
+    loaderData;
+  const notice = {
+    symbol,
+    refresh: t.instruments.sync.action,
+    redownload: t.instruments.history.redownload(symbol),
+    portfolio: t.nav.portfolio,
+    instruments: t.nav.instruments,
+  };
 
   return (
     <>
@@ -203,16 +230,32 @@ export default function OpportunityCost({ loaderData }: Route.ComponentProps) {
             />
           </div>
 
-          {truncated && (
-            <Explainer tone="notice" className="mt-2">
-              {o.truncated(
-                symbol,
-                formatDate(truncated.earliestDay),
-                truncated.excludedFlowCount,
-                formatMoney(truncated.excludedAmount),
-              )}
-            </Explainer>
-          )}
+          <ExcludedNotice
+            excluded={truncated}
+            text={(e, amount) =>
+              o.truncated({
+                ...notice,
+                day: formatDate(e.firstDay),
+                count: e.count,
+                amount,
+              })
+            }
+          />
+          <ExcludedNotice
+            excluded={stale}
+            text={(e, amount) =>
+              o.stale({
+                ...notice,
+                day: formatDate(e.lastDay),
+                count: e.count,
+                amount,
+              })
+            }
+          />
+          <ExcludedNotice
+            excluded={gaps}
+            text={(e, amount) => o.gaps({ ...notice, count: e.count, amount })}
+          />
           {unpriced.length > 0 && (
             <Explainer tone="notice" className="mt-2">
               {o.unpriced(unpriced.join(", "))}

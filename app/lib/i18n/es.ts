@@ -6,6 +6,17 @@ import type {
   Thesis,
 } from "~/core/domain";
 
+export interface ExcludedNotice {
+  symbol: string;
+  day: string;
+  count: number;
+  amount: string;
+  refresh: string;
+  redownload: string;
+  portfolio: string;
+  instruments: string;
+}
+
 const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
   "crypto-swap": "Intercambios con BTC",
   "crypto-transfer": "Transferencias de BTC",
@@ -1298,13 +1309,18 @@ export const es = {
       benchmark: "Contrafactual",
       difference: "Diferencial",
     },
-    truncated: (
-      symbol: string,
-      date: string,
-      count: number,
-      amount: string,
-    ): string =>
-      `El histórico de ${symbol} empieza el ${date}. ${count} ${count === 1 ? "compra anterior" : "compras anteriores"} (${amount}) no compran nada en el contrafactual, porque interpolar un precio que nadie publicó sería inventarlo, pero siguen contando en la cartera real: el diferencial la favorece en esa medida. Amplía el histórico con pnpm prices:backfill.`,
+    truncated: (n: ExcludedNotice): string => {
+      const one = n.count === 1;
+      return `El histórico de ${n.symbol} empieza el ${n.day}. ${n.count} ${one ? "compra anterior" : "compras anteriores"} (${n.amount}) no ${one ? "compra" : "compran"} nada en el contrafactual: interpolar un precio que nadie publicó sería inventarlo. ${one ? "Sigue" : "Siguen"} contando en la cartera real, así que el diferencial la favorece en esa medida. Abre ${n.symbol} en ${n.instruments}, elige un rango que llegue a ${one ? "esa compra" : "esas compras"} y pulsa «${n.redownload}».`;
+    },
+    stale: (n: ExcludedNotice): string => {
+      const one = n.count === 1;
+      return `El último cierre de ${n.symbol} es del ${n.day}. ${n.count} ${one ? "compra hecha" : "compras hechas"} más de una semana después de ese cierre (${n.amount}) no ${one ? "compra" : "compran"} nada en el contrafactual. ${one ? "Sigue" : "Siguen"} contando en la cartera real, así que el diferencial la favorece en esa medida. Pulsa «${n.refresh}» en ${n.portfolio}. Si no ves el botón, abre ${n.symbol} en ${n.instruments} y pulsa «${n.redownload}».`;
+    },
+    gaps: (n: Omit<ExcludedNotice, "day">): string => {
+      const one = n.count === 1;
+      return `${n.count} ${one ? "compra cae" : "compras caen"} en un hueco de más de una semana sin cierres de ${n.symbol} (${n.amount}). No ${one ? "compra" : "compran"} nada en el contrafactual. ${one ? "Sigue" : "Siguen"} contando en la cartera real, así que el diferencial la favorece en esa medida. Abre ${n.symbol} en ${n.instruments} y pulsa «${n.redownload}». Si el hueco sigue, Yahoo no tiene esas sesiones.`;
+    },
     unpriced: (names: string): string =>
       `Sin precio utilizable: ${names}. Se excluyen de los dos lados, porque contar su coste sin su valor inventaría una pérdida.`,
     unmapped: (symbol: string): string =>
