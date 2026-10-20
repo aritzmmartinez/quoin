@@ -68,6 +68,7 @@ pnpm exposure:map                 # list how every instrument resolves
 pnpm exposure:map <ISIN> <KIND> [LEAF]           # e.g. XS00TEST0003 COMMODITY XAU
 pnpm identity:resolve [--limit N] [--all] [--retry-ambiguous] [--refresh] [--report]
 pnpm ipc:sync [--force-rebase]        # INE consumer price index, national + Bizkaia
+pnpm fx:sync [CODE…]                  # ECB reference rates; default: every non-EUR currency in use
 pnpm target:set                       # show the savings-plan target in force today
 pnpm target:set <file> [--from=YYYY-MM-DD] [--name=…] [--note=…]   # record a version
 pnpm projection:converge              # seed-to-seed spread of p10/p50/p90 at several N
@@ -536,8 +537,15 @@ manual aliasing was abandoned — 726 confirmations is not a system.
   leaf would have to pick one and be wrong for the other. This is the payoff of
   contributions being kept rather than summed.
 - **No FX, and none is needed.** Every amount arriving is already EUR by the valuation
-  invariant. This labels and sums; it never converts. `app/adapters/fx` is still a
-  placeholder, and the IPC pipeline is a price index, not a rate source.
+  invariant. This labels and sums; it never converts. The ECB rates `pnpm fx:sync`
+  stores are not read by any valuation yet, and the IPC pipeline is a price index, not a
+  rate source.
+- **ECB rates: one currency per request, and the sync restarts from the last day
+  stored.** Measured 2026-10-20: asking for several at once (`USD+XYZ`) drops an unknown
+  one silently; alone, it is a 404 with `title: "Not Found"`. A rate for day D appears
+  around 16:00 Madrid, so a sync in the morning finds none for D; restarting from the
+  last day in `FxRate`, never from the last check in `FxSync`, is what asks for D again.
+  A rate that arrives different for a stored day refuses the whole batch.
 - A leaf with no known currency lands in its own bucket at full value and is never
   pro-rated — same rule as `UNRESOLVED`, `unpricedCount` and a missing CPI month.
 
