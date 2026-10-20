@@ -1203,9 +1203,14 @@ The image is **public**. Everything below was found by running it, not by readin
   `db-backup`** (`docker exec quoin db-backup`, `db-backup.sh`), which calls tsx directly.
   Adding another command to the image means copying its script and every file it
   imports, and `~/` imports need the tsconfig and `app/` too.
-- **Both `FROM` lines pin `node:24-trixie-slim@sha256:…`** with a `Node x.y.z, Debian n`
-  comment beside them. No `ARG` in a `FROM`: Dependabot cannot resolve it and stops
-  opening the digest PRs that bring Debian fixes. Its PR does not update the comment.
+- **Both `FROM` lines pin `node:24-trixie-slim@sha256:…`** with a `Node n, Debian n`
+  comment beside them, majors only: Dependabot's digest PR does not update the comment, so
+  a patch version there goes stale. No `ARG` in a `FROM`: Dependabot cannot resolve it and
+  stops opening the digest PRs that bring Debian fixes.
+- **The Node major lives in `.node-version`** (CI reads it through `node-version-file`) and
+  is bumped by hand, in one change, there, in both `FROM` lines, in `@types/node` and in the
+  `engines.node` floor; Dependabot ignores its majors and `scripts/node-version.test.ts`
+  fails while any of them disagree.
 - **`docker.yml` fails on a Critical or High with a fix (`only-fixed`), not on every
   one.** A CVE with no fix anywhere would leave the pipeline red with nothing to do.
   Dependabot's PRs run with Dependabot's secrets, not the repository's, so the scan
