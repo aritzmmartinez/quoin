@@ -98,7 +98,27 @@ describe("parseEcbCsv", () => {
     expect(() => parseEcbCsv(csv(line), "USD")).toThrow(/frequency M/);
   });
 
-  it.each(["", "NaN", "-1.2", "0", "1,2", "1.2e3"])(
+  it("skips a closing day the ECB printed with no rate, as it did until 2012", () => {
+    const days = parseEcbCsv(
+      csv(
+        row("2001-12-24", "0.8801"),
+        row("2001-12-25", ""),
+        row("2001-12-26", ""),
+        row("2001-12-27", "0.8827"),
+      ),
+      "USD",
+    ).map((rate) => rate.day);
+
+    expect(days).toEqual(["2001-12-24", "2001-12-27"]);
+  });
+
+  it("still checks the rest of a row that has no rate", () => {
+    expect(() => parseEcbCsv(csv(row("2001-12-25", "", "GBP")), "USD")).toThrow(
+      /currency GBP/,
+    );
+  });
+
+  it.each([" ", "NaN", "-1.2", "0", "1,2", "1.2e3"])(
     "refuses the rate %j",
     (rate) => {
       expect(() => parseEcbCsv(csv(row("2026-04-01", rate)), "USD")).toThrow();

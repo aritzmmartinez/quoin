@@ -5,25 +5,38 @@ import {
   PrismaPriceRepository,
 } from "~/adapters/persistence";
 
-import { currenciesInUse, syncFxRates, type FxSyncResult } from "./fx-sync";
+import { firstUseByCurrency, syncFxRates, type FxSyncResult } from "./fx-sync";
 
-export async function usedCurrencies(): Promise<string[]> {
-  const [events, prices] = await Promise.all([
+export async function firstUses(): Promise<Map<string, string>> {
+  const prices = new PrismaPriceRepository();
+  const [events, latest] = await Promise.all([
     new PrismaLedgerRepository().list(),
-    new PrismaPriceRepository().latest(),
+    prices.latest(),
   ]);
-  return currenciesInUse([
-    ...events.map((event) => event.currency),
-    ...[...prices.values()].map((snapshot) => snapshot.currency),
+  const priced = [...new Set([...latest.values()].map((s) => s.currency))];
+  const starts = await Promise.all(
+    priced.map(async (currency) => ({
+      currency,
+      starts: [...(await prices.historyStarts(currency)).values()],
+    })),
+  );
+
+  return firstUseByCurrency([
+    ...events.map((event) => ({ currency: event.currency, at: event.ts })),
+    ...starts.flatMap(({ currency, starts }) =>
+      starts.map((at) => ({ currency, at })),
+    ),
   ]);
 }
 
 export async function runFxSync(
-  currencies?: readonly string[],
+  codes?: readonly string[],
 ): Promise<FxSyncResult> {
+  const firstUse = await firstUses();
   return syncFxRates({
     repository: new PrismaFxRepository(),
     provider: new EcbFxRateProvider(),
-    currencies: currencies ?? (await usedCurrencies()),
+    currencies: codes ?? [...firstUse.keys()],
+    firstUse,
   });
 }

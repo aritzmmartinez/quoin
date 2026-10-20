@@ -52,6 +52,7 @@ describe("PrismaFxRepository (integration)", () => {
       rate(USD, "2026-04-02", "1.0850"),
       rate(USD, "2026-04-07", "1.0900"),
     ]);
+    expect(await fxRepo.firstDay(USD)).toBe("2026-04-02");
     expect(await fxRepo.lastDay(USD)).toBe("2026-04-07");
     expect(await fxRepo.lastDay(GBP)).toBe("2026-04-02");
   });

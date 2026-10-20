@@ -1,4 +1,4 @@
-import { dayOf } from "~/core/calendar";
+import { dayOf, shiftDay } from "~/core/calendar";
 import { BASE_CURRENCY } from "~/core/domain";
 import type {
   FxRate,
@@ -7,12 +7,17 @@ import type {
   FxSeries,
 } from "~/core/ports";
 
-export const FIRST_ECB_DAY = "1999-01-04";
+export const FIRST_USE_MARGIN_DAYS = 7;
+export const UNUSED_LOOKBACK_DAYS = 30;
 
 export interface FxSyncDeps {
-  repository: Pick<FxRepository, "save" | "lastDay" | "markChecked">;
+  repository: Pick<
+    FxRepository,
+    "save" | "firstDay" | "lastDay" | "markChecked"
+  >;
   provider: FxRateProvider;
   currencies: readonly string[];
+  firstUse: ReadonlyMap<string, string>;
   now?: Date;
 }
 
@@ -39,10 +44,27 @@ export interface FxSyncResult {
   unavailable: string[];
 }
 
-export function currenciesInUse(currencies: Iterable<string>): string[] {
-  return [...new Set(currencies)]
-    .filter((currency) => currency !== BASE_CURRENCY)
-    .sort();
+export function firstUseByCurrency(
+  uses: Iterable<{ currency: string; at: Date }>,
+): Map<string, string> {
+  const first = new Map<string, string>();
+  for (const { currency, at } of uses) {
+    if (currency === BASE_CURRENCY) continue;
+    const day = dayOf(at);
+    const held = first.get(currency);
+    if (held === undefined || day < held) first.set(currency, day);
+  }
+  return new Map([...first].sort(([a], [b]) => (a < b ? -1 : 1)));
+}
+
+export function syncStart(
+  needed: string,
+  firstUse: string | null,
+  stored: { first: string | null; last: string | null },
+): string {
+  if (stored.first === null || stored.last === null) return needed;
+  if (firstUse !== null && firstUse < stored.first) return needed;
+  return stored.last;
 }
 
 export async function syncFxRates(deps: FxSyncDeps): Promise<FxSyncResult> {
@@ -56,7 +78,14 @@ export async function syncFxRates(deps: FxSyncDeps): Promise<FxSyncResult> {
       base: provider.base,
       quote,
     };
-    const from = (await repository.lastDay(series)) ?? FIRST_ECB_DAY;
+    const used = deps.firstUse.get(quote);
+    const needed = used
+      ? shiftDay(used, -FIRST_USE_MARGIN_DAYS)
+      : shiftDay(today, -UNUSED_LOOKBACK_DAYS);
+    const from = syncStart(needed, used ?? null, {
+      first: await repository.firstDay(series),
+      last: await repository.lastDay(series),
+    });
 
     let rates: FxRate[];
     try {

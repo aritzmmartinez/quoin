@@ -30,7 +30,7 @@ export function parseEcbCsv(body: string, quote: string): FxRate[] {
     throw new Error(`ECB CSV is missing ${missing.join(", ")}`);
   }
 
-  const rates = data.map((row, index): FxRate => {
+  const rates = data.flatMap((row, index): FxRate[] => {
     const at = `ECB CSV row ${index + 2}`;
     if (row.FREQ !== "D") throw new Error(`${at}: frequency ${row.FREQ}`);
     if (row.CURRENCY !== quote) {
@@ -42,10 +42,11 @@ export function parseEcbCsv(body: string, quote: string): FxRate[] {
     const day = row.TIME_PERIOD ?? "";
     parseIsoDate(day);
     const rate = row.OBS_VALUE ?? "";
+    if (rate === "") return [];
     if (!isPositiveDecimal(rate)) {
       throw new Error(`${at}: rate ${JSON.stringify(rate)}`);
     }
-    return { source: ECB_SOURCE, base: ECB_BASE, quote, day, rate };
+    return [{ source: ECB_SOURCE, base: ECB_BASE, quote, day, rate }];
   });
 
   return rates.sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));

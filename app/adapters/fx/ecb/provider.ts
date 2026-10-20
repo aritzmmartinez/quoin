@@ -9,7 +9,7 @@ import {
 import { ECB_BASE, ECB_SOURCE, parseEcbCsv } from "./parse";
 
 const BASE = "https://data-api.ecb.europa.eu/service/data/EXR";
-export const ECB_TIMEOUT_MS = 30_000;
+export const ECB_TIMEOUT_MS = 60_000;
 
 const ECB_CODE = /^[A-Z]{3}$/;
 

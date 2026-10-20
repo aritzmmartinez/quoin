@@ -54,6 +54,15 @@ export class PrismaFxRepository implements FxRepository {
     });
   }
 
+  async firstDay(series: FxSeries): Promise<string | null> {
+    const row = await prisma.fxRate.findFirst({
+      where: series,
+      orderBy: { day: "asc" },
+      select: { day: true },
+    });
+    return row?.day ?? null;
+  }
+
   async lastDay(series: FxSeries): Promise<string | null> {
     const row = await prisma.fxRate.findFirst({
       where: series,

@@ -546,6 +546,17 @@ manual aliasing was abandoned — 726 confirmations is not a system.
   around 16:00 Madrid, so a sync in the morning finds none for D; restarting from the
   last day in `FxRate`, never from the last check in `FxSync`, is what asks for D again.
   A rate that arrives different for a stored day refuses the whole batch.
+- **A series starts a week before its currency was first used, never in 1999.** First
+  use is the earliest `LedgerEntry.ts` or `PriceSnapshot.asOf` in that currency; the
+  week covers a closing as long as Easter. A cold ECB query costs about 1.4 s per year
+  of range (measured 2026-10-20; the whole history since 1999 took 41–52 s), so asking
+  for nothing older than the portfolio is what keeps the sync usable behind a button.
+  A code given by hand and not in use goes back 30 days. The sync goes back again only
+  when a currency's first use is older than its first stored day — an older export
+  imported later — never because the margin fell on days with no rate.
+- **Until 2012 the ECB printed closing days as rows with an empty rate** (`OBS_STATUS=H`
+  in the full detail; `dataonly` shows only the empty value). The parser drops a row
+  with an empty rate and still refuses any other malformed one.
 - A leaf with no known currency lands in its own bucket at full value and is never
   pro-rated — same rule as `UNRESOLVED`, `unpricedCount` and a missing CPI month.
 

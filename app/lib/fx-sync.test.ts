@@ -10,9 +10,11 @@ import {
 } from "~/core/ports";
 
 import {
-  FIRST_ECB_DAY,
-  currenciesInUse,
+  FIRST_USE_MARGIN_DAYS,
+  UNUSED_LOOKBACK_DAYS,
+  firstUseByCurrency,
   syncFxRates,
+  syncStart,
   type FxSyncDeps,
 } from "./fx-sync";
 
@@ -27,21 +29,23 @@ const rate = (quote: string, day: string, value: string): FxRate => ({
 function fakeRepository(initial: FxRate[] = []) {
   const rows = [...initial];
   const checked: string[] = [];
-  const ofSeries = (series: FxSeries) =>
-    rows.filter((r) => fxSeriesKey(r) === fxSeriesKey(series));
+  const days = (series: FxSeries) =>
+    rows
+      .filter((r) => fxSeriesKey(r) === fxSeriesKey(series))
+      .map((r) => r.day)
+      .sort();
   const repository: FxSyncDeps["repository"] = {
     async save(series, rates) {
-      const { write, ...result } = planFxWrite(series, ofSeries(series), rates);
+      const stored = rows.filter((r) => fxSeriesKey(r) === fxSeriesKey(series));
+      const { write, ...result } = planFxWrite(series, stored, rates);
       rows.push(...write);
       return result;
     },
+    async firstDay(series) {
+      return days(series)[0] ?? null;
+    },
     async lastDay(series) {
-      return (
-        ofSeries(series)
-          .map((r) => r.day)
-          .sort()
-          .at(-1) ?? null
-      );
+      return days(series).at(-1) ?? null;
     },
     async markChecked(series) {
       checked.push(fxSeriesKey(series));
@@ -66,10 +70,10 @@ function fakeProvider(published: () => FxRate[]) {
 }
 
 describe("syncFxRates", () => {
-  it("asks a series never stored for the whole history up to today", async () => {
+  it("asks a series never stored from a week before the currency was first used", async () => {
     const { repository, rows, checked } = fakeRepository();
     const { provider, calls } = fakeProvider(() => [
-      rate("USD", "2026-04-01", "1.2001"),
+      rate("USD", "2026-03-30", "1.2030"),
       rate("USD", "2026-04-02", "1.2002"),
     ]);
 
@@ -77,11 +81,13 @@ describe("syncFxRates", () => {
       repository,
       provider,
       currencies: ["USD"],
+      firstUse: new Map([["USD", "2026-04-06"]]),
       now: new Date("2026-04-07T18:00:00Z"),
     });
 
+    expect(FIRST_USE_MARGIN_DAYS).toBe(7);
     expect(calls).toEqual([
-      { quote: "USD", from: FIRST_ECB_DAY, to: "2026-04-07" },
+      { quote: "USD", from: "2026-03-30", to: "2026-04-07" },
     ]);
     expect(rows).toHaveLength(2);
     expect(checked).toEqual(["ECB:EUR:USD"]);
@@ -90,12 +96,45 @@ describe("syncFxRates", () => {
       {
         quote: "USD",
         status: "written",
-        from: FIRST_ECB_DAY,
+        from: "2026-03-30",
         inserted: 2,
         unchanged: 0,
         lastDay: "2026-04-02",
       },
     ]);
+  });
+
+  it("covers Easter Monday's purchase with Maundy Thursday's rate inside the margin", async () => {
+    const { repository, rows } = fakeRepository();
+    const { provider } = fakeProvider(() => [
+      rate("USD", "2026-04-02", "1.2002"),
+    ]);
+
+    await syncFxRates({
+      repository,
+      provider,
+      currencies: ["USD"],
+      firstUse: new Map([["USD", "2026-04-06"]]),
+      now: new Date("2026-04-06T18:00:00Z"),
+    });
+
+    expect(rows.map((r) => r.day)).toEqual(["2026-04-02"]);
+  });
+
+  it("asks a code given by hand and not in use for the last month only", async () => {
+    const { repository } = fakeRepository();
+    const { provider, calls } = fakeProvider(() => []);
+
+    await syncFxRates({
+      repository,
+      provider,
+      currencies: ["CHF"],
+      firstUse: new Map(),
+      now: new Date("2026-04-07T18:00:00Z"),
+    });
+
+    expect(UNUSED_LOOKBACK_DAYS).toBe(30);
+    expect(calls[0]?.from).toBe("2026-03-08");
   });
 
   it("asks again for a day that had no rate yet, from the last day stored, not the last check", async () => {
@@ -104,11 +143,13 @@ describe("syncFxRates", () => {
     ]);
     let published = [rate("USD", "2026-04-02", "1.2002")];
     const { provider, calls } = fakeProvider(() => published);
+    const firstUse = new Map([["USD", "2026-04-02"]]);
 
     await syncFxRates({
       repository,
       provider,
       currencies: ["USD"],
+      firstUse,
       now: new Date("2026-04-07T08:00:00Z"),
     });
 
@@ -120,6 +161,7 @@ describe("syncFxRates", () => {
       repository,
       provider,
       currencies: ["USD"],
+      firstUse,
       now: new Date("2026-04-07T15:30:00Z"),
     });
 
@@ -133,6 +175,30 @@ describe("syncFxRates", () => {
     });
   });
 
+  it("goes back for an older purchase imported after the series was stored", async () => {
+    const { repository, rows } = fakeRepository([
+      rate("USD", "2026-04-02", "1.2002"),
+    ]);
+    const { provider, calls } = fakeProvider(() => [
+      rate("USD", "2026-02-20", "1.2220"),
+      rate("USD", "2026-04-02", "1.2002"),
+    ]);
+
+    await syncFxRates({
+      repository,
+      provider,
+      currencies: ["USD"],
+      firstUse: new Map([["USD", "2026-02-27"]]),
+      now: new Date("2026-04-07T18:00:00Z"),
+    });
+
+    expect(calls[0]?.from).toBe("2026-02-20");
+    expect(rows.map((r) => r.day).sort()).toEqual([
+      "2026-02-20",
+      "2026-04-02",
+    ]);
+  });
+
   it("asks up to today's Madrid day, not today's UTC day", async () => {
     const { repository } = fakeRepository();
     const { provider, calls } = fakeProvider(() => []);
@@ -141,6 +207,7 @@ describe("syncFxRates", () => {
       repository,
       provider,
       currencies: ["USD"],
+      firstUse: new Map(),
       now: new Date("2026-04-06T22:30:00Z"),
     });
 
@@ -160,6 +227,7 @@ describe("syncFxRates", () => {
       repository,
       provider,
       currencies: ["USD"],
+      firstUse: new Map([["USD", "2026-04-02"]]),
       now: new Date("2026-04-07T18:00:00Z"),
     });
 
@@ -189,6 +257,7 @@ describe("syncFxRates", () => {
       repository,
       provider,
       currencies: ["GBP", "USD"],
+      firstUse: new Map(),
       now: new Date("2026-04-07T18:00:00Z"),
     });
 
@@ -205,6 +274,7 @@ describe("syncFxRates", () => {
       repository,
       provider,
       currencies: ["USDG"],
+      firstUse: new Map([["USDG", "2026-04-02"]]),
       now: new Date("2026-04-07T18:00:00Z"),
     });
 
@@ -217,15 +287,54 @@ describe("syncFxRates", () => {
   });
 });
 
-describe("currenciesInUse", () => {
-  it("lists every currency but the base once, sorted", () => {
-    expect(currenciesInUse(["USD", "EUR", "GBP", "USD", "EUR"])).toEqual([
-      "GBP",
-      "USD",
-    ]);
+describe("syncStart", () => {
+  const stored = { first: "2026-04-02", last: "2026-04-07" };
+
+  it("starts a series never stored where it is needed", () => {
+    expect(
+      syncStart("2026-03-30", "2026-04-06", { first: null, last: null }),
+    ).toBe("2026-03-30");
+  });
+
+  it("restarts from the last day stored once the first use is covered", () => {
+    expect(syncStart("2026-03-30", "2026-04-06", stored)).toBe("2026-04-07");
+  });
+
+  it("does not go back for a margin that fell on days with no rate", () => {
+    expect(syncStart("2026-03-26", "2026-04-02", stored)).toBe("2026-04-07");
+  });
+
+  it("goes back when the currency was first used before the first day stored", () => {
+    expect(syncStart("2026-02-20", "2026-02-27", stored)).toBe("2026-02-20");
+  });
+
+  it("never goes back for a code that is not in use", () => {
+    expect(syncStart("2026-03-08", null, stored)).toBe("2026-04-07");
+  });
+});
+
+describe("firstUseByCurrency", () => {
+  it("keeps the earliest Madrid day of each currency but the base", () => {
+    expect(
+      firstUseByCurrency([
+        { currency: "USD", at: new Date("2026-04-07T10:00:00Z") },
+        { currency: "EUR", at: new Date("2025-01-01T10:00:00Z") },
+        { currency: "GBP", at: new Date("2026-03-31T22:30:00Z") },
+        { currency: "USD", at: new Date("2026-02-27T10:00:00Z") },
+      ]),
+    ).toEqual(
+      new Map([
+        ["GBP", "2026-04-01"],
+        ["USD", "2026-02-27"],
+      ]),
+    );
   });
 
   it("is empty for a portfolio held only in the base currency", () => {
-    expect(currenciesInUse(["EUR", "EUR"])).toEqual([]);
+    expect(
+      firstUseByCurrency([
+        { currency: "EUR", at: new Date("2026-04-07T10:00:00Z") },
+      ]),
+    ).toEqual(new Map());
   });
 });
