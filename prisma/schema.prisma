@@ -64,8 +64,7 @@ model LedgerEntry {
   fees        String  @default("0")
   taxWithheld String  @default("0")
 
-  currency String // operation currency (ISO 4217)
-  fxToBase String  @default("1") // rate to EUR at operation time
+  currency String // the currency grossAmount, fees and taxWithheld are in
 
   /// How `grossAmount` (in `currency`) becomes euros, frozen when the row is
   /// booked: IDENTITY | BROKER | ECB | MARKET | MANUAL, CHECK-constrained to those

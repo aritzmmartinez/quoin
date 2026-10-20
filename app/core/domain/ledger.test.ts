@@ -17,7 +17,6 @@ const baseTrade = {
   grossAmount: "150",
   fees: "1",
   currency: "EUR",
-  fxToBase: "1",
   account: "trade-republic",
   source: "TR_CSV",
   externalId: "abc-123",
@@ -56,7 +55,6 @@ describe("ledger schemas", () => {
       type: "DEPOSIT",
       grossAmount: "500",
       currency: "EUR",
-      fxToBase: "1",
       account: "trade-republic",
       source: "TR_CSV",
     });

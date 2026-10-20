@@ -981,8 +981,15 @@ adding it in **both** places, in the same change.
   deposits booked at 1:1 before `foreign-fiat` existed — that container would never
   start. An integration test applies the migration over such a row. Reads stay lenient
   (`ledgerEventSchema`), the `LedgerEntry.type` lesson: an old row that breaks the rule is
-  read, and `toBase` treats it as having no rate rather than throwing. `originalAmount`
+  read, and `toBase` counts it 1:1, as `fxToBase` did, rather than throwing. `originalAmount`
   and `originalCurrency` are informational and constrained by nothing.
+- **Every ledger amount reaches euros through `toBase(event, field)` in `core/fx`**, never
+  a multiplication at the call site. `IDENTITY` returns the amount untouched — a Kraken
+  reward worth a fraction of a cent keeps it. A converted amount divides by `fxRate`
+  (`QUOTE_PER_BASE`, the ECB's currency per euro) or multiplies by it (`BASE_PER_QUOTE`)
+  and is rounded to the cent, `ROUND_HALF_UP`, field by field — dividing by the
+  published rate is exact up to that rounding, where storing its inverse was not, which
+  is why `fxToBase` was dropped.
 
 ## CSV ingestion
 

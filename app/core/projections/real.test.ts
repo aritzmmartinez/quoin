@@ -30,7 +30,6 @@ function buy(
     grossAmount,
     fees,
     currency: "EUR",
-    fxToBase: "1",
     account: "test",
     source: "TEST",
   };

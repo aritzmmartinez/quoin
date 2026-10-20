@@ -31,7 +31,6 @@ function trade(
     grossAmount,
     fees: opts.fees ?? "0",
     currency: "EUR",
-    fxToBase: "1",
     account: "test",
     source: "TEST",
   };
@@ -264,7 +263,6 @@ describe("income received in kind", () => {
       taxWithheld,
       funding: "IN_KIND",
       currency: "EUR",
-      fxToBase: "1",
       account: "test",
       source: "TEST",
     };

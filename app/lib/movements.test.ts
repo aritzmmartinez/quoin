@@ -17,7 +17,6 @@ const INSTRUMENTS: Instrument[] = [
 
 const base = {
   currency: "EUR",
-  fxToBase: "1",
   account: "TR",
   source: "trade-republic",
 };
@@ -127,7 +126,10 @@ describe("toMovementRows", () => {
       [
         buy({
           currency: "USD",
-          fxToBase: "0.5",
+          fxSource: "ECB",
+          fxRate: "0.5",
+          fxDirection: "BASE_PER_QUOTE",
+          fxDate: "2025-01-01",
           grossAmount: "100",
           fees: "2",
         }),

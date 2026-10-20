@@ -52,7 +52,6 @@ function base(row: TradeRepublicRow) {
     id: crypto.randomUUID(),
     ts: new Date(row.datetime),
     currency: row.currency,
-    fxToBase: "1",
     account: "trade-republic",
     source: "TR_CSV",
     externalId: row.transaction_id,

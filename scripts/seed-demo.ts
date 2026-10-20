@@ -226,7 +226,6 @@ interface LedgerRow {
   fees: string;
   taxWithheld: string;
   currency: string;
-  fxToBase: string;
   account: string;
   source: string;
   externalId: string;
@@ -271,7 +270,6 @@ function buildLedger(
       fees: fee.toFixed(2),
       taxWithheld: "0",
       currency: "EUR",
-      fxToBase: "1",
       account: "demo-broker",
       source: "DEMO",
       externalId: `DEMO-${id}`,
@@ -299,7 +297,6 @@ function buildLedger(
       fees: "0",
       taxWithheld: taxWithheld.toFixed(2),
       currency: "EUR",
-      fxToBase: "1",
       account: "demo-broker",
       source: "DEMO",
       externalId: `DEMO-${id}`,
@@ -380,7 +377,6 @@ function buildLedger(
     fees: "1.00",
     taxWithheld: "0",
     currency: "EUR",
-    fxToBase: "1",
     account: "demo-broker",
     source: "DEMO",
     externalId: "DEMO-9001",

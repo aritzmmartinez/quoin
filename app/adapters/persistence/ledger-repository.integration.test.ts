@@ -34,7 +34,6 @@ const event = (externalId: string): LedgerEvent => ({
   grossAmount: "100",
   fees: "0",
   currency: "EUR",
-  fxToBase: "1",
   account: "trade-republic",
   source: "TR_CSV",
   externalId,
@@ -236,6 +235,15 @@ describe("PrismaLedgerRepository (integration)", () => {
       ]) {
         expect(table?.sql).toContain(name);
       }
+    });
+
+    it("has no fxToBase column once toBase reads the rate itself", async () => {
+      const { prisma } = await import("./index");
+      const columns = await prisma.$queryRaw<{ name: string }[]>`
+        SELECT name FROM pragma_table_info('LedgerEntry')`;
+
+      expect(columns.map((c) => c.name)).not.toContain("fxToBase");
+      expect(columns.map((c) => c.name)).toContain("fxRate");
     });
   });
 

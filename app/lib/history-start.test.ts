@@ -6,7 +6,6 @@ import { firstEventByInstrument, firstTradeAt } from "./history-start";
 
 const base = {
   currency: "EUR",
-  fxToBase: "1",
   account: "test",
   source: "TEST",
   externalId: null,

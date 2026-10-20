@@ -17,7 +17,6 @@ function event(externalId: string): LedgerEvent {
     type: "DEPOSIT",
     grossAmount: "100",
     currency: "EUR",
-    fxToBase: "1",
     account: "test",
     source: "TEST",
     externalId,

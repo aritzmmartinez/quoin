@@ -6,6 +6,7 @@ import {
   type Revalue,
   type TradeEvent,
 } from "../domain";
+import { toBase } from "../fx";
 
 export interface FifoLot {
   id: string;
@@ -85,14 +86,8 @@ export function walkFifo(
     }
 
     const quantity = new Decimal(trade.quantity);
-    const gross = restate(
-      Money.fromString(trade.grossAmount).scaleBy(trade.fxToBase),
-      trade.ts,
-    );
-    const fees = restate(
-      Money.fromString(trade.fees).scaleBy(trade.fxToBase),
-      trade.ts,
-    );
+    const gross = restate(toBase(trade, "grossAmount"), trade.ts);
+    const fees = restate(toBase(trade, "fees"), trade.ts);
 
     if (trade.type === "BUY") {
       const unitCost = quantity.isZero()

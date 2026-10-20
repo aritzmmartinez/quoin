@@ -7,6 +7,7 @@ import type {
   TradeEvent,
 } from "~/core/domain";
 import { Money, isInKind, type DividendEvent } from "~/core/domain";
+import { toBase } from "~/core/fx";
 import {
   WASH_SALE_WINDOW_MONTHS,
   carryforwardFrom,
@@ -152,16 +153,14 @@ export function inKindIncomeOf(
   const received = events.filter(
     (e): e is DividendEvent => isInKindIncome(e) && fiscalYearOf(e.ts) === year,
   );
-  const inBase = (value: string, fxToBase: string) =>
-    Money.fromString(value).scaleBy(fxToBase).toString();
   return {
     count: received.length,
     gross: sum(
-      received.map((e) => inBase(e.grossAmount, e.fxToBase)),
+      received.map((e) => toBase(e, "grossAmount").toString()),
       2,
     ),
     withheld: sum(
-      received.map((e) => inBase(e.taxWithheld, e.fxToBase)),
+      received.map((e) => toBase(e, "taxWithheld").toString()),
       2,
     ),
   };

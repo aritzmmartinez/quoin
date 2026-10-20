@@ -17,7 +17,6 @@ export interface LedgerEntryRow {
   fees: string;
   taxWithheld: string;
   currency: string;
-  fxToBase: string;
   fxSource: string;
   fxDate: string | null;
   fxRate: string | null;
@@ -38,7 +37,6 @@ export function rowToEvent(row: LedgerEntryRow): LedgerEvent {
     id: row.id,
     ts: row.ts,
     currency: row.currency,
-    fxToBase: row.fxToBase,
     fxSource: row.fxSource,
     fxDate: row.fxDate,
     fxRate: row.fxRate,
@@ -92,7 +90,6 @@ export function eventToCreateData(event: LedgerEvent): LedgerEntryCreateData {
     id: event.id,
     ts: event.ts,
     currency: event.currency,
-    fxToBase: event.fxToBase,
     fxSource: event.fxSource ?? "IDENTITY",
     fxDate: event.fxDate ?? null,
     fxRate: event.fxRate ?? null,

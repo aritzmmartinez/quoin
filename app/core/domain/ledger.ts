@@ -57,7 +57,6 @@ const baseEventSchema = z.object({
   id: z.string(),
   ts: z.date(),
   currency: z.string(),
-  fxToBase: decimalString,
   fxSource: fxSourceSchema.optional(),
   fxDate: z.string().nullish(),
   fxRate: decimalString.nullish(),

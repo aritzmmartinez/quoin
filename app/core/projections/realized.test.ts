@@ -14,7 +14,7 @@ function trade(
   instrumentId: string,
   quantity: string,
   grossAmount: string,
-  opts: { fees?: string; ts?: string; fxToBase?: string } = {},
+  opts: { fees?: string; ts?: string; eurPerUnit?: string } = {},
 ): TradeEvent {
   return {
     id: `evt-${seq++}`,
@@ -25,8 +25,15 @@ function trade(
     price: "0",
     grossAmount,
     fees: opts.fees ?? "0",
-    currency: "EUR",
-    fxToBase: opts.fxToBase ?? "1",
+    ...(opts.eurPerUnit
+      ? {
+          currency: "USD",
+          fxSource: "ECB" as const,
+          fxRate: opts.eurPerUnit,
+          fxDirection: "BASE_PER_QUOTE" as const,
+          fxDate: "2025-01-01",
+        }
+      : { currency: "EUR" }),
     account: "test",
     source: "TEST",
   };
@@ -147,11 +154,11 @@ describe("computeRealizedGains", () => {
     expect(sale.realizedPnL).toBe("600");
   });
 
-  it("converts to base currency via fxToBase", () => {
+  it("converts to base currency at the rate it was booked at", () => {
     const sale = only(
       computeRealizedGains([
-        trade("BUY", "X", "10", "1000", { fxToBase: "0.9", ts: "2025-01-01" }),
-        trade("SELL", "X", "10", "1200", { fxToBase: "0.9", ts: "2025-02-01" }),
+        trade("BUY", "X", "10", "1000", { eurPerUnit: "0.9", ts: "2025-01-01" }),
+        trade("SELL", "X", "10", "1200", { eurPerUnit: "0.9", ts: "2025-02-01" }),
       ]),
     );
 
@@ -249,7 +256,6 @@ describe("realized gains vs the portfolio total", () => {
         grossAmount: "50",
         taxWithheld: "10",
         currency: "EUR",
-        fxToBase: "1",
         account: "test",
         source: "TEST",
       },
@@ -259,7 +265,6 @@ describe("realized gains vs the portfolio total", () => {
         type: "DEPOSIT",
         grossAmount: "1000",
         currency: "EUR",
-        fxToBase: "1",
         account: "test",
         source: "TEST",
       },

@@ -50,7 +50,6 @@ function buy(
     grossAmount,
     fees: "0",
     currency: "EUR",
-    fxToBase: "1",
     account: "trade-republic",
     source: "TR_CSV",
     externalId: `${instrumentId}-${ts}`,

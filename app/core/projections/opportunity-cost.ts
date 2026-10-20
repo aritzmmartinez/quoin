@@ -8,6 +8,7 @@ import {
   type TradeEvent,
 } from "../domain";
 import { dayOf } from "../calendar";
+import { toBase } from "../fx";
 import type { PriceSnapshot } from "../ports";
 import { onOrBeforeDay } from "../series";
 import type { PriceLike } from "./market-value";
@@ -88,10 +89,6 @@ function isTrade(event: LedgerEvent): event is TradeEvent {
   return event.type === "BUY" || event.type === "SELL";
 }
 
-function baseAmount(value: string, fxToBase: string): Money {
-  return Money.fromString(value).scaleBy(fxToBase);
-}
-
 interface Bucket {
   instrumentId: string;
   quantity: Decimal;
@@ -170,8 +167,8 @@ export function computeOpportunityCost(
       buckets.set(trade.instrumentId, bucket);
     }
 
-    const gross = baseAmount(trade.grossAmount, trade.fxToBase);
-    const fees = baseAmount(trade.fees, trade.fxToBase);
+    const gross = toBase(trade, "grossAmount");
+    const fees = toBase(trade, "fees");
     const t = trade.ts.getTime();
 
     if (trade.type === "SELL") {

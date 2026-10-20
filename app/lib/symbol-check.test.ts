@@ -104,7 +104,6 @@ function trade(
     grossAmount,
     fees: "1",
     currency: "EUR",
-    fxToBase: "1",
     account: "test",
     source: "TEST",
     externalId: null,

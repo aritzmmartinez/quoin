@@ -5,7 +5,9 @@ import {
   type Instrument,
   type LedgerEvent,
   type LedgerEventType,
+  type Money,
 } from "~/core/domain";
+import { toBase } from "~/core/fx";
 
 export interface MovementRow {
   id: string;
@@ -25,16 +27,20 @@ const OUTFLOWS: ReadonlySet<LedgerEventType> = new Set<LedgerEventType>([
   "WITHDRAWAL",
 ]);
 
+function inBase(money: Money): Decimal {
+  return new Decimal(money.toString());
+}
+
 function signedAmount(event: LedgerEvent, costs: Decimal): Decimal {
-  const gross = new Decimal(event.grossAmount);
+  const gross = inBase(toBase(event, "grossAmount"));
   const signed = OUTFLOWS.has(event.type) ? gross.negated() : gross;
-  return signed.minus(costs).mul(event.fxToBase);
+  return signed.minus(costs);
 }
 
 function costsOf(event: LedgerEvent): Decimal {
   if (event.type === "BUY" || event.type === "SELL")
-    return new Decimal(event.fees);
-  if (event.type === "DIVIDEND") return new Decimal(event.taxWithheld);
+    return inBase(toBase(event, "fees"));
+  if (event.type === "DIVIDEND") return inBase(toBase(event, "taxWithheld"));
   return new Decimal(0);
 }
 
@@ -58,10 +64,7 @@ export function toMovementRows(
         quantity = qty.toFixed();
         price = qty.isZero()
           ? null
-          : new Decimal(event.grossAmount)
-              .mul(event.fxToBase)
-              .div(qty)
-              .toString();
+          : inBase(toBase(event, "grossAmount")).div(qty).toString();
       }
 
       return {
@@ -75,7 +78,7 @@ export function toMovementRows(
           : null,
         quantity,
         price,
-        costs: costs.mul(event.fxToBase).toFixed(2),
+        costs: costs.toFixed(2),
         amount: signedAmount(event, costs).toFixed(2),
       };
     });
