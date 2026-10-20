@@ -873,8 +873,11 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
 - Scope is still BTC-only by choice (`isBtc` in `map.ts`). Measured on a real export:
   most refid groups are set aside — `earn` rewards and `welcomebonus` in other assets. **A discard is classified by what it does to a modelled position, not by asset.**
   `unmodelled-asset` is noise (rewards, transfers and trades of assets Quoin does not
-  track); `crypto-swap` (BTC ↔ another crypto, in either direction), `crypto-transfer`
-  (BTC on-chain in or out) and `reward-unpriced` each leave the BTC position wrong, and
+  track, fiat deposits and withdrawals in a currency other than the base included);
+  `crypto-swap` (BTC ↔ another crypto, in either direction — a `stable_coin` is crypto,
+  not fiat), `crypto-transfer` (BTC on-chain in or out), `foreign-fiat` (BTC bought or
+  sold against a fiat that is not `BASE_CURRENCY`, which used to be booked as EUR at
+  1:1) and `reward-unpriced` each leave the BTC position wrong, and
   `AFFECTS_POSITION` flags them so the wizard and `pnpm ingest` warn. Every Kraken discard
   carries a per-group detail (date, type, subtype, asset or pair — never amounts).
   `DiscardReason` is a union and its labels are `Record<DiscardReason, string>` in both
