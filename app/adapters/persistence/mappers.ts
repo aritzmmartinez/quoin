@@ -132,7 +132,6 @@ export interface InstrumentRow {
   id: string;
   name: string;
   type: string;
-  currency: string;
   assetClass: string | null;
   quoteSymbol: string | null;
   exposureKind: string | null;
@@ -157,7 +156,6 @@ export function rowToInstrument(row: InstrumentRow): Instrument {
     id: row.id,
     name: row.name,
     type: row.type,
-    currency: row.currency,
     assetClass: row.assetClass,
     quoteSymbol: row.quoteSymbol ?? null,
     exposureKind: row.exposureKind ?? null,
@@ -175,7 +173,6 @@ export function instrumentToWriteData(
     id: instrument.id,
     name: instrument.name,
     type: instrument.type,
-    currency: instrument.currency,
     assetClass: instrument.assetClass ?? null,
   };
 }

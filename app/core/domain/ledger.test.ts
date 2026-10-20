@@ -73,7 +73,6 @@ describe("thesis", () => {
     id: "IE00BK5BQT80",
     name: "FTSE All-World",
     type: "ETF" as const,
-    currency: "EUR",
   };
 
   it("accepts the three values and nothing else", () => {

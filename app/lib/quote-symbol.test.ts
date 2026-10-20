@@ -16,7 +16,6 @@ const INSTRUMENT: Instrument = {
   id: "XS00TEST0003",
   name: "Test Instrument",
   type: "ETF",
-  currency: "EUR",
   quoteSymbol: null,
   exposureKind: null,
   exposureLeafId: null,

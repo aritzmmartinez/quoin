@@ -43,7 +43,6 @@ function toInstrument(row: TradeRepublicRow): Instrument {
     id: row.symbol,
     name: row.name,
     type: assetClassToType(row.asset_class),
-    currency: row.currency,
     assetClass: row.asset_class || null,
   });
 }

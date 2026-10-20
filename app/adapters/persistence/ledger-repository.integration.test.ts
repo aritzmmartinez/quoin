@@ -20,7 +20,6 @@ const instrument: Instrument = {
   id: "IE00BK5BQT80",
   name: "Vanguard FTSE All-World UCITS ETF",
   type: "ETF",
-  currency: "EUR",
   assetClass: "FUND",
   thesis: "CORE",
 };
@@ -113,6 +112,30 @@ describe("PrismaLedgerRepository (integration)", () => {
         },
       }),
     ).rejects.toThrow(/CHECK constraint failed/);
+  });
+
+  it("refuses an instrument thesis the domain does not model", async () => {
+    const { prisma } = await import("./index");
+
+    await expect(
+      prisma.instrument.create({
+        data: {
+          id: "XS00TEST0099",
+          name: "Synthetic Fund",
+          type: "ETF",
+          thesis: "SPECULATIVE",
+        },
+      }),
+    ).rejects.toThrow(/CHECK constraint failed/);
+  });
+
+  it("has no currency column on Instrument", async () => {
+    const { prisma } = await import("./index");
+
+    const columns = await prisma.$queryRaw<{ name: string }[]>`
+      SELECT name FROM pragma_table_info('Instrument')`;
+    expect(columns.map((c) => c.name)).not.toContain("currency");
+    expect(columns.map((c) => c.name)).toContain("thesis");
   });
 
   it("markInKind changes funding and nothing else, once, and never back", async () => {

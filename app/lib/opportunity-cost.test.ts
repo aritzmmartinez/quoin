@@ -21,7 +21,6 @@ const instrument = (
   id,
   name,
   type: "ETF",
-  currency: "EUR",
   quoteSymbol,
   thesis: "CORE",
 });

@@ -19,7 +19,6 @@ const instrument = (id: string): Instrument => ({
   id,
   name: `Synthetic ${id}`,
   type: "ETF",
-  currency: "EUR",
   assetClass: "FUND",
   thesis: "CORE",
 });

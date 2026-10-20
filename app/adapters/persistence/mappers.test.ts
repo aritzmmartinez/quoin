@@ -64,7 +64,6 @@ const instrument: Instrument = {
   id: "IE00TEST0010",
   name: "Test World Equity UCITS ETF Acc",
   type: "ETF",
-  currency: "EUR",
   assetClass: "FUND",
   quoteSymbol: null,
   exposureKind: null,

@@ -28,7 +28,6 @@ const INSTRUMENT: Instrument = {
   id: "XS00TEST0003",
   name: "Synthetic Fund",
   type: "ETF",
-  currency: "EUR",
   quoteSymbol: "AAA.DE",
   exposureKind: null,
   exposureLeafId: null,
