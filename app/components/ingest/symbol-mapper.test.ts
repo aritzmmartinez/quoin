@@ -14,7 +14,13 @@ import {
   type MapperState,
 } from "./symbol-mapper";
 
-const check = (symbol: string, currency = "EUR"): SymbolCheck => ({
+const check = (
+  symbol: string,
+  currency = "EUR",
+  rateSeries: SymbolCheck["rateSeries"] = currency === "EUR"
+    ? "base"
+    : "published",
+): SymbolCheck => ({
   symbol,
   price: "100",
   currency,
@@ -23,7 +29,7 @@ const check = (symbol: string, currency = "EUR"): SymbolCheck => ({
   quantity: "2",
   impliedValue: "200",
   closed: false,
-  foreignCurrency: currency === "EUR" ? null : currency,
+  rateSeries,
   dailyHistory: true,
   name: "Synthetic Fund",
   trades: [],
@@ -127,17 +133,29 @@ describe.each(PLACES)("symbol mapper in $place", ({ initial, stored }) => {
     expect(canSave(same, "OLD.DE")).toBe(false);
   });
 
-  it("verifies a quote outside euros but never lets it be saved", () => {
+  it("lets a quote in another currency the ECB publishes be saved", () => {
     const usd = run(
       initialMapper(initial),
       { type: "edit", symbol: "AAA" },
       { type: "verify" },
       { type: "verified", check: check("AAA", "USD") },
     );
-    expect(isVerified(usd)).toBe(true);
-    expect(usd.check?.foreignCurrency).toBe("USD");
-    expect(canSave(usd, stored)).toBe(false);
+    expect(canSave(usd, stored)).toBe(true);
   });
+
+  it.each(["none", "unavailable"] as const)(
+    "verifies a quote whose currency has rate series %s but never lets it be saved",
+    (series) => {
+      const xyz = run(
+        initialMapper(initial),
+        { type: "edit", symbol: "AAA" },
+        { type: "verify" },
+        { type: "verified", check: check("AAA", "XYZ", series) },
+      );
+      expect(isVerified(xyz)).toBe(true);
+      expect(canSave(xyz, stored)).toBe(false);
+    },
+  );
 
   it("verifies a symbol with no daily history but never lets it be saved", () => {
     const sg = run(

@@ -1,7 +1,7 @@
 import Decimal from "decimal.js";
 
 import { dayOf } from "~/core/calendar";
-import { Money } from "~/core/domain";
+import { BASE_CURRENCY, Money } from "~/core/domain";
 
 import { intlTag, type Locale } from "./locale";
 
@@ -14,6 +14,7 @@ export interface SignedMoney {
 
 export interface Format {
   formatMoney: (value: string, maximumFractionDigits?: number) => string;
+  formatAmount: (value: string, currency: string) => string;
   formatQuantity: (value: string, maximumFractionDigits?: number) => string;
   formatSignedMoney: (
     value: string,
@@ -44,6 +45,15 @@ export function createFormat(locale: Locale): Format {
       maximumFractionDigits,
       locale: tag,
     });
+  }
+
+  function formatAmount(value: string, currency: string): string {
+    if (currency === BASE_CURRENCY) return formatMoney(value);
+    const number = new Intl.NumberFormat(tag, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(new Decimal(value).toNumber());
+    return `${number} ${currency}`;
   }
 
   function formatQuantity(value: string, maximumFractionDigits = 8): string {
@@ -160,6 +170,7 @@ export function createFormat(locale: Locale): Format {
 
   return {
     formatMoney,
+    formatAmount,
     formatQuantity,
     formatSignedMoney,
     formatDate,

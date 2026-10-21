@@ -16,6 +16,8 @@ import {
   isHistoryRange,
 } from "~/lib/prices-backfill";
 
+import { ensureRatesNow } from "~/lib/fx-sync.server";
+
 import { announceDatabase } from "./lib/db-target";
 
 function usage(): string {
@@ -72,12 +74,19 @@ async function main(): Promise<void> {
       repository,
       { id: instrument.id, quoteSymbol: instrument.quoteSymbol },
       range,
+      ensureRatesNow,
     );
     total += report.written;
 
-    if (report.foreignCurrency) {
+    if (report.ratesUnavailable) {
       console.log(
-        `  ${report.instrumentId}  (${report.symbol})  history in ${report.foreignCurrency}, not stored: only EUR histories are valued`,
+        `  ${report.instrumentId}  (${report.symbol})  history in ${report.ratesUnavailable}, not stored: the ECB could not be reached for its rates`,
+      );
+      continue;
+    }
+    if (report.noRateSeries) {
+      console.log(
+        `  ${report.instrumentId}  (${report.symbol})  history in ${report.noRateSeries}, not stored: the ECB publishes no rates for it`,
       );
       continue;
     }

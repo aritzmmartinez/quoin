@@ -1,5 +1,6 @@
 import { dayOf } from "~/core/calendar";
 import {
+  fxSourceSchema,
   isUnconvertedForeign,
   ledgerEventWriteSchema,
   type Instrument,
@@ -12,6 +13,7 @@ import {
 } from "~/core/ports";
 
 import type { DiscardDetail, DiscardReason } from "./discard";
+import { noRates, type RateAt } from "./fx";
 
 export type { DiscardDetail, DiscardReason } from "./discard";
 
@@ -35,6 +37,7 @@ export interface MappedBatch {
   discarded: DiscardCounts;
   discardedDetails: DiscardDetails;
   errors: number;
+  ratesNeeded: Map<string, string>;
 }
 
 export interface ImportSummary {
@@ -61,6 +64,8 @@ export class InvalidLedgerEventError extends Error {
 }
 
 export class BatchBuilder {
+  constructor(private readonly rateAt: RateAt = noRates) {}
+
   private invalid: InvalidLedgerEventError | null = null;
   private readonly events: LedgerEvent[] = [];
   private readonly operationOf: number[] = [];
@@ -69,6 +74,7 @@ export class BatchBuilder {
   private readonly discarded: DiscardCounts = {};
   private readonly discardedDetails: DiscardDetails = {};
   private errors = 0;
+  private readonly ratesNeeded = new Map<string, string>();
 
   add(item: MappedItem): void {
     this.addOperation([item]);
@@ -78,15 +84,31 @@ export class BatchBuilder {
     const operation = this.operations;
     this.operations += 1;
 
-    const foreign = items.find(
-      (item) => item.kind === "domain" && isUnconvertedForeign(item.event),
-    );
-    if (foreign?.kind === "domain") {
-      this.addItem(foreignDiscard(foreign), operation);
-      return;
+    const converted: MappedItem[] = [];
+    for (const item of items) {
+      if (item.kind !== "domain" || !isUnconvertedForeign(item.event)) {
+        converted.push(item);
+        continue;
+      }
+      const rate = this.rateAt(item.event.currency, item.event.ts);
+      if (rate === null) {
+        this.needRate(item.event.currency, dayOf(item.event.ts));
+        this.addItem(unratedDiscard(item), operation);
+        return;
+      }
+      converted.push({
+        ...item,
+        event: {
+          ...item.event,
+          fxSource: fxSourceSchema.parse(rate.source),
+          fxRate: rate.rate,
+          fxDirection: "QUOTE_PER_BASE",
+          fxDate: rate.day,
+        },
+      });
     }
 
-    for (const item of items) {
+    for (const item of converted) {
       if (
         item.kind === "domain" &&
         this.invalid === null &&
@@ -122,6 +144,11 @@ export class BatchBuilder {
     this.operationOf.push(operation);
   }
 
+  private needRate(currency: string, day: string): void {
+    const held = this.ratesNeeded.get(currency);
+    if (held === undefined || day < held) this.ratesNeeded.set(currency, day);
+  }
+
   addError(): void {
     this.errors += 1;
   }
@@ -136,18 +163,19 @@ export class BatchBuilder {
       discarded: this.discarded,
       discardedDetails: this.discardedDetails,
       errors: this.errors,
+      ratesNeeded: this.ratesNeeded,
     };
   }
 }
 
-function foreignDiscard(
+function unratedDiscard(
   item: Extract<MappedItem, { kind: "domain" }>,
 ): MappedItem {
   const { event } = item;
   const name = item.instrument?.name ?? null;
   return {
     kind: "discard",
-    reason: "foreign-fiat",
+    reason: "fx-unavailable",
     detail: {
       date: event.ts.toISOString(),
       type: event.type,

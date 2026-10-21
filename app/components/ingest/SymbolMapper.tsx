@@ -120,14 +120,16 @@ export function SymbolMapper({
 }
 
 function CheckDetail({ check }: { check: SymbolCheck }) {
-  const { formatDate, formatMoney, formatPercent, formatRelativeTime } =
-    useFormat();
+  const {
+    formatAmount,
+    formatDate,
+    formatMoney,
+    formatPercent,
+    formatRelativeTime,
+  } = useFormat();
   const t = useCopy();
   const copy = t.ingest.map;
-  const value =
-    check.currency === "EUR"
-      ? formatMoney(check.impliedValue)
-      : `${check.impliedValue} ${check.currency}`;
+  const value = formatAmount(check.impliedValue, check.currency);
 
   return (
     <div className="mt-2 rounded-md border border-border bg-surface-2 px-3 py-2 text-[12px]">
@@ -136,7 +138,7 @@ function CheckDetail({ check }: { check: SymbolCheck }) {
         <span className="text-muted">
           {copy.price}{" "}
           <span className="font-mono tabular-nums text-text">
-            {check.price} {check.currency}
+            {formatAmount(check.price, check.currency)}
           </span>
         </span>
         {!check.closed && (
@@ -147,10 +149,14 @@ function CheckDetail({ check }: { check: SymbolCheck }) {
         )}
         <span className="text-muted">{formatRelativeTime(check.asOf)}</span>
       </div>
-      {check.foreignCurrency && (
-        <p className="mt-1 text-negative">
-          {copy.notEur(check.foreignCurrency)}
-        </p>
+      {check.rateSeries === "published" && (
+        <p className="mt-1 text-muted">{t.fx.quotedIn(check.currency)}</p>
+      )}
+      {check.rateSeries === "none" && (
+        <p className="mt-1 text-negative">{t.fx.noRateSeries(check.currency)}</p>
+      )}
+      {check.rateSeries === "unavailable" && (
+        <p className="mt-1 text-negative">{t.fx.sync.unavailable}</p>
       )}
       {!check.dailyHistory && (
         <p className="mt-1 text-negative">{copy.noDailyHistory}</p>
@@ -183,7 +189,7 @@ function CheckDetail({ check }: { check: SymbolCheck }) {
       {check.tradesAsked > 0 &&
         check.trades.length === 0 &&
         check.dailyHistory &&
-        !check.foreignCurrency && (
+        (check.rateSeries === "base" || check.rateSeries === "published") && (
           <p className="mt-1 text-muted">{copy.noTrades}</p>
         )}
     </div>

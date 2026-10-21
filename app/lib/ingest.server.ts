@@ -13,6 +13,7 @@ import {
   PrismaInstrumentRepository,
   PrismaLedgerRepository,
   PrismaPriceRepository,
+  PrismaPriceSyncRepository,
 } from "~/adapters/persistence";
 import type { HistoryRange } from "~/core/ports";
 import { computePositions } from "~/core/projections";
@@ -25,11 +26,15 @@ import {
   type PendingMapping,
   type PriceFillResult,
 } from "./ingest";
+import { ensureRatesNow } from "./fx-sync.server";
+import { planWithRates } from "./ingest-rates";
 import { backfillInstruments } from "./prices-backfill";
+import { loadRateBook } from "./rate-book.server";
 import { inTurn } from "./in-turn";
 import {
   failedSync,
   syncInstrumentPrices,
+  haltsSync,
   syncProblemOf,
   type SyncProblem,
 } from "./prices-sync";
@@ -54,16 +59,18 @@ async function plan(
 
   const instruments = new PrismaInstrumentRepository();
   const ledger = new PrismaLedgerRepository();
+  const adapter =
+    broker === "kraken"
+      ? new KrakenCsvAdapter(
+          instruments,
+          ledger,
+          new PrismaPriceRepository(),
+          loadRateBook,
+        )
+      : new TradeRepublicCsvAdapter(instruments, ledger, loadRateBook);
 
   try {
-    const batch =
-      broker === "kraken"
-        ? await new KrakenCsvAdapter(
-            instruments,
-            ledger,
-            new PrismaPriceRepository(),
-          ).plan(csv)
-        : new TradeRepublicCsvAdapter(instruments, ledger).plan(csv);
+    const batch = await planWithRates(() => adapter.plan(csv), ensureRatesNow);
     return { broker, batch };
   } catch (error) {
     if (error instanceof InvalidLedgerEventError) {
@@ -131,6 +138,7 @@ export async function checkQuoteSymbol(
     await new PrismaLedgerRepository().list(),
     instrumentId,
     symbol,
+    ensureRatesNow,
   );
   if (!check) throw new IngestError(t.ingest.map.noQuote(symbol));
   return check;
@@ -147,6 +155,7 @@ export async function mapQuoteSymbol(
     new YahooMarketDataProvider(),
     instrumentId,
     symbol,
+    ensureRatesNow,
   );
   if (result.ok) return;
   switch (result.reason) {
@@ -154,8 +163,10 @@ export async function mapQuoteSymbol(
       throw new IngestError(t.ingest.map.hasHistory);
     case "no-quote":
       throw new IngestError(t.ingest.map.noQuote(symbol));
-    case "not-eur":
-      throw new IngestError(t.ingest.map.notEur(result.currency));
+    case "no-rate-series":
+      throw new IngestError(t.fx.noRateSeries(result.currency));
+    case "rates-unavailable":
+      throw new IngestError(t.fx.sync.unavailable);
     case "no-history":
       throw new IngestError(t.ingest.map.noDailyHistory);
   }
@@ -171,6 +182,7 @@ export async function replaceHistory(
       instruments: new PrismaInstrumentRepository(),
       prices: new PrismaPriceRepository(),
       provider: new YahooMarketDataProvider(),
+      rates: ensureRatesNow,
     },
     { instrumentId, symbol, range },
   );
@@ -183,6 +195,7 @@ export async function fillPrices(
   const instruments = new PrismaInstrumentRepository();
   const prices = new PrismaPriceRepository();
   const provider = new YahooMarketDataProvider();
+  const checks = new PrismaPriceSyncRepository();
 
   const wanted = new Set(instrumentIds);
   const targets = (await instruments.list()).flatMap((i) =>
@@ -196,6 +209,7 @@ export async function fillPrices(
     prices,
     targets,
     range,
+    ensureRatesNow,
   );
 
   for (const report of backfilled) {
@@ -208,16 +222,22 @@ export async function fillPrices(
     }
   }
   const refused = new Set(
-    backfilled.filter((r) => r.foreignCurrency).map((r) => r.instrumentId),
+    backfilled.filter((r) => r.noRateSeries).map((r) => r.instrumentId),
   );
   const unreachable = new Set(
     backfilled.filter((r) => r.unavailable).map((r) => r.instrumentId),
   );
+  const unrated = new Set(
+    backfilled.filter((r) => r.ratesUnavailable).map((r) => r.instrumentId),
+  );
   const synced = await inTurn(
-    targets.filter((t) => !refused.has(t.id) && !unreachable.has(t.id)),
-    (target) => syncInstrumentPrices({ prices, provider }, target),
+    targets.filter(
+      (t) => !refused.has(t.id) && !unreachable.has(t.id) && !unrated.has(t.id),
+    ),
+    (target) => syncInstrumentPrices({ prices, provider, checks }, target),
     {
       onError: (error, target) => {
+        if (haltsSync(error)) throw error;
         console.error("Price sync failed", target.id, error);
         return failedSync(target, syncProblemOf(error));
       },
@@ -235,9 +255,12 @@ export async function fillPrices(
     synced: synced.filter((s) => s.live).length,
     stale: count("stale"),
     noQuote: count("no-quote"),
-    notEur: refused.size + count("not-eur"),
+    noRateSeries: refused.size,
     unavailable: targets
       .filter((t) => unreachable.has(t.id))
+      .map((t) => t.name),
+    ratesUnavailable: targets
+      .filter((t) => unrated.has(t.id))
       .map((t) => t.name),
   };
 }

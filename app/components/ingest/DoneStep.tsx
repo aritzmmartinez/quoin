@@ -42,11 +42,18 @@ export function DoneStep({
         {discarded > 0 && <li>{copy.discarded(discarded)}</li>}
         {fill && <li>{copy.candles(fill.candles)}</li>}
         {fill && <li>{copy.synced(fill.synced)}</li>}
-        {fill && fill.notEur > 0 && (
-          <li className="text-negative">{copy.notEurWarning(fill.notEur)}</li>
+        {fill && fill.noRateSeries > 0 && (
+          <li className="text-negative">
+            {t.fx.noRateSeriesCount(fill.noRateSeries)}
+          </li>
         )}
         {fill && fill.stale > 0 && (
           <li className="text-negative">{copy.staleWarning(fill.stale)}</li>
+        )}
+        {fill && fill.ratesUnavailable.length > 0 && (
+          <li className="text-negative">
+            {t.fx.ratesUnavailableFor(fill.ratesUnavailable.join(", "))}
+          </li>
         )}
         {fill && fill.unavailable.length > 0 && (
           <li className="text-negative">

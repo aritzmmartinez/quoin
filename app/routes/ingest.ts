@@ -4,6 +4,7 @@ import type { Route } from "./+types/ingest";
 
 import type { Broker, ImportSummary } from "~/adapters/ingestion";
 import { MarketDataUnavailableError } from "~/core/ports";
+import { describeFailure } from "~/lib/describe-failure";
 import { isHistoryRange } from "~/lib/prices-backfill";
 import {
   IngestError,
@@ -132,7 +133,14 @@ export async function action({ request }: Route.ActionArgs) {
           .split(",")
           .map((id) => id.trim())
           .filter((id) => id !== "");
-        const result = await fillPrices(ids, parsed.data.range);
+        let result: PriceFillResult;
+        try {
+          result = await fillPrices(ids, parsed.data.range);
+        } catch (error) {
+          if (error instanceof MarketDataUnavailableError) throw error;
+          console.error("Price fill stopped", error);
+          return fail(t.common.halted(describeFailure(error)), 500);
+        }
         return Response.json({
           ok: true,
           step: "fill",

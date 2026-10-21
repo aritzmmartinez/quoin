@@ -1,5 +1,6 @@
 import { dayOf, shiftDay } from "~/core/calendar";
 import { BASE_CURRENCY } from "~/core/domain";
+import type { RateBook } from "~/core/fx";
 import type {
   FxRate,
   FxRateProvider,
@@ -124,4 +125,55 @@ export async function syncFxRates(deps: FxSyncDeps): Promise<FxSyncResult> {
       .filter((o) => o.status === "unavailable")
       .map((o) => o.quote),
   };
+}
+
+export interface EnsuredRates {
+  book: RateBook;
+  unavailable: string[];
+}
+
+export type EnsureRates = (
+  needs: ReadonlyMap<string, string>,
+) => Promise<EnsuredRates>;
+
+export interface EnsureRatesDeps {
+  repository: Pick<
+    FxRepository,
+    "save" | "firstDay" | "lastDay" | "markChecked" | "book"
+  >;
+  provider: FxRateProvider;
+  now?: Date;
+}
+
+export async function ensureRates(
+  deps: EnsureRatesDeps,
+  needs: ReadonlyMap<string, string>,
+): Promise<EnsuredRates> {
+  const currencies = [...needs.keys()]
+    .filter((currency) => currency !== BASE_CURRENCY)
+    .sort();
+  if (currencies.length === 0) return { book: new Map(), unavailable: [] };
+
+  const { unavailable } = await syncFxRates({
+    repository: deps.repository,
+    provider: deps.provider,
+    currencies,
+    firstUse: needs,
+    ...(deps.now ? { now: deps.now } : {}),
+  });
+  return {
+    book: await deps.repository.book(deps.provider.source, currencies),
+    unavailable,
+  };
+}
+
+export type RateSeries = "base" | "published" | "none" | "unavailable";
+
+export function rateSeriesOf(
+  ensured: EnsuredRates,
+  currency: string,
+): RateSeries {
+  if (currency === BASE_CURRENCY) return "base";
+  if ((ensured.book.get(currency)?.length ?? 0) > 0) return "published";
+  return ensured.unavailable.includes(currency) ? "unavailable" : "none";
 }

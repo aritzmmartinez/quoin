@@ -12,6 +12,8 @@ import { isCoarseSeries } from "~/lib/coarse-candles";
 import { replaceQuoteHistories } from "~/lib/price-history";
 import { rangeSince } from "~/lib/prices-backfill";
 
+import { ensureRatesNow } from "~/lib/fx-sync.server";
+
 import { announceDatabase } from "./lib/db-target";
 
 async function main(): Promise<void> {
@@ -46,7 +48,12 @@ async function main(): Promise<void> {
   console.log(`Rebuilding ${targets.length} history(ies), one at a time.\n`);
 
   const outcomes = await replaceQuoteHistories(
-    { instruments, prices, provider: new YahooMarketDataProvider() },
+    {
+      instruments,
+      prices,
+      provider: new YahooMarketDataProvider(),
+      rates: ensureRatesNow,
+    },
     targets,
     (outcome, index) => {
       const target = targets[index]!;

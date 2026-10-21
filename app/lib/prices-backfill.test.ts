@@ -9,6 +9,9 @@ import {
   type Quote,
 } from "~/core/ports";
 
+import { rateBookFrom } from "~/core/fx";
+
+import type { EnsureRates } from "./fx-sync";
 import {
   backfillInstruments,
   isHistoryRange,
@@ -19,6 +22,8 @@ import {
 } from "./prices-backfill";
 
 const day = (iso: string) => new Date(`${iso}T07:00:00.000Z`);
+
+const NO_RATES: EnsureRates = async () => ({ book: new Map(), unavailable: [] });
 
 function fakeProvider(history: Record<string, Quote[]>): {
   provider: MarketDataProvider;
@@ -82,6 +87,7 @@ describe("backfillInstruments", () => {
       prices,
       [{ id: "XS00TEST0001", quoteSymbol: "AAA.DE" }],
       "5y",
+      NO_RATES,
     );
 
     expect(report?.written).toBe(2);
@@ -94,11 +100,66 @@ describe("backfillInstruments", () => {
     expect(saved[0]?.source).toBe("FAKE");
   });
 
-  it("stores nothing for a history that is not in euros, and says which currency", async () => {
+  it("stores a history in another currency once the ECB publishes its rates", async () => {
     const { provider } = fakeProvider({
       AAA: [
         { ...quote("2026-01-05", "10"), symbol: "AAA", currency: "USD" },
         { ...quote("2026-01-06", "11"), symbol: "AAA", currency: "USD" },
+      ],
+    });
+    const { prices, saved } = fakeRepository();
+    const asked: [string, string][] = [];
+    const rates: EnsureRates = async (needs) => {
+      asked.push(...needs);
+      return {
+        book: rateBookFrom([
+          { source: "ECB", base: "EUR", quote: "USD", day: "2026-01-05", rate: "1.1" },
+        ]),
+        unavailable: [],
+      };
+    };
+
+    const [report] = await backfillInstruments(
+      provider,
+      prices,
+      [{ id: "XS00TEST0001", quoteSymbol: "AAA" }],
+      "5y",
+      rates,
+    );
+
+    expect(asked).toEqual([["USD", "2026-01-05"]]);
+    expect(report).toMatchObject({ written: 2, noRateSeries: null });
+    expect(saved.map((s) => s.currency)).toEqual(["USD", "USD"]);
+  });
+
+  it("stores nothing when the ECB cannot be reached, and names the ECB, not Yahoo", async () => {
+    const { provider } = fakeProvider({
+      AAA: [{ ...quote("2026-01-05", "10"), symbol: "AAA", currency: "USD" }],
+    });
+    const { prices, saved } = fakeRepository();
+
+    const [report] = await backfillInstruments(
+      provider,
+      prices,
+      [{ id: "XS00TEST0001", quoteSymbol: "AAA" }],
+      "5y",
+      async () => ({ book: new Map(), unavailable: ["USD"] }),
+    );
+
+    expect(report).toMatchObject({
+      written: 0,
+      ratesUnavailable: "USD",
+      unavailable: null,
+      noRateSeries: null,
+    });
+    expect(saved).toEqual([]);
+  });
+
+  it("stores nothing for a currency the ECB publishes no rates for, and says which", async () => {
+    const { provider } = fakeProvider({
+      AAA: [
+        { ...quote("2026-01-05", "10"), symbol: "AAA", currency: "XYZ" },
+        { ...quote("2026-01-06", "11"), symbol: "AAA", currency: "XYZ" },
       ],
     });
     const { prices, saved } = fakeRepository();
@@ -108,9 +169,10 @@ describe("backfillInstruments", () => {
       prices,
       [{ id: "XS00TEST0001", quoteSymbol: "AAA" }],
       "5y",
+      NO_RATES,
     );
 
-    expect(report).toMatchObject({ written: 0, foreignCurrency: "USD" });
+    expect(report).toMatchObject({ written: 0, noRateSeries: "XYZ" });
     expect(saved).toEqual([]);
   });
 
@@ -129,6 +191,7 @@ describe("backfillInstruments", () => {
       prices,
       [{ id: "XS00TEST0001", quoteSymbol: "AAA.DE" }],
       "max",
+      NO_RATES,
     );
 
     expect(report?.weekly).toBe(true);
@@ -143,6 +206,7 @@ describe("backfillInstruments", () => {
       prices,
       [{ id: "XS00TEST0001", quoteSymbol: "XS00TEST0001.SG" }],
       "5y",
+      NO_RATES,
     );
 
     expect(report).toMatchObject({ written: 0, first: null, last: null });
@@ -164,6 +228,7 @@ describe("backfillInstruments", () => {
         { id: "XS00TEST0002", quoteSymbol: "BBB.DE" },
       ],
       "1y",
+      NO_RATES,
     );
 
     expect(asked).toEqual(["AAA.DE", "BBB.DE"]);
@@ -193,6 +258,7 @@ describe("backfillInstruments", () => {
         { id: "XS00TEST0002", quoteSymbol: "BBB.DE" },
       ],
       "1y",
+      NO_RATES,
     );
 
     expect(first).toMatchObject({ written: 0, unavailable: expect.stringContaining("429") });
@@ -208,6 +274,7 @@ describe("backfillInstruments", () => {
       prices,
       [{ id: "XS00TEST0001", quoteSymbol: "NONE.DE" }],
       "1y",
+      NO_RATES,
     );
 
     expect(report).toMatchObject({ written: 0, first: null, unavailable: null });

@@ -88,6 +88,8 @@ export const es = {
   common: {
     close: "Cerrar",
     marketDataUnavailable: "No se ha podido consultar Yahoo. Inténtalo de nuevo.",
+    halted: (cause: string): string =>
+      `Se ha detenido sin terminar: ${cause}. No es un fallo de un instrumento concreto, así que no se ha seguido con los demás.`,
     noRateExcluded: (names: readonly string[]): string => {
       const one = names.length === 1;
       return `Sin tipo de cambio: ${names.join(", ")}. ${one ? "Tiene" : "Tienen"} operaciones en otra divisa que no se han podido convertir a euros, así que ${one ? "queda" : "quedan"} fuera de todas las cifras: un tipo inventado daría un coste y un valor falsos. Las operaciones siguen en Movimientos.`;
@@ -216,6 +218,9 @@ export const es = {
       const one = names.length === 1;
       return `Sin tipo de cambio reciente: ${names.join(", ")}. ${one ? "Cotiza" : "Cotizan"} en ${currencies.join(", ")} y no hay un tipo del BCE de la última semana, así que ${one ? "queda" : "quedan"} sin valorar, igual que un instrumento sin precio. Para ${one ? "valorarlo" : "valorarlos"}, ${REFRESH_RATES}.`;
     },
+    noClosesInBase: `Su histórico de precios está en otra divisa y no hay tipo de cambio de ninguna de esas fechas, así que no se puede dibujar en euros. Para verlo, ${REFRESH_RATES}.`,
+    ratesUnavailableFor: (names: string): string =>
+      `El BCE no ha respondido, así que no se ha descargado el histórico de ${names}: cotiza en una divisa de la que no hay tipos guardados. Pruébalo más tarde con «Volver a descargar el histórico» en Instrumentos.`,
     unratedCloses: (count: number): string =>
       count === 1
         ? "1 cierre no se muestra: no hay tipo de cambio de esa semana."

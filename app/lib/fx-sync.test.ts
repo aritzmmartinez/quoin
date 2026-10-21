@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { planFxWrite } from "~/core/fx";
+import { planFxWrite, rateBookFrom } from "~/core/fx";
 import {
   FxRatesUnavailableError,
   fxSeriesKey,
@@ -12,7 +12,9 @@ import {
 import {
   FIRST_USE_MARGIN_DAYS,
   UNUSED_LOOKBACK_DAYS,
+  ensureRates,
   firstUseByCurrency,
+  rateSeriesOf,
   syncFxRates,
   syncStart,
   type FxSyncDeps,
@@ -336,5 +338,91 @@ describe("firstUseByCurrency", () => {
         { currency: "EUR", at: new Date("2026-04-07T10:00:00Z") },
       ]),
     ).toEqual(new Map());
+  });
+});
+
+describe("ensureRates", () => {
+  const withBook = (initial: FxRate[] = []) => {
+    const fake = fakeRepository(initial);
+    return {
+      ...fake,
+      repository: {
+        ...fake.repository,
+        book: async (_source: string, quotes: readonly string[]) =>
+          rateBookFrom(fake.rows.filter((r) => quotes.includes(r.quote))),
+      },
+    };
+  };
+
+  it("syncs each foreign currency from the day it is needed and reads them into a book", async () => {
+    const { repository } = withBook();
+    const { provider, calls } = fakeProvider(() => [
+      rate("USD", "2026-04-02", "1.2002"),
+    ]);
+
+    const ensured = await ensureRates(
+      { repository, provider, now: new Date("2026-04-07T18:00:00Z") },
+      new Map([
+        ["USD", "2026-04-06"],
+        ["EUR", "2026-04-01"],
+      ]),
+    );
+
+    expect(calls).toEqual([
+      { quote: "USD", from: "2026-03-30", to: "2026-04-07" },
+    ]);
+    expect(ensured.book.get("USD")?.map((r) => r.day)).toEqual(["2026-04-02"]);
+    expect(ensured.unavailable).toEqual([]);
+  });
+
+  it("asks nothing when only the base currency is needed", async () => {
+    const { repository } = withBook();
+    const { provider, calls } = fakeProvider(() => []);
+
+    const ensured = await ensureRates(
+      { repository, provider },
+      new Map([["EUR", "2026-04-01"]]),
+    );
+
+    expect(calls).toEqual([]);
+    expect(ensured.book.size).toBe(0);
+  });
+
+  it("names a currency the source could not be asked for, and still reads what is stored", async () => {
+    const { repository } = withBook([rate("USD", "2026-04-01", "1.2")]);
+    const provider: FxRateProvider = {
+      source: "ECB",
+      base: "EUR",
+      async getRates(quote) {
+        throw new FxRatesUnavailableError(quote, 503);
+      },
+    };
+
+    const ensured = await ensureRates(
+      { repository, provider, now: new Date("2026-04-07T18:00:00Z") },
+      new Map([["USD", "2026-04-06"]]),
+    );
+
+    expect(ensured.unavailable).toEqual(["USD"]);
+    expect(ensured.book.get("USD")).toHaveLength(1);
+  });
+});
+
+describe("rateSeriesOf", () => {
+  const book = rateBookFrom([rate("USD", "2026-04-02", "1.2")]);
+
+  it("tells the base, a published series, one the source does not publish and one it could not be asked for apart", () => {
+    expect(rateSeriesOf({ book, unavailable: [] }, "EUR")).toBe("base");
+    expect(rateSeriesOf({ book, unavailable: [] }, "USD")).toBe("published");
+    expect(rateSeriesOf({ book, unavailable: [] }, "XYZ")).toBe("none");
+    expect(rateSeriesOf({ book, unavailable: ["GBP"] }, "GBP")).toBe(
+      "unavailable",
+    );
+  });
+
+  it("calls a series published once it has rates, even if this sync could not refresh it", () => {
+    expect(rateSeriesOf({ book, unavailable: ["USD"] }, "USD")).toBe(
+      "published",
+    );
   });
 });

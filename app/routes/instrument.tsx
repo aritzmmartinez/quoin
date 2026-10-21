@@ -175,7 +175,10 @@ export default function Instrument({ loaderData }: Route.ComponentProps) {
           {t.fx.unratedCloses(unratedCloses)}
         </Explainer>
       )}
-      <InstrumentPriceChart data={priceChartData} />
+      <InstrumentPriceChart
+        data={priceChartData}
+        unrated={unratedCloses > 0}
+      />
       <InstrumentValueChart data={ivvData} />
       <Card className="overflow-hidden">
         <div className="px-gutter pb-3 pt-4 text-[14px] font-semibold">

@@ -1,3 +1,4 @@
+import { describeFailure } from "~/lib/describe-failure";
 import {
   syncProblemOf,
   type InstrumentSync,
@@ -26,12 +27,19 @@ export async function action({ request }: Route.ActionArgs) {
   } catch (error) {
     console.error("Price sync failed", instrumentId, error);
     const problem = syncProblemOf(error);
-    return Response.json({ ok: false, problem } satisfies PriceSyncResponse, {
-      status: problem === "unavailable" ? 503 : 500,
-    });
+    return Response.json(
+      problem === "unavailable"
+        ? ({ ok: false, problem } satisfies PriceSyncResponse)
+        : ({
+            ok: false,
+            problem,
+            cause: describeFailure(error),
+          } satisfies PriceSyncResponse),
+      { status: problem === "unavailable" ? 503 : 500 },
+    );
   }
 }
 
 export type PriceSyncResponse =
   | ({ ok: true } & InstrumentSync)
-  | { ok: false; problem?: SyncProblem };
+  | { ok: false; problem?: SyncProblem; cause?: string };

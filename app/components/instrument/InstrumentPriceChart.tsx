@@ -31,7 +31,13 @@ const TOOLTIP_STYLE = {
   fontSize: 12,
 } as const;
 
-export function InstrumentPriceChart({ data }: { data: PriceChartPoint[] }) {
+export function InstrumentPriceChart({
+  data,
+  unrated = false,
+}: {
+  data: PriceChartPoint[];
+  unrated?: boolean;
+}) {
   const { formatMoney, formatDate, formatTimeTick } = useFormat();
   const axisEur = (v: number) => formatMoney(String(v), 0);
   const hydrated = useHydrated();
@@ -57,7 +63,11 @@ export function InstrumentPriceChart({ data }: { data: PriceChartPoint[] }) {
         <h2 className="text-[14px] font-semibold">{c.title}</h2>
         <RangeSelector value={range} onChange={setRange} />
       </div>
-      {!hasPrice && <p className="mb-2 text-[12px] text-muted">{c.noPrice}</p>}
+      {!hasPrice && (
+        <p className="mb-2 text-[12px] text-muted">
+          {unrated ? t.fx.noClosesInBase : c.noPrice}
+        </p>
+      )}
       {series.kind === "empty" ? (
         <p className="py-10 text-center text-[13px] text-muted">{c.empty}</p>
       ) : series.kind === "outOfRange" ? (

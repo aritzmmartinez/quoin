@@ -82,6 +82,8 @@ export const en: Copy = {
   common: {
     close: "Close",
     marketDataUnavailable: "Yahoo could not be reached. Try again.",
+    halted: (cause: string): string =>
+      `Stopped before finishing: ${cause}. This is not a problem with one instrument, so the others were not tried.`,
     noRateExcluded: (names: readonly string[]): string => {
       const one = names.length === 1;
       return `No exchange rate: ${names.join(", ")}. ${one ? "It has" : "They have"} trades in another currency that could not be converted to euros, so ${one ? "it is" : "they are"} left out of every figure: an invented rate would give a false cost and value. The trades are still in Movements.`;
@@ -210,6 +212,9 @@ export const en: Copy = {
       const one = names.length === 1;
       return `No recent exchange rate: ${names.join(", ")}. ${one ? "It is" : "They are"} quoted in ${currencies.join(", ")} and there is no ECB rate from the last week, so ${one ? "it is" : "they are"} left unvalued, like an instrument with no price. To value ${one ? "it" : "them"}, ${REFRESH_RATES}.`;
     },
+    noClosesInBase: `Its price history is in another currency and there is no exchange rate for any of those dates, so it cannot be drawn in euros. To see it, ${REFRESH_RATES}.`,
+    ratesUnavailableFor: (names: string): string =>
+      `The ECB did not respond, so the history of ${names} was not downloaded: it is quoted in a currency with no rates stored. Try again later with “Download the history again” in Instruments.`,
     unratedCloses: (count: number): string =>
       count === 1
         ? "1 close is not shown: there is no exchange rate for that week."

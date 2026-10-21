@@ -7,8 +7,9 @@ import type { PriceSyncResponse } from "~/routes/prices-sync";
 
 import {
   failedSync,
-  inTurn,
   priceSyncToast,
+  SyncHaltedError,
+  syncInTurn,
   useCopy,
   type InstrumentSync,
 } from "~/lib";
@@ -27,6 +28,9 @@ async function syncOne(target: SyncPricesTarget): Promise<InstrumentSync> {
     body: new URLSearchParams({ instrumentId: target.id }),
   });
   const body = (await response.json()) as PriceSyncResponse;
+  if (!body.ok && body.problem === "error") {
+    throw new SyncHaltedError(body.cause ?? response.statusText);
+  }
   if (!body.ok) return failedSync(target, body.problem);
   const { ok: _ok, ...sync } = body;
   return sync;
@@ -56,26 +60,24 @@ export function SyncPricesButton({
     setBusy(true);
     const total = targets.length;
     const id = toast.loading(copy.syncing(Math.min(1, total), total));
-    let current = 0;
-
-    const steps = await inTurn(
-      targets,
-      (target) => {
-        current += 1;
-        toast.loading(copy.syncing(current, total), {
+    const { steps, halted } = await syncInTurn(targets, syncOne, {
+      onStart: (target, index) => {
+        toast.loading(copy.syncing(index + 1, total), {
           id,
           description: target.name,
         });
-        return syncOne(target);
       },
-      {
-        onError: (_error, target) => failedSync(target),
-        stopped: () => !mounted.current,
-      },
-    );
+      stopped: () => !mounted.current,
+    });
 
     const summary = priceSyncToast(t, steps, unmapped);
-    if (summary.failures.length === 0) {
+    if (halted !== null) {
+      toast.error(t.common.halted(halted), {
+        id,
+        duration: Infinity,
+        closeButton: true,
+      });
+    } else if (summary.failures.length === 0) {
       toast.success(summary.message, {
         id,
         description: summary.description,

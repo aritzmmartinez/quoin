@@ -1,16 +1,21 @@
-import { foreignCurrency } from "~/core/domain";
+import { dayOf, shiftDay } from "~/core/calendar";
 import type {
   InstrumentRepository,
   MarketDataProvider,
   PriceRepository,
 } from "~/core/ports";
 
-import { hasDailyHistory } from "./symbol-check";
+import { rateSeriesOf, type EnsureRates } from "./fx-sync";
+import { hasDailyHistory, RATE_PROBE_DAYS } from "./symbol-check";
 
 export type AssignResult =
   | { ok: true }
   | { ok: false; reason: "has-history" | "no-quote" | "no-history" }
-  | { ok: false; reason: "not-eur"; currency: string };
+  | {
+      ok: false;
+      reason: "no-rate-series" | "rates-unavailable";
+      currency: string;
+    };
 
 export async function assignQuoteSymbol(
   instruments: InstrumentRepository,
@@ -18,6 +23,8 @@ export async function assignQuoteSymbol(
   provider: MarketDataProvider,
   id: string,
   symbol: string,
+  rates: EnsureRates,
+  now: Date = new Date(),
 ): Promise<AssignResult> {
   const instrument = await instruments.get(id);
   if (!instrument) throw new Error(`No instrument with id "${id}".`);
@@ -29,8 +36,19 @@ export async function assignQuoteSymbol(
 
   const quote = await provider.getQuote(symbol);
   if (!quote) return { ok: false, reason: "no-quote" };
-  const foreign = foreignCurrency([quote]);
-  if (foreign) return { ok: false, reason: "not-eur", currency: foreign };
+  const series = rateSeriesOf(
+    await rates(
+      new Map([[quote.currency, shiftDay(dayOf(now), -RATE_PROBE_DAYS)]]),
+    ),
+    quote.currency,
+  );
+  if (series === "none" || series === "unavailable") {
+    return {
+      ok: false,
+      reason: series === "none" ? "no-rate-series" : "rates-unavailable",
+      currency: quote.currency,
+    };
+  }
   if (!(await hasDailyHistory(provider, symbol))) {
     return { ok: false, reason: "no-history" };
   }

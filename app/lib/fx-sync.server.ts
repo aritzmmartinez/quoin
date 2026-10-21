@@ -5,7 +5,13 @@ import {
   PrismaPriceRepository,
 } from "~/adapters/persistence";
 
-import { firstUseByCurrency, syncFxRates, type FxSyncResult } from "./fx-sync";
+import {
+  ensureRates,
+  firstUseByCurrency,
+  syncFxRates,
+  type EnsuredRates,
+  type FxSyncResult,
+} from "./fx-sync";
 
 export async function firstUses(): Promise<Map<string, string>> {
   const prices = new PrismaPriceRepository();
@@ -39,4 +45,13 @@ export async function runFxSync(
     currencies: codes ?? [...firstUse.keys()],
     firstUse,
   });
+}
+
+export function ensureRatesNow(
+  needs: ReadonlyMap<string, string>,
+): Promise<EnsuredRates> {
+  return ensureRates(
+    { repository: new PrismaFxRepository(), provider: new EcbFxRateProvider() },
+    needs,
+  );
 }
