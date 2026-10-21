@@ -3,6 +3,7 @@ export * from "./holdings-repository";
 export * from "./security-identity-repository";
 export * from "./instrument-repository";
 export * from "./price-repository";
+export * from "./price-sync-repository";
 export * from "./inflation-repository";
 export * from "./fx-repository";
 export * from "./target-repository";

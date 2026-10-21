@@ -1,4 +1,5 @@
-import { planFxWrite } from "~/core/fx";
+import { BASE_CURRENCY } from "~/core/domain";
+import { planFxWrite, rateBookFrom, type RateBook } from "~/core/fx";
 import {
   fxSeriesKey,
   type FxRate,
@@ -52,6 +53,16 @@ export class PrismaFxRepository implements FxRepository {
       orderBy: { day: "asc" },
       select: RATE_FIELDS,
     });
+  }
+
+  async book(source: string, quotes: readonly string[]): Promise<RateBook> {
+    if (quotes.length === 0) return rateBookFrom([]);
+    return rateBookFrom(
+      await prisma.fxRate.findMany({
+        where: { source, base: BASE_CURRENCY, quote: { in: [...quotes] } },
+        select: RATE_FIELDS,
+      }),
+    );
   }
 
   async firstDay(series: FxSeries): Promise<string | null> {

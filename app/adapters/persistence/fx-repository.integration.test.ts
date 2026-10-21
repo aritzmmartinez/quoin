@@ -91,4 +91,22 @@ describe("PrismaFxRepository (integration)", () => {
     expect(await fxRepo.lastSyncedAt(USD)).toBeInstanceOf(Date);
     expect(await fxRepo.lastSyncedAt(GBP)).toBeNull();
   });
+
+  it("reads a rate book for the currencies asked, sorted by day", async () => {
+    const other: FxSeries = { source: "TEST", base: "EUR", quote: "USD" };
+    await fxRepo.save(other, [rate(other, "2026-04-03", "9")]);
+
+    const book = await fxRepo.book("ECB", ["USD", "JPY"]);
+
+    expect(book.get("USD")?.map((r) => [r.day, r.rate])).toEqual([
+      ["2026-04-02", "1.0850"],
+      ["2026-04-07", "1.0900"],
+    ]);
+    expect(book.has("GBP")).toBe(false);
+    expect(book.has("JPY")).toBe(false);
+  });
+
+  it("reads an empty book when asked for no currency", async () => {
+    expect((await fxRepo.book("ECB", [])).size).toBe(0);
+  });
 });

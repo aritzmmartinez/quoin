@@ -161,11 +161,22 @@ model InflationSync {
   checkedAt DateTime
 }
 
+/// When each instrument's prices were last asked for. Same reason as
+/// InflationSync: PriceSnapshot.createdAt only moves when a row is written.
+/// No foreign key, like FxSync: it records a question, not a fact of the
+/// instrument.
+model PriceSync {
+  instrumentId String   @id
+  checkedAt    DateTime
+}
+
 /// A published exchange rate: units of `quote` per one `base`, for one day,
 /// exactly as the source printed it.
 ///
 /// A cache, not a fact of the portfolio: every ledger row freezes the rate it
-/// was booked at, so nothing already computed reads from here. A rate that
+/// was booked at, so a booked amount never reads from here again. Valuation
+/// does, to put a price quoted in another currency into euros, and so does an
+/// import, to book a row. A rate that
 /// arrives different for a day already stored is still refused and reported,
 /// never overwritten: the cache must not change in silence, and the next
 /// import would book at the new figure.
