@@ -301,6 +301,7 @@ export const en: Copy = {
       added: (n: number): string =>
         n === 1 ? "1 month of CPI added" : `${n} months of CPI added`,
       error: "The CPI could not be synced.",
+      unavailable: "INE is not responding. Try again later.",
       rebase: (series: string): string =>
         `${series}: INE changed the base year. Replace the series with pnpm ipc:sync --force-rebase.`,
     },
