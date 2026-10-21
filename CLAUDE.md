@@ -173,6 +173,14 @@ This has caused misdirected generation more than once:
   good symbol. Callers keep going past one: sync reports `unavailable`, the wizard's fill
   and "Rebuild all histories" carry on and name it, `api/ingest` answers 503 and logs it.
   The port is `getQuote(symbol)`, one symbol, because no caller ever asked for two.
+- **Every request to a provider goes through `withTimeout` in `adapters/http`**, which
+  bounds the whole request, body included, and fails it as that provider's unavailable
+  error with the `TimeoutError` as `cause`. Each adapter has its own constant, set from a
+  measurement made on 2026-10-21: Yahoo 15 s (a `max` history 0.46–0.88 s), INE 20 s
+  (0.24–0.58 s), ECB 60 s (41–52 s for the whole history), OpenFIGI 30 s for ten jobs
+  (7.4–8.6 s for ten large-cap ISINs) and 120 s for a hundred, which is extrapolated: no
+  key was used to measure it. The timer is a `setTimeout`, not `AbortSignal.timeout`, so
+  fake timers control it. It also takes an outside signal; no port carries one yet.
 - **`range=max` is not daily, whatever `interval` says.** Measured 2026-10-08: Yahoo
   answers `interval=1d&range=max` with monthly candles for a crypto pair and weekly ones
   for an ETF, each dated at the start of its period but carrying the period's last close — a
@@ -496,10 +504,15 @@ manual aliasing was abandoned — 726 confirmations is not a system.
   that does not exist.
 - **OpenFIGI v3 renamed the "not found" key from `error` to `warning`** (v2 shut down
   2026-07-01). Checking only `error` swallows every miss in silence.
-- Resolution happens **at import**, is cached permanently including misses, and runs in
-  **descending weight order** — unauthenticated the endpoint allows 10 jobs per request and
-  25 requests a minute, so five thousand leaves is twenty minutes; ordering by weight means
-  a couple of hundred lookups already cover every row that is drawn.
+- Resolution happens in **`pnpm identity:resolve`**, not when a composition is dropped on
+  Instruments. It is cached permanently including misses, and runs in **descending weight
+  order** — unauthenticated the endpoint allows 10 jobs per request and 25 requests a
+  minute, so five thousand leaves is twenty minutes; ordering by weight means a couple of
+  hundred lookups already cover every row that is drawn.
+- **A miss is an answer; an unanswered request is not.** Because misses are cached for
+  good, a batch that fails (status, network, timeout, a payload that is not an array) must
+  never become `not-found`, as it once did. `resolve` returns `{ resolutions, unavailable }`
+  and stops at the first such batch; the script saves only what was answered.
 
 ## Currency exposure
 

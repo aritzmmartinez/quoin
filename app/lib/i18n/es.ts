@@ -310,6 +310,7 @@ export const es = {
       added: (n: number): string =>
         n === 1 ? "1 mes de IPC añadido" : `${n} meses de IPC añadidos`,
       error: "No se pudo sincronizar el IPC.",
+      unavailable: "El INE no responde. Prueba más tarde.",
       rebase: (series: string): string =>
         `${series}: el INE cambió de año base. Reemplaza la serie con pnpm ipc:sync --force-rebase.`,
     },

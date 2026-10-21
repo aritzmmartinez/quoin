@@ -15,7 +15,8 @@ type Synced = Extract<IpcSyncResponse, { ok: true }>;
 async function run(error: string): Promise<Synced> {
   const response = await fetch(ENDPOINT, { method: "POST" });
   const body = (await response.json()) as IpcSyncResponse;
-  if (!response.ok || !body.ok) throw new Error(error);
+  if (!body.ok) throw new Error(body.error ?? error);
+  if (!response.ok) throw new Error(error);
   return body;
 }
 
@@ -36,7 +37,8 @@ export function IpcSyncButton() {
           rebaseBlocked: result.rebaseBlocked,
         });
       },
-      error: copy.error,
+      error: (error: unknown) =>
+        error instanceof Error ? error.message : copy.error,
       finally: () => setBusy(false),
     });
   }

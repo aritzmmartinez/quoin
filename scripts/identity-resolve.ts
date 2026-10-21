@@ -12,6 +12,7 @@ import {
 } from "~/adapters/persistence";
 import { looksLikeIsin } from "~/adapters/ingestion/holdings";
 import type { RawIdentity } from "~/core/ports";
+import { describeFailure } from "~/lib/describe-failure";
 
 import { announceDatabase } from "./lib/db-target";
 
@@ -170,14 +171,14 @@ async function main(): Promise<void> {
     },
   });
 
-  const resolved = await resolver.resolve(pending);
+  const { resolutions, unavailable } = await resolver.resolve(pending);
 
-  const entries = pending.slice(0, budget).map((identity) => ({
-    ...identity,
-    resolution:
-      resolved.get(identity.value) ?? ({ status: "not-found" } as const),
-    source: resolver.source,
-  }));
+  const entries = pending.slice(0, budget).flatMap((identity) => {
+    const resolution = resolutions.get(identity.value);
+    return resolution
+      ? [{ ...identity, resolution, source: resolver.source }]
+      : [];
+  });
   await cache.save(entries);
 
   const counts = { resolved: 0, "not-found": 0, ambiguous: 0 };
@@ -186,6 +187,13 @@ async function main(): Promise<void> {
   console.log(
     `\nSaved ${entries.length}: ${counts.resolved} resolved, ${counts["not-found"]} not found, ${counts.ambiguous} ambiguous.`,
   );
+  if (unavailable) {
+    console.error(
+      `\nOpenFIGI stopped answering: ${describeFailure(unavailable)}\n` +
+        `${budget - entries.length} not asked and not saved — run again.`,
+    );
+    exit(1);
+  }
   if (pending.length > budget) {
     console.log(
       `${pending.length - budget} still pending — run again, or pass --all.`,

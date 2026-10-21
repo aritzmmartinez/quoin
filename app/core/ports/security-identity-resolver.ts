@@ -29,6 +29,26 @@ export type IdentityResolution =
   | { status: "not-found" }
   | { status: "ambiguous"; candidates: number };
 
+export class IdentityResolutionUnavailableError extends Error {
+  constructor(
+    readonly status: number | null,
+    options?: { cause?: unknown },
+  ) {
+    super(
+      status === null
+        ? "Identity resolution unavailable"
+        : `Identity resolution unavailable (HTTP ${status})`,
+      options,
+    );
+    this.name = "IdentityResolutionUnavailableError";
+  }
+}
+
+export interface IdentityResolutionBatch {
+  resolutions: Map<string, IdentityResolution>;
+  unavailable: IdentityResolutionUnavailableError | null;
+}
+
 export interface SecurityIdentityResolver {
   readonly source: string;
   /**
@@ -37,7 +57,5 @@ export interface SecurityIdentityResolver {
    * person can actually see converge before the long tail, which matters when an
    * unauthenticated caller is limited to a few hundred lookups a minute.
    */
-  resolve(
-    identities: readonly RawIdentity[],
-  ): Promise<Map<string, IdentityResolution>>;
+  resolve(identities: readonly RawIdentity[]): Promise<IdentityResolutionBatch>;
 }

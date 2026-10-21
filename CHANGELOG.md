@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A Trade Republic row in a currency other than the euro would have been recorded as if its amount were in euros. Any import now sets such a row aside as "Trades in another currency", listed with its date, and imports the rest of the file; the preview shows the same.
 - A ledger entry in another currency with no exchange rate to euros was counted as if its amount were in euros. Such entries can exist from imports made before the fixes above. They are now left out of every figure: an instrument with a trade like that is left out whole and named on Portfolio and Summary, and on the tax view of Realized with a notice to check it before using the figures, since its sales are not in the calculation. Movements still lists the entry, with "No exchange rate" instead of an amount, and leaves it out of the net cash flow.
 - On Opportunity cost, the notice for purchases older than the benchmark's history sent you to a command-line tool the Docker image does not carry. It now points to downloading the history again from Instruments, with a range that reaches those purchases.
+- A request to Yahoo, INE or OpenFIGI that never answered left Refresh prices, Rebuild all histories, the import wizard's price step or Sync CPI waiting with no end and no error. Every request now gives up after a set time and fails as the provider being unavailable: Refresh prices and Rebuild all histories name the instrument and carry on with the rest.
+- Sync CPI says that INE is not responding when it cannot be reached, instead of a generic failure.
+- `pnpm identity:resolve` recorded every identity in a request OpenFIGI did not answer (a rate limit, an outage, a timeout) as not found, and never asked for it again. It now stops at that request, saves only what was answered and says how many are left for the next run.
+- `pnpm ipc:sync --force-rebase` deleted a series before downloading its replacement, so a failed download left it empty. It now downloads first.
 
 ## [0.12.1] - 2026-10-18
 

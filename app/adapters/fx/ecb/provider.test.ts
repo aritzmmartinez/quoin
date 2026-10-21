@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { FxRatesUnavailableError } from "~/core/ports";
 
-import { EcbFxRateProvider, ecbRatesUrl } from "./provider";
+import { ECB_TIMEOUT_MS, EcbFxRateProvider, ecbRatesUrl } from "./provider";
 
 const HEADER =
   "KEY,FREQ,CURRENCY,CURRENCY_DENOM,EXR_TYPE,EXR_SUFFIX,TIME_PERIOD,OBS_VALUE";
@@ -151,5 +151,33 @@ describe("EcbFxRateProvider", () => {
     await expect(
       provider.getRates("USD", "2026-04-01", "2026-04-02"),
     ).rejects.toBeInstanceOf(FxRatesUnavailableError);
+  });
+});
+
+describe("EcbFxRateProvider timeouts", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("waits the measured sixty seconds by default", () => {
+    expect(ECB_TIMEOUT_MS).toBe(60_000);
+  });
+
+  it("turns a request that does not answer into unavailable, with the timeout as cause", async () => {
+    vi.useFakeTimers();
+    answer(
+      () =>
+        new Response(new ReadableStream({ start() {} }), { status: 200 }),
+    );
+
+    const error = new EcbFxRateProvider({ timeoutMs: 1_000 })
+      .getRates("USD", "2026-04-01", "2026-04-02")
+      .catch((e: unknown) => e);
+    await vi.advanceTimersByTimeAsync(1_000);
+    const caught = await error;
+
+    expect(caught).toBeInstanceOf(FxRatesUnavailableError);
+    expect((caught as FxRatesUnavailableError).status).toBeNull();
+    expect((caught as Error).cause).toMatchObject({ name: "TimeoutError" });
   });
 });
