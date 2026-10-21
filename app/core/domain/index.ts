@@ -1,4 +1,5 @@
 export * from "./money";
+export * from "./amount";
 export * from "./currency";
 export * from "./exposure";
 export * from "./inflation";

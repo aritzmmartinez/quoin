@@ -64,7 +64,11 @@ function closesFrom(
   const byDay = new Map<string, { t: number; price: Decimal }>();
   for (const snapshot of history) {
     if (snapshot.instrumentId !== instrumentId) continue;
-    if (snapshot.currency !== baseCurrency) continue;
+    if (snapshot.currency !== baseCurrency) {
+      throw new Error(
+        `Benchmark close on ${snapshot.asOf.toISOString()} is in ${snapshot.currency}, not ${baseCurrency}; pass the history through historyInBase() first`,
+      );
+    }
     const day = dayOf(snapshot.asOf);
     const t = snapshot.asOf.getTime();
     const seen = byDay.get(day);
@@ -211,7 +215,12 @@ export function computeOpportunityCost(
 
   for (const bucket of buckets.values()) {
     const price = prices.get(bucket.instrumentId);
-    const priced = price !== undefined && price.currency === baseCurrency;
+    if (price !== undefined && price.currency !== baseCurrency) {
+      throw new Error(
+        `Price of ${bucket.instrumentId} is in ${price.currency}, not ${baseCurrency}; pass prices through pricesInBase() first`,
+      );
+    }
+    const priced = price !== undefined;
 
     if (bucket.quantity.gt(0) && !priced) {
       unpricedInstrumentIds.push(bucket.instrumentId);
