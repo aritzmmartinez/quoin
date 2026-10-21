@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 
 import { planFxWrite, rateBookFrom } from "~/core/fx";
+
+import { es } from "./i18n";
 import {
   FxRatesUnavailableError,
   fxSeriesKey,
@@ -14,9 +16,11 @@ import {
   UNUSED_LOOKBACK_DAYS,
   ensureRates,
   firstUseByCurrency,
+  fxSyncToast,
   rateSeriesOf,
   syncFxRates,
   syncStart,
+  type FxSyncCounts,
   type FxSyncDeps,
 } from "./fx-sync";
 
@@ -195,10 +199,7 @@ describe("syncFxRates", () => {
     });
 
     expect(calls[0]?.from).toBe("2026-02-20");
-    expect(rows.map((r) => r.day).sort()).toEqual([
-      "2026-02-20",
-      "2026-04-02",
-    ]);
+    expect(rows.map((r) => r.day).sort()).toEqual(["2026-02-20", "2026-04-02"]);
   });
 
   it("asks up to today's Madrid day, not today's UTC day", async () => {
@@ -424,5 +425,52 @@ describe("rateSeriesOf", () => {
     expect(rateSeriesOf({ book, unavailable: ["USD"] }, "USD")).toBe(
       "published",
     );
+  });
+});
+
+describe("fxSyncToast", () => {
+  const counts = (over: Partial<FxSyncCounts> = {}): FxSyncCounts => ({
+    currencies: ["USD", "GBP"],
+    inserted: 0,
+    conflicted: [],
+    unavailable: [],
+    ...over,
+  });
+
+  it("says nothing is in use when no currency other than the euro is", () => {
+    expect(fxSyncToast(es, counts({ currencies: [] }))).toEqual({
+      ok: true,
+      message: es.fx.sync.none,
+    });
+  });
+
+  it("counts the rates added, or says they were up to date", () => {
+    expect(fxSyncToast(es, counts({ inserted: 3 })).message).toBe(
+      es.fx.sync.added(3),
+    );
+    expect(fxSyncToast(es, counts()).message).toBe(es.fx.sync.upToDate);
+  });
+
+  it("says the ECB is not responding when no currency got an answer", () => {
+    expect(fxSyncToast(es, counts({ unavailable: ["USD", "GBP"] }))).toEqual({
+      ok: false,
+      message: es.fx.sync.unavailable,
+    });
+  });
+
+  it("names the currencies left unanswered when the others went through", () => {
+    const toast = fxSyncToast(
+      es,
+      counts({ inserted: 1, unavailable: ["GBP"] }),
+    );
+    expect(toast.ok).toBe(false);
+    expect(toast.description).toContain("GBP");
+  });
+
+  it("names a currency whose stored rates the ECB revised", () => {
+    expect(fxSyncToast(es, counts({ conflicted: ["USD"] }))).toEqual({
+      ok: false,
+      message: es.fx.sync.conflict(["USD"]),
+    });
   });
 });

@@ -1,4 +1,6 @@
-import type { Instrument } from "~/core/domain";
+import { dayOf } from "~/core/calendar";
+import { BASE_CURRENCY, type Instrument } from "~/core/domain";
+import { valuationRate, type RateBook } from "~/core/fx";
 import type { OpportunityCostLine } from "~/core/projections";
 
 import { readCookie } from "./cookie";
@@ -20,10 +22,11 @@ export interface BenchmarkCandidate {
 
 /**
  * What the benchmark setting may offer: an instrument with a quote symbol and
- * at least one EUR close — exactly what `loadOpportunityCost` refuses without.
- * `historyStarts` maps instrumentId to its first EUR close; an instrument
- * missing from it has no EUR history and is left out, not offered with a
- * warning. Sorted by name, like every other instrument list.
+ * at least one close that can be valued in euros — exactly what
+ * `loadOpportunityCost` refuses without. `historyStarts` maps instrumentId to
+ * that first close (see `convertibleStarts`); an instrument missing from it is
+ * left out, not offered with a warning. Sorted by name, like every other
+ * instrument list.
  */
 export function benchmarkCandidates(
   instruments: readonly Instrument[],
@@ -43,6 +46,34 @@ export function benchmarkCandidates(
     });
   }
   return candidates.sort((a, b) => a.name.localeCompare(b.name, tag));
+}
+
+export function convertibleStarts(
+  startsByCurrency: ReadonlyMap<string, ReadonlyMap<string, Date>>,
+  book: RateBook,
+): Map<string, Date> {
+  const starts = new Map<string, Date>();
+  const keep = (id: string, at: Date) => {
+    const held = starts.get(id);
+    if (held === undefined || at.getTime() < held.getTime()) starts.set(id, at);
+  };
+  for (const [currency, byInstrument] of startsByCurrency) {
+    if (currency === BASE_CURRENCY) {
+      for (const [id, at] of byInstrument) keep(id, at);
+      continue;
+    }
+    const firstRate = book.get(currency)?.[0];
+    if (!firstRate) continue;
+    for (const [id, at] of byInstrument) {
+      keep(
+        id,
+        valuationRate(book, currency, dayOf(at)) !== null
+          ? at
+          : new Date(`${firstRate.day}T12:00:00Z`),
+      );
+    }
+  }
+  return starts;
 }
 
 export interface OpportunityRow {

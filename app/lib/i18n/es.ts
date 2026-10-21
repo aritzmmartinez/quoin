@@ -87,9 +87,10 @@ const EXPOSURE_KIND_LABELS: Record<ExposureKind, string> = {
 export const es = {
   common: {
     close: "Cerrar",
-    marketDataUnavailable: "No se ha podido consultar Yahoo. Inténtalo de nuevo.",
+    marketDataUnavailable:
+      "No se ha podido consultar Yahoo. Inténtalo de nuevo.",
     halted: (cause: string): string =>
-      `Se ha detenido sin terminar: ${cause}. No es un fallo de un instrumento concreto, así que no se ha seguido con los demás.`,
+      `Se ha detenido sin terminar: ${cause.replace(/\.+$/, "")}. No es un fallo de un instrumento concreto, así que no se ha seguido con los demás.`,
     noRateExcluded: (names: readonly string[]): string => {
       const one = names.length === 1;
       return `Sin tipo de cambio: ${names.join(", ")}. ${one ? "Tiene" : "Tienen"} operaciones en otra divisa que no se han podido convertir a euros, así que ${one ? "queda" : "quedan"} fuera de todas las cifras: un tipo inventado daría un coste y un valor falsos. Las operaciones siguen en Movimientos.`;

@@ -1,6 +1,8 @@
 import { dayOf, shiftDay } from "~/core/calendar";
 import { BASE_CURRENCY } from "~/core/domain";
 import type { RateBook } from "~/core/fx";
+
+import type { Copy } from "./i18n";
 import type {
   FxRate,
   FxRateProvider,
@@ -176,4 +178,37 @@ export function rateSeriesOf(
   if (currency === BASE_CURRENCY) return "base";
   if ((ensured.book.get(currency)?.length ?? 0) > 0) return "published";
   return ensured.unavailable.includes(currency) ? "unavailable" : "none";
+}
+
+export interface FxSyncCounts {
+  currencies: string[];
+  inserted: number;
+  conflicted: string[];
+  unavailable: string[];
+}
+
+export interface FxSyncToast {
+  ok: boolean;
+  message: string;
+  description?: string;
+}
+
+export function fxSyncToast(t: Copy, counts: FxSyncCounts): FxSyncToast {
+  const copy = t.fx.sync;
+  if (counts.currencies.length === 0) return { ok: true, message: copy.none };
+  if (counts.unavailable.length === counts.currencies.length) {
+    return { ok: false, message: copy.unavailable };
+  }
+  if (counts.conflicted.length > 0) {
+    return { ok: false, message: copy.conflict(counts.conflicted) };
+  }
+  const message =
+    counts.inserted > 0 ? copy.added(counts.inserted) : copy.upToDate;
+  return counts.unavailable.length === 0
+    ? { ok: true, message }
+    : {
+        ok: false,
+        message,
+        description: `${copy.unavailable} (${counts.unavailable.join(", ")})`,
+      };
 }

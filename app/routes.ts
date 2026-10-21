@@ -22,5 +22,6 @@ export default [
   ]),
   route("api/prices/sync", "routes/prices-sync.ts"),
   route("api/ipc/sync", "routes/ipc-sync.ts"),
+  route("api/fx/sync", "routes/fx-sync.ts"),
   route("api/ingest", "routes/ingest.ts"),
 ] satisfies RouteConfig;

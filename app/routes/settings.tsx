@@ -1,11 +1,20 @@
 import type { ReactNode } from "react";
-import { Coins, Gauge, Globe, Moon, TrendingUp } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import {
+  ArrowLeftRight,
+  ChartLine,
+  Coins,
+  Gauge,
+  Globe,
+  Moon,
+  Percent,
+  TrendingUp,
+} from "lucide-react";
 
 import type { Route } from "./+types/settings";
 
 import {
   PrismaInstrumentRepository,
+  PrismaLedgerRepository,
   PrismaPriceRepository,
 } from "~/adapters/persistence";
 import {
@@ -14,16 +23,25 @@ import {
   ThemeSetting,
   ThresholdSetting,
 } from "~/components";
+import { ExternalDataSource } from "~/components/settings/ExternalDataSource";
+import { SettingRow as Row } from "~/components/settings/SettingRow";
+import { useFxRefresh } from "~/components/settings/use-fx-refresh";
+import { useIpcRefresh } from "~/components/settings/use-ipc-refresh";
+import { usePriceRefresh } from "~/components/settings/use-price-refresh";
 import { Select } from "~/components/ui/Select";
-import { BASE_CURRENCY } from "~/core/domain";
 import {
   benchmarkCandidates,
+  convertibleStarts,
   type Copy,
   copyFromMatches,
+  intlTag,
   parseBenchmark,
+  parseLocale,
   parseThreshold,
   useCopy,
 } from "~/lib";
+import { loadExternalData } from "~/lib/external-data.server";
+import { loadRateBook } from "~/lib/rate-book.server";
 
 export function meta({ matches }: Route.MetaArgs) {
   const t = copyFromMatches(matches);
@@ -37,14 +55,34 @@ export const handle = { title: (t: Copy) => t.settings.title };
 
 export async function loader({ request }: Route.LoaderArgs) {
   const cookie = request.headers.get("Cookie");
-  const [instruments, historyStarts] = await Promise.all([
+  const benchmark = parseBenchmark(cookie);
+  const prices = new PrismaPriceRepository();
+  const [instruments, events, latest] = await Promise.all([
     new PrismaInstrumentRepository().list(),
-    new PrismaPriceRepository().historyStarts(BASE_CURRENCY),
+    new PrismaLedgerRepository().list(),
+    prices.latest(),
   ]);
+
+  const currencies = [...new Set([...latest.values()].map((s) => s.currency))];
+  const [book, starts] = await Promise.all([
+    loadRateBook(currencies),
+    Promise.all(
+      currencies.map(
+        async (currency) =>
+          [currency, await prices.historyStarts(currency)] as const,
+      ),
+    ),
+  ]);
+
   return {
     threshold: parseThreshold(cookie),
-    benchmark: parseBenchmark(cookie),
-    candidates: benchmarkCandidates(instruments, historyStarts),
+    benchmark,
+    candidates: benchmarkCandidates(
+      instruments,
+      convertibleStarts(new Map(starts), book),
+      intlTag(parseLocale(cookie)),
+    ),
+    external: await loadExternalData(instruments, events, latest, benchmark),
   };
 }
 
@@ -56,9 +94,13 @@ const CURRENCIES = [
 ] as const;
 
 export default function Settings({ loaderData }: Route.ComponentProps) {
-  const { threshold, benchmark, candidates } = loaderData;
+  const { threshold, benchmark, candidates, external } = loaderData;
   const t = useCopy();
   const s = t.settings;
+  const d = s.externalData;
+  const prices = usePriceRefresh(external.syncTargets, external.unmapped);
+  const inflation = useIpcRefresh();
+  const rates = useFxRefresh();
 
   return (
     <div className="flex flex-col">
@@ -103,10 +145,38 @@ export default function Settings({ loaderData }: Route.ComponentProps) {
         <Row
           icon={TrendingUp}
           label={s.portfolio.benchmark.label}
-          hint={s.portfolio.benchmark.hint}
+          hint={s.portfolio.benchmark.hintRated}
         >
           <BenchmarkSetting benchmark={benchmark} candidates={candidates} />
         </Row>
+      </Section>
+
+      <Section title={d.title} desc={d.desc}>
+        <ExternalDataSource
+          icon={ChartLine}
+          label={d.prices.label}
+          hint={d.prices.hint}
+          status={external.prices}
+          refresh={prices.refresh}
+          busy={prices.busy}
+        />
+        <ExternalDataSource
+          icon={Percent}
+          label={d.inflation.label}
+          hint={d.inflation.hint}
+          status={external.inflation}
+          refresh={inflation.refresh}
+          busy={inflation.busy}
+        />
+        <ExternalDataSource
+          icon={ArrowLeftRight}
+          label={d.rates.label}
+          hint={d.rates.hint}
+          status={external.rates}
+          idle={t.fx.sync.none}
+          refresh={rates.refresh}
+          busy={rates.busy}
+        />
       </Section>
     </div>
   );
@@ -139,43 +209,6 @@ function Section({
         {children}
       </div>
     </section>
-  );
-}
-
-function Row({
-  icon: Icon,
-  label,
-  hint,
-  soon,
-  children,
-}: {
-  icon: LucideIcon;
-  label: string;
-  hint?: string;
-  soon?: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="flex min-h-14 flex-wrap items-center gap-4 px-4 py-3 not-first:border-t not-first:border-border-subtle">
-      <Icon
-        size={18}
-        strokeWidth={1.75}
-        aria-hidden
-        className="shrink-0 text-muted"
-      />
-      <div className="flex min-w-40 flex-1 flex-col gap-1">
-        <span className="flex items-center gap-2 text-[13px] font-medium">
-          {label}
-          {soon && (
-            <span className="rounded border border-border px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-faint">
-              {soon}
-            </span>
-          )}
-        </span>
-        {hint && <span className="text-[11px] text-muted">{hint}</span>}
-      </div>
-      {children}
-    </div>
   );
 }
 

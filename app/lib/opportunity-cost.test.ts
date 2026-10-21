@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import type { Instrument } from "~/core/domain";
+import { rateBookFrom } from "~/core/fx";
 import type { OpportunityCostLine } from "~/core/projections";
 
 import {
   BENCHMARK_COOKIE,
   benchmarkCandidates,
+  convertibleStarts,
   DEFAULT_BENCHMARK_SYMBOL,
   findBenchmark,
   namesOf,
@@ -62,9 +64,9 @@ describe("parseBenchmark", () => {
     expect(of("IWDA.AS")).toBe("IWDA.AS");
     expect(of(encodeURIComponent("EURUSD=X"))).toBe("EURUSD=X");
     expect(of(encodeURIComponent("^STOXX50E"))).toBe("^STOXX50E");
-    expect(parseBenchmark(`quoin-theme=dark; ${BENCHMARK_COOKIE}=SWRD.MI`)).toBe(
-      "SWRD.MI",
-    );
+    expect(
+      parseBenchmark(`quoin-theme=dark; ${BENCHMARK_COOKIE}=SWRD.MI`),
+    ).toBe("SWRD.MI");
   });
 
   it("falls back to the default when absent, empty, blank or malformed", () => {
@@ -74,6 +76,59 @@ describe("parseBenchmark", () => {
     expect(of("%20%20")).toBe(DEFAULT_BENCHMARK_SYMBOL);
     expect(of("%E0%A4%A")).toBe(DEFAULT_BENCHMARK_SYMBOL);
     expect(DEFAULT_BENCHMARK_SYMBOL).toBe("VWCE.DE");
+  });
+});
+
+describe("convertibleStarts", () => {
+  const book = rateBookFrom([
+    {
+      source: "ECB",
+      base: "EUR",
+      quote: "USD",
+      day: "2020-01-02",
+      rate: "1.1",
+    },
+  ]);
+  const start = (iso: string) => new Date(iso);
+
+  it("keeps a euro history from its first close", () => {
+    expect(
+      convertibleStarts(
+        new Map([
+          ["EUR", new Map([["IE00TEST0001", start("2019-05-01T16:00:00Z")]])],
+        ]),
+        book,
+      ),
+    ).toEqual(new Map([["IE00TEST0001", start("2019-05-01T16:00:00Z")]]));
+  });
+
+  it("starts a history in another currency at its first close that has a rate", () => {
+    const starts = convertibleStarts(
+      new Map([
+        [
+          "USD",
+          new Map([
+            ["US00TEST0001", start("2020-01-03T21:00:00Z")],
+            ["US00TEST0002", start("2015-06-01T21:00:00Z")],
+          ]),
+        ],
+      ]),
+      book,
+    );
+
+    expect(starts.get("US00TEST0001")).toEqual(start("2020-01-03T21:00:00Z"));
+    expect(starts.get("US00TEST0002")).toEqual(start("2020-01-02T12:00:00Z"));
+  });
+
+  it("offers nothing in a currency with no rates", () => {
+    expect(
+      convertibleStarts(
+        new Map([
+          ["GBP", new Map([["GB00TEST0001", start("2020-01-03T16:00:00Z")]])],
+        ]),
+        book,
+      ).size,
+    ).toBe(0);
   });
 });
 

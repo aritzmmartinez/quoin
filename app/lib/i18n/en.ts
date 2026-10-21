@@ -83,7 +83,7 @@ export const en: Copy = {
     close: "Close",
     marketDataUnavailable: "Yahoo could not be reached. Try again.",
     halted: (cause: string): string =>
-      `Stopped before finishing: ${cause}. This is not a problem with one instrument, so the others were not tried.`,
+      `Stopped before finishing: ${cause.replace(/\.+$/, "")}. This is not a problem with one instrument, so the others were not tried.`,
     noRateExcluded: (names: readonly string[]): string => {
       const one = names.length === 1;
       return `No exchange rate: ${names.join(", ")}. ${one ? "It has" : "They have"} trades in another currency that could not be converted to euros, so ${one ? "it is" : "they are"} left out of every figure: an invented rate would give a false cost and value. The trades are still in Movements.`;
@@ -907,7 +907,8 @@ export const en: Copy = {
         count === 1
           ? `1 price saved from ${first}.`
           : `${count} prices saved from ${first}.`,
-      noLive: "Yahoo returned no quote for today: press “Refresh prices” in Portfolio later.",
+      noLive:
+        "Yahoo returned no quote for today: press “Refresh prices” in Portfolio later.",
       noHistory: (symbol: string): string =>
         `Yahoo has no daily history for ${symbol}. Look for its ticker on a euro exchange (.DE, .AS…). Nothing was changed.`,
       notEur: (symbol: string, currency: string): string =>
