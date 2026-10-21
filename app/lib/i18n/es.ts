@@ -17,11 +17,17 @@ export interface ExcludedNotice {
   instruments: string;
 }
 
+const SETTINGS = "Ajustes";
+const EXTERNAL_DATA = "Datos externos";
+const REFRESH_NOW = "Actualizar ahora";
+const REFRESH_RATES = `pulsa «${REFRESH_NOW}» en los tipos de cambio de ${EXTERNAL_DATA} (${SETTINGS})`;
+
 const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
   "crypto-swap": "Intercambios con BTC",
   "crypto-transfer": "Transferencias de BTC",
   "reward-unpriced": "Recompensas de BTC sin precio",
   "foreign-fiat": "Operaciones en otra divisa",
+  "fx-unavailable": "Operaciones sin tipo de cambio del día",
   "unmodelled-asset": "Activos que Quoin no modela",
   "card-spending": "Pagos con tarjeta",
   "saveback-unpaired": "Saveback sin compra emparejada",
@@ -35,6 +41,7 @@ const DISCARD_REASON_HELP: Record<DiscardReason, string | null> = {
     "No hay precio de BTC de esas fechas, así que estas recompensas no se han registrado y tu posición de BTC no las incluye. En Instrumentos, abre el símbolo de BTC y pulsa «Volver a descargar el histórico» con un rango que llegue a esas fechas. Después vuelve a importar este mismo fichero: lo ya registrado no se duplica.",
   "foreign-fiat":
     "Quoin aún no convierte divisas, así que estas operaciones no se importan y no cuentan en sus posiciones.",
+  "fx-unavailable": `El BCE no tenía tipo para el día de estas operaciones en otra divisa (una de hoy antes de las 16:00, o una divisa que no publica), o no se ha podido consultar, así que no se han importado y no cuentan en sus posiciones. Más tarde, ${REFRESH_RATES} y vuelve a importar este mismo fichero: lo ya registrado no se duplica.`,
   "unmodelled-asset": null,
   "card-spending": null,
   "saveback-unpaired":
@@ -138,7 +145,7 @@ export const es = {
     system: "Sistema",
   },
   settings: {
-    title: "Ajustes",
+    title: SETTINGS,
     soon: "Próximamente",
     appearance: {
       title: "Apariencia",
@@ -171,7 +178,68 @@ export const es = {
         unusable:
           "No disponible: ningún instrumento con histórico en euros lleva este símbolo",
         none: "Ningún instrumento tiene todavía símbolo e histórico en euros. Asígnale uno en la columna Símbolo de Instrumentos: al guardarlo se descarga su histórico.",
+        hintRated:
+          "Usado en Coste de oportunidad y en el Resumen. Solo puedes comparar con instrumentos que tienes o has tenido en cartera, con símbolo mapeado e histórico en euros o en una divisa con tipos del BCE",
+        unusableRated:
+          "No disponible: ningún instrumento con histórico valorable lleva este símbolo",
+        noneRated:
+          "Ningún instrumento tiene todavía símbolo e histórico valorable. Asígnale uno en la columna Símbolo de Instrumentos: al guardarlo se descarga su histórico.",
       },
+    },
+    externalData: {
+      title: EXTERNAL_DATA,
+      desc: "Lo que Quoin descarga de fuera. Cada fuente se actualiza por separado.",
+      refresh: REFRESH_NOW,
+      refreshing: "Actualizando…",
+      lastChecked: (when: string): string => `Última actualización: ${when}`,
+      neverChecked: "Nunca actualizado",
+      dataUntil: (date: string): string => `Datos hasta ${date}`,
+      dataUntilFor: (date: string, name: string): string =>
+        `Datos hasta ${date}, por ${name}`,
+      noData: "Sin datos todavía",
+      prices: {
+        label: "Precios",
+        hint: "Yahoo Finance: posiciones abiertas e índice de referencia",
+      },
+      inflation: { label: "IPC", hint: "INE: nacional y Bizkaia" },
+      rates: {
+        label: "Tipos de cambio",
+        hint: "Banco Central Europeo: divisas en uso",
+      },
+    },
+  },
+  fx: {
+    unrated: (
+      names: readonly string[],
+      currencies: readonly string[],
+    ): string => {
+      const one = names.length === 1;
+      return `Sin tipo de cambio reciente: ${names.join(", ")}. ${one ? "Cotiza" : "Cotizan"} en ${currencies.join(", ")} y no hay un tipo del BCE de la última semana, así que ${one ? "queda" : "quedan"} sin valorar, igual que un instrumento sin precio. Para ${one ? "valorarlo" : "valorarlos"}, ${REFRESH_RATES}.`;
+    },
+    unratedCloses: (count: number): string =>
+      count === 1
+        ? "1 cierre no se muestra: no hay tipo de cambio de esa semana."
+        : `${count} cierres no se muestran: no hay tipo de cambio de esas semanas.`,
+    quotedIn: (currency: string): string =>
+      `Cotiza en ${currency}: se valora en euros con el tipo del BCE.`,
+    noRateSeries: (currency: string): string =>
+      `El BCE no publica tipos para ${currency}, así que este símbolo no se puede valorar. Elige su cotización en otra plaza.`,
+    noRateSeriesHistory: (symbol: string, currency: string): string =>
+      `El histórico de ${symbol} viene en ${currency} y el BCE no publica tipos para esa divisa, así que no se ha tocado nada.`,
+    noRateSeriesCount: (count: number): string =>
+      count === 1
+        ? "1 símbolo cotiza en una divisa para la que el BCE no publica tipos y no se ha descargado su histórico. Cámbialo en la columna Símbolo de Instrumentos."
+        : `${count} símbolos cotizan en divisas para las que el BCE no publica tipos y no se ha descargado su histórico. Cámbialos en la columna Símbolo de Instrumentos.`,
+    sync: {
+      loading: "Actualizando tipos del BCE…",
+      upToDate: "Los tipos de cambio ya estaban al día.",
+      added: (n: number): string =>
+        n === 1 ? "1 tipo de cambio añadido" : `${n} tipos de cambio añadidos`,
+      none: "No hay ninguna divisa distinta del euro en uso.",
+      error: "No se pudieron actualizar los tipos de cambio.",
+      unavailable: "El BCE no responde. Prueba más tarde.",
+      conflict: (currencies: readonly string[]): string =>
+        `El BCE ha corregido tipos ya guardados de ${currencies.join(", ")}: no se ha escrito nada de ${currencies.length === 1 ? "esa divisa" : "esas divisas"}.`,
     },
   },
   glossary: {

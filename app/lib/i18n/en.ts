@@ -9,11 +9,17 @@ import type {
 import type { ExcludedNotice } from "./es";
 import type { Copy } from "./types";
 
+const SETTINGS = "Settings";
+const EXTERNAL_DATA = "External data";
+const REFRESH_NOW = "Update now";
+const REFRESH_RATES = `use “${REFRESH_NOW}” on exchange rates in ${EXTERNAL_DATA} (${SETTINGS})`;
+
 const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
   "crypto-swap": "Swaps involving BTC",
   "crypto-transfer": "BTC transfers",
   "reward-unpriced": "BTC rewards without a price",
   "foreign-fiat": "Trades in another currency",
+  "fx-unavailable": "Trades with no exchange rate for their day",
   "unmodelled-asset": "Assets Quoin does not model",
   "card-spending": "Card payments",
   "saveback-unpaired": "Saveback with no paired purchase",
@@ -27,6 +33,7 @@ const DISCARD_REASON_HELP: Record<DiscardReason, string | null> = {
     "There is no BTC price for those dates, so these rewards were not recorded and your BTC position does not include them. In Instruments, open BTC's symbol and use “Download the history again” with a range that reaches those dates. Then import this same file again: what is already recorded is not duplicated.",
   "foreign-fiat":
     "Quoin does not convert currencies yet, so these trades are not imported and do not count towards their positions.",
+  "fx-unavailable": `The ECB had no rate for the day of these trades in another currency (one from today before 16:00, or a currency it does not publish), or could not be reached, so they were not imported and do not count towards their positions. Later, ${REFRESH_RATES} and import this same file again: what is already recorded is not duplicated.`,
   "unmodelled-asset": null,
   "card-spending": null,
   "saveback-unpaired":
@@ -132,7 +139,7 @@ export const en: Copy = {
     system: "System",
   },
   settings: {
-    title: "Settings",
+    title: SETTINGS,
     soon: "Coming soon",
     appearance: {
       title: "Appearance",
@@ -165,7 +172,68 @@ export const en: Copy = {
         unusable:
           "Unavailable: no instrument with euro history carries this symbol",
         none: "No instrument has a symbol and euro history yet. Give one a symbol in the Symbol column of Instruments: saving it downloads its history.",
+        hintRated:
+          "Used in Opportunity cost and the Summary. You can only compare against instruments you hold or have held, with a mapped symbol and a history in euros or in a currency the ECB publishes rates for",
+        unusableRated:
+          "Unavailable: no instrument with a history that can be valued carries this symbol",
+        noneRated:
+          "No instrument has a symbol and a history that can be valued yet. Give one a symbol in the Symbol column of Instruments: saving it downloads its history.",
       },
+    },
+    externalData: {
+      title: EXTERNAL_DATA,
+      desc: "What Quoin downloads from outside. Each source updates on its own.",
+      refresh: REFRESH_NOW,
+      refreshing: "Updating…",
+      lastChecked: (when: string): string => `Last updated: ${when}`,
+      neverChecked: "Never updated",
+      dataUntil: (date: string): string => `Data up to ${date}`,
+      dataUntilFor: (date: string, name: string): string =>
+        `Data up to ${date}, held back by ${name}`,
+      noData: "No data yet",
+      prices: {
+        label: "Prices",
+        hint: "Yahoo Finance: open positions and the benchmark",
+      },
+      inflation: { label: "CPI", hint: "INE: national and Bizkaia" },
+      rates: {
+        label: "Exchange rates",
+        hint: "European Central Bank: currencies in use",
+      },
+    },
+  },
+  fx: {
+    unrated: (
+      names: readonly string[],
+      currencies: readonly string[],
+    ): string => {
+      const one = names.length === 1;
+      return `No recent exchange rate: ${names.join(", ")}. ${one ? "It is" : "They are"} quoted in ${currencies.join(", ")} and there is no ECB rate from the last week, so ${one ? "it is" : "they are"} left unvalued, like an instrument with no price. To value ${one ? "it" : "them"}, ${REFRESH_RATES}.`;
+    },
+    unratedCloses: (count: number): string =>
+      count === 1
+        ? "1 close is not shown: there is no exchange rate for that week."
+        : `${count} closes are not shown: there is no exchange rate for those weeks.`,
+    quotedIn: (currency: string): string =>
+      `Quoted in ${currency}: valued in euros at the ECB rate.`,
+    noRateSeries: (currency: string): string =>
+      `The ECB publishes no rates for ${currency}, so this symbol cannot be valued. Pick its line on another venue.`,
+    noRateSeriesHistory: (symbol: string, currency: string): string =>
+      `The history of ${symbol} comes in ${currency} and the ECB publishes no rates for that currency, so nothing was changed.`,
+    noRateSeriesCount: (count: number): string =>
+      count === 1
+        ? "1 symbol is quoted in a currency the ECB publishes no rates for, and its history was not downloaded. Change it in the Symbol column of Instruments."
+        : `${count} symbols are quoted in currencies the ECB publishes no rates for, and their history was not downloaded. Change them in the Symbol column of Instruments.`,
+    sync: {
+      loading: "Updating ECB rates…",
+      upToDate: "Exchange rates were already up to date.",
+      added: (n: number): string =>
+        n === 1 ? "1 exchange rate added" : `${n} exchange rates added`,
+      none: "No currency other than the euro is in use.",
+      error: "Exchange rates could not be updated.",
+      unavailable: "The ECB is not responding. Try again later.",
+      conflict: (currencies: readonly string[]): string =>
+        `The ECB has revised rates already stored for ${currencies.join(", ")}: nothing was written for ${currencies.length === 1 ? "that currency" : "those currencies"}.`,
     },
   },
   glossary: {

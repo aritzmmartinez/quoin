@@ -255,6 +255,7 @@ describe("KrakenCsvAdapter discards", () => {
       "crypto-transfer",
       "reward-unpriced",
       "foreign-fiat",
+      "fx-unavailable",
     ]);
   });
 });
