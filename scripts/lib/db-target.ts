@@ -107,7 +107,6 @@ export function classifyDatabase(
 const KIND_LABEL = {
   ledger: "LIVE LEDGER, real trades",
   scratch: "scratch database",
-  other: "neither the ledger nor the scratch database",
 } as const;
 
 export function describeDatabase(
@@ -120,6 +119,12 @@ export function describeDatabase(
   }
 
   const missing = exists ? "" : ", does not exist yet";
+  if (target.kind === "other") {
+    return (
+      `Database: ${target.path} — not the live ledger (${REAL_DATABASE_FILE}) ` +
+      `nor the scratch database (${SCRATCH_DATABASE_FILE})${missing}`
+    );
+  }
   return `Database: ${target.path} (${KIND_LABEL[target.kind]}${missing})`;
 }
 

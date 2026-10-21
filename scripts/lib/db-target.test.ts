@@ -257,9 +257,16 @@ describe("describeDatabase", () => {
     ).toBe(`Database: ${scratchDatabasePath()} (scratch database)`);
   });
 
-  it("says a file is neither when it is neither", () => {
+  it("names both known paths when a file is neither, so it says what scratch is", () => {
     expect(describeDatabase({ kind: "other", path: "/x.sqlite" }, true)).toBe(
-      "Database: /x.sqlite (neither the ledger nor the scratch database)",
+      `Database: /x.sqlite — not the live ledger (${REAL_DATABASE_FILE}) ` +
+        `nor the scratch database (${SCRATCH_DATABASE_FILE})`,
+    );
+  });
+
+  it("says when another file does not exist yet", () => {
+    expect(describeDatabase({ kind: "other", path: "/x.sqlite" }, false)).toMatch(
+      /\(data\/dev\.sqlite\), does not exist yet$/,
     );
   });
 
