@@ -4,6 +4,7 @@ export * from "./security-identity-repository";
 export * from "./instrument-repository";
 export * from "./price-repository";
 export * from "./inflation-repository";
+export * from "./fx-repository";
 export * from "./target-repository";
 export * from "./mappers";
 export { prisma } from "./db.server";

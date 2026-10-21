@@ -1,4 +1,5 @@
 import {
+  InvalidLedgerEventError,
   KrakenCsvAdapter,
   TradeRepublicCsvAdapter,
   detectBroker,
@@ -54,16 +55,24 @@ async function plan(
   const instruments = new PrismaInstrumentRepository();
   const ledger = new PrismaLedgerRepository();
 
-  const batch =
-    broker === "kraken"
-      ? await new KrakenCsvAdapter(
-          instruments,
-          ledger,
-          new PrismaPriceRepository(),
-        ).plan(csv)
-      : new TradeRepublicCsvAdapter(instruments, ledger).plan(csv);
-
-  return { broker, batch };
+  try {
+    const batch =
+      broker === "kraken"
+        ? await new KrakenCsvAdapter(
+            instruments,
+            ledger,
+            new PrismaPriceRepository(),
+          ).plan(csv)
+        : new TradeRepublicCsvAdapter(instruments, ledger).plan(csv);
+    return { broker, batch };
+  } catch (error) {
+    if (error instanceof InvalidLedgerEventError) {
+      throw new IngestError(
+        t.ingest.invalidEvent(error.date, error.type, error.currency),
+      );
+    }
+    throw error;
+  }
 }
 
 export async function previewIngest(

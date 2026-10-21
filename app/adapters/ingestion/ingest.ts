@@ -1,4 +1,10 @@
-import type { Instrument, LedgerEvent } from "~/core/domain";
+import { dayOf } from "~/core/calendar";
+import {
+  isUnconvertedForeign,
+  ledgerEventWriteSchema,
+  type Instrument,
+  type LedgerEvent,
+} from "~/core/domain";
 import {
   ledgerDedupKey,
   type InstrumentRepository,
@@ -41,7 +47,21 @@ export interface ImportSummary {
   instruments: number;
 }
 
+export class InvalidLedgerEventError extends Error {
+  constructor(
+    readonly date: string,
+    readonly type: string,
+    readonly currency: string,
+  ) {
+    super(
+      `A ${type} on ${date} in ${currency} breaks the ledger's FX rule; nothing was imported`,
+    );
+    this.name = "InvalidLedgerEventError";
+  }
+}
+
 export class BatchBuilder {
+  private invalid: InvalidLedgerEventError | null = null;
   private readonly events: LedgerEvent[] = [];
   private readonly operationOf: number[] = [];
   private operations = 0;
@@ -57,7 +77,29 @@ export class BatchBuilder {
   addOperation(items: readonly MappedItem[]): void {
     const operation = this.operations;
     this.operations += 1;
-    for (const item of items) this.addItem(item, operation);
+
+    const foreign = items.find(
+      (item) => item.kind === "domain" && isUnconvertedForeign(item.event),
+    );
+    if (foreign?.kind === "domain") {
+      this.addItem(foreignDiscard(foreign), operation);
+      return;
+    }
+
+    for (const item of items) {
+      if (
+        item.kind === "domain" &&
+        this.invalid === null &&
+        !ledgerEventWriteSchema.safeParse(item.event).success
+      ) {
+        this.invalid = new InvalidLedgerEventError(
+          dayOf(item.event.ts),
+          item.event.type,
+          item.event.currency,
+        );
+      }
+      this.addItem(item, operation);
+    }
   }
 
   private addItem(item: MappedItem, operation: number): void {
@@ -85,6 +127,7 @@ export class BatchBuilder {
   }
 
   build(total: number): MappedBatch {
+    if (this.invalid) throw this.invalid;
     return {
       total,
       instruments: [...this.instruments.values()],
@@ -95,6 +138,23 @@ export class BatchBuilder {
       errors: this.errors,
     };
   }
+}
+
+function foreignDiscard(
+  item: Extract<MappedItem, { kind: "domain" }>,
+): MappedItem {
+  const { event } = item;
+  const name = item.instrument?.name ?? null;
+  return {
+    kind: "discard",
+    reason: "foreign-fiat",
+    detail: {
+      date: event.ts.toISOString(),
+      type: event.type,
+      subtype: null,
+      instrument: name ? `${name} (${event.currency})` : event.currency,
+    },
+  };
 }
 
 export function countOperations(

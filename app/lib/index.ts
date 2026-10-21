@@ -5,6 +5,7 @@ export * from "./discards";
 export * from "./exposures";
 export * from "./format";
 export * from "./use-format";
+export * from "./fx-sync";
 export * from "./i18n";
 export * from "./in-turn";
 export * from "./ingest";

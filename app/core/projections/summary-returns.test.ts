@@ -27,7 +27,6 @@ function trade(
     id: crypto.randomUUID(),
     type: "BUY",
     currency: "EUR",
-    fxToBase: "1",
     account: "trade-republic",
     source: "trade-republic",
     price: "0",

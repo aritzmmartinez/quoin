@@ -11,7 +11,6 @@ function trade(
     type: "BUY",
     instrumentId: "VWCE",
     currency: "EUR",
-    fxToBase: "1",
     account: "tr",
     source: "tr",
     price: "0",

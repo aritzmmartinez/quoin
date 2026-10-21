@@ -9,6 +9,8 @@ import {
   type DiscardReason,
 } from "~/adapters/ingestion/discard";
 
+import type { Copy } from "./i18n";
+
 export interface DiscardGroup {
   reason: DiscardReason;
   count: number;
@@ -45,4 +47,9 @@ export function discardGroups(summary: {
       },
     ];
   });
+}
+
+export function discardTypeLabel(t: Copy, type: string): string {
+  const types: Readonly<Record<string, string>> = t.movements.types;
+  return Object.hasOwn(types, type) ? (types[type] ?? type) : type;
 }

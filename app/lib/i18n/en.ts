@@ -13,7 +13,7 @@ const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
   "crypto-swap": "Swaps involving BTC",
   "crypto-transfer": "BTC transfers",
   "reward-unpriced": "BTC rewards without a price",
-  "foreign-fiat": "BTC trades in another currency",
+  "foreign-fiat": "Trades in another currency",
   "unmodelled-asset": "Assets Quoin does not model",
   "card-spending": "Card payments",
   "saveback-unpaired": "Saveback with no paired purchase",
@@ -25,7 +25,8 @@ const DISCARD_REASON_HELP: Record<DiscardReason, string | null> = {
   "crypto-transfer": null,
   "reward-unpriced":
     "There is no BTC price for those dates, so these rewards were not recorded and your BTC position does not include them. In Instruments, open BTC's symbol and use “Download the history again” with a range that reaches those dates. Then import this same file again: what is already recorded is not duplicated.",
-  "foreign-fiat": null,
+  "foreign-fiat":
+    "Quoin does not convert currencies yet, so these trades are not imported and do not count towards their positions.",
   "unmodelled-asset": null,
   "card-spending": null,
   "saveback-unpaired":
@@ -74,6 +75,12 @@ export const en: Copy = {
   common: {
     close: "Close",
     marketDataUnavailable: "Yahoo could not be reached. Try again.",
+    noRateExcluded: (names: readonly string[]): string => {
+      const one = names.length === 1;
+      return `No exchange rate: ${names.join(", ")}. ${one ? "It has" : "They have"} trades in another currency that could not be converted to euros, so ${one ? "it is" : "they are"} left out of every figure: an invented rate would give a false cost and value. The trades are still in Movements.`;
+    },
+    noRateTax: (names: string): string =>
+      `No exchange rate: ${names}. Their trades could not be converted to euros and are not part of this calculation. Check them before using these figures in a tax return.`,
   },
   notFound: {
     title: "Page not found",
@@ -589,6 +596,8 @@ export const en: Copy = {
     unknownBroker:
       "I do not recognise this export. A Trade Republic CSV (with a transaction_id column) or a Kraken one (with a refid column) is expected.",
     failed: "The import failed.",
+    invalidEvent: (date: string, type: string, currency: string): string =>
+      `The ${type} of ${date} in ${currency} breaks the ledger's rules. This is a fault in how Quoin reads this export, not in the file: nothing was imported.`,
     analysing: "Analysing the file…",
     importing: "Importing…",
     retrying: "Valuing the rewards…",
@@ -1068,6 +1077,9 @@ export const en: Copy = {
     },
     amountHint:
       "The amount is the real cash flow: fees included and withholdings deducted.",
+    noRateLabel: "no rate",
+    noRate: (currency: string): string =>
+      `This entry is in ${currency} and has no exchange rate to euros, so it could not be valued and counts in no figure.`,
   },
   portfolio: {
     title: "Portfolio",

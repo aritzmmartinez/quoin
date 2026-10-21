@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { discardGroups } from "./discards";
+import { discardGroups, discardTypeLabel } from "./discards";
+import { en } from "./i18n/en";
+import { es } from "./i18n/es";
 
 const at = (instrument: string | null) => ({
   date: "2026-02-01T09:00:00.000Z",
@@ -65,4 +67,22 @@ describe("discardGroups", () => {
   it("is empty when nothing was set aside", () => {
     expect(discardGroups({ discarded: {}, discardedDetails: {} })).toEqual([]);
   });
+});
+
+describe("discardTypeLabel", () => {
+  it.each([
+    [es, "BUY", "Compra"],
+    [es, "DEPOSIT", "Ingreso"],
+    [en, "BUY", "Buy"],
+    [en, "DIVIDEND", "Dividend"],
+  ])("labels a ledger type as Movements does", (copy, type, label) => {
+    expect(discardTypeLabel(copy, type)).toBe(label);
+  });
+
+  it.each(["receive", "staking", "BENEFITS_SAVEBACK", "toString"])(
+    "keeps a broker's own type %s as it came",
+    (type) => {
+      expect(discardTypeLabel(es, type)).toBe(type);
+    },
+  );
 });

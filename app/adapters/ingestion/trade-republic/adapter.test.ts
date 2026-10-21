@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
   ExposureKind,
@@ -12,6 +12,7 @@ import type {
   LedgerRepository,
 } from "~/core/ports";
 
+import { BatchBuilder, InvalidLedgerEventError, previewBatch } from "../ingest";
 import { TradeRepublicCsvAdapter } from "./adapter";
 
 class FakeInstrumentRepository implements InstrumentRepository {
@@ -203,5 +204,64 @@ describe("TradeRepublicCsvAdapter", () => {
     expect(
       ledger.appended.filter((e) => e.externalId === "b-old"),
     ).toHaveLength(1);
+  });
+});
+
+describe("TradeRepublicCsvAdapter with a row in another currency", () => {
+  const FOREIGN_CSV = [
+    HEADER,
+    `"2025-01-01T10:00:00Z","TRADING","BUY","FUND","World ETF","IE00AAA","1","100","-100","","","EUR","t1"`,
+    `"2025-01-02T10:00:00Z","TRADING","BUY","STOCK","Some Stock","US000AAA","2","50","-100","-1","","USD","t2"`,
+    `"2025-01-05T10:00:00Z","CASH","CUSTOMER_INPAYMENT","","","","","","500","","","EUR","t3"`,
+  ].join("\n");
+
+  let instruments: FakeInstrumentRepository;
+  let ledger: FakeLedgerRepository;
+  let adapter: TradeRepublicCsvAdapter;
+
+  beforeEach(() => {
+    instruments = new FakeInstrumentRepository();
+    ledger = new FakeLedgerRepository();
+    adapter = new TradeRepublicCsvAdapter(instruments, ledger);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("sets that row aside as foreign-fiat and imports the rest", async () => {
+    const summary = await adapter.import(FOREIGN_CSV);
+
+    expect(summary.imported).toBe(2);
+    expect(summary.discarded).toEqual({ "foreign-fiat": 1 });
+    expect(summary.discardedDetails["foreign-fiat"]).toEqual([
+      {
+        date: "2025-01-02T10:00:00.000Z",
+        type: "BUY",
+        subtype: null,
+        instrument: "Some Stock (USD)",
+      },
+    ]);
+    expect(ledger.appended.map((e) => e.externalId)).toEqual(["t1", "t3"]);
+    expect(instruments.upserted.map((i) => i.id)).toEqual(["IE00AAA"]);
+  });
+
+  it("previews exactly what it then imports", async () => {
+    const preview = await previewBatch(ledger, adapter.plan(FOREIGN_CSV));
+    const imported = await adapter.import(FOREIGN_CSV);
+
+    expect(preview).toEqual(imported);
+  });
+
+  it("writes nothing at all, instruments included, when a row breaks the rule otherwise", async () => {
+    vi.spyOn(BatchBuilder.prototype, "build").mockImplementation(() => {
+      throw new InvalidLedgerEventError("2025-01-02", "BUY", "USD");
+    });
+
+    await expect(adapter.import(FOREIGN_CSV)).rejects.toBeInstanceOf(
+      InvalidLedgerEventError,
+    );
+    expect(instruments.upserted).toEqual([]);
+    expect(ledger.appended).toEqual([]);
   });
 });

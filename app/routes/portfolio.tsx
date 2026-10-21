@@ -5,6 +5,7 @@ import type { Route } from "./+types/portfolio";
 
 import {
   Card,
+  Explainer,
   IngestModal,
   PortfolioEmpty,
   PortfolioTable,
@@ -17,6 +18,7 @@ import {
   PrismaPriceRepository,
 } from "~/adapters/persistence";
 import { BASE_CURRENCY } from "~/core/domain";
+import { unconvertibleInstrumentIds } from "~/core/fx";
 import {
   computeMarketValues,
   computePositions,
@@ -26,6 +28,7 @@ import {
   type Copy,
   copyFor,
   copyFromMatches,
+  namesOf,
   parseLocale,
   parseSort,
   sortPortfolioRows,
@@ -94,6 +97,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     value: totalMarketValue(rows),
     unrealized: totalUnrealizedPnL(rows),
     updatedAt,
+    noRate: namesOf(unconvertibleInstrumentIds(events), instruments),
   };
 }
 
@@ -109,6 +113,7 @@ export default function Portfolio({ loaderData }: Route.ComponentProps) {
     updatedAt,
     syncTargets,
     unmapped,
+    noRate,
   } = loaderData;
   const navigation = useNavigation();
   const busy = navigation.state === "loading";
@@ -121,7 +126,9 @@ export default function Portfolio({ loaderData }: Route.ComponentProps) {
             {rows.length > 0 && (
               <span className="text-[13px] text-muted">
                 {t.portfolio.summary(rows.length, formatMoney(invested))}
-                {value !== null && <> · {t.portfolio.value(formatMoney(value))}</>}
+                {value !== null && (
+                  <> · {t.portfolio.value(formatMoney(value))}</>
+                )}
               </span>
             )}
             {unrealized !== null && (
@@ -146,6 +153,12 @@ export default function Portfolio({ loaderData }: Route.ComponentProps) {
           </div>
         )}
       </header>
+
+      {noRate.length > 0 && (
+        <Explainer tone="notice" className="mb-4">
+          {t.common.noRateExcluded(noRate)}
+        </Explainer>
+      )}
 
       <Card>
         {rows.length === 0 ? (

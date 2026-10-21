@@ -15,7 +15,7 @@ export interface Position {
  *
  * Pure function: same events in, same positions out. Trades are processed in
  * chronological order regardless of input order. Amounts are aggregated in the base
- * currency (each is multiplied by its `fxToBase`, which is "1" for base-currency events).
+ * currency (each through `toBase`, at the rate it was booked at).
  *
  * Only BUY/SELL affect positions; dividends and cash movements are ignored here
  * (they belong to separate projections). One instrument is one position: the

@@ -68,6 +68,7 @@ pnpm exposure:map                 # list how every instrument resolves
 pnpm exposure:map <ISIN> <KIND> [LEAF]           # e.g. XS00TEST0003 COMMODITY XAU
 pnpm identity:resolve [--limit N] [--all] [--retry-ambiguous] [--refresh] [--report]
 pnpm ipc:sync [--force-rebase]        # INE consumer price index, national + Bizkaia
+pnpm fx:sync [CODE…]                  # ECB reference rates; default: every non-EUR currency in use
 pnpm target:set                       # show the savings-plan target in force today
 pnpm target:set <file> [--from=YYYY-MM-DD] [--name=…] [--note=…]   # record a version
 pnpm projection:converge              # seed-to-seed spread of p10/p50/p90 at several N
@@ -536,8 +537,26 @@ manual aliasing was abandoned — 726 confirmations is not a system.
   leaf would have to pick one and be wrong for the other. This is the payoff of
   contributions being kept rather than summed.
 - **No FX, and none is needed.** Every amount arriving is already EUR by the valuation
-  invariant. This labels and sums; it never converts. `app/adapters/fx` is still a
-  placeholder, and the IPC pipeline is a price index, not a rate source.
+  invariant. This labels and sums; it never converts. The ECB rates `pnpm fx:sync`
+  stores are not read by any valuation yet, and the IPC pipeline is a price index, not a
+  rate source.
+- **ECB rates: one currency per request, and the sync restarts from the last day
+  stored.** Measured 2026-10-20: asking for several at once (`USD+XYZ`) drops an unknown
+  one silently; alone, it is a 404 with `title: "Not Found"`. A rate for day D appears
+  around 16:00 Madrid, so a sync in the morning finds none for D; restarting from the
+  last day in `FxRate`, never from the last check in `FxSync`, is what asks for D again.
+  A rate that arrives different for a stored day refuses the whole batch.
+- **A series starts a week before its currency was first used, never in 1999.** First
+  use is the earliest `LedgerEntry.ts` or `PriceSnapshot.asOf` in that currency; the
+  week covers a closing as long as Easter. A cold ECB query costs about 1.4 s per year
+  of range (measured 2026-10-20; the whole history since 1999 took 41–52 s), so asking
+  for nothing older than the portfolio is what keeps the sync usable behind a button.
+  A code given by hand and not in use goes back 30 days. The sync goes back again only
+  when a currency's first use is older than its first stored day — an older export
+  imported later — never because the margin fell on days with no rate.
+- **Until 2012 the ECB printed closing days as rows with an empty rate** (`OBS_STATUS=H`
+  in the full detail; `dataonly` shows only the empty value). The parser drops a row
+  with an empty rate and still refuses any other malformed one.
 - A leaf with no known currency lands in its own bucket at full value and is never
   pro-rated — same rule as `UNRESOLVED`, `unpricedCount` and a missing CPI month.
 
@@ -884,7 +903,9 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
   `crypto-swap` (BTC ↔ another crypto, in either direction — a `stable_coin` is crypto,
   not fiat), `crypto-transfer` (BTC on-chain in or out), `foreign-fiat` (BTC bought or
   sold against a fiat that is not `BASE_CURRENCY`, which used to be booked as EUR at
-  1:1) and `reward-unpriced` each leave the BTC position wrong, and
+  1:1; any adapter's unconverted foreign event lands here too, see *CSV ingestion*, so
+  its label and help name no asset) and `reward-unpriced` each leave the BTC position
+  wrong, and
   `AFFECTS_POSITION` flags them so the wizard and `pnpm ingest` warn. Every Kraken discard
   carries a per-group detail (date, type, subtype, asset or pair — never amounts).
   `DiscardReason` is a union and its labels are `Record<DiscardReason, string>` in both
@@ -949,7 +970,40 @@ adding it in **both** places, in the same change.
   is the measured case: `migrate dev` generated a rebuild for a plain new column, so it was
   written with `--create-only` as `ADD COLUMN`. `funding` has its own CHECK
   (`CASH | IN_KIND`), same reason as `type`.
-
+- **Which `fxSource` fits which row is the domain's rule, checked at write, and never a
+  database CHECK.** `ledgerEventWriteSchema` (called by `eventToCreateData`, the only
+  ledger write path) allows `IDENTITY` only for a row in EUR with no `fxRate`,
+  `fxDirection` or `fxDate`, and any other source only for a row in another currency
+  with all three — so nothing new can count a foreign amount one-to-one, as the Kraken
+  mapper once did. The migration CHECKs only the values of `fxSource` and `fxDirection`.
+  A CHECK naming `currency` was written and withdrawn: an existing row that breaks it
+  makes the `ADD COLUMN` itself fail, and ledgers outside this one hold Kraken USD
+  deposits booked at 1:1 before `foreign-fiat` existed — that container would never
+  start. An integration test applies the migration over such a row. Reads stay lenient
+  (`ledgerEventSchema`), the `LedgerEntry.type` lesson: an old row that breaks the rule is
+  read, and `toBase` answers it with an explicit `no-rate` rather than throwing or counting
+  it 1:1. `originalAmount` and `originalCurrency` are informational and constrained by
+  nothing.
+- **Every ledger amount reaches euros through `toBase(event, field)` in `core/fx`**, never
+  a multiplication at the call site. `IDENTITY` returns the amount untouched — a Kraken
+  reward worth a fraction of a cent keeps it. A converted amount divides by `fxRate`
+  (`QUOTE_PER_BASE`, the ECB's currency per euro) or multiplies by it (`BASE_PER_QUOTE`)
+  and is rounded to the cent, `ROUND_HALF_UP`, field by field — dividing by the
+  published rate is exact up to that rounding, where storing its inverse was not, which
+  is why `fxToBase` was dropped.
+- **A row with no rate is excluded and named, never valued at 1:1** — the `unpricedCount`
+  rule, one step earlier. `toBase` returns `{ ok: false, reason: "no-rate" }` for an
+  `IDENTITY` row not in EUR or a conversion missing its rate or direction. `bookable`
+  drops **every** row of an instrument with a trade like that — dropping one trade would
+  unbalance AVCO and FIFO — and a dividend or cash row like that alone. Every core entry
+  point that values the ledger runs it itself (`walkAvco`, `sortTrades` and so FIFO and
+  the tax history, the cost line, contributions, TWR/MWR, the opportunity cost, in-kind
+  income), so no screen can forget it; they then read amounts through `baseOf`, which
+  throws only if that invariant is broken. What is excluded is named: Portfolio and
+  Summary through `unconvertibleInstrumentIds`; the tax view of `/realized` and
+  `pnpm tax:explain` through `taxExclusions`, because a holding missing from a tax
+  report in silence is the worst place for it; Movements keeps the row with "—" and
+  "No exchange rate" instead of an amount, and leaves it out of the net cash flow.
 ## CSV ingestion
 
 **The broker is detected from the header row, never from the filename and never by
@@ -966,6 +1020,16 @@ and are applied defensively to every adapter:
 2. a pre-validation filter dropping any row without a `type` field
 
 Append is idempotent: dedup by `source` + `externalId`.
+
+**`BatchBuilder` applies `ledgerEventWriteSchema` while planning, for every adapter.** An
+event in another currency with no conversion is set aside as `foreign-fiat` — the whole
+operation, so a saveback pair is never cut in half — and the rest of the file imports;
+the preview goes through the same plan, so it says the same. Any other break of the rule
+is a bug in the adapter: `build()` throws `InvalidLedgerEventError` (date, type, currency,
+never amounts), which `api/ingest` turns into a 400 before anything is written,
+instruments included. It throws from `build()`, outside the adapters' per-row `try`,
+because those count an exception as one bad row and carry on. `eventToCreateData` still
+validates as the last line.
 
 ## URL as state
 

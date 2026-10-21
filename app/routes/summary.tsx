@@ -12,6 +12,7 @@ import {
   AllocationCard,
   BasisNotice,
   Card,
+  Explainer,
   PortfolioEmpty,
   SetupChecklist,
   SummaryHero,
@@ -44,6 +45,7 @@ import {
   exposureKindLabel,
   filterByRange,
   heldValuesByInstrument,
+  namesOf,
   parseBenchmark,
   parseLocale,
   parseRange,
@@ -53,6 +55,7 @@ import {
 } from "~/lib";
 
 import { BASE_CURRENCY, type Revalue } from "~/core/domain";
+import { unconvertibleInstrumentIds } from "~/core/fx";
 import { firstEventByInstrument } from "~/lib/history-start";
 import { loadOpportunityCost } from "~/lib/opportunity-cost.server";
 import { resolveRealView } from "~/lib/real.server";
@@ -218,6 +221,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       allocation,
       top,
       range,
+      noRate: namesOf(unconvertibleInstrumentIds(events), instruments),
       real: {
         basis: real.basis,
         active: real.active,
@@ -251,6 +255,7 @@ export default function Summary({ loaderData }: Route.ComponentProps) {
     change,
     series,
     real,
+    noRate,
   } = loaderData;
   const t = useCopy();
   const hasPositions = summary.pricedCount > 0 || summary.unpricedCount > 0;
@@ -279,6 +284,10 @@ export default function Summary({ loaderData }: Route.ComponentProps) {
   return (
     <div className="flex flex-col gap-6">
       <BasisNotice {...real} />
+
+      {noRate.length > 0 && (
+        <Explainer tone="notice">{t.common.noRateExcluded(noRate)}</Explainer>
+      )}
 
       <SummaryHero
         totalValue={summary.totalValue}

@@ -21,7 +21,7 @@ const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
   "crypto-swap": "Intercambios con BTC",
   "crypto-transfer": "Transferencias de BTC",
   "reward-unpriced": "Recompensas de BTC sin precio",
-  "foreign-fiat": "Compras y ventas de BTC en otra divisa",
+  "foreign-fiat": "Operaciones en otra divisa",
   "unmodelled-asset": "Activos que Quoin no modela",
   "card-spending": "Pagos con tarjeta",
   "saveback-unpaired": "Saveback sin compra emparejada",
@@ -33,7 +33,8 @@ const DISCARD_REASON_HELP: Record<DiscardReason, string | null> = {
   "crypto-transfer": null,
   "reward-unpriced":
     "No hay precio de BTC de esas fechas, así que estas recompensas no se han registrado y tu posición de BTC no las incluye. En Instrumentos, abre el símbolo de BTC y pulsa «Volver a descargar el histórico» con un rango que llegue a esas fechas. Después vuelve a importar este mismo fichero: lo ya registrado no se duplica.",
-  "foreign-fiat": null,
+  "foreign-fiat":
+    "Quoin aún no convierte divisas, así que estas operaciones no se importan y no cuentan en sus posiciones.",
   "unmodelled-asset": null,
   "card-spending": null,
   "saveback-unpaired":
@@ -80,6 +81,12 @@ export const es = {
   common: {
     close: "Cerrar",
     marketDataUnavailable: "No se ha podido consultar Yahoo. Inténtalo de nuevo.",
+    noRateExcluded: (names: readonly string[]): string => {
+      const one = names.length === 1;
+      return `Sin tipo de cambio: ${names.join(", ")}. ${one ? "Tiene" : "Tienen"} operaciones en otra divisa que no se han podido convertir a euros, así que ${one ? "queda" : "quedan"} fuera de todas las cifras: un tipo inventado daría un coste y un valor falsos. Las operaciones siguen en Movimientos.`;
+    },
+    noRateTax: (names: string): string =>
+      `Sin tipo de cambio: ${names}. Sus operaciones no se han podido convertir a euros y no entran en este cálculo. Revísalo antes de usar estas cifras en la declaración.`,
   },
   notFound: {
     title: "Página no encontrada",
@@ -598,6 +605,8 @@ export const es = {
     unknownBroker:
       "No reconozco este export. Se espera un CSV de Trade Republic (con columna transaction_id) o de Kraken (con columna refid).",
     failed: "La importación ha fallado.",
+    invalidEvent: (date: string, type: string, currency: string): string =>
+      `La operación ${type} del ${date} en ${currency} no cumple las reglas del registro. Es un fallo de Quoin al leer este export, no del fichero: no se ha importado nada.`,
     analysing: "Analizando el fichero…",
     importing: "Importando…",
     retrying: "Valorando las recompensas…",
@@ -1079,6 +1088,9 @@ export const es = {
     },
     amountHint:
       "El importe es el flujo de caja real: comisiones incluidas y retenciones descontadas.",
+    noRateLabel: "sin tipo",
+    noRate: (currency: string): string =>
+      `Esta operación está en ${currency} y no tiene tipo de cambio a euros, así que no se ha podido valorar y no cuenta en ninguna cifra.`,
   },
   portfolio: {
     title: "Cartera",

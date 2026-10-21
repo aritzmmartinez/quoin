@@ -11,6 +11,7 @@ import {
   BasisNotice,
   Card,
   EmptyState,
+  Explainer,
   RealizedTable,
   RealizedViewTabs,
   TaxYearPanel,
@@ -30,6 +31,7 @@ import {
   parseRealizedView,
   parseTaxYear,
   realizedTotals,
+  taxExclusions,
   toRealizedRows,
   useCopy,
   useFormat,
@@ -86,6 +88,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       checkStale: real.checkStale,
     },
     fiscal: {
+      noRate: taxExclusions(events, instruments),
       years: taxYears,
       year: taxYear,
       view:
@@ -109,6 +112,11 @@ export default function Realized({ loaderData }: Route.ComponentProps) {
         <header className="mb-4">
           <RealizedViewTabs value={view} />
         </header>
+        {fiscal.noRate.length > 0 && (
+          <Explainer tone="notice" className="mb-4">
+            {t.common.noRateTax(fiscal.noRate.join(", "))}
+          </Explainer>
+        )}
         <TaxYearPanel
           years={fiscal.years}
           year={fiscal.year}

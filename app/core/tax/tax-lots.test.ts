@@ -24,7 +24,6 @@ function trade(
     grossAmount,
     fees: opts.fees ?? "0",
     currency: "EUR",
-    fxToBase: "1",
     account: "test",
     source: "TEST",
   };
@@ -417,5 +416,22 @@ describe("computeTaxLots", () => {
     for (const y of [2024, 2025, 2026, 2027]) {
       expect(taxYearOf(history, y)).toEqual(computeTaxLots(events, y, LISTED));
     }
+  });
+});
+
+describe("an instrument with a trade it cannot convert to euros", () => {
+  it("is left out of the FIFO whole, so the other instruments' figures stand", () => {
+    const events = [
+      trade("BUY", "IE00TEST0001", "10", "1000", { ts: "2025-01-10" }),
+      trade("SELL", "IE00TEST0001", "10", "1200", { ts: "2025-06-10" }),
+      trade("BUY", "US00TEST0002", "5", "500", { ts: "2025-01-10" }),
+      {
+        ...trade("SELL", "US00TEST0002", "5", "900", { ts: "2025-06-10" }),
+        currency: "USD",
+      },
+    ];
+
+    const result = taxYearOf(computeTaxHistory(events, LISTED), 2025);
+    expect(result.gains.map((g) => g.instrumentId)).toEqual(["IE00TEST0001"]);
   });
 });

@@ -19,7 +19,7 @@ import {
   taxYearOf,
   type RealizedGainDetail,
 } from "~/core/tax";
-import { unlistedInstrumentIds } from "~/lib/tax";
+import { taxExclusions, unlistedInstrumentIds } from "~/lib/tax";
 import { databasePath } from "./lib/db-target";
 
 const YEAR = Number(
@@ -98,6 +98,16 @@ async function main(): Promise<void> {
     new PrismaInstrumentRepository().list(),
   ]);
   const names = new Map(instruments.map((i) => [i.id, i.name]));
+
+  const excluded = taxExclusions(events, instruments);
+  if (excluded.length > 0) {
+    console.log(
+      `! No exchange rate: ${excluded.join(", ")}.\n` +
+        "  Their trades could not be converted to euros and are not part of\n" +
+        "  this calculation. Check them before using these figures in a tax\n" +
+        "  return.\n",
+    );
+  }
 
   const history = computeTaxHistory(events, {
     unlistedInstrumentIds: unlistedInstrumentIds(instruments),
