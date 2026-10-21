@@ -6,6 +6,8 @@ import {
   type FxRateProvider,
 } from "~/core/ports";
 
+import { withTimeout } from "~/adapters/http";
+
 import { ECB_BASE, ECB_SOURCE, parseEcbCsv } from "./parse";
 
 const BASE = "https://data-api.ecb.europa.eu/service/data/EXR";
@@ -23,9 +25,19 @@ export function ecbRatesUrl(quote: string, from: string, to: string): string {
   return `${BASE}/D.${quote}.${ECB_BASE}.SP00.A?${params.toString()}`;
 }
 
+export interface EcbOptions {
+  timeoutMs?: number;
+}
+
 export class EcbFxRateProvider implements FxRateProvider {
   readonly source = ECB_SOURCE;
   readonly base = ECB_BASE;
+
+  private readonly timeoutMs: number;
+
+  constructor(options: EcbOptions = {}) {
+    this.timeoutMs = options.timeoutMs ?? ECB_TIMEOUT_MS;
+  }
 
   async getRates(quote: string, from: string, to: string): Promise<FxRate[]> {
     currencyCodeSchema.parse(quote);
@@ -34,19 +46,14 @@ export class EcbFxRateProvider implements FxRateProvider {
     if (!ECB_CODE.test(quote)) return [];
 
     let res: Response;
+    let body: string;
     try {
-      res = await fetch(ecbRatesUrl(quote, from, to), {
-        signal: AbortSignal.timeout(ECB_TIMEOUT_MS),
+      [res, body] = await withTimeout(this.timeoutMs, async (signal) => {
+        const answer = await fetch(ecbRatesUrl(quote, from, to), { signal });
+        return [answer, await answer.text()] as const;
       });
     } catch (cause) {
       throw new FxRatesUnavailableError(quote, null, { cause });
-    }
-
-    let body: string;
-    try {
-      body = await res.text();
-    } catch (cause) {
-      throw new FxRatesUnavailableError(quote, res.status, { cause });
     }
 
     if (res.status === 404 && isNotFound(body)) return [];

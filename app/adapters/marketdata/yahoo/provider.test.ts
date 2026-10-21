@@ -162,3 +162,71 @@ describe("YahooMarketDataProvider failures", () => {
     ).rejects.toBeInstanceOf(MarketDataUnavailableError);
   });
 });
+
+describe("YahooMarketDataProvider timeouts", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  const hang = () => {
+    const fetch = vi.fn(
+      (_url: string | URL | Request, init?: RequestInit) =>
+        new Promise<Response>((_, reject) => {
+          init?.signal?.addEventListener("abort", () =>
+            reject(init.signal?.reason),
+          );
+        }),
+    );
+    vi.stubGlobal("fetch", fetch);
+    return fetch;
+  };
+
+  it("gives every request a signal", async () => {
+    const fetch = vi.fn(
+      async (_url: string | URL | Request, _init?: RequestInit) =>
+        new Response("{}", { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetch);
+
+    await new YahooMarketDataProvider().getHistory("VWCE.DE", "1y");
+
+    expect(fetch.mock.calls[0]![1]?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("turns a request that does not answer into unavailable, with the timeout as cause", async () => {
+    vi.useFakeTimers();
+    hang();
+    const provider = new YahooMarketDataProvider({ timeoutMs: 1_000 });
+
+    for (const call of [
+      () => provider.getQuote("VWCE.DE"),
+      () => provider.getHistory("VWCE.DE", "1y"),
+    ]) {
+      const error = call().catch((e: unknown) => e);
+      await vi.advanceTimersByTimeAsync(1_000);
+      const caught = await error;
+      expect(caught).toBeInstanceOf(MarketDataUnavailableError);
+      expect((caught as MarketDataUnavailableError).status).toBeNull();
+      expect((caught as Error).cause).toMatchObject({ name: "TimeoutError" });
+    }
+  });
+
+  it("times out a body that never finishes arriving", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(new ReadableStream({ start() {} }), { status: 200 }),
+      ),
+    );
+
+    const error = new YahooMarketDataProvider({ timeoutMs: 1_000 })
+      .getQuote("VWCE.DE")
+      .catch((e: unknown) => e);
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(await error).toBeInstanceOf(MarketDataUnavailableError);
+  });
+});
