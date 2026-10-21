@@ -185,7 +185,7 @@ pnpm run typecheck      # react-router typegen + tsc
 pnpm run lint           # eslint (includes the layer boundaries)
 pnpm run build          # production build
 pnpm run db:generate    # regenerate the Prisma client after a schema change
-pnpm run db:migrate     # development only: create a migration from a schema change
+pnpm run db:migrate     # development only: create a migration; refuses the ledger
 pnpm run db:studio      # Prisma Studio (GUI to inspect the data)
 pnpm run db:backup      # VACUUM INTO data/backups/, keeping the last 30
 pnpm run db:seed        # synthetic portfolio -> the scratch database
@@ -201,15 +201,18 @@ pnpm run test:integration   # migrations against a temporary SQLite database
 With Docker, see the steps under *With Docker*: a new image backs up the ledger and
 migrates it on its own.
 
-From source, pull the new version, then back up and migrate:
+From source, pull the new version, then migrate:
 
 ```bash
 pnpm install
-pnpm run db:backup      # snapshot the ledger first
-pnpm run db:deploy      # prisma migrate deploy: apply pending migrations, nothing else
+pnpm run db:deploy      # backs up the ledger if a migration is pending, then applies it
 ```
 
-Never update a ledger with `db:migrate`. It is `prisma migrate dev`, meant for writing
+`db:deploy` first prints the database it is about to migrate and whether it is the
+ledger. When it is, and a migration is pending, it takes the same backup as `db:backup`
+before migrating, and stops without migrating if that backup fails.
+
+`db:migrate` refuses the ledger. It is `prisma migrate dev`, meant for writing
 migrations: when it finds the schema out of step, it can offer to reset the database.
 
 ## Architecture
