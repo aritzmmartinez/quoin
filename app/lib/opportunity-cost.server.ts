@@ -1,9 +1,6 @@
 import { PrismaPriceRepository } from "~/adapters/persistence";
-import {
-  BASE_CURRENCY,
-  type Instrument,
-  type LedgerEvent,
-} from "~/core/domain";
+import type { Instrument, LedgerEvent } from "~/core/domain";
+import { historyInBase, type RateBook } from "~/core/fx";
 import {
   computeOpportunityCost,
   type OpportunityCostResult,
@@ -26,18 +23,19 @@ export type OpportunityView =
 export async function loadOpportunityCost(
   events: readonly LedgerEvent[],
   instruments: readonly Instrument[],
-  prices: ReadonlyMap<string, PriceLike>,
+  valuation: { prices: ReadonlyMap<string, PriceLike>; book: RateBook },
   symbol: string,
   now: Date = new Date(),
 ): Promise<OpportunityView> {
   const benchmark = findBenchmark(instruments, symbol);
   if (!benchmark) return { ok: false, symbol, reason: "unmapped" };
 
-  const history = await new PrismaPriceRepository().historyFor(
+  const stored = await new PrismaPriceRepository().historyFor(
     benchmark.id,
     firstTradeAt(events),
   );
-  if (!history.some((snapshot) => snapshot.currency === BASE_CURRENCY)) {
+  const { history } = historyInBase(stored, valuation.book);
+  if (history.length === 0) {
     return { ok: false, symbol, reason: "no-history" };
   }
 
@@ -50,7 +48,7 @@ export async function loadOpportunityCost(
       events,
       benchmarkInstrumentId: benchmark.id,
       benchmarkHistory: history,
-      prices,
+      prices: valuation.prices,
       now,
     }),
   };

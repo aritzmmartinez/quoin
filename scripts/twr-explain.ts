@@ -13,6 +13,7 @@ import {
   type LedgerEvent,
   type TradeEvent,
 } from "~/core/domain";
+import { historyInBase } from "~/core/fx";
 import type { PriceSnapshot } from "~/core/ports";
 import {
   computeCostBasisTimeline,
@@ -28,6 +29,8 @@ import {
   type InvestedVsValuePoint,
   type TwrSubPeriod,
 } from "~/core/projections";
+import { loadValuation } from "~/lib/rate-book.server";
+
 import { announceDatabase } from "./lib/db-target";
 
 const TOP = Number(
@@ -264,11 +267,13 @@ async function main(): Promise<void> {
   announceDatabase();
 
   const priceRepository = new PrismaPriceRepository();
-  const [allEvents, instruments, prices] = await Promise.all([
+  const now = new Date();
+  const [allEvents, instruments, valuation] = await Promise.all([
     new PrismaLedgerRepository().list(),
     new PrismaInstrumentRepository().list(),
-    priceRepository.latest(),
+    loadValuation(now),
   ]);
+  const { prices } = valuation;
 
   const names = new Map(instruments.map((i) => [i.id, i.name]));
   const allPositions = computePositions(allEvents);
@@ -283,11 +288,8 @@ async function main(): Promise<void> {
     heldIds.map((id) => priceRepository.historyFor(id)),
   );
 
-  const now = new Date();
   const holdings: Holding[] = heldIds.map((id, index) => {
-    const history = (histories[index] ?? []).filter(
-      (snapshot) => snapshot.currency === BASE_CURRENCY,
-    );
+    const { history } = historyInBase(histories[index] ?? [], valuation.book);
     return {
       id,
       name: names.get(id) ?? id,
@@ -300,9 +302,7 @@ async function main(): Promise<void> {
           asOf: snapshot.asOf,
           price: snapshot.price,
         })),
-        prices.get(id)?.currency === BASE_CURRENCY
-          ? (prices.get(id)?.price ?? null)
-          : null,
+        prices.get(id)?.price ?? null,
         now,
       ),
     };

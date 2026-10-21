@@ -3,7 +3,6 @@ import type { Route } from "./+types/ter";
 import {
   PrismaInstrumentRepository,
   PrismaLedgerRepository,
-  PrismaPriceRepository,
 } from "~/adapters/persistence";
 import {
   Card,
@@ -38,7 +37,10 @@ import {
   useCopy,
   useFormat,
 } from "~/lib";
+import { UnratedNotice } from "~/components/ui/UnratedNotice";
 import { loadProjectionContext } from "~/lib/projection.server";
+import { loadValuation } from "~/lib/rate-book.server";
+import { openInstrumentIds, unratedNames } from "~/lib/unrated";
 
 export function meta({ matches }: Route.MetaArgs) {
   const t = copyFromMatches(matches);
@@ -56,14 +58,18 @@ export async function loader({ request }: Route.LoaderArgs) {
   const horizonYears = parseHorizonYears(new URL(request.url).searchParams);
   const locale = parseLocale(request.headers.get("Cookie"));
 
-  const [events, instruments, prices] = await Promise.all([
+  const [events, instruments, valuation] = await Promise.all([
     new PrismaLedgerRepository().list(),
     new PrismaInstrumentRepository().list(),
-    new PrismaPriceRepository().latest(),
+    loadValuation(),
   ]);
 
   const positions = computePositions(events);
-  const marketValues = computeMarketValues(positions, prices, BASE_CURRENCY);
+  const marketValues = computeMarketValues(
+    positions,
+    valuation.prices,
+    BASE_CURRENCY,
+  );
   const byId = new Map(instruments.map((i) => [i.id, i]));
 
   const lines: TerLine[] = [
@@ -81,6 +87,12 @@ export async function loader({ request }: Route.LoaderArgs) {
     weighted,
     rows: toTerRows(lines, instruments, createFormat(locale).tag),
     unknown: namesOf(weighted.unknownInstrumentIds, instruments),
+    unrated: unratedNames(
+      valuation.unrated,
+      instruments,
+      openInstrumentIds(positions),
+      createFormat(locale).tag,
+    ),
     projected: null,
     contribution: "0.00",
     unavailable: null as Unavailable | null,
@@ -129,6 +141,7 @@ export default function Ter({ loaderData }: Route.ComponentProps) {
     weighted,
     rows,
     unknown,
+    unrated,
     projected,
     contribution,
     unavailable,
@@ -187,6 +200,7 @@ export default function Ter({ loaderData }: Route.ComponentProps) {
           {copy.unknown(unknown.join(", "))}
         </Explainer>
       )}
+      <UnratedNotice unrated={unrated} className="mt-2" />
 
       <Card className="mt-4 flex flex-col gap-4 p-5">
         <div className="flex flex-col gap-1.5">

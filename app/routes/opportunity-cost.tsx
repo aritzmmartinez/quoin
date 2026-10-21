@@ -6,7 +6,6 @@ import type { Route } from "./+types/opportunity-cost";
 import {
   PrismaInstrumentRepository,
   PrismaLedgerRepository,
-  PrismaPriceRepository,
 } from "~/adapters/persistence";
 import {
   Card,
@@ -21,17 +20,22 @@ import {
   InfoHint,
 } from "~/components";
 import { buttonClass } from "~/components/ui/Button";
+import { UnratedNotice } from "~/components/ui/UnratedNotice";
 import type { ExcludedPurchases } from "~/core/projections";
 import {
   type Copy,
   copyFromMatches,
+  intlTag,
   namesOf,
+  parseLocale,
   parseBenchmark,
   toOpportunityRows,
   useCopy,
   useFormat,
 } from "~/lib";
 import { loadOpportunityCost } from "~/lib/opportunity-cost.server";
+import { loadValuation } from "~/lib/rate-book.server";
+import { unratedNames } from "~/lib/unrated";
 
 export function meta({ matches }: Route.MetaArgs) {
   const t = copyFromMatches(matches);
@@ -44,17 +48,18 @@ export function meta({ matches }: Route.MetaArgs) {
 export const handle = { title: (t: Copy) => t.opportunity.title, parent: "/" };
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const [events, instruments, prices] = await Promise.all([
+  const cookie = request.headers.get("Cookie");
+  const [events, instruments, valuation] = await Promise.all([
     new PrismaLedgerRepository().list(),
     new PrismaInstrumentRepository().list(),
-    new PrismaPriceRepository().latest(),
+    loadValuation(),
   ]);
 
   const view = await loadOpportunityCost(
     events,
     instruments,
-    prices,
-    parseBenchmark(request.headers.get("Cookie")),
+    valuation,
+    parseBenchmark(cookie),
   );
   if (!view.ok) {
     return { ok: false as const, symbol: view.symbol, reason: view.reason };
@@ -76,6 +81,12 @@ export async function loader({ request }: Route.LoaderArgs) {
     },
     rows: toOpportunityRows(result.lines, instruments),
     unpriced: namesOf(result.unpricedInstrumentIds, instruments),
+    unrated: unratedNames(
+      valuation.unrated,
+      instruments,
+      result.unpricedInstrumentIds,
+      intlTag(parseLocale(cookie)),
+    ),
     truncated: result.truncated,
     stale: result.stale,
     gaps: result.gaps,
@@ -124,7 +135,7 @@ export default function OpportunityCost({ loaderData }: Route.ComponentProps) {
     );
   }
 
-  const { symbol, totals, rows, unpriced, truncated, stale, gaps } =
+  const { symbol, totals, rows, unpriced, unrated, truncated, stale, gaps } =
     loaderData;
   const notice = {
     symbol,
@@ -261,6 +272,7 @@ export default function OpportunityCost({ loaderData }: Route.ComponentProps) {
               {o.unpriced(unpriced.join(", "))}
             </Explainer>
           )}
+          <UnratedNotice unrated={unrated} className="mt-2" />
 
           <Card className="mt-4">
             <div className="flex items-center justify-between gap-3 border-b border-border-subtle px-gutter py-4">
