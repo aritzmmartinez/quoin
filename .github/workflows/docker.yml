@@ -31,11 +31,13 @@ on:
       - db-backup.sh
       - scripts/db-backup.ts
       - scripts/lib/db-target.ts
+      - scripts/lib/backup.ts
       - scripts/lib/backup-names.ts
       - scripts/lib/backup-verify.ts
       - package.json
       - pnpm-lock.yaml
       - pnpm-workspace.yaml
+      - prisma.config.ts
       - prisma/**
       - .github/workflows/docker.yml
 

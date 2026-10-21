@@ -73,7 +73,7 @@ COPY --from=build /app/build ./build
 COPY package.json prisma.config.ts ./
 COPY prisma ./prisma
 COPY scripts/db-backup.ts ./scripts/
-COPY scripts/lib/db-target.ts scripts/lib/backup-names.ts scripts/lib/backup-verify.ts ./scripts/lib/
+COPY scripts/lib/db-target.ts scripts/lib/backup.ts scripts/lib/backup-names.ts scripts/lib/backup-verify.ts ./scripts/lib/
 COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/
 COPY --chmod=755 db-backup.sh /usr/local/bin/db-backup
 
