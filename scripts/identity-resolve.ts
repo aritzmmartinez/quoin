@@ -13,6 +13,8 @@ import {
 import { looksLikeIsin } from "~/adapters/ingestion/holdings";
 import type { RawIdentity } from "~/core/ports";
 
+import { announceDatabase } from "./lib/db-target";
+
 const USAGE = `Usage:
   pnpm identity:resolve [--limit N] [--all]
 
@@ -106,6 +108,7 @@ async function report(cache: PrismaSecurityIdentityRepository): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  announceDatabase();
   const args = argv.slice(2);
   if (args.includes("--help") || args.includes("-h")) {
     console.log(USAGE);

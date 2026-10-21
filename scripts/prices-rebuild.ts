@@ -12,7 +12,10 @@ import { isCoarseSeries } from "~/lib/coarse-candles";
 import { replaceQuoteHistories } from "~/lib/price-history";
 import { rangeSince } from "~/lib/prices-backfill";
 
+import { announceDatabase } from "./lib/db-target";
+
 async function main(): Promise<void> {
+  announceDatabase();
   const only = argv.slice(2).find((arg) => !arg.startsWith("-"));
 
   const instruments = new PrismaInstrumentRepository();

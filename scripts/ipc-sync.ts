@@ -6,9 +6,12 @@ import { IneInflationProvider } from "~/adapters/inflation";
 import { PrismaInflationRepository, prisma } from "~/adapters/persistence";
 import { runInflationSync } from "~/lib/ipc-sync.server";
 
+import { announceDatabase } from "./lib/db-target";
+
 const FORCE_REBASE = "--force-rebase";
 
 async function main(): Promise<void> {
+  announceDatabase();
   const force = argv.includes(FORCE_REBASE);
 
   const result = await runInflationSync();

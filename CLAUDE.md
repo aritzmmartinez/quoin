@@ -54,8 +54,8 @@ pnpm test:integration             # migrate deploy against a temp sqlite db
 pnpm verify                       # lint + typecheck + build + test (the four unit-level checks)
 pnpm verify:full                  # verify + test:integration — the full CI gate, run before a tag
 pnpm db:generate                  # prisma generate
-pnpm db:migrate                   # prisma migrate dev — development only
-pnpm db:deploy                    # prisma migrate deploy — apply pending migrations to a ledger
+pnpm db:migrate                   # prisma migrate dev — development only, refuses the ledger
+pnpm db:deploy                    # prisma migrate deploy — backs up the ledger first if pending
 pnpm db:studio
 pnpm db:backup                    # VACUUM INTO data/backups/, keeps the last 30
 pnpm db:seed [--anchor=YYYY-MM-DD]   # synthetic portfolio into the scratch database
@@ -306,6 +306,15 @@ ledger while that rule is in force. Useful, but do not mistake it for a sandbox.
   says the statement ran, not that the result opens — and a bad snapshot that still
   counted as one would push the oldest good backup out of the 30-file window, so a single
   corrupt copy would cost two. A failed verification deletes the copy and exits non-zero.
+- **Every script that opens the database calls `announceDatabase()` first**, on stderr:
+  the file, and whether it is the ledger, scratch or neither. It is information, not a
+  fourth defence — `pnpm db:deploy` once went to the ledger while it was believed to go to
+  `dev.sqlite`, and nothing said so. A new script that opens the database calls it too.
+  `scripts/db-which.ts` does it for Prisma's own commands: `deploy` backs the ledger up
+  first when `migrate status` is non-zero (the entrypoint's rule, through the same
+  `backupDatabase` as `db:backup`), `migrate` refuses the ledger. It spawns Prisma as
+  `node_modules/prisma/build/index.js` under `process.execPath`, never through a shell:
+  the checkout path has a space in it.
 - The seed is **synthetic and stays synthetic** — same reason fixtures are (see *Privacy*).
   It encodes the shapes that have caused bugs: `fees ≠ 0`, an unpriced position, a fund
   with no holdings, two funds sharing constituents, a partial sell.

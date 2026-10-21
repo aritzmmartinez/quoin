@@ -1,19 +1,10 @@
 import "dotenv/config";
 
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  statSync,
-  unlinkSync,
-} from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { relative, resolve } from "node:path";
 import { argv, exit } from "node:process";
 
-import Database from "better-sqlite3";
-
-import { backupFileName, backupsToRemove, KEEP } from "./lib/backup-names";
-import { tableCounts, verifyOrDiscard } from "./lib/backup-verify";
+import { backupDatabase, describeBackup } from "./lib/backup";
 import { PROJECT_ROOT, realDatabasePath } from "./lib/db-target";
 
 /**
@@ -26,8 +17,6 @@ import { PROJECT_ROOT, realDatabasePath } from "./lib/db-target";
  *
  */
 
-const BACKUP_DIR = resolve(PROJECT_ROOT, "data/backups");
-
 const USAGE = `Usage:
   pnpm db:backup           snapshot the live ledger (${relative(PROJECT_ROOT, realDatabasePath())})
   pnpm db:backup <FILE>    snapshot another SQLite file
@@ -35,23 +24,6 @@ const USAGE = `Usage:
 In the Docker image:
   docker exec quoin db-backup
   docker exec quoin db-backup <FILE>`;
-
-function sqlLiteral(value: string): string {
-  return `'${value.replaceAll("'", "''")}'`;
-}
-
-function destinationFor(now: Date): string {
-  const base = join(BACKUP_DIR, backupFileName(now));
-  if (!existsSync(base)) return base;
-
-  return join(BACKUP_DIR, backupFileName(now, now.getSeconds()));
-}
-
-function rotate(): number {
-  const doomed = backupsToRemove(readdirSync(BACKUP_DIR));
-  for (const file of doomed) unlinkSync(join(BACKUP_DIR, file));
-  return doomed.length;
-}
 
 function main(): void {
   const [arg] = argv.slice(2);
@@ -66,32 +38,7 @@ function main(): void {
     exit(1);
   }
 
-  mkdirSync(BACKUP_DIR, { recursive: true });
-  const destination = destinationFor(new Date());
-
-  const db = new Database(source, { readonly: true, fileMustExist: true });
-  let expected: Map<string, number>;
-  try {
-    db.exec(`VACUUM INTO ${sqlLiteral(destination)}`);
-    expected = tableCounts(db);
-  } finally {
-    db.close();
-  }
-
-  verifyOrDiscard(destination, expected);
-
-  const { size } = statSync(destination);
-  const rows = [...expected.values()].reduce((sum, n) => sum + n, 0);
-  console.log(
-    `Backed up ${relative(PROJECT_ROOT, source)} → ` +
-      `${relative(PROJECT_ROOT, destination)} (${(size / 1024 / 1024).toFixed(1)} MB)\n` +
-      `  verified: integrity_check ok, ${expected.size} tables, ${rows} rows`,
-  );
-
-  const removed = rotate();
-  if (removed > 0) {
-    console.log(`Rotated out ${removed} backup(s) beyond the last ${KEEP}.`);
-  }
+  console.log(describeBackup(backupDatabase(source)));
 }
 
 try {

@@ -11,7 +11,10 @@ import {
 } from "~/lib/prices-sync";
 import { defaultDeps, syncTargets } from "~/lib/prices-sync.server";
 
+import { announceDatabase } from "./lib/db-target";
+
 async function main(): Promise<void> {
+  announceDatabase();
   const { targets, unmapped } = await syncTargets();
 
   console.log(

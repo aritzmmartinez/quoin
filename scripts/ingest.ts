@@ -32,6 +32,8 @@ import {
 } from "~/lib";
 import { fillPrices } from "~/lib/ingest.server";
 
+import { announceDatabase } from "./lib/db-target";
+
 const USAGE = `Usage: pnpm ingest --broker=<${BROKERS.join("|")}> <file.csv> [--yes]`;
 
 const copy = copyFor("en").ingest.summary;
@@ -118,6 +120,7 @@ async function retryRewards(
 }
 
 async function main(): Promise<void> {
+  announceDatabase();
   const { values, positionals } = parseArgs({
     args: argv.slice(2),
     options: {

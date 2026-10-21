@@ -16,6 +16,8 @@ import { isHistoryRange, rangeSince } from "~/lib/prices-backfill";
 import { clearQuoteSymbol } from "~/lib/quote-symbol";
 import { checkQuoteAgainstLedger } from "~/lib/symbol-check";
 
+import { announceDatabase } from "./lib/db-target";
+
 const USAGE = `Usage:
   pnpm prices:map <ISIN>                    show the current quote symbol
   pnpm prices:map <ISIN> <SYMBOL> [range]   set the symbol and replace the history
@@ -73,6 +75,7 @@ async function preview(symbol: string, instrumentId: string): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  announceDatabase();
   const [id, symbolArg] = argv.slice(2);
   if (!id) {
     console.error(USAGE);

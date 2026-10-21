@@ -320,7 +320,7 @@ trust nobody earned.
 ```bash
 cp .env.example .env    # DATABASE_URL -> data/quoin.sqlite
 pnpm install            # builds better-sqlite3 + generates the client (postinstall)
-pnpm run db:migrate     # creates the database and the first migration
+pnpm run db:deploy      # creates the database and applies every migration
 pnpm run db:studio      # (optional) GUI to inspect the data
 ```
 

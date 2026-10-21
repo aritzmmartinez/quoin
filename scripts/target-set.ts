@@ -22,6 +22,8 @@ import {
   type PortfolioTarget,
 } from "~/core/domain";
 
+import { announceDatabase } from "./lib/db-target";
+
 const USAGE = `Usage:
   pnpm target:set                      show the target in force today
   pnpm target:set <file> [options]     record a new version from a plan file
@@ -68,6 +70,7 @@ function describe(
 }
 
 async function main(): Promise<void> {
+  announceDatabase();
   const [file] = argv.slice(2);
 
   const instruments = await new PrismaInstrumentRepository().list();

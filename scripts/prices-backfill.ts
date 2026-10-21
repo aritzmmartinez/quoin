@@ -16,6 +16,8 @@ import {
   isHistoryRange,
 } from "~/lib/prices-backfill";
 
+import { announceDatabase } from "./lib/db-target";
+
 function usage(): string {
   return [
     "Usage: pnpm prices:backfill [ISIN] [range]",
@@ -26,6 +28,7 @@ function usage(): string {
 }
 
 async function main(): Promise<void> {
+  announceDatabase();
   const args = argv.slice(2);
   if (args.includes("--help") || args.includes("-h")) {
     console.log(usage());

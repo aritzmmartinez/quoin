@@ -8,12 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Upgrading
-- This release's migration cannot be read by an earlier version: once it is applied, an older image no longer opens the database. The Docker image backs up the ledger to `data/backups` before migrating; to go back, stop the container, restore that snapshot and start the older image. From source, run `pnpm db:backup` before `pnpm db:deploy`.
+- This release's migration cannot be read by an earlier version: once it is applied, an older image no longer opens the database. The Docker image backs up the ledger to `data/backups` before migrating; to go back, stop the container, restore that snapshot and start the older image. From source, `pnpm db:deploy` now takes that backup itself.
 
 ### Added
 - `pnpm fx:sync` downloads the European Central Bank's daily euro reference rates for every currency other than the euro that the portfolio uses, or for the codes it is given (`pnpm fx:sync USD`). Nothing reads them yet: every figure is still in euros. A rate the ECB revises for a day already stored is reported and not written.
 
 ### Changed
+- Every command that opens the database prints, before anything else, which file it is about to use and whether it is the ledger, the scratch database or another file.
+- `pnpm db:deploy` backs up the ledger before migrating when a migration is pending, as the Docker image does, and does not migrate if the backup fails.
+- `pnpm db:migrate` refuses to run against the ledger and points to `pnpm db:deploy`.
 - Opportunity cost no longer buys the benchmark at a close more than a week older than the purchase. Such a purchase buys nothing in the counterfactual and is named in one of two new notices: purchases after the benchmark's last close, which Refresh prices fixes, and purchases in a gap inside its history, which downloading the history again may fix.
 
 ### Removed

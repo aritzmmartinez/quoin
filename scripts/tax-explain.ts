@@ -20,7 +20,7 @@ import {
   type RealizedGainDetail,
 } from "~/core/tax";
 import { taxExclusions, unlistedInstrumentIds } from "~/lib/tax";
-import { databasePath } from "./lib/db-target";
+import { announceDatabase } from "./lib/db-target";
 
 const YEAR = Number(
   process.argv.find((a) => /^\d{4}$/.test(a)) ??
@@ -91,7 +91,7 @@ function printSale(gain: RealizedGainDetail, names: Map<string, string>): void {
 }
 
 async function main(): Promise<void> {
-  console.log(`Database: ${databasePath() ?? "(unset)"}\n`);
+  announceDatabase();
 
   const [events, instruments] = await Promise.all([
     new PrismaLedgerRepository().list(),

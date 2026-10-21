@@ -17,6 +17,8 @@ import {
 } from "~/core/domain";
 import { computePositions } from "~/core/projections";
 
+import { announceDatabase } from "./lib/db-target";
+
 const KINDS = exposureKindSchema.options;
 
 const USAGE = `Usage:
@@ -69,6 +71,7 @@ async function describe(id: string): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  announceDatabase();
   const [id, kindArg, leafArg] = argv.slice(2);
 
   if (!id) {
