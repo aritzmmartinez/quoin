@@ -7,7 +7,10 @@ import { currencyCodeSchema } from "~/core/domain";
 import { describeFailure } from "~/lib/describe-failure";
 import { runFxSync } from "~/lib/fx-sync.server";
 
+import { announceDatabase } from "./lib/db-target";
+
 async function main(): Promise<void> {
+  announceDatabase();
   const codes = argv.slice(2);
   for (const code of codes) {
     if (!currencyCodeSchema.safeParse(code).success) {

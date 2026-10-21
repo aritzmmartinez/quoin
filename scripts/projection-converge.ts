@@ -12,7 +12,7 @@ import {
 import { MIN_WINDOW_MONTHS } from "~/lib/projection";
 import { loadProjectionContext } from "~/lib/projection.server";
 
-import { databasePath } from "./lib/db-target";
+import { announceDatabase } from "./lib/db-target";
 
 const TARGET_SPREAD = 0.01;
 
@@ -123,7 +123,7 @@ function eur(value: number): string {
 }
 
 async function main(): Promise<void> {
-  console.log(`Database: ${databasePath() ?? "(unset)"}\n`);
+  announceDatabase();
 
   const { plan } = await loadProjectionContext();
   if (plan === null) {

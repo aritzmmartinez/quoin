@@ -28,7 +28,7 @@ import {
   type InvestedVsValuePoint,
   type TwrSubPeriod,
 } from "~/core/projections";
-import { databasePath } from "./lib/db-target";
+import { announceDatabase } from "./lib/db-target";
 
 const TOP = Number(
   process.argv.find((a) => a.startsWith("--top="))?.slice("--top=".length) ??
@@ -261,7 +261,7 @@ function openLink(
 }
 
 async function main(): Promise<void> {
-  console.log(`Database: ${databasePath() ?? "(unset)"}\n`);
+  announceDatabase();
 
   const priceRepository = new PrismaPriceRepository();
   const [allEvents, instruments, prices] = await Promise.all([
