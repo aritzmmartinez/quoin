@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [Unreleased]
+## [0.13.0] - 2026-10-22
 
 ### Upgrading
 - After this update, an older version can no longer open the database. The Docker image backs up the ledger before migrating; to go back, restore that backup (see *Updating* in the README).
@@ -410,7 +410,8 @@ fund holdings must be supplied as CSV rather than the Excel most issuers publish
 Design rationale lives beside the code it explains, in `docs/ARCHITECTURE.md` and in the
 commit history — not here.
 
-[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.12.1...HEAD
+[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/aritzmmartinez/quoin/compare/v0.12.1...v0.13.0
 [0.12.1]: https://github.com/aritzmmartinez/quoin/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/aritzmmartinez/quoin/compare/v0.11.1...v0.12.0
 [0.11.1]: https://github.com/aritzmmartinez/quoin/compare/v0.11.0...v0.11.1
