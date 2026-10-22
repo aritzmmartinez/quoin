@@ -133,7 +133,7 @@ describe("KrakenCsvAdapter", () => {
     adapter = new KrakenCsvAdapter(
       instruments,
       ledger,
-      new FakePriceRepository([btcAt("2025-11-25T00:00:00Z", "80000")]),
+      new FakePriceRepository([btcAt("2025-11-24T00:00:00Z", "80000")]),
     );
   });
 
@@ -219,7 +219,7 @@ describe("KrakenCsvAdapter in another fiat currency", () => {
     const adapter = new KrakenCsvAdapter(
       new FakeInstrumentRepository(),
       ledger,
-      new FakePriceRepository([usdBtc("2026-01-07", "99000")]),
+      new FakePriceRepository([usdBtc("2026-01-06", "99000")]),
       async (currencies) => {
         asked.push([...currencies]);
         return book;

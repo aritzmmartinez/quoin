@@ -396,10 +396,35 @@ describe("priceLookupFrom", () => {
     snapshot("2025-11-26T00:00:00Z", "81000"),
   ];
 
-  it("takes the last close at or before the moment asked for", () => {
+  it("takes the close of the last day that has ended", () => {
     const priceAt = priceLookupFrom(history);
 
-    expect(priceAt("BTC", new Date("2025-11-25T23:25:20Z"))).toEqual(AT_80K);
+    expect(priceAt("BTC", new Date("2025-11-26T05:52:00Z"))).toEqual(AT_80K);
+  });
+
+  it("a reward late on day D takes the close of D−1, not D's, which came after it", () => {
+    const priceAt = priceLookupFrom(history);
+
+    expect(priceAt("BTC", new Date("2025-11-25T23:25:20Z"))?.price).toBe(
+      "79000",
+    );
+    expect(priceAt("BTC", new Date("2025-11-25T23:59:59Z"))?.price).toBe(
+      "79000",
+    );
+  });
+
+  it("takes a live quote from its own market time", () => {
+    const priceAt = priceLookupFrom([
+      ...history,
+      { ...snapshot("2025-11-25T14:00:00Z", "79500"), source: "YAHOO_LIVE" },
+    ]);
+
+    expect(priceAt("BTC", new Date("2025-11-25T15:00:00Z"))?.price).toBe(
+      "79500",
+    );
+    expect(priceAt("BTC", new Date("2025-11-25T13:00:00Z"))?.price).toBe(
+      "79000",
+    );
   });
 
   it("carries the close's currency with its price", () => {
@@ -407,7 +432,7 @@ describe("priceLookupFrom", () => {
       { ...snapshot("2025-11-25T00:00:00Z", "90000"), currency: "USD" },
     ]);
 
-    expect(priceAt("BTC", new Date("2025-11-25T12:00:00Z"))).toEqual({
+    expect(priceAt("BTC", new Date("2025-11-26T12:00:00Z"))).toEqual({
       price: "90000",
       currency: "USD",
     });
@@ -416,16 +441,15 @@ describe("priceLookupFrom", () => {
   it("never reaches forward for a closer candle", () => {
     const priceAt = priceLookupFrom(history);
 
-    expect(priceAt("BTC", new Date("2025-11-25T23:59:59Z"))).toEqual(AT_80K);
-    expect(priceAt("BTC", new Date("2025-11-23T00:00:00Z"))).toBeNull();
+    expect(priceAt("BTC", new Date("2025-11-24T23:59:59Z"))).toBeNull();
   });
 
-  it("refuses a close too old to describe that day", () => {
+  it("refuses a close too old to describe that day, counting from when it was known", () => {
     const priceAt = priceLookupFrom([
       snapshot("2025-11-01T00:00:00Z", "70000"),
     ]);
 
-    expect(priceAt("BTC", new Date("2025-11-05T00:00:00Z"))?.price).toBe(
+    expect(priceAt("BTC", new Date("2025-11-08T23:00:00Z"))?.price).toBe(
       "70000",
     );
     expect(priceAt("BTC", new Date("2025-11-25T00:00:00Z"))).toBeNull();
@@ -441,7 +465,7 @@ describe("priceLookupFrom", () => {
     const shuffled = [history[2]!, history[0]!, history[1]!];
 
     expect(
-      priceLookupFrom(shuffled)("BTC", new Date("2025-11-25T12:00:00Z")),
+      priceLookupFrom(shuffled)("BTC", new Date("2025-11-26T12:00:00Z")),
     ).toEqual(AT_80K);
   });
 });

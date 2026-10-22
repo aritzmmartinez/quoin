@@ -15,6 +15,7 @@ import type {
   MarketDataProvider,
   Quote,
 } from "~/core/ports";
+import { DAILY_CANDLE_MS, candleKnownAt } from "~/core/prices";
 import { computePositions } from "~/core/projections";
 import { atOrBefore } from "~/core/series";
 
@@ -123,7 +124,7 @@ export function tradeSpan(marks: readonly TradeMark[]): HistorySpan | null {
   if (marks.length === 0) return null;
   const times = marks.map((mark) => mark.ts.getTime());
   return {
-    from: new Date(Math.min(...times) - LOOKBACK_MS),
+    from: new Date(Math.min(...times) - LOOKBACK_MS - DAILY_CANDLE_MS),
     to: new Date(Math.max(...times) + 86_400_000),
   };
 }
@@ -146,17 +147,12 @@ export function compareTrades(
   candles: readonly Quote[],
   book: RateBook = new Map(),
 ): TradeComparison[] {
-  const asOfTime = (quote: Quote) => quote.asOf.getTime();
-  const sorted = [...candles].sort((a, b) => asOfTime(a) - asOfTime(b));
+  const knownAt = (quote: Quote) => candleKnownAt(quote.asOf);
+  const sorted = [...candles].sort((a, b) => knownAt(a) - knownAt(b));
   const limit = new Decimal(TRADE_DEVIATION_LIMIT);
 
   return marks.flatMap((mark) => {
-    const candle = atOrBefore(
-      sorted,
-      asOfTime,
-      mark.ts.getTime(),
-      LOOKBACK_MS,
-    );
+    const candle = atOrBefore(sorted, knownAt, mark.ts.getTime(), LOOKBACK_MS);
     if (!candle) return [];
     const close = closeInBase(candle, book, mark.ts);
     if (close === null) return [];

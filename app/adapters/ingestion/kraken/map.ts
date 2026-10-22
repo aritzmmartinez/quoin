@@ -9,6 +9,7 @@ import {
   type Instrument,
 } from "~/core/domain";
 import type { PriceSnapshot } from "~/core/ports";
+import { snapshotKnownAt } from "~/core/prices";
 import { atOrBefore } from "~/core/series";
 
 import { cryptoInstrumentId } from "../crypto-id";
@@ -45,8 +46,6 @@ export type PriceAt = (instrumentId: string, ts: Date) => PricedAt | null;
 
 const MAX_PRICE_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
-const asOfTime = (snapshot: PriceSnapshot) => snapshot.asOf.getTime();
-
 export function priceLookupFrom(snapshots: readonly PriceSnapshot[]): PriceAt {
   const byInstrument = new Map<string, PriceSnapshot[]>();
   for (const snapshot of snapshots) {
@@ -55,13 +54,18 @@ export function priceLookupFrom(snapshots: readonly PriceSnapshot[]): PriceAt {
     byInstrument.set(snapshot.instrumentId, list);
   }
   for (const list of byInstrument.values()) {
-    list.sort((a, b) => asOfTime(a) - asOfTime(b));
+    list.sort((a, b) => snapshotKnownAt(a) - snapshotKnownAt(b));
   }
 
   return (instrumentId, ts) => {
     const history = byInstrument.get(instrumentId);
     if (!history) return null;
-    const close = atOrBefore(history, asOfTime, ts.getTime(), MAX_PRICE_AGE_MS);
+    const close = atOrBefore(
+      history,
+      snapshotKnownAt,
+      ts.getTime(),
+      MAX_PRICE_AGE_MS,
+    );
     return close ? { price: close.price, currency: close.currency } : null;
   };
 }
