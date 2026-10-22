@@ -7,30 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [Unreleased]
+
 ### Upgrading
-- This release's migration cannot be read by an earlier version: once it is applied, an older image no longer opens the database. The Docker image backs up the ledger to `data/backups` before migrating; to go back, stop the container, restore that snapshot and start the older image. From source, `pnpm db:deploy` now takes that backup itself.
+- After this update, an older version can no longer open the database. The Docker image backs up the ledger before migrating; to go back, restore that backup (see *Updating* in the README).
+- If you hold anything quoted in another currency, open Settings → External data and update exchange rates.
 
 ### Added
-- `pnpm fx:sync` downloads the European Central Bank's daily euro reference rates for every currency other than the euro that the portfolio uses, or for the codes it is given (`pnpm fx:sync USD`). Nothing reads them yet: every figure is still in euros. A rate the ECB revises for a day already stored is reported and not written.
+- Multi-currency: instruments and trades in other currencies are converted to euros at the European Central Bank's reference rate, each trade at its own day's rate and today's value at the latest one.
+- Kraken and Trade Republic imports convert trades in other currencies instead of setting them aside.
+- Settings → External data: prices, CPI and exchange rates in one place, each with its last update and an Update now button.
+- The benchmark can be an instrument in any currency the ECB publishes.
 
 ### Changed
-- Every command that opens the database prints, before anything else, which file it is about to use and whether it is the ledger, the scratch database or another file.
-- `pnpm db:deploy` backs up the ledger before migrating when a migration is pending, as the Docker image does, and does not migrate if the backup fails.
-- `pnpm db:migrate` refuses to run against the ledger and points to `pnpm db:deploy`.
-- Opportunity cost no longer buys the benchmark at a close more than a week older than the purchase. Such a purchase buys nothing in the counterfactual and is named in one of two new notices: purchases after the benchmark's last close, which Refresh prices fixes, and purchases in a gap inside its history, which downloading the history again may fix.
+- Opportunity cost no longer uses a benchmark close more than a week older than a purchase, and names the purchases it leaves out.
+- From source: every command says which database it uses, `db:deploy` backs up the ledger before migrating, `db:migrate` refuses to touch it, and `pnpm fx:sync` downloads exchange rates.
 
 ### Removed
-- The Docker image no longer carries npm, npx, corepack or yarn. Back up by hand with `docker exec quoin db-backup`; `docker exec quoin npm run db:backup` no longer works.
+- npm, npx, corepack and yarn from the Docker image. Back up with `docker exec quoin db-backup`.
 
 ### Fixed
-- A Kraken BTC purchase or sale against a fiat currency other than the euro was recorded as if the amount were in euros. It is now set aside as "Trades in another currency", listed row by row and flagged as leaving the BTC position incomplete. Deposits and withdrawals in another fiat currency are set aside as an asset Quoin does not model instead of counting as euro movements.
-- A Trade Republic row in a currency other than the euro would have been recorded as if its amount were in euros. Any import now sets such a row aside as "Trades in another currency", listed with its date, and imports the rest of the file; the preview shows the same.
-- A ledger entry in another currency with no exchange rate to euros was counted as if its amount were in euros. Such entries can exist from imports made before the fixes above. They are now left out of every figure: an instrument with a trade like that is left out whole and named on Portfolio and Summary, and on the tax view of Realized with a notice to check it before using the figures, since its sales are not in the calculation. Movements still lists the entry, with "No exchange rate" instead of an amount, and leaves it out of the net cash flow.
-- On Opportunity cost, the notice for purchases older than the benchmark's history sent you to a command-line tool the Docker image does not carry. It now points to downloading the history again from Instruments, with a range that reaches those purchases.
-- A request to Yahoo, INE or OpenFIGI that never answered left Refresh prices, Rebuild all histories, the import wizard's price step or Sync CPI waiting with no end and no error. Every request now gives up after a set time and fails as the provider being unavailable: Refresh prices and Rebuild all histories name the instrument and carry on with the rest.
-- Sync CPI says that INE is not responding when it cannot be reached, instead of a generic failure.
-- `pnpm identity:resolve` recorded every identity in a request OpenFIGI did not answer (a rate limit, an outage, a timeout) as not found, and never asked for it again. It now stops at that request, saves only what was answered and says how many are left for the next run.
-- `pnpm ipc:sync --force-rebase` deleted a series before downloading its replacement, so a failed download left it empty. It now downloads first.
+- Kraken trades, deposits and withdrawals in another currency were recorded as if they were in euros.
+- Entries in another currency with no exchange rate counted as euros. They are now left out and named.
+- A provider that did not answer (Yahoo, INE, OpenFIGI) could leave the app waiting with no end. Requests now time out.
+- `identity:resolve` no longer marks as not found what OpenFIGI failed to answer.
+- Notices no longer tell you to run commands the Docker image does not have.
+- Clearer messages: the ECB is named when it is the one failing, a failure common to every instrument is reported once, and prices in the symbol check are formatted like every other amount.
 
 ## [0.12.1] - 2026-10-18
 

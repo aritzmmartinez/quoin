@@ -29,7 +29,7 @@ export function BenchmarkSetting({
   }));
   const usable = options.some((option) => option.value === symbol);
   if (!usable) {
-    options.unshift({ value: symbol, label: symbol, desc: copy.unusableRated });
+    options.unshift({ value: symbol, label: symbol, desc: copy.unusable });
   }
 
   function select(next: string) {
@@ -49,7 +49,7 @@ export function BenchmarkSetting({
       />
       {!usable && (
         <span className="max-w-60 text-right text-[11px] text-negative">
-          {candidates.length === 0 ? copy.noneRated : copy.unusableRated}
+          {candidates.length === 0 ? copy.none : copy.unusable}
         </span>
       )}
     </div>

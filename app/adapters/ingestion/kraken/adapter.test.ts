@@ -326,7 +326,6 @@ describe("KrakenCsvAdapter discards", () => {
       "crypto-swap",
       "crypto-transfer",
       "reward-unpriced",
-      "foreign-fiat",
       "fx-unavailable",
     ]);
   });

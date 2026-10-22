@@ -127,8 +127,9 @@ file at once vs. a preview, a commit and two follow-up steps).
   with fakes); `app/lib/x.server.ts` builds them from Prisma and the real provider. **No
   `*.server.ts` is exported from `app/lib/index.ts`** — that barrel is what components
   import, and one such export pulls Prisma into the client bundle. That exclusion covers
-  all seven `*.server.ts` files, including `real.server.ts` and `version.server.ts`, which
-  have no pure half at all; it is the rule, not a special case for any one of them.
+  every `*.server.ts` file, including `real.server.ts`, `rate-book.server.ts` and
+  `version.server.ts`, which have no pure half at all; it is the rule, not a special case
+  for any one of them.
 - **A destructive option stays CLI-only.** `ipc:sync --force-rebase` replaces a series
   wholesale, so `scripts/ipc-sync.ts` owns the flag and `syncInflation` cannot rebase at
   all: it *reports* `rebaseBlocked`, and the endpoint names the affected series without
@@ -220,6 +221,12 @@ This has caused misdirected generation more than once:
   by the clock — on a Saturday it is Friday's close and belongs to Friday. The overlap is
   what heals rows written before `YAHOO_LIVE` existed: they cannot be told apart from
   candles, and nothing tries to.
+- **A sync stops on a failure that is not the provider's.** `haltsSync`: anything but
+  `MarketDataUnavailableError` (the database, a bug) is common to every instrument, so
+  `syncInTurn` (Refresh prices and its row in External data), the wizard's price step
+  and `prices:sync` stop there and say it once with the cause, instead of listing every
+  instrument as an error. `syncInstrumentPrices` records a `PriceSync` check once Yahoo
+  has answered, which is what External data shows as the last update.
 - **Once a day has its candle, that candle is the day's only row** (`planDailyWrite`, applied
   by `PriceRepository.saveDaily` in one transaction). Any other row that Madrid day is
   deleted by id, `YAHOO` or `YAHOO_LIVE`; a candle on an `asOf` already stored updates it.
@@ -242,20 +249,33 @@ This has caused misdirected generation more than once:
   symbol together — an integration test pins that. Two symbols' prices must never share
   a series, so a symbol change only ever goes through it.
 - **`replaceQuoteHistory` fetches everything before it writes anything.** Daily candles
-  first; none, or any not in EUR, returns a failure and touches nothing — a failed Yahoo
-  call must leave the old series intact. Then today's quote, kept only if fresh, in EUR
-  and newer than the last candle, because the newest daily candle can arrive without a
-  close. If that quote is missing and the symbol is unchanged, rows newer than the last
+  first; none returns a failure and touches nothing — a failed Yahoo call must leave the
+  old series intact. Then the rates of the history's currency, from its first day
+  (`ensureRates`): a currency the ECB publishes nothing for fails as `no-rate-series`, an
+  ECB that does not answer as `rates-unavailable`, and neither writes. Then today's quote,
+  kept only if fresh, in the history's own currency and newer than the last candle,
+  because the newest daily candle can arrive without a close. If that quote is missing and the symbol is unchanged, rows newer than the last
   candle are kept (`keepAfter`), so `latest()` never moves back. On a symbol change it
   may: the old rows belong to another security.
-- **"Only EUR is valued" is one function: `foreignCurrency` in `core/domain/money.ts`.**
-  `replaceQuoteHistory` refuses with it, `backfillInstrument` stores nothing and reports
-  `foreignCurrency` (so the wizard's `fill` skips that instrument's sync too),
-  `checkSymbol` carries it so the symbol check warns and `canSave` refuses, and
-  `assignQuoteSymbol` asks the provider for a quote and refuses on the server too, so the
-  `map` endpoint holds when called without the screen. `syncInstrumentPrices` writes
-  nothing when a gap candle is foreign and no live row when the quote is. Write any new
-  check through this function, never as a literal `"EUR"`.
+- **A rate is used two ways, and `core/fx/rates.ts` keeps them apart.** `bookingRate`
+  books a ledger row: the rate of its own TARGET day (`rateDayFor`, a weekend or closing
+  day falls back to the last business day) or nothing, never an older one, because a
+  booked amount is frozen. `valuationRate` values a price: the last rate published on or
+  before the day, at most `VALUATION_RATE_MAX_AGE_DAYS` (7) old, because the day's rate
+  appears around 16:00 and the longest closure (Easter) is under a week. Today's value and
+  every past close go through the same `valuationRate`; today is just `day = today`.
+- **Prices reach euros in one place: `pricesInBase` / `historyInBase` in `core/fx`.** A
+  price with no rate within the week is left out and reported in `unrated`, the
+  `unpricedCount` rule. `computeMarketValues` and `computeOpportunityCost` throw on a
+  price that is not in euros instead of reading it as unpriced, so a loader that skipped
+  the conversion fails loudly. Loaders read prices through `loadValuation`
+  (`rate-book.server.ts`), and `UnratedNotice` names the open positions left out.
+- **The write paths refuse only a currency with no ECB series.** `ensureRates` syncs a
+  currency from the day it is needed and `rateSeriesOf` tells base, published, none and
+  unavailable apart, so an ECB outage is never read as "no rates". Assigning, replacing,
+  backfilling and the symbol check go through it; `syncInstrumentPrices` writes a foreign
+  history as it arrives. Write any new check through `rateSeriesOf`, never as a literal
+  `"EUR"`.
 - **The wizard's `map` only assigns; it cannot replace.** `assignQuoteSymbol` refuses an
   instrument that already has prices and the endpoint sends the user to Instruments.
   Changing a symbol is the `replace` intent, which carries the range and goes through
@@ -373,8 +393,9 @@ that caused it. Same failure mode as `LedgerEntry.type`, same defence.
 
 ## Yahoo symbol mapping traps
 
-An ISIN trades on many venues. Always map the **EUR-denominated venue line**, never the
-ISIN itself, and always sanity-check the price magnitude.
+An ISIN trades on many venues. Map a **venue line**, never the ISIN itself, prefer the
+one in euros when there is one (a line in another currency is valued at the ECB rate, and
+picks up that currency's moves), and always sanity-check the price magnitude.
 
 - **Never map an ISIN as a `quoteSymbol`** (e.g. `XS00TEST0003.SG`). Yahoo resolves the
   ISIN to a quote, but has no historical series under that key — `timestamps` and `closes`
@@ -387,14 +408,16 @@ ISIN itself, and always sanity-check the price magnitude.
   `YAHOO_LIVE` rows. `historyStart` counts them on purpose: `SymbolPanel` reads it to
   choose between assigning and replacing, and `assignQuoteSymbol` refuses any instrument
   with a price.
-- **Verify the price magnitude, not just the currency.** Several symbols quote in EUR and
-  pass the currency filter yet are a different fund tracking the same index, or the same
+- **Verify the price magnitude, not just the currency.** Several symbols quote in the
+  expected currency yet are a different fund tracking the same index, or the same
   fund with a different entitlement per certificate — observed at 5.5x, 0.5x and 0.4x the
   correct line. Check the candidate price against the broker's own `amount / quantity` for
   a real trade before committing the mapping.
 - **The symbol check does that comparison itself** (`checkQuoteAgainstLedger`): the last
-  three EUR trades of the instrument, `grossAmount / quantity` against the last close at
-  or before each trade, within a week, never a later one. It downloads only that date
+  three trades of the instrument that have a rate, at their euro amount (`baseOf`) over
+  the quantity, against the last close at or before each trade, within a week, never a
+  later one, converted at the booking rate of the trade's own day; a day with no rate is
+  skipped, never compared across currencies. It downloads only that date
   span. The warning is on the **median** deviation above 10%, so one odd fill does not
   trip it while a 0.4x or 5.5x line always does. Kraken reward buys are excluded: they
   were valued from a price history, so comparing them with one proves nothing.
@@ -558,10 +581,10 @@ manual aliasing was abandoned — 726 confirmations is not a system.
   through a hedged fund is one leaf and two different currency exposures; folding at the
   leaf would have to pick one and be wrong for the other. This is the payoff of
   contributions being kept rather than summed.
-- **No FX, and none is needed.** Every amount arriving is already EUR by the valuation
-  invariant. This labels and sums; it never converts. The ECB rates `pnpm fx:sync`
-  stores are not read by any valuation yet, and the IPC pipeline is a price index, not a
-  rate source.
+- **Currency exposure converts nothing.** Every amount arriving is already in euros,
+  because valuation converted each price before it got here (`pricesInBase`). This labels
+  and sums. The currency it reports comes from the leaf, never from the currency the
+  quote line happens to trade in. The IPC pipeline is a price index, not a rate source.
 - **ECB rates: one currency per request, and the sync restarts from the last day
   stored.** Measured 2026-10-20: asking for several at once (`USD+XYZ`) drops an unknown
   one silently; alone, it is a 404 with `title: "Not Found"`. A rate for day D appears
@@ -706,9 +729,12 @@ manual aliasing was abandoned — 726 confirmations is not a system.
   a real return against nominal money. The Summary loader builds a second, un-deflated
   series for it. Portfolio TWR is **not** an average of the per-instrument TWRs — a return
   is not additive.
-- Valuation is **EUR-base only, no FX**. Every mapped instrument quotes in EUR. A fund
-  named "USD Acc" states the fund's *denomination* currency, not the currency of the line
-  being bought — it needs no conversion.
+- **Valuation is in euros, and a price in another currency is converted, never mixed.**
+  Today's value uses the last rate published, at most a week old; each past close uses its
+  own day's (`valuationRate`). A position whose currency has no rate in that week is left
+  unvalued exactly like an unpriced one and named. A fund named "USD Acc" states the fund's
+  *denomination* currency, not the currency of the line being bought — a euro line of it
+  needs no conversion.
 - Positions without a usable price are excluded from **both** `totalValue` and
   `totalInvested` (= `pricedCost`, what `returnPct` and the all-time hero change measure
   against), and reported via `unpricedCount` / `unpricedCost`. Adding a cost without its
@@ -921,13 +947,10 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
 - Scope is still BTC-only by choice (`isBtc` in `map.ts`). Measured on a real export:
   most refid groups are set aside — `earn` rewards and `welcomebonus` in other assets. **A discard is classified by what it does to a modelled position, not by asset.**
   `unmodelled-asset` is noise (rewards, transfers and trades of assets Quoin does not
-  track, fiat deposits and withdrawals in a currency other than the base included);
-  `crypto-swap` (BTC ↔ another crypto, in either direction — a `stable_coin` is crypto,
-  not fiat), `crypto-transfer` (BTC on-chain in or out), `foreign-fiat` (BTC bought or
-  sold against a fiat that is not `BASE_CURRENCY`, which used to be booked as EUR at
-  1:1; any adapter's unconverted foreign event lands here too, see *CSV ingestion*, so
-  its label and help name no asset) and `reward-unpriced` each leave the BTC position
-  wrong, and
+  track); `crypto-swap` (BTC ↔ another crypto, in either direction — a `stable_coin` is
+  crypto, not fiat), `crypto-transfer` (BTC on-chain in or out), `fx-unavailable` (a row
+  in another currency with no ECB rate for its day, from any adapter, see *CSV
+  ingestion*) and `reward-unpriced` each leave the BTC position wrong, and
   `AFFECTS_POSITION` flags them so the wizard and `pnpm ingest` warn. Every Kraken discard
   carries a per-group detail (date, type, subtype, asset or pair — never amounts).
   `DiscardReason` is a union and its labels are `Record<DiscardReason, string>` in both
@@ -1043,10 +1066,17 @@ and are applied defensively to every adapter:
 
 Append is idempotent: dedup by `source` + `externalId`.
 
-**`BatchBuilder` applies `ledgerEventWriteSchema` while planning, for every adapter.** An
-event in another currency with no conversion is set aside as `foreign-fiat` — the whole
-operation, so a saveback pair is never cut in half — and the rest of the file imports;
-the preview goes through the same plan, so it says the same. Any other break of the rule
+**`BatchBuilder` converts and applies `ledgerEventWriteSchema` while planning, for every
+adapter.** An event in another currency with no conversion gets the ECB rate of its Madrid
+day through `bookingRate` (`fxSource` ECB, rate, `QUOTE_PER_BASE`, day). With no rate the
+whole operation is set aside as `fx-unavailable` — so a saveback pair is never cut in
+half — the currency and earliest day go into `ratesNeeded`, and the rest of the file
+imports. `planWithRates` plans, syncs what was missing and plans again; the preview,
+the commit, the reward retry and `pnpm ingest` all go through it, so they agree. Kraken
+books a trade, deposit or withdrawal in its own fiat and the batch converts it; the
+balance held in that currency, and its gain or loss, are not modelled. Trade Republic
+keeps its own EUR charge (`IDENTITY`) and stores `original_amount` / `original_currency`
+when both are present; `fx_rate` is not stored. Any other break of the rule
 is a bug in the adapter: `build()` throws `InvalidLedgerEventError` (date, type, currency,
 never amounts), which `api/ingest` turns into a 400 before anything is written,
 instruments included. It throws from `build()`, outside the adapters' per-row `try`,
@@ -1160,7 +1190,7 @@ the two controls sitting side by side behave differently on purpose.
   that round trip too — still not worth optimising away.
 - **The benchmark setting is a list of eligible instruments, never free text.** Eligible
   is exactly what `loadOpportunityCost` refuses without: a `quoteSymbol` plus at least
-  one EUR close (`benchmarkCandidates`). A stored symbol that stops qualifying stays
+  one close that can be valued in euros (`benchmarkCandidates` over `convertibleStarts`). A stored symbol that stops qualifying stays
   selected and flagged; substituting the first valid option would compare against an
   index nobody chose.
 - **`Copy` is `typeof es`, and `es` is deliberately NOT `as const`.** Literal types there

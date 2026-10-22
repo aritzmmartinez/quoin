@@ -145,7 +145,7 @@ export default function Settings({ loaderData }: Route.ComponentProps) {
         <Row
           icon={TrendingUp}
           label={s.portfolio.benchmark.label}
-          hint={s.portfolio.benchmark.hintRated}
+          hint={s.portfolio.benchmark.hint}
         >
           <BenchmarkSetting benchmark={benchmark} candidates={candidates} />
         </Row>
