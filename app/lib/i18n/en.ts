@@ -751,6 +751,8 @@ export const en: Copy = {
       invalid: "Invalid symbol.",
       noQuote: (symbol: string): string =>
         `Yahoo returns no price for ${symbol}. Try another venue (.DE, .MI, .PA, .AS).`,
+      noQuoteCrypto: (symbol: string, code: string): string =>
+        `Yahoo returns no price for ${symbol}. For a crypto asset, try ${code}-USD, valued at the ECB rate, or the ticker with the number Yahoo appends when the code is shared, such as PEPE24478-USD. A shared ticker can be another coin with the same code: check the name and the implied value before saving.`,
       price: "Price",
       impliedValue: "Implied value",
       quantity: "Units",
@@ -770,6 +772,8 @@ export const en: Copy = {
         "This symbol has no closes on the dates of your trades, so they cannot be compared.",
       noDailyHistory:
         "Yahoo has no daily history for this symbol. Look for its ticker on a euro exchange (.DE, .AS…).",
+      noDailyHistoryCrypto: (code: string): string =>
+        `Yahoo has no daily history for this symbol. For a crypto asset, try ${code}-USD, valued at the ECB rate, or the ticker with the number Yahoo appends when the code is shared, such as PEPE24478-USD. A shared ticker can be another coin with the same code: check the name and the implied value before saving.`,
       hasHistory:
         "This instrument already has stored prices. Change its symbol in the Symbol column of Instruments: the new history is downloaded there before the old one is removed.",
       pending: (count: number): string =>
@@ -902,6 +906,8 @@ export const en: Copy = {
     noSymbol: "No symbol",
     noDailyHistory:
       "This symbol has no daily history. Download it again or change the symbol to its ticker on a euro exchange.",
+    noDailyHistoryCrypto: (code: string): string =>
+      `This symbol has no daily history. For a crypto asset, try ${code}-USD, valued at the ECB rate, or the ticker with the number Yahoo appends when the code is shared, such as PEPE24478-USD. A shared ticker can be another coin with the same code: check the name and the implied value before saving.`,
     obsoleteVenues:
       "This composition was imported under obsolete country codes and does not merge with other funds. Drop its file on this row again.",
     resolves: RESOLVES_LABELS,

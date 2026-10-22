@@ -1,6 +1,8 @@
 import type { Broker, ImportSummary } from "~/adapters/ingestion";
 import type { Instrument } from "~/core/domain";
 
+import type { Copy } from "./i18n";
+
 import type { BackfillReport } from "./prices-backfill";
 
 export interface PendingMapping {
@@ -8,6 +10,7 @@ export interface PendingMapping {
   name: string;
   quantity: string;
   suggested: string | null;
+  cryptoCode: string | null;
 }
 
 /**
@@ -21,6 +24,29 @@ export interface PendingMapping {
 const CRYPTO_SYMBOLS: Readonly<Record<string, string>> = {
   PEPE: "PEPE24478-USD",
 };
+
+export function cryptoCodeOf(instrument: Instrument): string | null {
+  return instrument.type === "CRYPTO" ? instrument.id : null;
+}
+
+export function noQuoteMessage(
+  t: Copy,
+  cryptoCode: string | null,
+  symbol: string,
+): string {
+  return cryptoCode === null
+    ? t.ingest.map.noQuote(symbol)
+    : t.ingest.map.noQuoteCrypto(symbol, cryptoCode);
+}
+
+export function noDailyHistoryMessage(
+  t: Copy,
+  cryptoCode: string | null,
+): string {
+  return cryptoCode === null
+    ? t.ingest.map.noDailyHistory
+    : t.ingest.map.noDailyHistoryCrypto(cryptoCode);
+}
 
 export function suggestedQuoteSymbol(instrument: Instrument): string | null {
   if (instrument.type !== "CRYPTO") return null;

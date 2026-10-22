@@ -78,6 +78,7 @@ export function SymbolPanel({ item }: { item: InstrumentListItem }) {
         <SymbolMapper
           instrumentId={item.id}
           stored={item.quoteSymbol}
+          cryptoCode={item.type === "CRYPTO" ? item.id : null}
           saveLabel={item.quoteSymbol ? copy.change : copy.assign}
           disabled={busy || pending !== null}
           onSave={onSave}

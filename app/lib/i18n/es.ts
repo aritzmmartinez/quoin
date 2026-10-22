@@ -762,6 +762,8 @@ export const es = {
       invalid: "Símbolo no válido.",
       noQuote: (symbol: string): string =>
         `Yahoo no devuelve precio para ${symbol}. Prueba otra plaza (.DE, .MI, .PA, .AS).`,
+      noQuoteCrypto: (symbol: string, code: string): string =>
+        `Yahoo no devuelve precio para ${symbol}. Para una cripto, prueba ${code}-USD, que se valora con el tipo del BCE, o el ticker con el número que Yahoo añade cuando el código está repetido, como PEPE24478-USD. Un ticker repetido puede ser otra moneda con el mismo código: comprueba el nombre y el valor implícito antes de guardar.`,
       price: "Precio",
       impliedValue: "Valor implícito",
       quantity: "Unidades",
@@ -781,6 +783,8 @@ export const es = {
         "No hay cierres de este símbolo en las fechas de tus operaciones, así que no se pueden comparar.",
       noDailyHistory:
         "Yahoo no tiene histórico diario de este símbolo. Busca su ticker en una bolsa en euros (.DE, .AS…).",
+      noDailyHistoryCrypto: (code: string): string =>
+        `Yahoo no tiene histórico diario de este símbolo. Para una cripto, prueba ${code}-USD, que se valora con el tipo del BCE, o el ticker con el número que Yahoo añade cuando el código está repetido, como PEPE24478-USD. Un ticker repetido puede ser otra moneda con el mismo código: comprueba el nombre y el valor implícito antes de guardar.`,
       hasHistory:
         "Este instrumento ya tiene precios guardados. Cambia su símbolo en la columna Símbolo de Instrumentos: allí se descarga el histórico nuevo antes de borrar el anterior.",
       pending: (count: number): string =>
@@ -917,6 +921,8 @@ export const es = {
     noSymbol: "Sin símbolo",
     noDailyHistory:
       "Este símbolo no tiene histórico diario. Vuelve a descargarlo o cambia el símbolo por su ticker en una bolsa en euros.",
+    noDailyHistoryCrypto: (code: string): string =>
+      `Este símbolo no tiene histórico diario. Para una cripto, prueba ${code}-USD, que se valora con el tipo del BCE, o el ticker con el número que Yahoo añade cuando el código está repetido, como PEPE24478-USD. Un ticker repetido puede ser otra moneda con el mismo código: comprueba el nombre y el valor implícito antes de guardar.`,
     obsoleteVenues:
       "Esta composición se importó con códigos de país antiguos y no se fusiona con otros fondos. Vuelve a soltar su archivo en esta fila.",
     resolves: RESOLVES_LABELS,

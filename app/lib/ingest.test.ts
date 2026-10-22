@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import type { ImportSummary } from "~/adapters/ingestion";
 import type { Instrument } from "~/core/domain";
 
+import { copyFor } from "./i18n";
+
 import {
   earliestUnpricedReward,
   importAction,
@@ -11,6 +13,9 @@ import {
   retryAfterFill,
   rewardsNeedMapping,
   suggestedQuoteSymbol,
+  cryptoCodeOf,
+  noDailyHistoryMessage,
+  noQuoteMessage,
   unpricedRewards,
 } from "./ingest";
 
@@ -156,6 +161,7 @@ describe("rewardsNeedMapping", () => {
     name: "Bitcoin",
     quantity: "0",
     suggested: "BTC-EUR",
+    cryptoCode: "BTC",
   };
 
   it("points at the mapping step while BTC is pending and unmapped", () => {
@@ -239,5 +245,37 @@ describe("suggestedQuoteSymbol", () => {
 
   it("proposes nothing for anything that is not crypto", () => {
     expect(suggestedQuoteSymbol(instrument("IE00TEST0001", "ETF"))).toBeNull();
+  });
+});
+
+describe("the hint when Yahoo has no price", () => {
+  const t = copyFor("es");
+
+  it("points a fund at another venue", () => {
+    expect(noQuoteMessage(t, null, "XS00TEST0001.SG")).toBe(
+      t.ingest.map.noQuote("XS00TEST0001.SG"),
+    );
+    expect(noDailyHistoryMessage(t, null)).toBe(t.ingest.map.noDailyHistory);
+  });
+
+  it("points a crypto asset at its dollar line and warns about shared tickers", () => {
+    const message = noQuoteMessage(t, "DOGE", "DOGE-EUR");
+    expect(message).toContain("DOGE-USD");
+    expect(message).toContain("PEPE24478-USD");
+    expect(message).not.toContain(".MI");
+    expect(noDailyHistoryMessage(copyFor("en"), "DOGE")).toContain(
+      "another coin",
+    );
+  });
+
+  it("knows a crypto asset by its type, by its code", () => {
+    const instrument = (type: Instrument["type"]): Instrument => ({
+      id: "DOGE",
+      name: "DOGE",
+      type,
+      thesis: "CORE",
+    });
+    expect(cryptoCodeOf(instrument("CRYPTO"))).toBe("DOGE");
+    expect(cryptoCodeOf(instrument("ETF"))).toBeNull();
   });
 });
