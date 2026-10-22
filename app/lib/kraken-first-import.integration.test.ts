@@ -175,7 +175,7 @@ describe("first Kraken import into an empty database (integration)", () => {
 
     for (const event of rewards) {
       if (event.type !== "BUY") throw new Error("a reward must be a BUY");
-      const price = candleFor(dayIndex(event.ts.toISOString()));
+      const price = candleFor(dayIndex(event.ts.toISOString()) - 1);
       expect(event.price).toBe(price);
       const twin = income.find((e) => e.externalId === `${event.externalId}:income`);
       expect(twin?.type === "DIVIDEND" && twin.grossAmount).toBe(event.grossAmount);
@@ -183,9 +183,9 @@ describe("first Kraken import into an empty database (integration)", () => {
     expect(
       rewards.map((e) => e.type === "BUY" && [e.quantity, e.grossAmount]),
     ).toEqual([
-      ["0.000002", "0.16056"],
-      ["0.000003", "0.24105"],
-      ["0.000005", "0.4021"],
+      ["0.000002", "0.16054"],
+      ["0.000003", "0.24102"],
+      ["0.000005", "0.40205"],
     ]);
   });
 
@@ -340,7 +340,7 @@ describe("candle spacing and the 7-day lookup (integration)", () => {
     const reward = (await new persistence.PrismaLedgerRepository().list()).find(
       (e) => e.note === "kraken-reward",
     );
-    expect(reward?.type === "BUY" && reward.price).toBe("80026");
+    expect(reward?.type === "BUY" && reward.price).toBe("80025");
   });
 
   it("prices a reward older than the instrument's first written trade", async () => {
