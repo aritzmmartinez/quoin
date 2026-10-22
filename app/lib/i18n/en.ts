@@ -1,4 +1,4 @@
-import type { DiscardReason } from "~/adapters/ingestion/discard";
+import type { DiscardReason, NoticeReason } from "~/adapters/ingestion/discard";
 import type {
   ExposureKind,
   InstrumentType,
@@ -18,12 +18,12 @@ const REFRESH_RATES = `use “${REFRESH_NOW}” on exchange rates in ${EXTERNAL_
 const REFRESH_CPI = `use “${REFRESH_NOW}” on the CPI in ${EXTERNAL_DATA} (${SETTINGS})`;
 
 const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
-  "crypto-swap": "Swaps involving BTC",
-  "crypto-transfer": "BTC transfers",
-  "reward-unpriced": "BTC rewards without a price",
+  "crypto-swap": "Swaps between crypto assets",
+  "crypto-transfer": "Crypto transfers",
+  "reward-unpriced": "Rewards without a price",
   "fx-unavailable": "Trades with no exchange rate for their day",
   "invalid-crypto-code": "Crypto with an invalid asset code",
-  "unmodelled-asset": "Assets Quoin does not model",
+  "internal-move": "Moves between your Kraken wallets",
   "card-spending": "Card payments",
   "saveback-unpaired": "Saveback with no paired purchase",
   unsupported: "Unsupported",
@@ -32,15 +32,28 @@ const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
 const DISCARD_REASON_HELP: Record<DiscardReason, string | null> = {
   "crypto-swap": null,
   "crypto-transfer": null,
-  "reward-unpriced": `There is no BTC price for those dates, so these rewards were not recorded and your BTC position does not include them. In Instruments, open BTC's symbol and use “${REDOWNLOAD}” with a range that reaches those dates. Then import this same file again: what is already recorded is not duplicated.`,
+  "reward-unpriced": `There is no price for those dates for the asset of these rewards, so they were not recorded and its position does not include them. In Instruments, open that asset's symbol and use “${REDOWNLOAD}” with a range that reaches those dates. Then import this same file again: what is already recorded is not duplicated.`,
   "fx-unavailable": `The ECB had no rate for the day of these trades in another currency (one from today before 16:00, or a currency it does not publish), or could not be reached, so they were not imported and do not count towards their positions. Later, ${REFRESH_RATES} and import this same file again: what is already recorded is not duplicated.`,
   "invalid-crypto-code":
     "Quoin identifies each crypto asset by its asset code (BTC, ETH…), the same at every broker, so that its purchases and sales form a single position. These rows carried something else in its place, so they were not imported and their position does not include them.",
-  "unmodelled-asset": null,
+  "internal-move":
+    "Steps between your own Kraken wallets, such as allocating to Earn or taking back from it. They do not change what you hold, so they are not recorded.",
   "card-spending": null,
   "saveback-unpaired":
     "The purchase this saveback paid for was not found (one purchase of the same amount in the 7 days after it, and only one). If that purchase is in the file, it counts as your own contribution. If it is in another export, import one that covers both dates.",
   unsupported: null,
+};
+
+const NOTICE_LABELS: Record<NoticeReason, string> = {
+  "account-transfer": "Transfers with another account",
+  "internal-booked-as-reward": "Internal moves recorded earlier as rewards",
+};
+
+const NOTICE_HELP: Record<NoticeReason, string> = {
+  "account-transfer":
+    "Cash leaving this Kraken account for another account, or arriving from one. It is recorded as a withdrawal or a deposit.",
+  "internal-booked-as-reward":
+    "An earlier version of Quoin recorded these steps between your Kraken wallets as rewards, and they are still in the ledger as purchases in kind. They do not change what you hold, so that position includes units it should not.",
 };
 
 const THESIS_LABELS: Record<Thesis, string> = {
@@ -697,11 +710,14 @@ export const en: Copy = {
       reasonHelp: DISCARD_REASON_HELP,
       details: (count: number): string =>
         count === 1 ? "1 transaction" : `${count} transactions`,
-      pendingPrice: "BTC rewards awaiting a price",
+      pendingPrice: "Rewards awaiting a price",
       pendingPriceNote:
         "They will be valued after the price step, by importing the file again.",
       positionWarning:
-        "These change your BTC balance and Quoin does not record them, so your BTC position does not reflect them and may not match the broker's.",
+        "These change your balance of that asset and Quoin does not record them, so its position does not reflect them and may not match the broker's.",
+      noticed: "Notices",
+      notices: NOTICE_LABELS,
+      noticeHelp: NOTICE_HELP,
       noInstrument: "No instrument",
     },
     nothingNew:
@@ -781,7 +797,7 @@ export const en: Copy = {
     done: {
       title: "Import summary",
       rewardsNeedMapping:
-        "The BTC rewards are still unvalued because BTC has no symbol. Go back to the mapping step, give it one and carry on: the wizard will download its prices and import the file again.",
+        "Some rewards are still unvalued because their asset has no symbol. Go back to the mapping step, give it one and carry on: the wizard will download its prices and import the file again.",
       recovered: (count: number): string =>
         count === 1
           ? "1 reward recovered by valuing it with the downloaded prices"

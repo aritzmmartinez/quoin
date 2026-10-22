@@ -172,6 +172,49 @@ describe("recentTradeMarks", () => {
     expect(mark?.price).toBe("23.91");
   });
 
+  it("takes a reward valued at Kraken's own figure, never one valued from a price history", () => {
+    const marks = recentTradeMarks(
+      [
+        trade("2026-03-02T09:00:00Z", "0.01", "1.40", {
+          currency: "USD",
+          fxSource: "ECB",
+          fxRate: "1.25",
+          fxDirection: "QUOTE_PER_BASE",
+          fxDate: "2026-03-02",
+          funding: "IN_KIND",
+          note: "kraken-reward",
+          valuationSource: "kraken-amountusd",
+        }),
+        trade("2026-03-09T05:52:00Z", "0.01", "999", {
+          funding: "IN_KIND",
+          note: "kraken-reward",
+        }),
+      ],
+      ID,
+    );
+
+    expect(marks.map((m) => m.price)).toEqual(["112"]);
+  });
+
+  it("keeps the price of a small asset, and skips a trade worth less than a cent", () => {
+    const marks = recentTradeMarks(
+      [
+        trade("2026-03-02T09:00:00Z", "120000", "0.48", { fees: "0" }),
+        trade("2026-03-03T09:00:00Z", "100", "0.004", {
+          fees: "0",
+          currency: "USD",
+          fxSource: "ECB",
+          fxRate: "1.25",
+          fxDirection: "QUOTE_PER_BASE",
+          fxDate: "2026-03-03",
+        }),
+      ],
+      ID,
+    );
+
+    expect(marks.map((m) => m.price)).toEqual(["0.000004"]);
+  });
+
   it("is empty for an instrument never traded", () => {
     expect(recentTradeMarks([], ID)).toEqual([]);
   });

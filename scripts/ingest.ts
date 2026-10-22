@@ -26,6 +26,7 @@ import {
   discardGroups,
   earliestUnpricedReward,
   mergeRewardRetry,
+  noticeGroups,
   rangeSince,
   rewardRetryIds,
   unpricedRewards,
@@ -70,6 +71,10 @@ function printSummary(title: string, summary: ImportSummary): void {
     )
   ) {
     console.log(`  ! ${copy.positionWarning}`);
+  }
+  for (const { reason, details } of noticeGroups(summary)) {
+    console.log(`  ${copy.notices[reason]}: ${details.length}`);
+    console.log(`        ${copy.noticeHelp[reason]}`);
   }
   console.log(`  errors             : ${summary.errors}`);
   console.log(`  instruments        : ${summary.instruments}`);

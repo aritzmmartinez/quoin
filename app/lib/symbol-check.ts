@@ -1,5 +1,6 @@
 import Decimal from "decimal.js";
 
+import { REWARD_NOTE } from "~/adapters/ingestion/kraken/map";
 import { isFreshQuote } from "~/adapters/marketdata";
 import { dayOf, shiftDay } from "~/core/calendar";
 import {
@@ -23,8 +24,8 @@ import { rateSeriesOf, type EnsureRates, type RateSeries } from "./fx-sync";
 
 export const TRADE_CHECKS = 3;
 export const TRADE_DEVIATION_LIMIT = "0.1";
+const MARK_SIGNIFICANT_DIGITS = 12;
 const LOOKBACK_MS = 7 * 86_400_000;
-const REWARD_NOTE = "kraken-reward";
 export const DAILY_HISTORY_PROBE: HistoryRange = "1y";
 export const RATE_PROBE_DAYS = 30;
 
@@ -96,9 +97,12 @@ function isComparableTrade(
   return (
     (event.type === "BUY" || event.type === "SELL") &&
     event.instrumentId === instrumentId &&
-    event.note !== REWARD_NOTE &&
+    !(
+      event.note === REWARD_NOTE && event.valuationSource !== "kraken-amountusd"
+    ) &&
     hasRate(event) &&
-    new Decimal(event.quantity).gt(0)
+    new Decimal(event.quantity).gt(0) &&
+    !baseOf(event, "grossAmount").isZero()
   );
 }
 
@@ -115,8 +119,8 @@ export function recentTradeMarks(
       ts: trade.ts,
       price: new Decimal(baseOf(trade, "grossAmount").toString())
         .div(trade.quantity)
-        .toDecimalPlaces(6)
-        .toString(),
+        .toSignificantDigits(MARK_SIGNIFICANT_DIGITS)
+        .toFixed(),
     }));
 }
 

@@ -23,6 +23,7 @@ import { computePositions } from "~/core/projections";
 import type { Copy } from "./i18n";
 import {
   rewardRetryIds,
+  suggestedQuoteSymbol,
   type IngestPreview,
   type IngestResult,
   type PendingMapping,
@@ -135,6 +136,7 @@ async function pendingMappings(batch: MappedBatch): Promise<PendingMapping[]> {
       instrumentId: i.id,
       name: i.name,
       quantity: heldQuantity(positions, i.id),
+      suggested: suggestedQuoteSymbol(i),
     }));
 }
 

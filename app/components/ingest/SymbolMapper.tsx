@@ -19,6 +19,7 @@ import {
 export function SymbolMapper({
   instrumentId,
   stored,
+  suggested = null,
   saveLabel,
   disabled = false,
   onSave,
@@ -27,6 +28,7 @@ export function SymbolMapper({
 }: {
   instrumentId: string;
   stored: string | null;
+  suggested?: string | null;
   saveLabel: string;
   disabled?: boolean;
   onSave: (symbol: string) => Promise<string | null>;
@@ -40,7 +42,7 @@ export function SymbolMapper({
   const copy = t.ingest.map;
   const [state, dispatch] = useReducer(
     mapperReducer,
-    stored ?? "",
+    stored ?? suggested ?? "",
     initialMapper,
   );
   const symbol = trimmedSymbol(state);
