@@ -1,3 +1,5 @@
+import Decimal from "decimal.js";
+
 import { dayOf } from "../calendar";
 import type { PriceSnapshot } from "../ports";
 
@@ -51,7 +53,10 @@ export function planDailyWrite(
         row.source === candle.source,
     );
     if (!same) inserted += 1;
-    else if (same.price !== candle.price || same.currency !== candle.currency) {
+    else if (
+      !new Decimal(same.price).equals(candle.price) ||
+      same.currency !== candle.currency
+    ) {
       corrected += 1;
     } else continue;
     write.push(candle);
