@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Tax: a loss sale whose repurchase window is still open says until when, since a purchase before then can still defer it.
+- Tax: a sale of a bond, commodity or cash instrument is named, since no repurchase rule covers it.
+
+### Changed
+- Tax: from 2025, a crypto loss with a purchase of the same asset in the two months before or after is deferred (Art. 43.i, NF 6/2025), whichever broker each trade was at. Crypto sold before 2025 is unchanged.
+- Import: a crypto row whose symbol is not an asset code is set aside and named instead of becoming an instrument of its own.
+
 ## [0.13.0] - 2026-10-22
 
 ### Upgrading

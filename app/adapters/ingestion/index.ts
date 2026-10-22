@@ -1,3 +1,4 @@
+export * from "./crypto-id";
 export * from "./detect";
 export * from "./discard";
 export * from "./ingest";

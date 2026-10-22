@@ -21,13 +21,7 @@ import {
 const BADGE =
   "shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide";
 
-export function TaxSaleItem({
-  sale,
-  windowMonths,
-}: {
-  sale: TaxSaleRow;
-  windowMonths: number;
-}) {
+export function TaxSaleItem({ sale }: { sale: TaxSaleRow }) {
   const {
     formatMoney,
     formatQuantity,
@@ -77,6 +71,7 @@ export function TaxSaleItem({
           {washSale && (
             <div className="mt-0.5 text-[11.5px] leading-snug text-negative">
               {copy.washSaleReason(
+                washSale.letter,
                 formatQuantity(washSale.repurchased),
                 formatQuantity(sale.quantity),
               )}
@@ -87,6 +82,11 @@ export function TaxSaleItem({
                 )}`}
               {sale.carriedOver !== "0" &&
                 ` ${copy.carriedOverReason(formatSignedMoney(sale.carriedOver).text)}`}
+            </div>
+          )}
+          {sale.windowOpenUntil && (
+            <div className="mt-0.5 text-[11.5px] leading-snug text-muted">
+              {copy.windowOpenReason(formatDate(sale.windowOpenUntil))}
             </div>
           )}
           {sale.unlistedRepurchaseAt && (
@@ -118,13 +118,7 @@ export function TaxSaleItem({
 
       {open && (
         <div className="border-t border-border-subtle bg-surface-2 px-gutter py-3">
-          {washSale && (
-            <WashSaleBreakdown
-              sale={sale}
-              washSale={washSale}
-              months={windowMonths}
-            />
-          )}
+          {washSale && <WashSaleBreakdown sale={sale} washSale={washSale} />}
 
           <div className="mb-2 text-[11px] uppercase tracking-[0.08em] text-muted">
             {copy.lotsTitle}
@@ -163,12 +157,11 @@ export function TaxSaleItem({
 function WashSaleBreakdown({
   sale,
   washSale,
-  months,
 }: {
   sale: TaxSaleRow;
   washSale: TaxWashSaleRow;
-  months: number;
 }) {
+  const months = washSale.windowMonths;
   const { formatQuantity, formatDate, formatPercent, formatSignedMoney } =
     useFormat();
   const copy = useCopy().realized.fiscal.breakdown;
@@ -191,7 +184,7 @@ function WashSaleBreakdown({
   return (
     <div className="mb-4">
       <div className="mb-2 text-[11px] uppercase tracking-[0.08em] text-muted">
-        {copy.title}
+        {copy.title[washSale.letter]}
       </div>
       {rows.map(([label, value]) => (
         <div

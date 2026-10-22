@@ -2,14 +2,15 @@ import Decimal from "decimal.js";
 
 import type {
   Instrument,
+  InstrumentType,
   LedgerEvent,
   Thesis,
   TradeEvent,
 } from "~/core/domain";
+import { toIsoDate } from "~/core/calendar";
 import { Money, isInKind, type DividendEvent } from "~/core/domain";
 import { baseOf, bookable, unconvertibleInstrumentIds } from "~/core/fx";
 import {
-  WASH_SALE_WINDOW_MONTHS,
   carryforwardFrom,
   computeSavingsQuota,
   computeTaxHistory,
@@ -18,10 +19,14 @@ import {
   taxYearOf,
   type CarryforwardStep,
   type RealizedGainDetail,
+  type RepurchaseAssetClass,
+  type RepurchaseLetter,
   type TaxBracket,
+  type TaxOptions,
   type Territory,
 } from "~/core/tax";
 
+import { todayInMadrid } from "./format";
 import { namesOf } from "./opportunity-cost";
 import { REALIZED_VIEW_PARAM } from "./realized";
 
@@ -38,6 +43,24 @@ export function taxExclusions(
   instruments: readonly Instrument[],
 ): string[] {
   return namesOf(unconvertibleInstrumentIds(events), instruments);
+}
+
+export function unclassifiedSales(
+  events: readonly LedgerEvent[],
+  instruments: readonly Instrument[],
+): string[] {
+  const unclassified = new Set(
+    instruments
+      .filter((i) => repurchaseAssetClassOf(i.type) === "unclassified")
+      .map((i) => i.id),
+  );
+  const sold = new Set(
+    events
+      .filter(isSellTrade)
+      .map((e) => e.instrumentId)
+      .filter((id) => unclassified.has(id)),
+  );
+  return namesOf([...sold].sort(), instruments);
 }
 
 export function listTaxYears(events: readonly LedgerEvent[]): number[] {
@@ -78,12 +101,41 @@ export function taxYearHref(params: URLSearchParams, year: number): string {
   return `?${next.toString()}`;
 }
 
-export function unlistedInstrumentIds(
+export const TAX_TERRITORY: Territory = "bizkaia";
+
+export function repurchaseAssetClassOf(
+  type: InstrumentType,
+): RepurchaseAssetClass {
+  switch (type) {
+    case "ETF":
+    case "STOCK":
+      return "listed-security";
+    case "CRYPTO":
+      return "fungible-crypto";
+    case "BOND":
+    case "COMMODITY":
+    case "CASH":
+      return "unclassified";
+    default: {
+      const unclassified: never = type;
+      throw new Error(`No repurchase asset class for type ${unclassified}`);
+    }
+  }
+}
+
+export function repurchaseAssetClasses(
   instruments: readonly Instrument[],
-): Set<string> {
-  return new Set(
-    instruments.filter((i) => i.type === "CRYPTO").map((i) => i.id),
+): Map<string, RepurchaseAssetClass> {
+  return new Map(
+    instruments.map((i) => [i.id, repurchaseAssetClassOf(i.type)]),
   );
+}
+
+export function taxOptionsFor(instruments: readonly Instrument[]): TaxOptions {
+  return {
+    territory: TAX_TERRITORY,
+    assetClasses: repurchaseAssetClasses(instruments),
+  };
 }
 
 export interface TaxLotRow {
@@ -101,6 +153,8 @@ export interface TaxRecipientRow {
 }
 
 export interface TaxWashSaleRow {
+  letter: RepurchaseLetter;
+  windowMonths: number;
   before: string;
   remainingAfter: string;
   repurchaseBefore: string;
@@ -125,6 +179,7 @@ export interface TaxSaleRow {
   nonComputable: string;
   carriedOver: string;
   washSale: TaxWashSaleRow | null;
+  windowOpenUntil: string | null;
   unlistedRepurchaseAt: string | null;
   lots: TaxLotRow[];
 }
@@ -182,7 +237,6 @@ export interface TaxScaleView {
 export interface TaxYearView {
   year: number;
   territory: Territory;
-  washSaleWindowMonths: number;
   sales: TaxSaleRow[];
   affectedCount: number;
   ownNet: string;
@@ -203,20 +257,19 @@ export function buildTaxYearView(
   events: readonly LedgerEvent[],
   instruments: readonly Instrument[],
   year: number,
+  today: string = todayInMadrid(),
 ): TaxYearView {
   const byId = new Map(instruments.map((i) => [i.id, i]));
   const nameOf = (id: string): string => byId.get(id)?.name ?? id;
 
-  const history = computeTaxHistory(events, {
-    unlistedInstrumentIds: unlistedInstrumentIds(instruments),
-  });
+  const history = computeTaxHistory(events, taxOptionsFor(instruments));
   const result = taxYearOf(history, year);
   const saleTs = new Map(history.gains.map((g) => [g.eventId, g.ts]));
   const originT = (id: string): string =>
     (saleTs.get(id) ?? new Date(0)).toISOString();
 
   const sales = result.gains
-    .map((gain) => toSaleRow(gain, byId))
+    .map((gain) => toSaleRow(gain, byId, today))
     .sort((a, b) => a.t.localeCompare(b.t));
 
   const integrations: TaxIntegrationRow[] = result.integrations.map((i) => ({
@@ -253,7 +306,6 @@ export function buildTaxYearView(
   return {
     year: result.year,
     territory: result.territory,
-    washSaleWindowMonths: WASH_SALE_WINDOW_MONTHS,
     sales,
     affectedCount: sales.filter((s) => s.washSale !== null).length,
     ownNet: sum(
@@ -283,9 +335,20 @@ export function buildTaxYearView(
   };
 }
 
+export function windowOpenUntil(
+  gain: RealizedGainDetail,
+  today: string,
+): string | null {
+  if (!gain.repurchaseWindow || !new Decimal(gain.realizedPnL).isNegative())
+    return null;
+  const end = toIsoDate(gain.repurchaseWindow.window.end);
+  return today <= end ? end : null;
+}
+
 function toSaleRow(
   gain: RealizedGainDetail,
   byId: ReadonlyMap<string, Instrument>,
+  today: string,
 ): TaxSaleRow {
   return {
     id: gain.eventId,
@@ -302,6 +365,8 @@ function toSaleRow(
     nonComputable: gain.nonComputable,
     carriedOver: gain.carriedOver,
     washSale: gain.washSale && {
+      letter: gain.washSale.letter,
+      windowMonths: gain.washSale.windowMonths,
       before: gain.washSale.before,
       remainingAfter: gain.washSale.remainingAfter,
       repurchaseBefore: gain.washSale.repurchaseBefore,
@@ -315,6 +380,7 @@ function toSaleRow(
         deferredLoss: r.deferredLoss,
       })),
     },
+    windowOpenUntil: windowOpenUntil(gain, today),
     unlistedRepurchaseAt: gain.unlistedNotice?.buyTs.toISOString() ?? null,
     lots: gain.lots.map((lot) => ({
       buyEventId: lot.buyEventId,

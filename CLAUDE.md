@@ -903,14 +903,16 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
   are taken oldest acquisition first, then purchases after the sale. Within one lot a
   deferral is spread pro rata over the units still held. Do not present any of these as
   doctrine.
-- **Crypto is outside Art. 43** (the DGT: not a security admitted to trading). Core takes
-  `unlistedInstrumentIds`, built in the app from `Instrument.type === "CRYPTO"` — a field
-  ingestion writes from the broker's asset class, unlike the hand-set `exposureKind`. It
-  is a **required** option so no caller can forget it and silently apply the rule to BTC.
-  An ETN that trades on an exchange is a listed security and stays inside. A crypto loss
-  rebought within a year gets a notice — some doctrine would apply a one-year repurchase
-  rule, and it is unsettled — and changes no figure. Do not tie that rule to securities
-  not admitted to trading: an earlier wording did, and it misattributed the doctrine.
+- **Crypto falls under Art. 43.i for transmissions from 1 January 2025, and under no
+  rule before** (NF 6/2025). The rule is chosen by the Madrid day of the transmission.
+  Core takes a repurchase class per instrument, built in the app from `Instrument.type`
+  — a field ingestion writes from the broker's asset class, unlike the hand-set
+  `exposureKind` — and throws on a sale with no class, so no caller can silently apply
+  the wrong letter. An ETN that trades on an exchange is a listed security under letter
+  g. A crypto loss before 2025 rebought within a year gets a notice — some doctrine
+  would apply a one-year repurchase rule, and it is unsettled — and changes no figure.
+  Do not tie that rule to securities not admitted to trading: an earlier wording did,
+  and it misattributed the doctrine.
 - **Core fixes the trade order: `ts`, then BUY before SELL, then `externalId`.** The same
   `compareTrades` drives `walkFifo` and the rule; the repository's `orderBy` sorts by `ts`
   alone and SQLite breaks ties however it likes. Before/after a sale is by instant, never by

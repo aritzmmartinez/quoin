@@ -7,7 +7,7 @@ Rule (enforced by lint):
 - Swapping broker / price provider / country = a new adapter, `core` untouched.
 
 Contents:
-- `ingestion/`   `TradeRepublicCsvAdapter` + `KrakenCsvAdapter` (CSV -> ledger events; filters card spending / non-BTC crypto; dedup by transaction id), plus `holdings/`: one issuer-agnostic parser for fund compositions
+- `ingestion/`   `TradeRepublicCsvAdapter` + `KrakenCsvAdapter` (CSV -> ledger events; filters card spending / non-BTC crypto; dedup by transaction id), plus `holdings/`: one issuer-agnostic parser for fund compositions. A crypto instrument's id is its asset code (`BTC`, `ETH`…) in every adapter, through `cryptoInstrumentId`, so one asset is one FIFO queue whichever broker holds it (Art. 47.2 NF 13/2013)
 - `persistence/` Prisma 7 + SQLite (schema, generated client, repositories for ledger, instruments, prices, holdings, identities, inflation levels and the savings plan)
 - `marketdata/`  `YahooMarketDataProvider` behind the `MarketDataProvider` port; per-instrument `quoteSymbol` mapping (kept in the local DB, not the repo)
 - `identity/`    `OpenFigiIdentityResolver` behind the `SecurityIdentityResolver` port; maps an ISIN or a venue-qualified ticker to a share-class FIGI so the same company stops being two leaves

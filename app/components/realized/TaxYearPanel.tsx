@@ -157,11 +157,7 @@ export function TaxYearPanel({
                   </div>
                   <ul>
                     {view.sales.map((sale) => (
-                      <TaxSaleItem
-                        key={sale.id}
-                        sale={sale}
-                        windowMonths={view.washSaleWindowMonths}
-                      />
+                      <TaxSaleItem key={sale.id} sale={sale} />
                     ))}
                   </ul>
                 </div>
