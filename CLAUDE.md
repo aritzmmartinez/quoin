@@ -944,8 +944,11 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
   step and `pnpm ingest` offers to, both merging the two writes with `mergeRewardRetry`.
   An unpriced reward still carries the BTC instrument, so a file of nothing but rewards
   creates BTC and the mapping step can reach it.
-- **The lookup never reaches forward.** `priceLookupFrom` takes the last close at or before
-  the timestamp, within 7 days; a later candle is information that did not exist yet.
+- **The lookup never reaches forward.** `priceLookupFrom` takes the last price *known* at or
+  before the timestamp, within 7 days: a daily candle counts from 24 h after its date,
+  because Yahoo dates it at the session open and fills it with the close, and a live row
+  from its own time (`snapshotKnownAt` in `core/prices`). Keyed by the candle's date, a
+  reward late on day D read D's close, which did not exist yet.
 - Scope is still BTC-only by choice (`isBtc` in `map.ts`). Measured on a real export:
   most refid groups are set aside — `earn` rewards and `welcomebonus` in other assets. **A discard is classified by what it does to a modelled position, not by asset.**
   `unmodelled-asset` is noise (rewards, transfers and trades of assets Quoin does not
