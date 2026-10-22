@@ -18,7 +18,13 @@ import {
   taxYearOf,
   type RealizedGainDetail,
 } from "~/core/tax";
-import { taxExclusions, taxOptionsFor, unclassifiedSales } from "~/lib/tax";
+import { todayInMadrid } from "~/lib/format";
+import {
+  taxExclusions,
+  taxOptionsFor,
+  unclassifiedSales,
+  windowOpenUntil,
+} from "~/lib/tax";
 import { announceDatabase } from "./lib/db-target";
 
 const YEAR = Number(
@@ -39,6 +45,8 @@ function day(t: Date): string {
   return toIsoDate(toCalendarDate(t, FISCAL_TIME_ZONE));
 }
 
+const TODAY = todayInMadrid();
+
 function printSale(gain: RealizedGainDetail, names: Map<string, string>): void {
   const name = names.get(gain.instrumentId) ?? gain.instrumentId;
   const flag = gain.washSale
@@ -51,6 +59,13 @@ function printSale(gain: RealizedGainDetail, names: Map<string, string>): void {
       `  gross ${eur(gain.grossAmount)}  fees ${eur(gain.fees)}  cost ${eur(gain.costBasis)}` +
       `  pnl ${eur(gain.realizedPnL)}  ${name}${flag}`,
   );
+
+  const openUntil = windowOpenUntil(gain, TODAY);
+  if (openUntil) {
+    console.log(
+      `      window open until ${openUntil}: a purchase before then can still defer this loss`,
+    );
+  }
 
   const ws = gain.washSale;
   if (ws) {

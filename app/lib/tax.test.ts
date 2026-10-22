@@ -480,3 +480,71 @@ describe("crypto from Trade Republic in the tax view", () => {
     expect(view.computableNet).toBe("-100");
   });
 });
+
+describe("a repurchase window still open", () => {
+  const instruments = [
+    instrument("X", "Fondo X", "ETF"),
+    instrument("BTC", "Bitcoin", "CRYPTO"),
+  ];
+
+  function lossSale(id: string, saleTs: string) {
+    const sell = trade("SELL", id, "1", "50", { ts: saleTs });
+    return {
+      sell,
+      events: [trade("BUY", id, "1", "60", { ts: "2024-01-10" }), sell],
+    };
+  }
+
+  it("is named until the last day of the window after a loss, under letter g", () => {
+    const { events } = lossSale("X", "2026-05-08T10:00:00Z");
+
+    const open = (today: string) =>
+      buildTaxYearView(events, instruments, 2026, today).sales[0]!
+        .windowOpenUntil;
+
+    expect(open("2026-05-08")).toBe("2026-07-08");
+    expect(open("2026-07-08")).toBe("2026-07-08");
+    expect(open("2026-07-09")).toBeNull();
+  });
+
+  it("is named under letter i too, across the new year", () => {
+    const { events } = lossSale("BTC", "2025-11-20T10:00:00Z");
+
+    const view = buildTaxYearView(events, instruments, 2025, "2026-01-05");
+
+    expect(view.sales[0]!.windowOpenUntil).toBe("2026-01-20");
+  });
+
+  it("is named whether or not a repurchase has already been found", () => {
+    const { events } = lossSale("X", "2026-05-08T10:00:00Z");
+    const rebought = [
+      ...events,
+      trade("BUY", "X", "1", "52", { ts: "2026-05-20T10:00:00Z" }),
+    ];
+
+    const sale = buildTaxYearView(rebought, instruments, 2026, "2026-06-01")
+      .sales[0]!;
+
+    expect(sale.washSale).not.toBeNull();
+    expect(sale.windowOpenUntil).toBe("2026-07-08");
+  });
+
+  it("is not named for a sale at a gain", () => {
+    const events = [
+      trade("BUY", "X", "1", "40", { ts: "2024-01-10" }),
+      trade("SELL", "X", "1", "50", { ts: "2026-05-08T10:00:00Z" }),
+    ];
+
+    const view = buildTaxYearView(events, instruments, 2026, "2026-05-09");
+
+    expect(view.sales[0]!.windowOpenUntil).toBeNull();
+  });
+
+  it("is not named for a sale no rule covers", () => {
+    const { events } = lossSale("BTC", "2024-12-20T10:00:00Z");
+
+    const view = buildTaxYearView(events, instruments, 2024, "2025-01-05");
+
+    expect(view.sales[0]!.windowOpenUntil).toBeNull();
+  });
+});

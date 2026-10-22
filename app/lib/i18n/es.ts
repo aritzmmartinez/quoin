@@ -1286,6 +1286,8 @@ export const es = {
         `El ${share} de la pérdida (${amount}) no computa este año: queda diferida en las uds recompradas y se integrará cuando se vendan.`,
       carriedOverReason: (amount: string): string =>
         `Las uds vendidas traían pérdida diferida de ventas anteriores; ${amount} pasa a las nuevas uds recompradas, aunque esta venta sea con ganancia. La ganancia propia no se bloquea.`,
+      windowOpenReason: (date: string): string =>
+        `Ventana de recompra abierta hasta el ${date}: una compra del mismo activo hasta ese día todavía puede diferir esta pérdida, así que la cifra del año puede cambiar.`,
       unlistedReason: (date: string): string =>
         `Criptomoneda vendida antes de 2025: la regla de recompra de criptoactivos (Art. 43.i) rige para las transmisiones desde el 1 de enero de 2025, así que la pérdida computa entera. Hay una nueva compra el ${date}; parte de la doctrina aplicaría la regla de recompra en el año siguiente. No está resuelto y no cambia ninguna cifra.`,
       breakdown: {

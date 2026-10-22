@@ -33,6 +33,7 @@ import {
   realizedTotals,
   taxExclusions,
   toRealizedRows,
+  todayInMadrid,
   unclassifiedSales,
   useCopy,
   useFormat,
@@ -96,7 +97,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       view:
         view !== "tax" || taxYear === null
           ? null
-          : buildTaxYearView(events, instruments, taxYear),
+          : buildTaxYearView(events, instruments, taxYear, todayInMadrid()),
     },
   };
 }

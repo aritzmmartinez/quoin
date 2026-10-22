@@ -1275,6 +1275,8 @@ export const en: Copy = {
         `${share} of the loss (${amount}) does not compute this year: it stays deferred on the repurchased units and computes when they are sold.`,
       carriedOverReason: (amount: string): string =>
         `The units sold carried deferred loss from earlier sales; ${amount} moves on to the new repurchased units, even when this sale is at a gain. Its own gain is never held back.`,
+      windowOpenReason: (date: string): string =>
+        `Repurchase window open until ${date}: a purchase of the same asset up to that day can still defer this loss, so the year's figure may change.`,
       unlistedReason: (date: string): string =>
         `Crypto sold before 2025: the repurchase rule for crypto assets (Art. 43.i) governs transmissions from 1 January 2025, so the loss counts in full. There is a new purchase on ${date}; some doctrine would apply the one-year repurchase rule. This is unsettled and changes no figures.`,
       breakdown: {

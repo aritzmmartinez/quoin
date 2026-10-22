@@ -84,6 +84,11 @@ export function TaxSaleItem({ sale }: { sale: TaxSaleRow }) {
                 ` ${copy.carriedOverReason(formatSignedMoney(sale.carriedOver).text)}`}
             </div>
           )}
+          {sale.windowOpenUntil && (
+            <div className="mt-0.5 text-[11.5px] leading-snug text-muted">
+              {copy.windowOpenReason(formatDate(sale.windowOpenUntil))}
+            </div>
+          )}
           {sale.unlistedRepurchaseAt && (
             <div className="mt-0.5 text-[11.5px] leading-snug text-muted">
               {copy.unlistedReason(formatDate(sale.unlistedRepurchaseAt))}

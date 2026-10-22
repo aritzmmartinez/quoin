@@ -7,6 +7,7 @@ import type {
   Thesis,
   TradeEvent,
 } from "~/core/domain";
+import { toIsoDate } from "~/core/calendar";
 import { Money, isInKind, type DividendEvent } from "~/core/domain";
 import { baseOf, bookable, unconvertibleInstrumentIds } from "~/core/fx";
 import {
@@ -25,6 +26,7 @@ import {
   type Territory,
 } from "~/core/tax";
 
+import { todayInMadrid } from "./format";
 import { namesOf } from "./opportunity-cost";
 import { REALIZED_VIEW_PARAM } from "./realized";
 
@@ -177,6 +179,7 @@ export interface TaxSaleRow {
   nonComputable: string;
   carriedOver: string;
   washSale: TaxWashSaleRow | null;
+  windowOpenUntil: string | null;
   unlistedRepurchaseAt: string | null;
   lots: TaxLotRow[];
 }
@@ -254,6 +257,7 @@ export function buildTaxYearView(
   events: readonly LedgerEvent[],
   instruments: readonly Instrument[],
   year: number,
+  today: string = todayInMadrid(),
 ): TaxYearView {
   const byId = new Map(instruments.map((i) => [i.id, i]));
   const nameOf = (id: string): string => byId.get(id)?.name ?? id;
@@ -265,7 +269,7 @@ export function buildTaxYearView(
     (saleTs.get(id) ?? new Date(0)).toISOString();
 
   const sales = result.gains
-    .map((gain) => toSaleRow(gain, byId))
+    .map((gain) => toSaleRow(gain, byId, today))
     .sort((a, b) => a.t.localeCompare(b.t));
 
   const integrations: TaxIntegrationRow[] = result.integrations.map((i) => ({
@@ -331,9 +335,20 @@ export function buildTaxYearView(
   };
 }
 
+export function windowOpenUntil(
+  gain: RealizedGainDetail,
+  today: string,
+): string | null {
+  if (!gain.repurchaseWindow || !new Decimal(gain.realizedPnL).isNegative())
+    return null;
+  const end = toIsoDate(gain.repurchaseWindow.window.end);
+  return today <= end ? end : null;
+}
+
 function toSaleRow(
   gain: RealizedGainDetail,
   byId: ReadonlyMap<string, Instrument>,
+  today: string,
 ): TaxSaleRow {
   return {
     id: gain.eventId,
@@ -365,6 +380,7 @@ function toSaleRow(
         deferredLoss: r.deferredLoss,
       })),
     },
+    windowOpenUntil: windowOpenUntil(gain, today),
     unlistedRepurchaseAt: gain.unlistedNotice?.buyTs.toISOString() ?? null,
     lots: gain.lots.map((lot) => ({
       buyEventId: lot.buyEventId,

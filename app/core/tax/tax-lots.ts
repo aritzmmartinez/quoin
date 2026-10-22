@@ -71,7 +71,13 @@ export interface RealizedGainDetail {
   nonComputable: string;
   carriedOver: string;
   washSale: WashSaleDetail | null;
+  repurchaseWindow: RepurchaseWindowDetail | null;
   unlistedNotice: UnlistedNoticeDetail | null;
+}
+
+export interface RepurchaseWindowDetail {
+  letter: RepurchaseLetter;
+  window: WashSaleWindow;
 }
 
 export interface DeferredLossIntegration {
@@ -131,6 +137,9 @@ export function computeTaxHistory(
         assessment && assessment.repurchased.gt(0)
           ? washSaleDetail(assessment, deferral.shares)
           : null,
+      repurchaseWindow: assessment
+        ? { letter: assessment.rule.letter, window: assessment.window }
+        : null,
       unlistedNotice: notice
         ? { buyEventId: notice.buyEventId, buyTs: notice.buyTs }
         : null,
@@ -201,6 +210,7 @@ function saleFigures(
   | "nonComputable"
   | "carriedOver"
   | "washSale"
+  | "repurchaseWindow"
   | "unlistedNotice"
 > {
   return {
