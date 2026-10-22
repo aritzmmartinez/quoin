@@ -6,7 +6,10 @@ import { Money } from "../domain";
 /** Spanish IRPF territories only (foral and común) — not a multi-country abstraction. */
 export type Territory = "bizkaia";
 
-export type RepurchaseAssetClass = "listed-security" | "fungible-crypto";
+export type RepurchaseAssetClass =
+  "listed-security" | "fungible-crypto" | "unclassified";
+
+export type RepurchaseLetter = "g" | "i";
 
 /**
  * Art. 43 NF 13/2013 de Bizkaia — pérdidas patrimoniales no computables por
@@ -28,10 +31,17 @@ export type RepurchaseAssetClass = "listed-security" | "fungible-crypto";
  *   repurchase of a sale on or after it.
  *
  * A sale no entry covers is assessed by nothing, and its loss computes whole.
+ * No entry covers "unclassified": a bond held directly yields income from
+ * movable capital, outside Art. 43, and a commodity held directly would fall
+ * under a letter that is not modelled, so the app names such a sale instead.
+ *
+ * Letter i is letter g's mechanics with another homogeneity and another
+ * start: fungible crypto of the same type, transmitted from 1 January 2025.
+ * A crypto sale before that day has no rule and only its notice.
  */
 export interface RepurchaseRule {
   territory: Territory;
-  letter: string;
+  letter: RepurchaseLetter;
   assetClass: RepurchaseAssetClass;
   windowMonths: number;
   homogeneity: "instrument";
@@ -52,6 +62,18 @@ export const REPURCHASE_RULES: readonly RepurchaseRule[] = [
     from: null,
     to: null,
     source: "Art. 43.g NF 13/2013 de Bizkaia",
+  },
+  {
+    territory: "bizkaia",
+    letter: "i",
+    assetClass: "fungible-crypto",
+    windowMonths: 2,
+    homogeneity: "instrument",
+    acquisitions: "all",
+    from: "2025-01-01",
+    to: null,
+    source:
+      "Art. 43.i NF 13/2013, redacción de la NF 6/2025, de 12 de diciembre (BOB 15/12/2025)",
   },
 ];
 
@@ -75,8 +97,8 @@ export function repurchaseRuleFor(
 
 /**
  * How far after a crypto loss sale a new acquisition of the same asset is
- * pointed out. Informative only: crypto is outside the two-month rule, and
- * whether a one-year repurchase rule reaches it is unsettled.
+ * pointed out, for a sale before letter i governs crypto. Informative only:
+ * whether a one-year repurchase rule reached those sales is unsettled.
  */
 export const UNLISTED_NOTICE_WINDOW_MONTHS = 12;
 /**

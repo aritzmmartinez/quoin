@@ -42,13 +42,20 @@ function yearRoundTrip(
   ];
 }
 
-const LISTED: TaxOptions = { territory: "bizkaia", assetClasses: new Map() };
+function listed(events: readonly TradeEvent[]): TaxOptions {
+  return {
+    territory: "bizkaia",
+    assetClasses: new Map(
+      events.map((e) => [e.instrumentId, "listed-security"] as const),
+    ),
+  };
+}
 
 describe("computeNetWithCarryforward", () => {
   it("passes a year through unchanged when nothing was ever negative", () => {
     const events = yearRoundTrip("X", 2026, 2026, "1000", "1300");
 
-    const result = computeNetWithCarryforward(events, 2026, LISTED);
+    const result = computeNetWithCarryforward(events, 2026, listed(events));
 
     expect(result.netSavingsBase).toBe("300");
     expect(result.steps.every((s) => s.consumedFromCarryforward === "0")).toBe(
@@ -65,7 +72,7 @@ describe("computeNetWithCarryforward", () => {
       ...yearRoundTrip("E", 2026, 2026, "1000", "2000"), // +1000
     ];
 
-    const result = computeNetWithCarryforward(events, 2026, LISTED);
+    const result = computeNetWithCarryforward(events, 2026, listed(events));
 
     expect(result.steps.map((s) => [s.year, s.ownNet, s.finalNet])).toEqual([
       [2022, "-1000", "-1000"],
@@ -84,7 +91,7 @@ describe("computeNetWithCarryforward", () => {
       ...yearRoundTrip("B", 2026, 2026, "1000", "1500"), // +500 in the target year
     ];
 
-    const result = computeNetWithCarryforward(events, 2026, LISTED);
+    const result = computeNetWithCarryforward(events, 2026, listed(events));
 
     expect(result.steps[0]!.year).toBe(2022);
     expect(result.netSavingsBase).toBe("500");
@@ -96,7 +103,7 @@ describe("computeNetWithCarryforward", () => {
       ...yearRoundTrip("B", 2026, 2026, "1000", "1100"), // +100, less than the loss
     ];
 
-    const result = computeNetWithCarryforward(events, 2026, LISTED);
+    const result = computeNetWithCarryforward(events, 2026, listed(events));
 
     const finalStep = result.steps[result.steps.length - 1]!;
     expect(finalStep.consumedFromCarryforward).toBe("100");
@@ -112,7 +119,7 @@ describe("computeNetWithCarryforward", () => {
       ...yearRoundTrip("Y", 2027, 2027, "1000", "1400"), // +400
     ];
 
-    const result = computeNetWithCarryforward(events, 2027, LISTED);
+    const result = computeNetWithCarryforward(events, 2027, listed(events));
 
     expect(result.steps.map((s) => [s.year, s.ownNet, s.finalNet])).toEqual([
       [2023, "0", "0"],
@@ -132,7 +139,7 @@ describe("computeNetWithCarryforward", () => {
       ...yearRoundTrip("Y", 2029, 2029, "1000", "1400"), // +400
     ];
 
-    const result = computeNetWithCarryforward(events, 2029, LISTED);
+    const result = computeNetWithCarryforward(events, 2029, listed(events));
 
     expect(result.steps[0]).toMatchObject({ year: 2025, ownNet: "-250" });
     expect(result.netSavingsBase).toBe("150");

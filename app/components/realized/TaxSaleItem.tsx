@@ -71,6 +71,7 @@ export function TaxSaleItem({ sale }: { sale: TaxSaleRow }) {
           {washSale && (
             <div className="mt-0.5 text-[11.5px] leading-snug text-negative">
               {copy.washSaleReason(
+                washSale.letter,
                 formatQuantity(washSale.repurchased),
                 formatQuantity(sale.quantity),
               )}
@@ -178,7 +179,7 @@ function WashSaleBreakdown({
   return (
     <div className="mb-4">
       <div className="mb-2 text-[11px] uppercase tracking-[0.08em] text-muted">
-        {copy.title}
+        {copy.title[washSale.letter]}
       </div>
       {rows.map(([label, value]) => (
         <div

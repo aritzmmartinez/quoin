@@ -5,6 +5,7 @@ import type {
   LeafKind,
   Thesis,
 } from "~/core/domain";
+import type { RepurchaseLetter } from "~/core/tax";
 
 import type { ExcludedNotice } from "./es";
 import type { Copy } from "./types";
@@ -91,6 +92,8 @@ export const en: Copy = {
     },
     noRateTax: (names: string): string =>
       `No exchange rate: ${names}. Their trades could not be converted to euros and are not part of this calculation. Check them before using these figures in a tax return.`,
+    unclassifiedTax: (names: string): string =>
+      `No repurchase rule: ${names}. Its type (bond, commodity or cash) is neither a listed security nor a crypto asset: a bond held directly yields income from movable capital, to which Art. 43 does not apply, and a commodity held directly would have a rule of its own, which Quoin does not model. Its sales are computed with no repurchase rule. Check them before using these figures in a tax return.`,
   },
   notFound: {
     title: "Page not found",
@@ -1223,7 +1226,7 @@ export const en: Copy = {
     fiscal: {
       about: "About the tax basis",
       intro:
-        "The same sales, on a FIFO basis instead of AVCO, which is what the Bizkaia foral tax return (NF 13/2013) requires and not what the Sales tab uses. A loss with a repurchase of homogeneous securities in the two months before or after is deferred under Art. 43, in the proportion repurchased, and computes when the repurchased securities are transmitted; offsetting against earlier years follows Art. 66. The repurchase arithmetic follows the DGT rulings V1403-21, V1117-21 and V3282-18 on the parallel state rule, which do not bind the Hacienda Foral.",
+        "The same sales, on a FIFO basis instead of AVCO, which is what the Bizkaia foral tax return (NF 13/2013) requires and not what the Sales tab uses. A loss with a repurchase in the two months before or after is deferred under Art. 43 (letter g for homogeneous securities and, for transmissions from 1 January 2025, letter i for crypto assets of the same type), in the proportion repurchased, and computes when the repurchased units are transmitted; offsetting against earlier years follows Art. 66. The repurchase arithmetic follows the DGT rulings V1403-21, V1117-21 and V3282-18 on the parallel state rule, which do not bind the Hacienda Foral.",
       yearLabel: "Tax year",
       noYears: "There are no sales recorded in any year yet.",
       summary: {
@@ -1262,16 +1265,23 @@ export const en: Copy = {
         quantity: "Units",
         unitCost: "Unit cost",
       },
-      washSaleReason: (repurchased: string, sold: string): string =>
-        `Art. 43: ${repurchased} of the ${sold} units sold were repurchased.`,
+      washSaleReason: (
+        letter: RepurchaseLetter,
+        repurchased: string,
+        sold: string,
+      ): string =>
+        `Art. 43.${letter}: ${repurchased} of the ${sold} units sold were repurchased.`,
       ownDeferredReason: (share: string, amount: string): string =>
         `${share} of the loss (${amount}) does not compute this year: it stays deferred on the repurchased units and computes when they are sold.`,
       carriedOverReason: (amount: string): string =>
         `The units sold carried deferred loss from earlier sales; ${amount} moves on to the new repurchased units, even when this sale is at a gain. Its own gain is never held back.`,
       unlistedReason: (date: string): string =>
-        `Crypto: the two-month rule doesn't apply and the loss counts in full. There is a new purchase on ${date}; some doctrine would apply the one-year repurchase rule. This is unsettled and changes no figures.`,
+        `Crypto sold before 2025: the repurchase rule for crypto assets (Art. 43.i) governs transmissions from 1 January 2025, so the loss counts in full. There is a new purchase on ${date}; some doctrine would apply the one-year repurchase rule. This is unsettled and changes no figures.`,
       breakdown: {
-        title: "Repurchase of homogeneous securities (Art. 43)",
+        title: {
+          g: "Repurchase of homogeneous securities (Art. 43.g)",
+          i: "Repurchase of crypto assets of the same type (Art. 43.i)",
+        },
         before: (months: number): string =>
           `Acquired in the ${months} months before`,
         remainingAfter: "Position left after the sale",

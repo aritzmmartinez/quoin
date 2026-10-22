@@ -2,6 +2,7 @@ import Decimal from "decimal.js";
 
 import type {
   Instrument,
+  InstrumentType,
   LedgerEvent,
   Thesis,
   TradeEvent,
@@ -18,6 +19,7 @@ import {
   type CarryforwardStep,
   type RealizedGainDetail,
   type RepurchaseAssetClass,
+  type RepurchaseLetter,
   type TaxBracket,
   type TaxOptions,
   type Territory,
@@ -39,6 +41,24 @@ export function taxExclusions(
   instruments: readonly Instrument[],
 ): string[] {
   return namesOf(unconvertibleInstrumentIds(events), instruments);
+}
+
+export function unclassifiedSales(
+  events: readonly LedgerEvent[],
+  instruments: readonly Instrument[],
+): string[] {
+  const unclassified = new Set(
+    instruments
+      .filter((i) => repurchaseAssetClassOf(i.type) === "unclassified")
+      .map((i) => i.id),
+  );
+  const sold = new Set(
+    events
+      .filter(isSellTrade)
+      .map((e) => e.instrumentId)
+      .filter((id) => unclassified.has(id)),
+  );
+  return namesOf([...sold].sort(), instruments);
 }
 
 export function listTaxYears(events: readonly LedgerEvent[]): number[] {
@@ -81,14 +101,31 @@ export function taxYearHref(params: URLSearchParams, year: number): string {
 
 export const TAX_TERRITORY: Territory = "bizkaia";
 
+export function repurchaseAssetClassOf(
+  type: InstrumentType,
+): RepurchaseAssetClass {
+  switch (type) {
+    case "ETF":
+    case "STOCK":
+      return "listed-security";
+    case "CRYPTO":
+      return "fungible-crypto";
+    case "BOND":
+    case "COMMODITY":
+    case "CASH":
+      return "unclassified";
+    default: {
+      const unclassified: never = type;
+      throw new Error(`No repurchase asset class for type ${unclassified}`);
+    }
+  }
+}
+
 export function repurchaseAssetClasses(
   instruments: readonly Instrument[],
 ): Map<string, RepurchaseAssetClass> {
   return new Map(
-    instruments.map((i) => [
-      i.id,
-      i.type === "CRYPTO" ? "fungible-crypto" : "listed-security",
-    ]),
+    instruments.map((i) => [i.id, repurchaseAssetClassOf(i.type)]),
   );
 }
 
@@ -114,7 +151,7 @@ export interface TaxRecipientRow {
 }
 
 export interface TaxWashSaleRow {
-  letter: string;
+  letter: RepurchaseLetter;
   windowMonths: number;
   before: string;
   remainingAfter: string;

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import type { DividendEvent, Instrument, TradeEvent } from "~/core/domain";
+import {
+  instrumentTypeSchema,
+  type DividendEvent,
+  type Instrument,
+  type TradeEvent,
+} from "~/core/domain";
 import { computeTaxHistory } from "~/core/tax";
 import { mapRow } from "~/adapters/ingestion/trade-republic/map";
 import type { TradeRepublicRow } from "~/adapters/ingestion/trade-republic/row";
@@ -12,8 +17,10 @@ import {
   parseTaxYear,
   taxExclusions,
   TAX_YEAR_PARAM,
+  repurchaseAssetClassOf,
   repurchaseAssetClasses,
   taxOptionsFor,
+  unclassifiedSales,
 } from "./tax";
 
 let seq = 0;
@@ -186,7 +193,24 @@ describe("buildTaxYearView", () => {
     expect(view.pending).toEqual([]);
   });
 
-  it("keeps crypto outside the rule, from Instrument.type, with a notice", () => {
+  it("keeps crypto sold before 2025 outside the rule, from Instrument.type, with a notice", () => {
+    const btc = [...instruments, instrument("BTC", "Bitcoin", "CRYPTO")];
+    const sell = trade("SELL", "BTC", "1", "50000", { ts: "2024-05-08" });
+    const rebuy = trade("BUY", "BTC", "1", "52000", { ts: "2024-05-20" });
+    const events = [
+      trade("BUY", "BTC", "1", "60000", { ts: "2024-01-10" }),
+      sell,
+      rebuy,
+    ];
+
+    const view = buildTaxYearView(events, btc, 2024);
+
+    expect(view.sales[0]!.washSale).toBeNull();
+    expect(view.sales[0]!.unlistedRepurchaseAt).toBe(rebuy.ts.toISOString());
+    expect(view.computableNet).toBe("-10000");
+  });
+
+  it("defers a crypto loss from 2025 on under Art. 43.i, from Instrument.type", () => {
     const btc = [...instruments, instrument("BTC", "Bitcoin", "CRYPTO")];
     const sell = trade("SELL", "BTC", "1", "50000", { ts: "2026-05-08" });
     const rebuy = trade("BUY", "BTC", "1", "52000", { ts: "2026-05-20" });
@@ -198,9 +222,13 @@ describe("buildTaxYearView", () => {
 
     const view = buildTaxYearView(events, btc, 2026);
 
-    expect(view.sales[0]!.washSale).toBeNull();
-    expect(view.sales[0]!.unlistedRepurchaseAt).toBe(rebuy.ts.toISOString());
-    expect(view.computableNet).toBe("-10000");
+    expect(view.sales[0]!.washSale).toMatchObject({
+      letter: "i",
+      windowMonths: 2,
+      repurchased: "1",
+    });
+    expect(view.sales[0]!.unlistedRepurchaseAt).toBeNull();
+    expect(view.computableNet).toBe("0");
   });
 
   it("orders sales chronologically (FIFO order), not by insertion order", () => {
@@ -233,14 +261,15 @@ describe("buildTaxYearView", () => {
     expect(view.carryforward.at(-1)?.consumedFromCarryforward).toBe("300");
   });
 
-  it("reports no instrument name it doesn't have as a fallback to the id", () => {
+  it("refuses a sale of an instrument it has no record of, instead of guessing its class", () => {
     const events = [
       trade("BUY", "Y", "10", "1000", { ts: "2025-01-01" }),
       trade("SELL", "Y", "10", "1200", { ts: "2025-06-01" }),
     ];
 
-    const view = buildTaxYearView(events, instruments, 2025);
-    expect(view.sales[0]!.name).toBe("Y");
+    expect(() => buildTaxYearView(events, instruments, 2025)).toThrow(
+      "No repurchase asset class for instrument Y",
+    );
   });
 });
 
@@ -257,6 +286,60 @@ describe("repurchaseAssetClasses", () => {
       ["GOLD", "listed-security"],
       ["X", "listed-security"],
     ]);
+  });
+
+  it("gives every instrument type a class", () => {
+    expect(
+      Object.fromEntries(
+        instrumentTypeSchema.options.map((type) => [
+          type,
+          repurchaseAssetClassOf(type),
+        ]),
+      ),
+    ).toEqual({
+      ETF: "listed-security",
+      STOCK: "listed-security",
+      CRYPTO: "fungible-crypto",
+      BOND: "unclassified",
+      COMMODITY: "unclassified",
+      CASH: "unclassified",
+    });
+  });
+});
+
+describe("unclassifiedSales", () => {
+  const instruments = [
+    instrument("B", "Bono directo", "BOND"),
+    instrument("G", "Oro físico", "COMMODITY"),
+    instrument("X", "Fondo X", "ETF"),
+  ];
+
+  it("names each unclassified instrument that has ever been sold, once", () => {
+    const events = [
+      trade("BUY", "B", "10", "1000", { ts: "2024-01-01" }),
+      trade("SELL", "B", "5", "480", { ts: "2024-06-01" }),
+      trade("SELL", "B", "5", "490", { ts: "2026-06-01" }),
+      trade("BUY", "G", "1", "2000", { ts: "2025-01-01" }),
+      trade("BUY", "X", "10", "1000", { ts: "2025-01-01" }),
+      trade("SELL", "X", "10", "900", { ts: "2025-06-01" }),
+    ];
+
+    expect(unclassifiedSales(events, instruments)).toEqual(["Bono directo"]);
+  });
+
+  it("assesses no repurchase on such a sale, and gives it no notice", () => {
+    const sell = trade("SELL", "B", "10", "900", { ts: "2026-05-08" });
+    const events = [
+      trade("BUY", "B", "10", "1000", { ts: "2026-01-10" }),
+      sell,
+      trade("BUY", "B", "10", "905", { ts: "2026-05-20" }),
+    ];
+
+    const view = buildTaxYearView(events, instruments, 2026);
+
+    expect(view.sales[0]!.washSale).toBeNull();
+    expect(view.sales[0]!.unlistedRepurchaseAt).toBeNull();
+    expect(view.computableNet).toBe("-100");
   });
 });
 

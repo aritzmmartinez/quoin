@@ -2,7 +2,7 @@ import Decimal from "decimal.js";
 
 import { Money, type LedgerEvent, type Revalue } from "../domain";
 
-import type { Territory } from "./config";
+import type { RepurchaseLetter, Territory } from "./config";
 import {
   walkDeferredLosses,
   type DeferredLossPiece,
@@ -40,7 +40,7 @@ export interface WashSaleRecipientDetail {
 }
 
 export interface WashSaleDetail {
-  letter: string;
+  letter: RepurchaseLetter;
   windowMonths: number;
   window: WashSaleWindow;
   before: string;

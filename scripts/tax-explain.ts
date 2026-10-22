@@ -18,7 +18,7 @@ import {
   taxYearOf,
   type RealizedGainDetail,
 } from "~/core/tax";
-import { taxExclusions, taxOptionsFor } from "~/lib/tax";
+import { taxExclusions, taxOptionsFor, unclassifiedSales } from "~/lib/tax";
 import { announceDatabase } from "./lib/db-target";
 
 const YEAR = Number(
@@ -105,6 +105,16 @@ async function main(): Promise<void> {
         "  Their trades could not be converted to euros and are not part of\n" +
         "  this calculation. Check them before using these figures in a tax\n" +
         "  return.\n",
+    );
+  }
+
+  const unclassified = unclassifiedSales(events, instruments);
+  if (unclassified.length > 0) {
+    console.log(
+      `! No repurchase rule: ${unclassified.join(", ")}.\n` +
+        "  A bond, commodity or cash instrument is neither a listed security\n" +
+        "  nor a crypto asset, so its sales are computed with no repurchase\n" +
+        "  rule. Check them before using these figures in a tax return.\n",
     );
   }
 

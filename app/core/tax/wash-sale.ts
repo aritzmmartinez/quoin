@@ -33,9 +33,9 @@ export function washSaleWindow(saleTs: Date, months: number): WashSaleWindow {
 
 /**
  * What the rules are read against: the territory, and which class each
- * instrument belongs to. An instrument missing from `assetClasses` is a listed
- * security, as every instrument that is not crypto is today. `rules` defaults
- * to the table in config.ts and is open only so a test can state a variant.
+ * instrument belongs to. A sale of an instrument missing from `assetClasses`
+ * throws: no class is never read as one. `rules` defaults to the table in
+ * config.ts and is open only so a test can state a variant.
  */
 export interface RepurchaseScope {
   territory: Territory;
@@ -79,8 +79,15 @@ export function createWashSaleAssessor(
   trades: readonly TradeEvent[],
   scope: RepurchaseScope,
 ): WashSaleAssessor {
-  const assetClassOf = (instrumentId: string): RepurchaseAssetClass =>
-    scope.assetClasses.get(instrumentId) ?? "listed-security";
+  const assetClassOf = (instrumentId: string): RepurchaseAssetClass => {
+    const assetClass = scope.assetClasses.get(instrumentId);
+    if (assetClass === undefined) {
+      throw new Error(
+        `No repurchase asset class for instrument ${instrumentId}`,
+      );
+    }
+    return assetClass;
+  };
   const counts = (rule: RepurchaseRule, buy: TradeEvent): boolean =>
     rule.acquisitions === "all" || !isInKind(buy);
 
