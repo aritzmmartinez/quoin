@@ -20,7 +20,8 @@ export function InstrumentHeader({
 }: {
   instrument: InstrumentHeaderData;
 }) {
-  const { formatMoney, formatQuantity, formatRelativeTime } = useFormat();
+  const { formatMoney, formatPrice, formatQuantity, formatRelativeTime } =
+    useFormat();
   const t = useCopy();
   return (
     <header className="mb-6">
@@ -44,7 +45,7 @@ export function InstrumentHeader({
         <div className="text-right">
           {instrument.price && (
             <div className="text-[20px] font-semibold tabular-nums">
-              {formatMoney(instrument.price.value)}
+              {formatPrice(instrument.price.value)}
             </div>
           )}
           <div className="mt-0.5 flex items-center justify-end gap-2 text-[13px]">

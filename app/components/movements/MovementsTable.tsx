@@ -93,7 +93,7 @@ function Cell({
   row: MovementRow;
   column: MovementColumnKey;
 }) {
-  const { formatMoney, formatQuantity, formatDate } = useFormat();
+  const { formatMoney, formatPrice, formatQuantity, formatDate } = useFormat();
   const t = useCopy();
   switch (column) {
     case "date":
@@ -124,7 +124,7 @@ function Cell({
       return <>{row.quantity === null ? DASH : formatQuantity(row.quantity)}</>;
 
     case "price":
-      return <>{row.price === null ? DASH : formatMoney(row.price)}</>;
+      return <>{row.price === null ? DASH : formatPrice(row.price)}</>;
 
     case "costs":
       return (

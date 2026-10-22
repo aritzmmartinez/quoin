@@ -125,6 +125,7 @@ function CheckDetail({ check }: { check: SymbolCheck }) {
     formatDate,
     formatMoney,
     formatPercent,
+    formatPrice,
     formatRelativeTime,
   } = useFormat();
   const t = useCopy();
@@ -138,7 +139,7 @@ function CheckDetail({ check }: { check: SymbolCheck }) {
         <span className="text-muted">
           {copy.price}{" "}
           <span className="font-mono tabular-nums text-text">
-            {formatAmount(check.price, check.currency)}
+            {formatPrice(check.price, check.currency)}
           </span>
         </span>
         {!check.closed && (

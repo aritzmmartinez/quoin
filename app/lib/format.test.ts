@@ -8,6 +8,7 @@ const {
   formatDate,
   formatMoney,
   formatPercent,
+  formatPrice,
   formatQuantity,
   formatRelativeTime,
   formatSignedMoney,
@@ -45,6 +46,34 @@ describe("formatQuantity", () => {
 
   it("preserves crypto precision", () => {
     expect(formatQuantity("0.00412345")).toBe("0,00412345");
+  });
+
+  it("shows ten decimals of millions of units without losing a digit", () => {
+    expect(norm(formatQuantity("12345678.1234567891"))).toBe(
+      "12.345.678,1234567891",
+    );
+  });
+});
+
+describe("formatPrice", () => {
+  it("formats a price of one or more as money, two decimals", () => {
+    expect(formatPrice("769.05")).toBe(formatMoney("769.05"));
+    expect(formatPrice("1")).toBe(formatMoney("1"));
+    expect(formatPrice("0")).toBe(formatMoney("0"));
+  });
+
+  it("formats a price under one to four significant digits, never to zero", () => {
+    expect(norm(formatPrice("0.00000438"))).toBe("0,00000438 €");
+    expect(norm(formatPrice("0.1234567"))).toBe("0,1235 €");
+    expect(norm(formatPrice("0.5"))).toBe("0,50 €");
+  });
+
+  it("names another currency after the figure, by the same rule", () => {
+    expect(norm(formatPrice("0.00000438", "USD"))).toBe("0,00000438 USD");
+    expect(norm(formatPrice("343.99", "USD"))).toBe("343,99 USD");
+    expect(norm(createFormat("en").formatPrice("0.00000438", "USD"))).toBe(
+      "0.00000438 USD",
+    );
   });
 });
 
