@@ -11,7 +11,6 @@ import { toCalendarDate, toIsoDate } from "~/core/calendar";
 import { Money } from "~/core/domain";
 import {
   FISCAL_TIME_ZONE,
-  WASH_SALE_WINDOW_MONTHS,
   carryforwardFrom,
   computeSavingsQuota,
   computeTaxHistory,
@@ -19,7 +18,7 @@ import {
   taxYearOf,
   type RealizedGainDetail,
 } from "~/core/tax";
-import { taxExclusions, unlistedInstrumentIds } from "~/lib/tax";
+import { taxExclusions, taxOptionsFor } from "~/lib/tax";
 import { announceDatabase } from "./lib/db-target";
 
 const YEAR = Number(
@@ -56,7 +55,7 @@ function printSale(gain: RealizedGainDetail, names: Map<string, string>): void {
   const ws = gain.washSale;
   if (ws) {
     console.log(
-      `      window: [${toIsoDate(ws.window.start)} .. ${toIsoDate(ws.window.end)}]  (sale ± ${WASH_SALE_WINDOW_MONTHS}m, Madrid)`,
+      `      window: [${toIsoDate(ws.window.start)} .. ${toIsoDate(ws.window.end)}]  (Art. 43.${ws.letter}, sale ± ${ws.windowMonths}m, Madrid)`,
     );
     console.log(
       `      before ${ws.before}  R ${ws.remainingAfter}  repurchase_before ${ws.repurchaseBefore}` +
@@ -109,9 +108,7 @@ async function main(): Promise<void> {
     );
   }
 
-  const history = computeTaxHistory(events, {
-    unlistedInstrumentIds: unlistedInstrumentIds(instruments),
-  });
+  const history = computeTaxHistory(events, taxOptionsFor(instruments));
   const saleDays = new Map(history.gains.map((g) => [g.eventId, day(g.ts)]));
   const result = taxYearOf(history, YEAR);
 

@@ -3,7 +3,12 @@ import { describe, expect, it } from "vitest";
 import type { TradeEvent } from "../domain";
 
 import { fiscalYearOf } from "./fiscal-year";
-import { computeTaxHistory, computeTaxLots, taxYearOf } from "./tax-lots";
+import {
+  computeTaxHistory,
+  computeTaxLots,
+  taxYearOf,
+  type TaxOptions,
+} from "./tax-lots";
 
 let seq = 0;
 
@@ -29,12 +34,17 @@ function trade(
   };
 }
 
-const LISTED = { unlistedInstrumentIds: new Set<string>() };
+function options(crypto: string[] = []): TaxOptions {
+  return {
+    territory: "bizkaia",
+    assetClasses: new Map(crypto.map((id) => [id, "fungible-crypto"])),
+  };
+}
 
-function year(events: TradeEvent[], y: number, unlisted: string[] = []) {
-  return computeTaxLots(events, y, {
-    unlistedInstrumentIds: new Set(unlisted),
-  });
+const LISTED = options();
+
+function year(events: TradeEvent[], y: number, crypto: string[] = []) {
+  return computeTaxLots(events, y, options(crypto));
 }
 
 describe("fiscalYearOf", () => {

@@ -1,12 +1,78 @@
 import Decimal from "decimal.js";
 
+import { toIsoDate, type CalendarDate } from "../calendar";
 import { Money } from "../domain";
 
 /** Spanish IRPF territories only (foral and común) — not a multi-country abstraction. */
 export type Territory = "bizkaia";
 
-/** Art. 43 NF 13/2013 de Bizkaia — pérdidas patrimoniales no computables (recompra de valores homogéneos). */
-export const WASH_SALE_WINDOW_MONTHS = 2;
+export type RepurchaseAssetClass = "listed-security" | "fungible-crypto";
+
+/**
+ * Art. 43 NF 13/2013 de Bizkaia — pérdidas patrimoniales no computables por
+ * recompra. Each letter is one entry over one engine (wash-sale.ts,
+ * deferred-loss.ts); the letters differ in the assets they cover, the window
+ * either side of the transmission, what counts as the same asset and the
+ * transmissions they govern, never in how a deferred loss is carried or
+ * integrated.
+ *
+ * - `homogeneity: "instrument"` is the same instrument id. For crypto that is
+ *   the same asset at any broker, because every adapter takes a crypto
+ *   instrument's id from its asset code (`cryptoInstrumentId`).
+ * - `acquisitions` says which purchases in the window count: "all" reads
+ *   "hubiera adquirido" literally, so units received in kind (a reward, a
+ *   saveback) are an acquisition; "cash-only" leaves them out of the window
+ *   and out of the recipients of the deferral.
+ * - `from` / `to` are Madrid calendar days of the transmission, inclusive. The
+ *   transmission decides: a purchase before `from` still counts as the
+ *   repurchase of a sale on or after it.
+ *
+ * A sale no entry covers is assessed by nothing, and its loss computes whole.
+ */
+export interface RepurchaseRule {
+  territory: Territory;
+  letter: string;
+  assetClass: RepurchaseAssetClass;
+  windowMonths: number;
+  homogeneity: "instrument";
+  acquisitions: "all" | "cash-only";
+  from: string | null;
+  to: string | null;
+  source: string;
+}
+
+export const REPURCHASE_RULES: readonly RepurchaseRule[] = [
+  {
+    territory: "bizkaia",
+    letter: "g",
+    assetClass: "listed-security",
+    windowMonths: 2,
+    homogeneity: "instrument",
+    acquisitions: "all",
+    from: null,
+    to: null,
+    source: "Art. 43.g NF 13/2013 de Bizkaia",
+  },
+];
+
+export function repurchaseRuleFor(
+  territory: Territory,
+  assetClass: RepurchaseAssetClass,
+  saleDay: CalendarDate,
+  rules: readonly RepurchaseRule[] = REPURCHASE_RULES,
+): RepurchaseRule | null {
+  const day = toIsoDate(saleDay);
+  return (
+    rules.find(
+      (rule) =>
+        rule.territory === territory &&
+        rule.assetClass === assetClass &&
+        (rule.from === null || rule.from <= day) &&
+        (rule.to === null || day <= rule.to),
+    ) ?? null
+  );
+}
+
 /**
  * How far after a crypto loss sale a new acquisition of the same asset is
  * pointed out. Informative only: crypto is outside the two-month rule, and

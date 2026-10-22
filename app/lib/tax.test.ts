@@ -12,7 +12,8 @@ import {
   parseTaxYear,
   taxExclusions,
   TAX_YEAR_PARAM,
-  unlistedInstrumentIds,
+  repurchaseAssetClasses,
+  taxOptionsFor,
 } from "./tax";
 
 let seq = 0;
@@ -243,15 +244,19 @@ describe("buildTaxYearView", () => {
   });
 });
 
-describe("unlistedInstrumentIds", () => {
-  it("takes exactly the instruments typed CRYPTO", () => {
+describe("repurchaseAssetClasses", () => {
+  it("takes exactly the instruments typed CRYPTO as fungible crypto", () => {
     expect([
-      ...unlistedInstrumentIds([
+      ...repurchaseAssetClasses([
         instrument("BTC", "Bitcoin", "CRYPTO"),
         instrument("GOLD", "Physical gold ETC", "ETF"),
         instrument("X", "Fondo X"),
       ]),
-    ]).toEqual(["BTC"]);
+    ]).toEqual([
+      ["BTC", "fungible-crypto"],
+      ["GOLD", "listed-security"],
+      ["X", "listed-security"],
+    ]);
   });
 });
 
@@ -286,10 +291,8 @@ describe("income received in kind", () => {
 
   it("is read by no tax calculation", () => {
     expect(
-      computeTaxHistory([...ledger, ...incomes], {
-        unlistedInstrumentIds: new Set(),
-      }),
-    ).toEqual(computeTaxHistory(ledger, { unlistedInstrumentIds: new Set() }));
+      computeTaxHistory([...ledger, ...incomes], taxOptionsFor(instruments)),
+    ).toEqual(computeTaxHistory(ledger, taxOptionsFor(instruments)));
 
     const { inKindIncome: _with, ...withIncome } = buildTaxYearView(
       [...ledger, ...incomes],
@@ -388,7 +391,7 @@ describe("crypto from Trade Republic in the tax view", () => {
 
     const view = buildTaxYearView(events, crypto, 2026);
 
-    expect([...unlistedInstrumentIds(crypto)]).toEqual(["BTC"]);
+    expect(repurchaseAssetClasses(crypto).get("BTC")).toBe("fungible-crypto");
     expect(view.sales).toHaveLength(1);
     expect(view.sales[0]!.name).toBe("Bitcoin");
     expect(view.computableNet).toBe("-100");

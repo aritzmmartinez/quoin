@@ -9,7 +9,6 @@ import type {
 import { Money, isInKind, type DividendEvent } from "~/core/domain";
 import { baseOf, bookable, unconvertibleInstrumentIds } from "~/core/fx";
 import {
-  WASH_SALE_WINDOW_MONTHS,
   carryforwardFrom,
   computeSavingsQuota,
   computeTaxHistory,
@@ -18,7 +17,9 @@ import {
   taxYearOf,
   type CarryforwardStep,
   type RealizedGainDetail,
+  type RepurchaseAssetClass,
   type TaxBracket,
+  type TaxOptions,
   type Territory,
 } from "~/core/tax";
 
@@ -78,12 +79,24 @@ export function taxYearHref(params: URLSearchParams, year: number): string {
   return `?${next.toString()}`;
 }
 
-export function unlistedInstrumentIds(
+export const TAX_TERRITORY: Territory = "bizkaia";
+
+export function repurchaseAssetClasses(
   instruments: readonly Instrument[],
-): Set<string> {
-  return new Set(
-    instruments.filter((i) => i.type === "CRYPTO").map((i) => i.id),
+): Map<string, RepurchaseAssetClass> {
+  return new Map(
+    instruments.map((i) => [
+      i.id,
+      i.type === "CRYPTO" ? "fungible-crypto" : "listed-security",
+    ]),
   );
+}
+
+export function taxOptionsFor(instruments: readonly Instrument[]): TaxOptions {
+  return {
+    territory: TAX_TERRITORY,
+    assetClasses: repurchaseAssetClasses(instruments),
+  };
 }
 
 export interface TaxLotRow {
@@ -101,6 +114,8 @@ export interface TaxRecipientRow {
 }
 
 export interface TaxWashSaleRow {
+  letter: string;
+  windowMonths: number;
   before: string;
   remainingAfter: string;
   repurchaseBefore: string;
@@ -182,7 +197,6 @@ export interface TaxScaleView {
 export interface TaxYearView {
   year: number;
   territory: Territory;
-  washSaleWindowMonths: number;
   sales: TaxSaleRow[];
   affectedCount: number;
   ownNet: string;
@@ -207,9 +221,7 @@ export function buildTaxYearView(
   const byId = new Map(instruments.map((i) => [i.id, i]));
   const nameOf = (id: string): string => byId.get(id)?.name ?? id;
 
-  const history = computeTaxHistory(events, {
-    unlistedInstrumentIds: unlistedInstrumentIds(instruments),
-  });
+  const history = computeTaxHistory(events, taxOptionsFor(instruments));
   const result = taxYearOf(history, year);
   const saleTs = new Map(history.gains.map((g) => [g.eventId, g.ts]));
   const originT = (id: string): string =>
@@ -253,7 +265,6 @@ export function buildTaxYearView(
   return {
     year: result.year,
     territory: result.territory,
-    washSaleWindowMonths: WASH_SALE_WINDOW_MONTHS,
     sales,
     affectedCount: sales.filter((s) => s.washSale !== null).length,
     ownNet: sum(
@@ -302,6 +313,8 @@ function toSaleRow(
     nonComputable: gain.nonComputable,
     carriedOver: gain.carriedOver,
     washSale: gain.washSale && {
+      letter: gain.washSale.letter,
+      windowMonths: gain.washSale.windowMonths,
       before: gain.washSale.before,
       remainingAfter: gain.washSale.remainingAfter,
       repurchaseBefore: gain.washSale.repurchaseBefore,

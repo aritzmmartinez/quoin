@@ -6,12 +6,15 @@ import {
   toCalendarDate,
   type CalendarDate,
 } from "../calendar";
-import type { TradeEvent } from "../domain";
+import { isInKind, type TradeEvent } from "../domain";
 
 import {
   FISCAL_TIME_ZONE,
   UNLISTED_NOTICE_WINDOW_MONTHS,
-  WASH_SALE_WINDOW_MONTHS,
+  repurchaseRuleFor,
+  type RepurchaseAssetClass,
+  type RepurchaseRule,
+  type Territory,
 } from "./config";
 import { compareTrades, type FifoSale } from "./fifo";
 
@@ -20,12 +23,24 @@ export interface WashSaleWindow {
   end: CalendarDate;
 }
 
-export function washSaleWindow(saleTs: Date): WashSaleWindow {
+export function washSaleWindow(saleTs: Date, months: number): WashSaleWindow {
   const sale = toCalendarDate(saleTs, FISCAL_TIME_ZONE);
   return {
-    start: addCalendarMonths(sale, -WASH_SALE_WINDOW_MONTHS),
-    end: addCalendarMonths(sale, WASH_SALE_WINDOW_MONTHS),
+    start: addCalendarMonths(sale, -months),
+    end: addCalendarMonths(sale, months),
   };
+}
+
+/**
+ * What the rules are read against: the territory, and which class each
+ * instrument belongs to. An instrument missing from `assetClasses` is a listed
+ * security, as every instrument that is not crypto is today. `rules` defaults
+ * to the table in config.ts and is open only so a test can state a variant.
+ */
+export interface RepurchaseScope {
+  territory: Territory;
+  assetClasses: ReadonlyMap<string, RepurchaseAssetClass>;
+  rules?: readonly RepurchaseRule[];
 }
 
 export interface WashSaleRecipient {
@@ -44,6 +59,7 @@ export interface WashSaleAssessment {
   repurchased: Decimal;
   fraction: Decimal;
   recipients: WashSaleRecipient[];
+  rule: RepurchaseRule;
 }
 
 export interface UnlistedRepurchaseNotice {
@@ -53,15 +69,21 @@ export interface UnlistedRepurchaseNotice {
 }
 
 export interface WashSaleAssessor {
-  isListed(instrumentId: string): boolean;
-  assess(sale: FifoSale): WashSaleAssessment;
+  assetClassOf(instrumentId: string): RepurchaseAssetClass;
+  ruleFor(sale: FifoSale): RepurchaseRule | null;
+  assess(sale: FifoSale, rule: RepurchaseRule): WashSaleAssessment;
   unlistedNotice(sale: FifoSale): UnlistedRepurchaseNotice | null;
 }
 
 export function createWashSaleAssessor(
   trades: readonly TradeEvent[],
-  unlistedInstrumentIds: ReadonlySet<string>,
+  scope: RepurchaseScope,
 ): WashSaleAssessor {
+  const assetClassOf = (instrumentId: string): RepurchaseAssetClass =>
+    scope.assetClasses.get(instrumentId) ?? "listed-security";
+  const counts = (rule: RepurchaseRule, buy: TradeEvent): boolean =>
+    rule.acquisitions === "all" || !isInKind(buy);
+
   const ordered = [...trades].sort(compareTrades);
   const position = new Map(ordered.map((t, i) => [t.id, i]));
   const buysByInstrument = new Map<string, TradeEvent[]>();
@@ -82,10 +104,21 @@ export function createWashSaleAssessor(
     used.set(buyId, (used.get(buyId) ?? new Decimal(0)).plus(quantity));
   };
 
-  function assess(sale: FifoSale): WashSaleAssessment {
+  function ruleFor(sale: FifoSale): RepurchaseRule | null {
+    return repurchaseRuleFor(
+      scope.territory,
+      assetClassOf(sale.trade.instrumentId),
+      toCalendarDate(sale.trade.ts, FISCAL_TIME_ZONE),
+      scope.rules,
+    );
+  }
+
+  function assess(sale: FifoSale, rule: RepurchaseRule): WashSaleAssessment {
     const saleAt = position.get(sale.trade.id) ?? -1;
-    const buys = buysByInstrument.get(sale.trade.instrumentId) ?? [];
-    const window = washSaleWindow(sale.trade.ts);
+    const buys = (buysByInstrument.get(sale.trade.instrumentId) ?? []).filter(
+      (buy) => counts(rule, buy),
+    );
+    const window = washSaleWindow(sale.trade.ts, rule.windowMonths);
     const inWindow = buys.filter((b) =>
       isWithin(
         toCalendarDate(b.ts, FISCAL_TIME_ZONE),
@@ -154,11 +187,13 @@ export function createWashSaleAssessor(
         ? repurchased.dividedBy(sale.quantity)
         : new Decimal(0),
       recipients,
+      rule,
     };
   }
 
   return {
-    isListed: (instrumentId) => !unlistedInstrumentIds.has(instrumentId),
+    assetClassOf,
+    ruleFor,
     assess,
     unlistedNotice: (sale) =>
       findUnlistedRepurchase(

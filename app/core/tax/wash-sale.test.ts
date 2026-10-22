@@ -3,8 +3,13 @@ import { describe, expect, it } from "vitest";
 
 import type { TradeEvent } from "../domain";
 
-import { toIsoDate } from "../calendar";
+import { calendarDate, toIsoDate } from "../calendar";
 
+import {
+  REPURCHASE_RULES,
+  repurchaseRuleFor,
+  type RepurchaseRule,
+} from "./config";
 import {
   createWashSaleAssessor,
   washSaleWindow,
@@ -37,18 +42,27 @@ function trade(
   };
 }
 
-function assess(trades: TradeEvent[], unlisted: string[] = []) {
-  const assessor = createWashSaleAssessor(trades, new Set(unlisted));
+function assess(
+  trades: TradeEvent[],
+  crypto: string[] = [],
+  rules?: readonly RepurchaseRule[],
+) {
+  const assessor = createWashSaleAssessor(trades, {
+    territory: "bizkaia",
+    assetClasses: new Map(crypto.map((id) => [id, "fungible-crypto"])),
+    rules,
+  });
   const bySale = new Map<string, WashSaleAssessment>();
   const notices = new Map<string, UnlistedRepurchaseNotice>();
   for (const sale of walkFifo(trades).sales) {
     if (!sale.realizedPnL.isNegative()) continue;
-    if (!assessor.isListed(sale.trade.instrumentId)) {
+    const rule = assessor.ruleFor(sale);
+    if (rule === null) {
       const notice = assessor.unlistedNotice(sale);
       if (notice) notices.set(sale.trade.id, notice);
       continue;
     }
-    bySale.set(sale.trade.id, assessor.assess(sale));
+    bySale.set(sale.trade.id, assessor.assess(sale, rule));
   }
   return { bySale, notices };
 }
@@ -313,7 +327,7 @@ function tripsOn(saleTs: string, rebuyTs: string): boolean {
 }
 
 function windowOf(saleTs: string): string {
-  const { start, end } = washSaleWindow(new Date(saleTs));
+  const { start, end } = washSaleWindow(new Date(saleTs), 2);
   return `${toIsoDate(start)}..${toIsoDate(end)}`;
 }
 
@@ -407,5 +421,62 @@ describe("washSaleWindow — date to date on Madrid's calendar, bounds inside", 
     // 23:59 CET on 26 December = 22:59Z; midnight = 23:00Z.
     expect(tripsOn("2025-10-26T01:30:00Z", "2025-12-26T22:59:00Z")).toBe(true);
     expect(tripsOn("2025-10-26T01:30:00Z", "2025-12-26T23:00:00Z")).toBe(false);
+  });
+});
+
+describe("repurchase rules", () => {
+  it("covers listed securities with letter g, two months either side, on any day", () => {
+    for (const day of [calendarDate(2010, 1, 1), calendarDate(2026, 5, 8)]) {
+      expect(
+        repurchaseRuleFor("bizkaia", "listed-security", day),
+      ).toMatchObject({
+        letter: "g",
+        windowMonths: 2,
+        homogeneity: "instrument",
+        acquisitions: "all",
+      });
+    }
+  });
+
+  it("covers no crypto", () => {
+    expect(
+      repurchaseRuleFor("bizkaia", "fungible-crypto", calendarDate(2026, 5, 8)),
+    ).toBeNull();
+  });
+
+  it("takes the rule into the assessment", () => {
+    const buy = trade("BUY", "X", "10", "1000", { ts: "2025-01-01" });
+    const sell = trade("SELL", "X", "10", "700", { ts: "2025-03-01" });
+
+    expect(assess([buy, sell]).bySale.get(sell.id)?.rule.letter).toBe("g");
+  });
+});
+
+describe("acquisitions received in kind", () => {
+  const cashOnly = REPURCHASE_RULES.map((rule): RepurchaseRule => ({
+    ...rule,
+    acquisitions: "cash-only",
+  }));
+  const buy = trade("BUY", "X", "10", "1000", { ts: "2025-01-01" });
+  const sell = trade("SELL", "X", "10", "700", { ts: "2025-03-01" });
+  const reward: TradeEvent = {
+    ...trade("BUY", "X", "4", "280", { ts: "2025-03-20" }),
+    funding: "IN_KIND",
+  };
+
+  it("count as a repurchase when the rule takes every acquisition", () => {
+    const assessment = assess([buy, sell, reward]).bySale.get(sell.id);
+    expect(assessment?.repurchased.toFixed()).toBe("4");
+    expect(assessment?.recipients.map((r) => r.buyEventId)).toEqual([
+      reward.id,
+    ]);
+  });
+
+  it("count for nothing when the rule takes only acquisitions paid in cash", () => {
+    const assessment = assess([buy, sell, reward], [], cashOnly).bySale.get(
+      sell.id,
+    );
+    expect(assessment?.repurchased.toFixed()).toBe("0");
+    expect(assessment?.recipients).toEqual([]);
   });
 });

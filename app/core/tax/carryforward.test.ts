@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { TradeEvent } from "../domain";
 
 import { computeNetWithCarryforward } from "./carryforward";
+import type { TaxOptions } from "./tax-lots";
 
 let seq = 0;
 
@@ -41,7 +42,7 @@ function yearRoundTrip(
   ];
 }
 
-const LISTED = { unlistedInstrumentIds: new Set<string>() };
+const LISTED: TaxOptions = { territory: "bizkaia", assetClasses: new Map() };
 
 describe("computeNetWithCarryforward", () => {
   it("passes a year through unchanged when nothing was ever negative", () => {
