@@ -53,6 +53,9 @@ export type FxSource = z.infer<typeof fxSourceSchema>;
 export const fxDirectionSchema = z.enum(["QUOTE_PER_BASE", "BASE_PER_QUOTE"]);
 export type FxDirection = z.infer<typeof fxDirectionSchema>;
 
+export const valuationSourceSchema = z.enum(["kraken-amountusd", "yahoo"]);
+export type ValuationSource = z.infer<typeof valuationSourceSchema>;
+
 const baseEventSchema = z.object({
   id: z.string(),
   ts: z.date(),
@@ -63,6 +66,7 @@ const baseEventSchema = z.object({
   fxDirection: fxDirectionSchema.nullish(),
   originalAmount: decimalString.nullish(),
   originalCurrency: z.string().nullish(),
+  valuationSource: z.string().nullish(),
   account: z.string(),
   source: z.string(),
   externalId: z.string().nullish(),
@@ -132,6 +136,13 @@ export const ledgerEventWriteSchema = ledgerEventSchema.superRefine(
     const conversion = [event.fxRate, event.fxDirection, event.fxDate];
     const issue = (message: string) =>
       ctx.addIssue({ code: "custom", message });
+
+    if (
+      event.valuationSource != null &&
+      !valuationSourceSchema.safeParse(event.valuationSource).success
+    ) {
+      issue(`Unknown valuation source "${event.valuationSource}"`);
+    }
 
     if (source === "IDENTITY") {
       if (event.currency !== BASE_CURRENCY) {
