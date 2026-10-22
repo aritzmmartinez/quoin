@@ -15,6 +15,7 @@ export interface SignedMoney {
 export interface Format {
   formatMoney: (value: string, maximumFractionDigits?: number) => string;
   formatAmount: (value: string, currency: string) => string;
+  formatPrice: (value: string, currency?: string) => string;
   formatQuantity: (value: string, maximumFractionDigits?: number) => string;
   formatSignedMoney: (
     value: string,
@@ -37,6 +38,10 @@ export interface Format {
   tag: string;
 }
 
+function exact(value: string): `${number}` {
+  return new Decimal(value).toFixed() as `${number}`;
+}
+
 export function createFormat(locale: Locale): Format {
   const tag = intlTag(locale);
 
@@ -56,9 +61,25 @@ export function createFormat(locale: Locale): Format {
     return `${number} ${currency}`;
   }
 
-  function formatQuantity(value: string, maximumFractionDigits = 8): string {
+  function formatPrice(value: string, currency = BASE_CURRENCY): string {
+    const price = new Decimal(value);
+    if (price.isZero() || price.abs().gte(1)) {
+      return formatAmount(value, currency);
+    }
+    const digits = { minimumSignificantDigits: 2, maximumSignificantDigits: 4 };
+    if (currency === BASE_CURRENCY) {
+      return new Intl.NumberFormat(tag, {
+        style: "currency",
+        currency,
+        ...digits,
+      }).format(exact(value));
+    }
+    return `${new Intl.NumberFormat(tag, digits).format(exact(value))} ${currency}`;
+  }
+
+  function formatQuantity(value: string, maximumFractionDigits = 10): string {
     return new Intl.NumberFormat(tag, { maximumFractionDigits }).format(
-      new Decimal(value).toNumber(),
+      exact(value),
     );
   }
 
@@ -171,6 +192,7 @@ export function createFormat(locale: Locale): Format {
   return {
     formatMoney,
     formatAmount,
+    formatPrice,
     formatQuantity,
     formatSignedMoney,
     formatDate,

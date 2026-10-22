@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tax: from 2025, a crypto loss with a purchase of the same asset in the two months before or after is deferred (Art. 43.i, NF 6/2025), whichever broker each trade was at. Crypto sold before 2025 is unchanged.
 - Import: a crypto row whose symbol is not an asset code is set aside and named instead of becoming an instrument of its own.
 
+### Fixed
+- Prices below a cent were stored to six decimals, so a crypto quoted in millionths lost most of its value or became zero; they are now stored as Yahoo sends them and shown with significant digits.
+- Quantities are shown to ten decimals without losing digits on large holdings.
+- A Kraken reward was valued at the close of its own day, published hours after it; it now takes the last close already published. Rewards already imported are not revalued.
+- The symbol check compared each trade with a close published after it; it now uses the last one before.
+
 ## [0.13.0] - 2026-10-22
 
 ### Upgrading

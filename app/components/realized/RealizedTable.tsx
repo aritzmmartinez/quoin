@@ -133,8 +133,13 @@ function TotalsBand({
 }
 
 function RealizedRowItem({ row }: { row: RealizedRow }) {
-  const { formatMoney, formatQuantity, formatDate, formatPercent } =
-    useFormat();
+  const {
+    formatMoney,
+    formatPrice,
+    formatQuantity,
+    formatDate,
+    formatPercent,
+  } = useFormat();
   const t = useCopy();
   return (
     <li className={TABLE_DIVIDER}>
@@ -162,7 +167,7 @@ function RealizedRowItem({ row }: { row: RealizedRow }) {
           {formatQuantity(row.quantity)}
         </span>
         <span className={`${TABLE_NUM} text-right`}>
-          {row.price === null ? DASH : formatMoney(row.price)}
+          {row.price === null ? DASH : formatPrice(row.price)}
         </span>
         <span className={`${TABLE_NUM} text-right`}>
           {formatMoney(row.grossAmount)}
