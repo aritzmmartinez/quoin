@@ -14,6 +14,7 @@ import {
   monthlyTotal,
   type PortfolioTarget,
 } from "~/core/domain";
+import { historyInBase } from "~/core/fx";
 import {
   computeMarketValues,
   computePortfolioSummary,
@@ -23,7 +24,9 @@ import {
 
 import { heldValuesByInstrument } from "./portfolio";
 import { buildProjectionSource, type ProjectionSource } from "./projection";
+import { loadValuation } from "./rate-book.server";
 import { DEFAULT_INFLATION_SERIES } from "./real.server";
+import { unratedNames, type UnratedNames } from "./unrated";
 import { createServerTiming, type ServerTiming } from "./server-timing";
 
 export type ProjectionCase = Omit<
@@ -38,6 +41,7 @@ export interface ProjectionPlan {
   defaultContribution: string;
   offPlanValues: Map<string, string>;
   unpricedCount: number;
+  unrated: UnratedNames | null;
   nameOf: (instrumentId: string) => string;
 }
 
@@ -58,8 +62,8 @@ export async function loadProjectionContext(
   const instruments = await timing.time("db-instruments", () =>
     new PrismaInstrumentRepository().list(),
   );
-  const prices = await timing.time("db-prices-latest", () =>
-    priceRepository.latest(),
+  const valuation = await timing.time("db-prices-latest", () =>
+    loadValuation(asOf),
   );
   const targets = await timing.time("db-targets", () =>
     new PrismaTargetRepository().list(),
@@ -80,7 +84,7 @@ export async function loadProjectionContext(
 
   const positions = timing.time("positions", () => computePositions(events));
   const marketValues = timing.time("valuation", () =>
-    computeMarketValues(positions, prices, BASE_CURRENCY),
+    computeMarketValues(positions, valuation.prices, BASE_CURRENCY),
   );
   const summary = computePortfolioSummary(positions, marketValues);
   const held = heldValuesByInstrument(positions, marketValues);
@@ -113,12 +117,9 @@ export async function loadProjectionContext(
       new Map(
         historyIds.map((id, index) => [
           id,
-          (histories[index] ?? [])
-            .filter((snapshot) => snapshot.currency === BASE_CURRENCY)
-            .map((snapshot) => ({
-              asOf: snapshot.asOf,
-              price: snapshot.price,
-            })),
+          historyInBase(histories[index] ?? [], valuation.book).history.map(
+            (snapshot) => ({ asOf: snapshot.asOf, price: snapshot.price }),
+          ),
         ]),
       ),
       instrumentsById,
@@ -142,6 +143,7 @@ export async function loadProjectionContext(
       defaultContribution: monthlyTotal(target),
       offPlanValues,
       unpricedCount: summary.unpricedCount,
+      unrated: unratedNames(valuation.unrated, instruments, held.keys()),
       nameOf,
     },
   };

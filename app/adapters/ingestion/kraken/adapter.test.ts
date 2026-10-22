@@ -15,6 +15,8 @@ import type {
   PriceSnapshot,
 } from "~/core/ports";
 
+import { rateBookFrom } from "~/core/fx";
+
 import { AFFECTS_POSITION, DISCARD_REASONS } from "../discard";
 import { KrakenCsvAdapter } from "./adapter";
 
@@ -184,6 +186,76 @@ describe("KrakenCsvAdapter", () => {
   });
 });
 
+describe("KrakenCsvAdapter in another fiat currency", () => {
+  const USD_CSV = [
+    HEADER,
+    `"u1","U1","2026-01-05 10:00:00","deposit","","currency","fiat","USD","spot / main",500.0000,0,500`,
+    `"u2","B1","2026-01-06 10:00:00","spend","","currency","fiat","USD","spot / main",-100.0000,-0.4,400`,
+    `"u3","B1","2026-01-06 10:00:00","receive","","currency","crypto","BTC","spot / main",0.0010000000,0,0.001`,
+    `"u4","R1","2026-01-07 05:52:00","reward","","currency","crypto","BTC","spot / main",0.0000010000,0,0.001`,
+  ].join("\n");
+
+  const usdBtc = (day: string, price: string): PriceSnapshot => ({
+    instrumentId: "BTC",
+    price,
+    currency: "USD",
+    asOf: new Date(`${day}T00:00:00Z`),
+    source: "YAHOO",
+  });
+
+  const book = rateBookFrom(
+    ["2026-01-05", "2026-01-06", "2026-01-07"].map((day) => ({
+      source: "ECB",
+      base: "EUR",
+      quote: "USD",
+      day,
+      rate: "1.1",
+    })),
+  );
+
+  it("converts the deposit, the purchase and a reward priced in dollars at the ECB rate of each day", async () => {
+    const ledger = new FakeLedgerRepository();
+    const asked: string[][] = [];
+    const adapter = new KrakenCsvAdapter(
+      new FakeInstrumentRepository(),
+      ledger,
+      new FakePriceRepository([usdBtc("2026-01-07", "99000")]),
+      async (currencies) => {
+        asked.push([...currencies]);
+        return book;
+      },
+    );
+
+    const summary = await adapter.import(USD_CSV);
+
+    expect(asked).toEqual([["USD"]]);
+    expect(summary.discarded).toEqual({});
+    expect(ledger.appended.map((e) => [e.type, e.currency, e.fxSource, e.fxDate])).toEqual([
+      ["DEPOSIT", "USD", "ECB", "2026-01-05"],
+      ["BUY", "USD", "ECB", "2026-01-06"],
+      ["BUY", "USD", "ECB", "2026-01-07"],
+      ["DIVIDEND", "USD", "ECB", "2026-01-07"],
+    ]);
+  });
+
+  it("sets aside as fx-unavailable what has no rate for its day, and says which days it needs", async () => {
+    const adapter = new KrakenCsvAdapter(
+      new FakeInstrumentRepository(),
+      new FakeLedgerRepository(),
+      new FakePriceRepository([]),
+      async () => rateBookFrom([]),
+    );
+
+    const batch = await adapter.plan(USD_CSV);
+
+    expect(batch.discarded).toEqual({
+      "fx-unavailable": 2,
+      "reward-unpriced": 1,
+    });
+    expect(batch.ratesNeeded).toEqual(new Map([["USD", "2026-01-05"]]));
+  });
+});
+
 describe("KrakenCsvAdapter discards", () => {
   const MIXED = [
     HEADER,
@@ -254,7 +326,7 @@ describe("KrakenCsvAdapter discards", () => {
       "crypto-swap",
       "crypto-transfer",
       "reward-unpriced",
-      "foreign-fiat",
+      "fx-unavailable",
     ]);
   });
 });

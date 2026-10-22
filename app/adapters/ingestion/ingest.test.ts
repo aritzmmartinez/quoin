@@ -1,7 +1,10 @@
 import { describe, it, expect } from "vitest";
 
 import type { LedgerEvent } from "~/core/domain";
+import { rateBookFrom } from "~/core/fx";
 import { ledgerDedupKey } from "~/core/ports";
+
+import { rateLookupFrom } from "./fx";
 
 import {
   BatchBuilder,
@@ -115,15 +118,38 @@ describe("events the ledger cannot book as they stand", () => {
     currency: "USD",
   });
 
-  it("sets aside an amount in another currency with no conversion, and keeps the rest", () => {
+  const rates = rateLookupFrom(
+    rateBookFrom([
+      { source: "ECB", base: "EUR", quote: "USD", day: "2025-11-14", rate: "1.25" },
+    ]),
+  );
+
+  it("converts an amount in another currency at the ECB rate of its Madrid day", () => {
+    const builder = new BatchBuilder(rates);
+    builder.add({ kind: "domain", instrument: null, event: usd("b") });
+    const b = builder.build(1);
+
+    expect(b.events).toHaveLength(1);
+    expect(b.events[0]).toMatchObject({
+      currency: "USD",
+      grossAmount: "100",
+      fxSource: "ECB",
+      fxRate: "1.25",
+      fxDirection: "QUOTE_PER_BASE",
+      fxDate: "2025-11-14",
+    });
+    expect(b.ratesNeeded.size).toBe(0);
+  });
+
+  it("sets aside an amount with no rate for its day as fx-unavailable, and keeps the rest", () => {
     const builder = new BatchBuilder();
     builder.add({ kind: "domain", instrument: null, event: event("a") });
     builder.add({ kind: "domain", instrument: null, event: usd("b") });
     const b = builder.build(2);
 
     expect(b.events.map((e) => e.externalId)).toEqual(["a"]);
-    expect(b.discarded).toEqual({ "foreign-fiat": 1 });
-    expect(b.discardedDetails["foreign-fiat"]).toEqual([
+    expect(b.discarded).toEqual({ "fx-unavailable": 1 });
+    expect(b.discardedDetails["fx-unavailable"]).toEqual([
       {
         date: "2025-11-13T23:30:00.000Z",
         type: "DEPOSIT",
@@ -147,11 +173,33 @@ describe("events the ledger cannot book as they stand", () => {
     });
 
     expect(
-      builder.build(1).discardedDetails["foreign-fiat"]?.[0]?.instrument,
+      builder.build(1).discardedDetails["fx-unavailable"]?.[0]?.instrument,
     ).toBe("Synthetic Stock (USD)");
   });
 
-  it("sets aside a whole operation when one of its rows is foreign, counting it once", () => {
+  it("records the earliest Madrid day each currency was missing a rate for", () => {
+    const builder = new BatchBuilder();
+    builder.add({ kind: "domain", instrument: null, event: usd("b") });
+    builder.add({
+      kind: "domain",
+      instrument: null,
+      event: { ...usd("c"), ts: new Date("2025-11-02T10:00:00Z") },
+    });
+    builder.add({
+      kind: "domain",
+      instrument: null,
+      event: { ...usd("d"), currency: "GBP" },
+    });
+
+    expect(builder.build(3).ratesNeeded).toEqual(
+      new Map([
+        ["USD", "2025-11-02"],
+        ["GBP", "2025-11-14"],
+      ]),
+    );
+  });
+
+  it("sets aside a whole operation when one of its rows has no rate, counting it once", () => {
     const builder = new BatchBuilder();
     builder.addOperation([
       { kind: "domain", instrument: null, event: event("p") },
@@ -160,7 +208,7 @@ describe("events the ledger cannot book as they stand", () => {
     const b = builder.build(1);
 
     expect(b.events).toEqual([]);
-    expect(b.discarded).toEqual({ "foreign-fiat": 1 });
+    expect(b.discarded).toEqual({ "fx-unavailable": 1 });
   });
 
   it("refuses the whole batch on any other break of the rule, naming the row by its Madrid day", () => {

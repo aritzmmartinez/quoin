@@ -12,10 +12,10 @@ import {
   SignedMoney,
   SyncPricesButton,
 } from "~/components";
+import { UnratedNotice } from "~/components/ui/UnratedNotice";
 import {
   PrismaInstrumentRepository,
   PrismaLedgerRepository,
-  PrismaPriceRepository,
 } from "~/adapters/persistence";
 import { BASE_CURRENCY } from "~/core/domain";
 import { unconvertibleInstrumentIds } from "~/core/fx";
@@ -28,6 +28,7 @@ import {
   type Copy,
   copyFor,
   copyFromMatches,
+  intlTag,
   namesOf,
   parseLocale,
   parseSort,
@@ -41,6 +42,8 @@ import {
   useCopy,
   useFormat,
 } from "~/lib";
+import { loadValuation } from "~/lib/rate-book.server";
+import { unratedNames } from "~/lib/unrated";
 
 export function meta({ matches }: Route.MetaArgs) {
   const t = copyFromMatches(matches);
@@ -56,15 +59,20 @@ export async function loader({ request }: Route.LoaderArgs) {
   const sort = parseSort(new URL(request.url).searchParams);
   const locale = parseLocale(request.headers.get("Cookie"));
 
-  const [events, instruments, prices] = await Promise.all([
+  const [events, instruments, valuation] = await Promise.all([
     new PrismaLedgerRepository().list(),
     new PrismaInstrumentRepository().list(),
-    new PrismaPriceRepository().latest(),
+    loadValuation(),
   ]);
+  const { latest: prices } = valuation;
 
   const positions = computePositions(events);
   const tradeMeta = computeTradeMeta(events);
-  const marketValues = computeMarketValues(positions, prices, BASE_CURRENCY);
+  const marketValues = computeMarketValues(
+    positions,
+    valuation.prices,
+    BASE_CURRENCY,
+  );
 
   const rows = sortPortfolioRows(
     toPortfolioRows(positions, instruments, tradeMeta, marketValues),
@@ -98,6 +106,12 @@ export async function loader({ request }: Route.LoaderArgs) {
     unrealized: totalUnrealizedPnL(rows),
     updatedAt,
     noRate: namesOf(unconvertibleInstrumentIds(events), instruments),
+    unrated: unratedNames(
+      valuation.unrated,
+      instruments,
+      openIds,
+      intlTag(locale),
+    ),
   };
 }
 
@@ -114,6 +128,7 @@ export default function Portfolio({ loaderData }: Route.ComponentProps) {
     syncTargets,
     unmapped,
     noRate,
+    unrated,
   } = loaderData;
   const navigation = useNavigation();
   const busy = navigation.state === "loading";
@@ -159,6 +174,7 @@ export default function Portfolio({ loaderData }: Route.ComponentProps) {
           {t.common.noRateExcluded(noRate)}
         </Explainer>
       )}
+      <UnratedNotice unrated={unrated} className="mb-4" />
 
       <Card>
         {rows.length === 0 ? (

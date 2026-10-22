@@ -1,6 +1,6 @@
 import Decimal from "decimal.js";
 
-import { BASE_CURRENCY, Money, type LedgerEvent } from "../domain";
+import { Amount, BASE_CURRENCY, Money, type LedgerEvent } from "../domain";
 
 type AmountField = "grossAmount" | "fees" | "taxWithheld";
 
@@ -33,15 +33,16 @@ export function toBase<E extends LedgerEvent>(
     return { ok: true, amount: Money.fromString(amount) };
   }
 
-  const value = new Decimal(amount);
-  const converted =
-    fxDirection === "QUOTE_PER_BASE"
-      ? value.dividedBy(fxRate)
-      : value.times(fxRate);
+  const converted = Amount.of(amount, event.currency).inBase(
+    fxRate,
+    fxDirection,
+  );
   return {
     ok: true,
     amount: Money.fromString(
-      converted.toDecimalPlaces(BASE_DECIMALS, Decimal.ROUND_HALF_UP).toFixed(),
+      new Decimal(converted.toString())
+        .toDecimalPlaces(BASE_DECIMALS, Decimal.ROUND_HALF_UP)
+        .toFixed(),
     ),
   };
 }

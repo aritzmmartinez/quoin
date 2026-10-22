@@ -8,6 +8,8 @@ import { SearchX } from "lucide-react";
 import { ErrorBoundary as SharedErrorBoundary } from "~/components/ui/ErrorBoundary";
 import { buttonClass } from "~/components/ui/Button";
 import { ErrorState } from "~/components/ui/ErrorState";
+import { Explainer } from "~/components/ui/Explainer";
+import { UnratedNotice } from "~/components/ui/UnratedNotice";
 import {
   Card,
   InstrumentHeader,
@@ -22,7 +24,8 @@ import {
   PrismaLedgerRepository,
   PrismaPriceRepository,
 } from "~/adapters/persistence";
-import { BASE_CURRENCY, Money } from "~/core/domain";
+import { Money } from "~/core/domain";
+import { historyInBase, pricesInBase } from "~/core/fx";
 import {
   computeCostBasisTimeline,
   computeInvestedVsValueSeries,
@@ -37,6 +40,8 @@ import {
   toMovementRows,
   useCopy,
 } from "~/lib";
+import { loadRateBook } from "~/lib/rate-book.server";
+import { unratedNames } from "~/lib/unrated";
 
 export function meta({ matches }: Route.MetaArgs) {
   const t = copyFromMatches(matches);
@@ -72,8 +77,14 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     costBasis = costBasis.add(Money.fromString(p.costBasis));
   }
 
-  const baseHistory = history.filter((s) => s.currency === BASE_CURRENCY);
-  const latest = baseHistory.at(-1) ?? null;
+  const book = await loadRateBook(history.map((s) => s.currency));
+  const { history: baseHistory, unrated: unratedCloses } = historyInBase(
+    history,
+    book,
+  );
+  const last = history.at(-1);
+  const current = pricesInBase(new Map(last ? [[id, last]] : []), book, now);
+  const latest = current.prices.get(id) ?? null;
   const currentPrice = latest ? latest.price : null;
   const priced = currentPrice !== null && quantity.gt(0);
   const marketValue = priced
@@ -137,6 +148,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     movements,
     movementsPage,
     hasSymbol: Boolean(instrument.quoteSymbol),
+    unrated: unratedNames(current.unrated, [instrument], [id]),
+    unratedCloses,
   };
 }
 
@@ -149,12 +162,23 @@ export default function Instrument({ loaderData }: Route.ComponentProps) {
     ivvData,
     movements,
     movementsPage,
+    unrated,
+    unratedCloses,
   } = loaderData;
   return (
     <>
       <InstrumentHeader instrument={instrument} />
+      <UnratedNotice unrated={unrated} className="mb-4" />
       <InstrumentStats kpis={kpis} />
-      <InstrumentPriceChart data={priceChartData} />
+      {unratedCloses > 0 && (
+        <Explainer tone="notice" className="mb-4">
+          {t.fx.unratedCloses(unratedCloses)}
+        </Explainer>
+      )}
+      <InstrumentPriceChart
+        data={priceChartData}
+        unrated={unratedCloses > 0}
+      />
       <InstrumentValueChart data={ivvData} />
       <Card className="overflow-hidden">
         <div className="px-gutter pb-3 pt-4 text-[14px] font-semibold">

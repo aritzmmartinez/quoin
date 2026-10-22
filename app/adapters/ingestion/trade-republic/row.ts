@@ -15,6 +15,9 @@ export const tradeRepublicRowSchema = z.object({
   tax: z.string(),
   currency: z.string(),
   transaction_id: z.string(),
+  original_amount: z.string().optional(),
+  original_currency: z.string().optional(),
+  fx_rate: z.string().optional(),
 });
 
 export type TradeRepublicRow = z.infer<typeof tradeRepublicRowSchema>;

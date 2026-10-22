@@ -59,7 +59,8 @@ export function canVerify(state: MapperState): boolean {
 export function canSave(state: MapperState, stored: string | null): boolean {
   return (
     isVerified(state) &&
-    state.check?.foreignCurrency === null &&
+    (state.check?.rateSeries === "base" ||
+      state.check?.rateSeries === "published") &&
     state.check.dailyHistory &&
     state.busy === null &&
     trimmedSymbol(state) !== stored

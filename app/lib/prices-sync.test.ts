@@ -19,6 +19,9 @@ import {
   priceSyncToast,
   splitUnmapped,
   SYNC_OVERLAP_DAYS,
+  haltsSync,
+  SyncHaltedError,
+  syncInTurn,
   syncInstrumentPrices,
   syncProblemOf,
   toSyncTargets,
@@ -330,12 +333,12 @@ describe("syncInstrumentPrices — the live quote", () => {
   });
 });
 
-describe("syncInstrumentPrices — only euros", () => {
-  it("writes nothing when the candles are not in EUR", async () => {
+describe("syncInstrumentPrices — other currencies", () => {
+  it("writes candles and the live quote in the currency they arrive in", async () => {
     const { prices, view } = memory({ [ETF.id]: [["2026-10-13T07:00Z", "YAHOO"]] });
     const provider = yahoo(
       { "AAA.DE": [q("AAA.DE", "2026-10-14T13:30Z", "10", "USD")] },
-      [q("AAA.DE", "2026-10-15T13:30Z")],
+      [q("AAA.DE", "2026-10-15T13:30Z", "11", "USD")],
     );
 
     const sync = await syncInstrumentPrices(
@@ -343,26 +346,65 @@ describe("syncInstrumentPrices — only euros", () => {
       ETF,
     );
 
-    expect(sync).toMatchObject({
-      inserted: 0,
-      corrected: 0,
-      live: false,
-      problem: "not-eur",
-    });
-    expect(view(ETF.id)).toEqual(["2026-10-13T07:00 YAHOO"]);
+    expect(sync).toMatchObject({ inserted: 1, live: true, problem: null });
+    expect(view(ETF.id)).toHaveLength(3);
+  });
+});
+
+describe("syncInstrumentPrices — the check record", () => {
+  const checks = () => {
+    const marked: string[] = [];
+    return {
+      marked,
+      repository: {
+        markChecked: async (id: string) => {
+          marked.push(id);
+        },
+        lastChecked: async () => new Map<string, Date>(),
+      },
+    };
+  };
+
+  it("records a check once Yahoo has answered, whatever it said", async () => {
+    const { prices } = memory();
+    const record = checks();
+
+    const sync = await syncInstrumentPrices(
+      {
+        prices,
+        provider: yahoo({}),
+        checks: record.repository,
+        now: at("2026-10-15T14:00Z"),
+      },
+      ETF,
+    );
+
+    expect(sync.problem).toBe("no-quote");
+    expect(record.marked).toEqual([ETF.id]);
   });
 
-  it("refuses a live quote not in EUR", async () => {
-    const { prices, view } = memory();
-    const provider = yahoo({}, [q("AAA.DE", "2026-10-15T13:30Z", "10", "USD")]);
+  it("records no check when Yahoo could not be asked", async () => {
+    const { prices } = memory();
+    const record = checks();
+    const busy = {
+      ...yahoo({}),
+      getQuote: async (symbol: string) => {
+        throw new MarketDataUnavailableError(symbol, 503);
+      },
+    };
 
-    const sync = await syncInstrumentPrices(
-      { prices, provider, now: at("2026-10-15T14:00Z") },
-      ETF,
-    );
-
-    expect(sync).toMatchObject({ live: false, problem: "not-eur" });
-    expect(view(ETF.id)).toEqual([]);
+    await expect(
+      syncInstrumentPrices(
+        {
+          prices,
+          provider: busy,
+          checks: record.repository,
+          now: at("2026-10-15T14:00Z"),
+        },
+        ETF,
+      ),
+    ).rejects.toBeInstanceOf(MarketDataUnavailableError);
+    expect(record.marked).toEqual([]);
   });
 });
 
@@ -463,5 +505,67 @@ describe("priceSyncToast", () => {
     expect(toast.description).toBe(
       `${es.instruments.sync.candles(3)}. ${es.instruments.sync.unmappedOpen(1)}. ${es.instruments.sync.unmappedAction}`,
     );
+  });
+});
+
+describe("syncInTurn", () => {
+  const targets = [
+    { id: "A", name: "Alpha" },
+    { id: "B", name: "Beta" },
+    { id: "C", name: "Gamma" },
+  ];
+  const ok = (target: { id: string; name: string }) => ({
+    instrumentId: target.id,
+    name: target.name,
+    inserted: 1,
+    corrected: 0,
+    live: true,
+    problem: null,
+  });
+
+  it("goes through every instrument when none fails in common", async () => {
+    const run = await syncInTurn(targets, async (target) => ok(target));
+    expect(run.halted).toBeNull();
+    expect(run.steps.map((s) => s.instrumentId)).toEqual(["A", "B", "C"]);
+  });
+
+  it("stops at a failure common to all and says it once, with the cause", async () => {
+    const asked: string[] = [];
+    const run = await syncInTurn(targets, async (target) => {
+      asked.push(target.id);
+      if (target.id === "B") {
+        throw new Error("The table `main.PriceSync` does not exist");
+      }
+      return ok(target);
+    });
+
+    expect(asked).toEqual(["A", "B"]);
+    expect(run.steps.map((s) => s.instrumentId)).toEqual(["A"]);
+    expect(run.halted).toBe(
+      "Error: The table `main.PriceSync` does not exist",
+    );
+  });
+
+  it("takes the cause the server sent as it is", async () => {
+    const run = await syncInTurn(targets, async () => {
+      throw new SyncHaltedError("PrismaClientKnownRequestError: no such table");
+    });
+    expect(run.halted).toBe("PrismaClientKnownRequestError: no such table");
+    expect(run.steps).toEqual([]);
+  });
+
+  it("keeps a provider's answer for one instrument a step, not a halt", async () => {
+    const run = await syncInTurn(targets, async (target) =>
+      target.id === "B"
+        ? { ...ok(target), live: false, problem: "unavailable" as const }
+        : ok(target),
+    );
+    expect(run.halted).toBeNull();
+    expect(run.steps.map((s) => s.problem)).toEqual([null, "unavailable", null]);
+  });
+
+  it("tells a provider failure from one common to all", () => {
+    expect(haltsSync(new MarketDataUnavailableError("AAA", 429))).toBe(false);
+    expect(haltsSync(new Error("database is locked"))).toBe(true);
   });
 });

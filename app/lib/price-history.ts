@@ -1,5 +1,5 @@
 import { isFreshQuote } from "~/adapters/marketdata";
-import { foreignCurrency } from "~/core/domain";
+import { dayOf } from "~/core/calendar";
 import {
   MarketDataUnavailableError,
   type HistoryRange,
@@ -11,6 +11,7 @@ import {
 } from "~/core/ports";
 import { liveSource } from "~/core/prices";
 
+import { rateSeriesOf, type EnsureRates } from "./fx-sync";
 import type { Copy } from "./i18n";
 import { inTurn } from "./in-turn";
 
@@ -18,6 +19,7 @@ export interface ReplaceHistoryDeps {
   instruments: InstrumentRepository;
   prices: PriceRepository;
   provider: MarketDataProvider;
+  rates: EnsureRates;
   now?: Date;
 }
 
@@ -29,7 +31,8 @@ export interface ReplaceHistoryRequest {
 
 export type ReplaceFailure =
   | "no-history"
-  | "not-eur"
+  | "no-rate-series"
+  | "rates-unavailable"
   | "unavailable"
   | "failed";
 
@@ -63,6 +66,7 @@ function dailyCandles(quotes: readonly Quote[]): Quote[] {
 async function liveQuote(
   provider: MarketDataProvider,
   symbol: string,
+  currency: string,
   after: Date,
   now: Date,
 ): Promise<Quote | null> {
@@ -73,7 +77,7 @@ async function liveQuote(
     return null;
   }
   if (!quote) return null;
-  if (foreignCurrency([quote])) return null;
+  if (quote.currency !== currency) return null;
   if (!isFreshQuote(quote, now)) return null;
   if (quote.asOf.getTime() <= after.getTime()) return null;
   return quote;
@@ -99,10 +103,17 @@ export async function replaceQuoteHistory(
   const last = history[history.length - 1];
   if (!first || !last) return failure("no-history");
 
-  const foreign = foreignCurrency(history);
-  if (foreign) return failure("not-eur", foreign);
+  const currencies = [...new Set(history.map((quote) => quote.currency))];
+  if (currencies.length > 1) return failure("failed", currencies.join(", "));
+  const currency = first.currency;
+  const series = rateSeriesOf(
+    await deps.rates(new Map([[currency, dayOf(first.asOf)]])),
+    currency,
+  );
+  if (series === "none") return failure("no-rate-series", currency);
+  if (series === "unavailable") return failure("rates-unavailable", currency);
 
-  const live = await liveQuote(provider, symbol, last.asOf, now);
+  const live = await liveQuote(provider, symbol, currency, last.asOf, now);
   const unchanged = instrument.quoteSymbol === symbol;
 
   const snapshot = (quote: Quote, source: string): PriceSnapshot => ({
@@ -160,8 +171,10 @@ export function replaceFailureMessage(
   switch (outcome.reason) {
     case "no-history":
       return copy.noHistory(outcome.symbol);
-    case "not-eur":
-      return copy.notEur(outcome.symbol, outcome.currency ?? "?");
+    case "no-rate-series":
+      return t.fx.noRateSeriesHistory(outcome.symbol, outcome.currency ?? "?");
+    case "rates-unavailable":
+      return t.fx.sync.unavailable;
     case "unavailable":
       return t.common.marketDataUnavailable;
     case "failed":

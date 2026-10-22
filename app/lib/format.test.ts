@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createFormat } from "./format";
 
 const {
+  formatAmount,
   formatClock,
   formatDate,
   formatMoney,
@@ -21,6 +22,19 @@ describe("formatMoney", () => {
 
   it("groups thousands for 5+ digit integers", () => {
     expect(norm(formatMoney("12345.60"))).toContain("12.345,60");
+  });
+});
+
+describe("formatAmount", () => {
+  it("formats an amount in another currency with two decimals and its code", () => {
+    expect(norm(formatAmount("343.990000", "USD"))).toBe("343,99 USD");
+    expect(norm(createFormat("en").formatAmount("343.990000", "USD"))).toBe(
+      "343.99 USD",
+    );
+  });
+
+  it("formats an amount in euros exactly as formatMoney does", () => {
+    expect(formatAmount("1234.5", "EUR")).toBe(formatMoney("1234.5"));
   });
 });
 

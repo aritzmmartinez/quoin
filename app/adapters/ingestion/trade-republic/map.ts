@@ -47,11 +47,19 @@ function toInstrument(row: TradeRepublicRow): Instrument {
   });
 }
 
+function originals(row: TradeRepublicRow) {
+  const amount = row.original_amount?.trim() ?? "";
+  const currency = row.original_currency?.trim() ?? "";
+  if (amount === "" || currency === "") return {};
+  return { originalAmount: abs(amount), originalCurrency: currency };
+}
+
 function base(row: TradeRepublicRow) {
   return {
     id: crypto.randomUUID(),
     ts: new Date(row.datetime),
     currency: row.currency,
+    ...originals(row),
     account: "trade-republic",
     source: "TR_CSV",
     externalId: row.transaction_id,

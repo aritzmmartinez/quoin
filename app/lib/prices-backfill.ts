@@ -1,4 +1,4 @@
-import { foreignCurrency } from "~/core/domain";
+import { dayOf } from "~/core/calendar";
 import {
   HISTORY_RANGE_DAYS,
   MarketDataUnavailableError,
@@ -8,6 +8,8 @@ import {
   type PriceSnapshot,
   type Quote,
 } from "~/core/ports";
+
+import { rateSeriesOf, type EnsureRates } from "./fx-sync";
 
 export const HISTORY_RANGES: readonly HistoryRange[] = [
   "1y",
@@ -68,7 +70,8 @@ export interface BackfillReport {
   first: string | null;
   last: string | null;
   currency: string | null;
-  foreignCurrency: string | null;
+  noRateSeries: string | null;
+  ratesUnavailable: string | null;
   weekly: boolean;
   unavailable: string | null;
 }
@@ -103,7 +106,8 @@ function reportOf(
     first: quotes[0]?.asOf.toISOString() ?? null,
     last: quotes[quotes.length - 1]?.asOf.toISOString() ?? null,
     currency: quotes[0]?.currency ?? null,
-    foreignCurrency: null,
+    noRateSeries: null,
+    ratesUnavailable: null,
     weekly: medianGapDays(quotes) >= 4,
     unavailable: null,
   };
@@ -114,13 +118,27 @@ export async function backfillInstrument(
   prices: PriceRepository,
   target: BackfillTarget,
   range: HistoryRange,
+  rates: EnsureRates,
 ): Promise<BackfillReport> {
   const quotes = await provider.getHistory(target.quoteSymbol, range);
-  if (quotes.length === 0) return reportOf(target, quotes, 0);
+  const first = quotes[0];
+  if (!first) return reportOf(target, quotes, 0);
 
-  const foreign = foreignCurrency(quotes);
-  if (foreign) {
-    return { ...reportOf(target, quotes, 0), foreignCurrency: foreign };
+  const needs = new Map<string, string>();
+  for (const quote of quotes) {
+    const day = dayOf(quote.asOf);
+    const held = needs.get(quote.currency);
+    if (held === undefined || day < held) needs.set(quote.currency, day);
+  }
+  const ensured = await rates(needs);
+  for (const currency of needs.keys()) {
+    const series = rateSeriesOf(ensured, currency);
+    if (series === "none") {
+      return { ...reportOf(target, quotes, 0), noRateSeries: currency };
+    }
+    if (series === "unavailable") {
+      return { ...reportOf(target, quotes, 0), ratesUnavailable: currency };
+    }
   }
 
   const snapshots: PriceSnapshot[] = quotes.map((quote) => ({
@@ -139,11 +157,14 @@ export async function backfillInstruments(
   prices: PriceRepository,
   targets: readonly BackfillTarget[],
   range: HistoryRange,
+  rates: EnsureRates,
 ): Promise<BackfillReport[]> {
   const reports: BackfillReport[] = [];
   for (const target of targets) {
     try {
-      reports.push(await backfillInstrument(provider, prices, target, range));
+      reports.push(
+        await backfillInstrument(provider, prices, target, range, rates),
+      );
     } catch (error) {
       if (!(error instanceof MarketDataUnavailableError)) throw error;
       reports.push({ ...reportOf(target, [], 0), unavailable: error.message });

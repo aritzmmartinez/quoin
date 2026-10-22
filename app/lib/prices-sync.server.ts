@@ -2,6 +2,7 @@ import { YahooMarketDataProvider } from "~/adapters/marketdata";
 import {
   PrismaInstrumentRepository,
   PrismaPriceRepository,
+  PrismaPriceSyncRepository,
 } from "~/adapters/persistence";
 
 import {
@@ -15,6 +16,7 @@ export function defaultDeps(): SyncDeps {
   return {
     prices: new PrismaPriceRepository(),
     provider: new YahooMarketDataProvider(),
+    checks: new PrismaPriceSyncRepository(),
   };
 }
 

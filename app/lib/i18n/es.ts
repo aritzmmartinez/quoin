@@ -17,11 +17,18 @@ export interface ExcludedNotice {
   instruments: string;
 }
 
+const SETTINGS = "Ajustes";
+const EXTERNAL_DATA = "Datos externos";
+const REFRESH_NOW = "Actualizar ahora";
+const REDOWNLOAD = "Volver a descargar el histórico";
+const REFRESH_RATES = `pulsa «${REFRESH_NOW}» en los tipos de cambio de ${EXTERNAL_DATA} (${SETTINGS})`;
+const REFRESH_CPI = `pulsa «${REFRESH_NOW}» en el IPC de ${EXTERNAL_DATA} (${SETTINGS})`;
+
 const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
   "crypto-swap": "Intercambios con BTC",
   "crypto-transfer": "Transferencias de BTC",
   "reward-unpriced": "Recompensas de BTC sin precio",
-  "foreign-fiat": "Operaciones en otra divisa",
+  "fx-unavailable": "Operaciones sin tipo de cambio del día",
   "unmodelled-asset": "Activos que Quoin no modela",
   "card-spending": "Pagos con tarjeta",
   "saveback-unpaired": "Saveback sin compra emparejada",
@@ -32,9 +39,8 @@ const DISCARD_REASON_HELP: Record<DiscardReason, string | null> = {
   "crypto-swap": null,
   "crypto-transfer": null,
   "reward-unpriced":
-    "No hay precio de BTC de esas fechas, así que estas recompensas no se han registrado y tu posición de BTC no las incluye. En Instrumentos, abre el símbolo de BTC y pulsa «Volver a descargar el histórico» con un rango que llegue a esas fechas. Después vuelve a importar este mismo fichero: lo ya registrado no se duplica.",
-  "foreign-fiat":
-    "Quoin aún no convierte divisas, así que estas operaciones no se importan y no cuentan en sus posiciones.",
+    `No hay precio de BTC de esas fechas, así que estas recompensas no se han registrado y tu posición de BTC no las incluye. En Instrumentos, abre el símbolo de BTC y pulsa «${REDOWNLOAD}» con un rango que llegue a esas fechas. Después vuelve a importar este mismo fichero: lo ya registrado no se duplica.`,
+  "fx-unavailable": `El BCE no tenía tipo para el día de estas operaciones en otra divisa (una de hoy antes de las 16:00, o una divisa que no publica), o no se ha podido consultar, así que no se han importado y no cuentan en sus posiciones. Más tarde, ${REFRESH_RATES} y vuelve a importar este mismo fichero: lo ya registrado no se duplica.`,
   "unmodelled-asset": null,
   "card-spending": null,
   "saveback-unpaired":
@@ -80,7 +86,10 @@ const EXPOSURE_KIND_LABELS: Record<ExposureKind, string> = {
 export const es = {
   common: {
     close: "Cerrar",
-    marketDataUnavailable: "No se ha podido consultar Yahoo. Inténtalo de nuevo.",
+    marketDataUnavailable:
+      "No se ha podido consultar Yahoo. Inténtalo de nuevo.",
+    halted: (cause: string): string =>
+      `Se ha detenido sin terminar: ${cause.replace(/\.+$/, "")}. No es un fallo de un instrumento concreto, así que no se ha seguido con los demás.`,
     noRateExcluded: (names: readonly string[]): string => {
       const one = names.length === 1;
       return `Sin tipo de cambio: ${names.join(", ")}. ${one ? "Tiene" : "Tienen"} operaciones en otra divisa que no se han podido convertir a euros, así que ${one ? "queda" : "quedan"} fuera de todas las cifras: un tipo inventado daría un coste y un valor falsos. Las operaciones siguen en Movimientos.`;
@@ -138,7 +147,7 @@ export const es = {
     system: "Sistema",
   },
   settings: {
-    title: "Ajustes",
+    title: SETTINGS,
     soon: "Próximamente",
     appearance: {
       title: "Apariencia",
@@ -165,13 +174,71 @@ export const es = {
       },
       benchmark: {
         label: "Índice de referencia",
-        hint: "Usado en Coste de oportunidad y en el Resumen. Solo puedes comparar con instrumentos que tienes o has tenido en cartera, con símbolo mapeado e histórico en euros",
+        hint: "Usado en Coste de oportunidad y en el Resumen. Solo puedes comparar con instrumentos que tienes o has tenido en cartera, con símbolo mapeado e histórico en euros o en una divisa con tipos del BCE",
         search: "Buscar ticker o nombre",
         since: (date: string): string => `histórico desde ${date}`,
         unusable:
-          "No disponible: ningún instrumento con histórico en euros lleva este símbolo",
-        none: "Ningún instrumento tiene todavía símbolo e histórico en euros. Asígnale uno en la columna Símbolo de Instrumentos: al guardarlo se descarga su histórico.",
+          "No disponible: ningún instrumento con histórico valorable lleva este símbolo",
+        none: "Ningún instrumento tiene todavía símbolo e histórico valorable. Asígnale uno en la columna Símbolo de Instrumentos: al guardarlo se descarga su histórico.",
       },
+    },
+    externalData: {
+      title: EXTERNAL_DATA,
+      desc: "Lo que Quoin descarga de fuera. Cada fuente se actualiza por separado.",
+      refresh: REFRESH_NOW,
+      refreshing: "Actualizando…",
+      lastChecked: (when: string): string => `Última actualización: ${when}`,
+      neverChecked: "Nunca actualizado",
+      dataUntil: (date: string): string => `Datos hasta ${date}`,
+      dataUntilFor: (date: string, name: string): string =>
+        `Datos hasta ${date}, por ${name}`,
+      noData: "Sin datos todavía",
+      prices: {
+        label: "Precios",
+        hint: "Yahoo Finance: posiciones abiertas e índice de referencia",
+      },
+      inflation: { label: "IPC", hint: "INE: nacional y Bizkaia" },
+      rates: {
+        label: "Tipos de cambio",
+        hint: "Banco Central Europeo: divisas en uso",
+      },
+    },
+  },
+  fx: {
+    unrated: (
+      names: readonly string[],
+      currencies: readonly string[],
+    ): string => {
+      const one = names.length === 1;
+      return `Sin tipo de cambio reciente: ${names.join(", ")}. ${one ? "Cotiza" : "Cotizan"} en ${currencies.join(", ")} y no hay un tipo del BCE de la última semana, así que ${one ? "queda" : "quedan"} sin valorar, igual que un instrumento sin precio. Para ${one ? "valorarlo" : "valorarlos"}, ${REFRESH_RATES}.`;
+    },
+    noClosesInBase: `Su histórico de precios está en otra divisa y no hay tipo de cambio de ninguna de esas fechas, así que no se puede dibujar en euros. Para verlo, ${REFRESH_RATES}.`,
+    ratesUnavailableFor: (names: string): string =>
+      `El BCE no ha respondido, así que no se ha descargado el histórico de ${names}: cotiza en una divisa de la que no hay tipos guardados. Pruébalo más tarde con «${REDOWNLOAD}» en Instrumentos.`,
+    unratedCloses: (count: number): string =>
+      count === 1
+        ? "1 cierre no se muestra: no hay tipo de cambio de esa semana."
+        : `${count} cierres no se muestran: no hay tipo de cambio de esas semanas.`,
+    quotedIn: (currency: string): string =>
+      `Cotiza en ${currency}: se valora en euros con el tipo del BCE.`,
+    noRateSeries: (currency: string): string =>
+      `El BCE no publica tipos para ${currency}, así que este símbolo no se puede valorar. Elige su cotización en otra plaza.`,
+    noRateSeriesHistory: (symbol: string, currency: string): string =>
+      `El histórico de ${symbol} viene en ${currency} y el BCE no publica tipos para esa divisa, así que no se ha tocado nada.`,
+    noRateSeriesCount: (count: number): string =>
+      count === 1
+        ? "1 símbolo cotiza en una divisa para la que el BCE no publica tipos y no se ha descargado su histórico. Cámbialo en la columna Símbolo de Instrumentos."
+        : `${count} símbolos cotizan en divisas para las que el BCE no publica tipos y no se ha descargado su histórico. Cámbialos en la columna Símbolo de Instrumentos.`,
+    sync: {
+      loading: "Actualizando tipos del BCE…",
+      upToDate: "Los tipos de cambio ya estaban al día.",
+      added: (n: number): string =>
+        n === 1 ? "1 tipo de cambio añadido" : `${n} tipos de cambio añadidos`,
+      none: "No hay ninguna divisa distinta del euro en uso.",
+      error: "No se pudieron actualizar los tipos de cambio.",
+      unavailable: "El BCE no responde. Prueba más tarde.",
+      conflict: (currencies: readonly string[]): string =>
+        `El BCE ha corregido tipos ya guardados de ${currencies.join(", ")}: no se ha escrito nada de ${currencies.length === 1 ? "esa divisa" : "esas divisas"}.`,
     },
   },
   glossary: {
@@ -312,7 +379,7 @@ export const es = {
       error: "No se pudo sincronizar el IPC.",
       unavailable: "El INE no responde. Prueba más tarde.",
       rebase: (series: string): string =>
-        `${series}: el INE cambió de año base. Reemplaza la serie con pnpm ipc:sync --force-rebase.`,
+        `${series}: el INE ha vuelto a publicar el IPC con un nuevo año base. Quoin no mezcla niveles de dos bases y aún no puede reemplazar la serie desde la app, así que esta serie no se actualiza: el modo Real sigue con los meses que ya tenía.`,
     },
   },
   pagination: {
@@ -462,7 +529,7 @@ export const es = {
     unresolvedBody:
       "No se reparte entre las divisas conocidas: hacerlo inventaría una exposición que no tienes. Aquí caen las hojas sin identidad canónica resuelta, las clases de acción listadas en más de un país (no hay una sola divisa que sea la respuesta) y la parte de tus fondos que el emisor no desglosa.",
     unresolvedFix:
-      "Ejecuta pnpm identity:resolve --refresh para rellenar las identidades que aún no tienen mercado principal guardado.",
+      "Algunas identidades se resolvieron antes de que Quoin guardara su mercado principal y siguen sin él. Volver a resolverlas aún no se puede hacer desde la app, así que su valor queda aquí, sin determinar.",
     hedged: (count: number): string =>
       count === 1
         ? "1 instrumento cubierto a euro cuenta como euro, no como la divisa de su subyacente."
@@ -684,8 +751,6 @@ export const es = {
         "No hay cierres de este símbolo en las fechas de tus operaciones, así que no se pueden comparar.",
       noDailyHistory:
         "Yahoo no tiene histórico diario de este símbolo. Busca su ticker en una bolsa en euros (.DE, .AS…).",
-      notEur: (currency: string): string =>
-        `Este símbolo cotiza en ${currency}. Hoy Quoin solo valora históricos en euros: elige la cotización en euros del mismo fondo en otra plaza (.DE, .MI, .PA, .AS).`,
       hasHistory:
         "Este instrumento ya tiene precios guardados. Cambia su símbolo en la columna Símbolo de Instrumentos: allí se descarga el histórico nuevo antes de borrar el anterior.",
       pending: (count: number): string =>
@@ -736,10 +801,6 @@ export const es = {
         count === 1
           ? "1 instrumento sigue sin símbolo y no se puede valorar."
           : `${count} instrumentos siguen sin símbolo y no se pueden valorar.`,
-      notEurWarning: (count: number): string =>
-        count === 1
-          ? "1 símbolo no cotiza en euros y no se ha descargado su histórico: hoy solo se valoran históricos en euros. Cámbialo en la columna Símbolo de Instrumentos."
-          : `${count} símbolos no cotizan en euros y no se ha descargado su histórico: hoy solo se valoran históricos en euros. Cámbialos en la columna Símbolo de Instrumentos.`,
       staleWarning: (count: number): string =>
         count === 1
           ? "1 símbolo ha devuelto una cotización antigua: revisa la plaza."
@@ -833,8 +894,7 @@ export const es = {
       title: "Símbolo e histórico",
       assign: "Usar este símbolo",
       change: "Cambiar a este símbolo",
-      redownload: (symbol: string): string =>
-        `Volver a descargar el histórico de ${symbol}`,
+      redownload: (symbol: string): string => `${REDOWNLOAD} de ${symbol}`,
       range: "Histórico",
       confirmReplace: (symbol: string): string =>
         `Se descargará el histórico diario de ${symbol} y la cotización de hoy. Si llegan velas, sustituyen a todos los precios guardados de este instrumento; si no llega ninguna, no se toca nada. Las operaciones no cambian.`,
@@ -851,8 +911,6 @@ export const es = {
         "Yahoo no ha dado cotización de hoy: pulsa «Refrescar precios» en Cartera más tarde.",
       noHistory: (symbol: string): string =>
         `Yahoo no tiene histórico diario de ${symbol}. Busca su ticker en una bolsa en euros (.DE, .AS…). No se ha tocado nada.`,
-      notEur: (symbol: string, currency: string): string =>
-        `El histórico de ${symbol} viene en ${currency}. Hoy Quoin solo valora históricos en euros, así que no se ha tocado nada.`,
       failed: "La descarga ha fallado. No se ha tocado nada.",
       rebuild: "Rehacer todos los históricos",
       rebuildConfirm: (count: number): string =>
@@ -886,7 +944,6 @@ export const es = {
       problem: {
         "no-quote": "sin respuesta",
         stale: "cotización caducada",
-        "not-eur": "no cotiza en euros",
         unavailable: "no se ha podido consultar Yahoo",
         error: "error inesperado",
       },
@@ -956,9 +1013,9 @@ export const es = {
       "No hay ningún objetivo vigente que proyectar. Define tu plan de aportación en Objetivo y vuelve aquí.",
     fromTarget: "Simula tu plan actual",
     noHistory:
-      "Ninguna línea de tu plan tiene histórico de precios, así que no hay nada que remuestrear. Mapea sus símbolos con pnpm prices:map y descarga el histórico con pnpm prices:backfill.",
+      "Ninguna línea de tu plan tiene histórico de precios, así que no hay nada que remuestrear. Asígnales un símbolo en la columna Símbolo de Instrumentos: al guardarlo se descarga su histórico.",
     noWindow:
-      "Las líneas de tu plan no comparten ni un solo mes de histórico, así que no hay ventana común que remuestrear. Amplía el histórico más corto con pnpm prices:backfill.",
+      `Las líneas de tu plan no comparten ni un solo mes de histórico, así que no hay ventana común que remuestrear. Amplía el histórico más corto en Instrumentos con «${REDOWNLOAD}» y un rango más largo.`,
     thinWindow: {
       title: "Sin cifras todavía: la ventana es demasiado corta",
       body: (months: number, minimum: number, instrument: string): string =>
@@ -966,7 +1023,7 @@ export const es = {
       why: (months: number, years: number): string =>
         `No es un aviso que puedas saltarte: remuestrear ${months} meses de un tramo de mercado concreto y componerlos ${years * 12} meses hacia delante no proyecta tu cartera, extrapola ese tramo. Un número así se lee como una previsión por mucho que lleve una nota debajo, y decidir cuánto aportas sobre él sería decidirlo sobre esos ${months} meses.`,
       fix: (instrument: string): string =>
-        `Ejecuta pnpm prices:backfill sobre ${instrument} (por defecto trae 5 años) y vuelve. En cuanto la ventana llegue al mínimo, la pantalla da cifras.`,
+        `En Instrumentos, abre ${instrument} y pulsa «${REDOWNLOAD}» con un rango más largo (por defecto son 5 años). En cuanto la ventana llegue al mínimo, la pantalla da cifras.`,
     },
     form: {
       horizon: "Horizonte (años)",
@@ -997,8 +1054,7 @@ export const es = {
       p90Hint:
         "Percentil 90: solo una de cada diez simulaciones acaba por encima de esta cifra. Es la que se estima con menos caminos, así que es la que más se mueve al cambiar de semilla.",
       real: (amount: string): string => `${amount} en euros de hoy`,
-      noReal:
-        "Sin datos de IPC no se puede expresar en euros de hoy. Ejecuta pnpm ipc:sync.",
+      noReal: `Sin datos de IPC no se puede expresar en euros de hoy. Para tenerlos, ${REFRESH_CPI}.`,
     },
     contributed: (amount: string): string =>
       `De ahí, ${amount} sale de tu bolsillo: lo que ya tienes simulado más todas las aportaciones del horizonte.`,
@@ -1024,7 +1080,7 @@ export const es = {
         "Todo lo que tienes en cartera lo nombra el plan, así que no hay nada que simular aparte.",
     },
     excluded: (names: string, coverage: string): string =>
-      `Sin histórico de precios, así que quedan fuera de la simulación: ${names}. Los pesos restantes se reparten el 100 %, de modo que lo proyectado es el ${coverage} de tu plan, no el plan entero. Ejecuta pnpm prices:backfill antes de fiarte del rango.`,
+      `Sin histórico de precios, así que quedan fuera de la simulación: ${names}. Los pesos restantes se reparten el 100 %, de modo que lo proyectado es el ${coverage} de tu plan, no el plan entero. Descarga su histórico en Instrumentos con «${REDOWNLOAD}» antes de fiarte del rango.`,
     unsimulated: (names: string, amount: string): string =>
       `${amount} en posiciones fuera del plan con menos histórico que la ventana: ${names}. No entran en las cifras de arriba ni se suman al final. Congelarlas veinte años a un 0 % sería una afirmación tan falsa como prestarles el rendimiento del plan. Que el plan fije la ventana es lo que evita que una compra reciente la encoja para todo lo demás.`,
     unpriced: (count: number): string =>
@@ -1339,7 +1395,7 @@ export const es = {
     unmapped: (symbol: string): string =>
       `Ningún instrumento está mapeado a ${symbol}, así que no hay índice contra el que comparar. Elige en Ajustes uno de tus instrumentos con histórico de precios.`,
     noHistory: (symbol: string): string =>
-      `${symbol} no tiene histórico de precios en euros. Ejecuta pnpm prices:backfill <ISIN> max para descargarlo.`,
+      `${symbol} no tiene histórico de precios que se pueda valorar en euros. En Instrumentos, pulsa «${REDOWNLOAD}» en su fila con el rango más largo.`,
     chooseBenchmark: "Elegir otro índice en Ajustes",
     empty: {
       title: "Sin compras todavía",
@@ -1383,7 +1439,7 @@ export const es = {
       "no-window":
         "Los instrumentos del plan no comparten ni un mes de histórico, así que no hay nada que remuestrear.",
       "thin-window": (months: number, name: string): string =>
-        `El histórico común es de ${months} meses y hacen falta 60. El que manda es ${name}: amplíalo con pnpm prices:backfill.`,
+        `El histórico común es de ${months} meses y hacen falta 60. El que manda es ${name}: amplíalo en Instrumentos con «${REDOWNLOAD}».`,
     },
     table: {
       title: "Por posición",

@@ -1,3 +1,5 @@
+import type { RateBook } from "../fx/rates";
+
 export interface FxRate {
   base: string;
   quote: string;
@@ -21,6 +23,7 @@ export interface FxSaveResult {
 export interface FxRepository {
   save(series: FxSeries, rates: readonly FxRate[]): Promise<FxSaveResult>;
   list(series: FxSeries): Promise<FxRate[]>;
+  book(source: string, quotes: readonly string[]): Promise<RateBook>;
   firstDay(series: FxSeries): Promise<string | null>;
   lastDay(series: FxSeries): Promise<string | null>;
   lastSyncedAt(series: FxSeries): Promise<Date | null>;

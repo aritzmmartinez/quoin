@@ -176,14 +176,23 @@ describe("computeOpportunityCost", () => {
     expect(result.benchmarkValue).toBe("1500");
   });
 
-  it("treats a quote in another currency as no price at all", () => {
-    const result = run(
-      [trade("BUY", "USD", "2025-01-15T10:00:00Z", "10", "1000", "5")],
-      new Map([["USD", { price: "150", currency: "USD" }]]),
-    );
+  it("throws on a quote in another currency, which pricesInBase converts first", () => {
+    expect(() =>
+      run(
+        [trade("BUY", "USD", "2025-01-15T10:00:00Z", "10", "1000", "5")],
+        new Map([["USD", { price: "150", currency: "USD" }]]),
+      ),
+    ).toThrow(/pricesInBase/);
+  });
 
-    expect(result.unpricedInstrumentIds).toEqual(["USD"]);
-    expect(result.realValue).toBe("0");
+  it("throws on a benchmark close in another currency, which historyInBase converts first", () => {
+    expect(() =>
+      run(
+        [trade("BUY", "PRICED", "2025-01-15T10:00:00Z", "10", "1000", "5")],
+        prices({ PRICED: "150" }),
+        [{ ...close("2025-01-15T17:30:00Z", "100"), currency: "USD" }],
+      ),
+    ).toThrow(/historyInBase/);
   });
 
   it("buys at the close of the trade's Madrid day, not its UTC day", () => {

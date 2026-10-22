@@ -12,6 +12,9 @@ import {
   type ReplaceHistoryOptions,
 } from "~/core/ports";
 
+import { rateBookFrom } from "~/core/fx";
+
+import type { EnsureRates } from "./fx-sync";
 import { es } from "./i18n";
 import {
   replaceFailureMessage,
@@ -21,6 +24,28 @@ import {
 } from "./price-history";
 
 const NOW = new Date("2026-10-08T15:00:00.000Z");
+
+const NO_RATES: EnsureRates = async () => ({ book: new Map(), unavailable: [] });
+
+function ratesFor(currency: string, days: string[]) {
+  const asked: [string, string][] = [];
+  const rates: EnsureRates = async (needs) => {
+    asked.push(...needs);
+    return {
+      book: rateBookFrom(
+        days.map((d) => ({
+          source: "ECB",
+          base: "EUR",
+          quote: currency,
+          day: d,
+          rate: "1.1",
+        })),
+      ),
+      unavailable: [],
+    };
+  };
+  return { rates, asked };
+}
 const day = (iso: string, hour = 7) =>
   new Date(`${iso}T${String(hour).padStart(2, "0")}:00:00.000Z`);
 
@@ -120,7 +145,13 @@ describe("replaceQuoteHistory", () => {
     const { state, instruments, prices } = store(COARSE_OLD);
 
     const outcome = await replaceQuoteHistory(
-      { instruments, prices, provider: provider({}), now: NOW },
+      {
+        instruments,
+        prices,
+        provider: provider({}),
+        rates: NO_RATES,
+        now: NOW,
+      },
       { instrumentId: INSTRUMENT.id, symbol: "NEW.DE", range: "5y" },
     );
 
@@ -140,6 +171,7 @@ describe("replaceQuoteHistory", () => {
           instruments,
           prices,
           provider: provider({ "AAA.DE": unavailable }),
+          rates: NO_RATES,
           now: NOW,
         },
         { instrumentId: INSTRUMENT.id, symbol: "AAA.DE", range: "5y" },
@@ -153,7 +185,13 @@ describe("replaceQuoteHistory", () => {
     const { state, instruments, prices } = store(COARSE_OLD);
 
     const outcome = await replaceQuoteHistory(
-      { instruments, prices, provider: provider({ "AAA.DE": [] }), now: NOW },
+      {
+        instruments,
+        prices,
+        provider: provider({ "AAA.DE": [] }),
+        rates: NO_RATES,
+        now: NOW,
+      },
       { instrumentId: INSTRUMENT.id, symbol: "AAA.DE", range: "5y" },
     );
 
@@ -162,7 +200,48 @@ describe("replaceQuoteHistory", () => {
     expect(state.rows).toEqual(COARSE_OLD);
   });
 
-  it("refuses a history that is not in euros without touching anything", async () => {
+  it("stores a history in another currency as it came, once the ECB publishes its rates", async () => {
+    const { state, instruments, prices } = store(COARSE_OLD);
+    const usd = DAILY_NEW("AAA").map((q) => ({ ...q, currency: "USD" }));
+    const { rates, asked } = ratesFor("USD", ["2026-10-05"]);
+
+    const outcome = await replaceQuoteHistory(
+      { instruments, prices, provider: provider({ AAA: usd }), rates, now: NOW },
+      { instrumentId: INSTRUMENT.id, symbol: "AAA", range: "5y" },
+    );
+
+    expect(outcome).toMatchObject({ ok: true, written: 3 });
+    expect(asked).toEqual([["USD", "2026-10-05"]]);
+    expect(state.rows.map((r) => r.currency)).toEqual(["USD", "USD", "USD"]);
+    expect(state.symbol).toBe("AAA");
+  });
+
+  it("refuses a history in a currency the ECB publishes no rates for, touching nothing", async () => {
+    const { state, instruments, prices } = store(COARSE_OLD);
+    const xyz = DAILY_NEW("AAA").map((q) => ({ ...q, currency: "XYZ" }));
+
+    const outcome = await replaceQuoteHistory(
+      {
+        instruments,
+        prices,
+        provider: provider({ AAA: xyz }),
+        rates: NO_RATES,
+        now: NOW,
+      },
+      { instrumentId: INSTRUMENT.id, symbol: "AAA", range: "5y" },
+    );
+
+    expect(outcome).toMatchObject({
+      ok: false,
+      reason: "no-rate-series",
+      currency: "XYZ",
+    });
+    expect(state.replaced).toBe(0);
+    expect(state.rows).toEqual(COARSE_OLD);
+    expect(state.symbol).toBe("AAA.DE");
+  });
+
+  it("refuses, touching nothing, when the ECB cannot be reached for a currency with no stored rates", async () => {
     const { state, instruments, prices } = store(COARSE_OLD);
     const usd = DAILY_NEW("AAA").map((q) => ({ ...q, currency: "USD" }));
 
@@ -171,6 +250,7 @@ describe("replaceQuoteHistory", () => {
         instruments,
         prices,
         provider: provider({ AAA: usd }),
+        rates: async () => ({ book: new Map(), unavailable: ["USD"] }),
         now: NOW,
       },
       { instrumentId: INSTRUMENT.id, symbol: "AAA", range: "5y" },
@@ -178,12 +258,29 @@ describe("replaceQuoteHistory", () => {
 
     expect(outcome).toMatchObject({
       ok: false,
-      reason: "not-eur",
+      reason: "rates-unavailable",
       currency: "USD",
     });
     expect(state.replaced).toBe(0);
-    expect(state.rows).toEqual(COARSE_OLD);
-    expect(state.symbol).toBe("AAA.DE");
+  });
+
+  it("drops today's quote when it is in a different currency from the history", async () => {
+    const { state, instruments, prices } = store([]);
+    const live = quote("NEW.DE", day("2026-10-08", 14), "103", "USD");
+
+    await replaceQuoteHistory(
+      {
+        instruments,
+        prices,
+        provider: provider({ "NEW.DE": DAILY_NEW("NEW.DE") }, [live]),
+        rates: NO_RATES,
+        now: NOW,
+      },
+      { instrumentId: INSTRUMENT.id, symbol: "NEW.DE", range: "5y" },
+    );
+
+    expect(state.rows.every((r) => r.currency === "EUR")).toBe(true);
+    expect(state.rows).toHaveLength(3);
   });
 
   it("on a new symbol keeps only its daily candles plus today's quote", async () => {
@@ -195,6 +292,7 @@ describe("replaceQuoteHistory", () => {
         instruments,
         prices,
         provider: provider({ "NEW.DE": DAILY_NEW("NEW.DE") }, [live]),
+        rates: NO_RATES,
         now: NOW,
       },
       { instrumentId: INSTRUMENT.id, symbol: "NEW.DE", range: "5y" },
@@ -227,6 +325,7 @@ describe("replaceQuoteHistory", () => {
         instruments,
         prices,
         provider: provider({ "AAA.DE": DAILY_NEW("AAA.DE") }, [live]),
+        rates: NO_RATES,
         now: NOW,
       },
       { instrumentId: INSTRUMENT.id, symbol: "AAA.DE", range: "5y" },
@@ -249,6 +348,7 @@ describe("replaceQuoteHistory", () => {
         instruments,
         prices,
         provider: provider({ "AAA.DE": DAILY_NEW("AAA.DE") }, [stale]),
+        rates: NO_RATES,
         now: NOW,
       },
       { instrumentId: INSTRUMENT.id, symbol: "AAA.DE", range: "5y" },
@@ -273,6 +373,7 @@ describe("replaceQuoteHistory", () => {
         instruments,
         prices,
         provider: provider({ "NEW.DE": DAILY_NEW("NEW.DE") }),
+        rates: NO_RATES,
         now: NOW,
       },
       { instrumentId: INSTRUMENT.id, symbol: "NEW.DE", range: "5y" },
@@ -291,6 +392,7 @@ describe("replaceQuoteHistory", () => {
         instruments,
         prices,
         provider: provider({ "AAA.DE": DAILY_NEW("AAA.DE") }, [old]),
+        rates: NO_RATES,
         now: NOW,
       },
       { instrumentId: INSTRUMENT.id, symbol: "AAA.DE", range: "5y" },
@@ -309,6 +411,7 @@ describe("replaceQuoteHistory", () => {
         instruments,
         prices,
         provider: provider({ "AAA.DE": repeated }),
+        rates: NO_RATES,
         now: NOW,
       },
       { instrumentId: INSTRUMENT.id, symbol: "AAA.DE", range: "5y" },
@@ -322,7 +425,13 @@ describe("replaceQuoteHistory", () => {
 
     await expect(
       replaceQuoteHistory(
-        { instruments, prices, provider: provider({}), now: NOW },
+        {
+          instruments,
+          prices,
+          provider: provider({}),
+          rates: NO_RATES,
+          now: NOW,
+        },
         { instrumentId: "NOPE", symbol: "AAA.DE", range: "5y" },
       ),
     ).rejects.toThrow(/NOPE/);
@@ -345,6 +454,7 @@ describe("replaceQuoteHistories", () => {
           "BUSY.DE": new MarketDataUnavailableError("BUSY.DE", 503),
           "CCC.DE": DAILY_NEW("CCC.DE"),
         }),
+        rates: NO_RATES,
         now: NOW,
       },
       [
@@ -372,7 +482,12 @@ describe("replaceQuoteHistories", () => {
 
 describe("replaceFailureMessage", () => {
   const failure = (
-    reason: "no-history" | "not-eur" | "unavailable" | "failed",
+    reason:
+      | "no-history"
+      | "no-rate-series"
+      | "rates-unavailable"
+      | "unavailable"
+      | "failed",
     currency: string | null = null,
   ): Extract<ReplaceOutcome, { ok: false }> => ({
     ok: false,
@@ -384,8 +499,11 @@ describe("replaceFailureMessage", () => {
 
   it("says that nothing was touched and why", () => {
     expect(replaceFailureMessage(es, failure("no-history"))).toContain("AAA");
-    expect(replaceFailureMessage(es, failure("not-eur", "USD"))).toContain(
-      "USD",
+    expect(
+      replaceFailureMessage(es, failure("no-rate-series", "XYZ")),
+    ).toBe(es.fx.noRateSeriesHistory("AAA", "XYZ"));
+    expect(replaceFailureMessage(es, failure("rates-unavailable", "USD"))).toBe(
+      es.fx.sync.unavailable,
     );
     expect(replaceFailureMessage(es, failure("failed"))).toBe(
       es.instruments.history.failed,

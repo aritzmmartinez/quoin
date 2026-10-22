@@ -9,11 +9,18 @@ import type {
 import type { ExcludedNotice } from "./es";
 import type { Copy } from "./types";
 
+const SETTINGS = "Settings";
+const EXTERNAL_DATA = "External data";
+const REFRESH_NOW = "Update now";
+const REDOWNLOAD = "Download the history again";
+const REFRESH_RATES = `use “${REFRESH_NOW}” on exchange rates in ${EXTERNAL_DATA} (${SETTINGS})`;
+const REFRESH_CPI = `use “${REFRESH_NOW}” on the CPI in ${EXTERNAL_DATA} (${SETTINGS})`;
+
 const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
   "crypto-swap": "Swaps involving BTC",
   "crypto-transfer": "BTC transfers",
   "reward-unpriced": "BTC rewards without a price",
-  "foreign-fiat": "Trades in another currency",
+  "fx-unavailable": "Trades with no exchange rate for their day",
   "unmodelled-asset": "Assets Quoin does not model",
   "card-spending": "Card payments",
   "saveback-unpaired": "Saveback with no paired purchase",
@@ -24,9 +31,8 @@ const DISCARD_REASON_HELP: Record<DiscardReason, string | null> = {
   "crypto-swap": null,
   "crypto-transfer": null,
   "reward-unpriced":
-    "There is no BTC price for those dates, so these rewards were not recorded and your BTC position does not include them. In Instruments, open BTC's symbol and use “Download the history again” with a range that reaches those dates. Then import this same file again: what is already recorded is not duplicated.",
-  "foreign-fiat":
-    "Quoin does not convert currencies yet, so these trades are not imported and do not count towards their positions.",
+    `There is no BTC price for those dates, so these rewards were not recorded and your BTC position does not include them. In Instruments, open BTC's symbol and use “${REDOWNLOAD}” with a range that reaches those dates. Then import this same file again: what is already recorded is not duplicated.`,
+  "fx-unavailable": `The ECB had no rate for the day of these trades in another currency (one from today before 16:00, or a currency it does not publish), or could not be reached, so they were not imported and do not count towards their positions. Later, ${REFRESH_RATES} and import this same file again: what is already recorded is not duplicated.`,
   "unmodelled-asset": null,
   "card-spending": null,
   "saveback-unpaired":
@@ -75,6 +81,8 @@ export const en: Copy = {
   common: {
     close: "Close",
     marketDataUnavailable: "Yahoo could not be reached. Try again.",
+    halted: (cause: string): string =>
+      `Stopped before finishing: ${cause.replace(/\.+$/, "")}. This is not a problem with one instrument, so the others were not tried.`,
     noRateExcluded: (names: readonly string[]): string => {
       const one = names.length === 1;
       return `No exchange rate: ${names.join(", ")}. ${one ? "It has" : "They have"} trades in another currency that could not be converted to euros, so ${one ? "it is" : "they are"} left out of every figure: an invented rate would give a false cost and value. The trades are still in Movements.`;
@@ -132,7 +140,7 @@ export const en: Copy = {
     system: "System",
   },
   settings: {
-    title: "Settings",
+    title: SETTINGS,
     soon: "Coming soon",
     appearance: {
       title: "Appearance",
@@ -159,13 +167,71 @@ export const en: Copy = {
       },
       benchmark: {
         label: "Benchmark index",
-        hint: "Used in Opportunity cost and the Summary. You can only compare against instruments you hold or have held, with a mapped symbol and euro history",
+        hint: "Used in Opportunity cost and the Summary. You can only compare against instruments you hold or have held, with a mapped symbol and a history in euros or in a currency the ECB publishes rates for",
         search: "Search ticker or name",
         since: (date: string): string => `history since ${date}`,
         unusable:
-          "Unavailable: no instrument with euro history carries this symbol",
-        none: "No instrument has a symbol and euro history yet. Give one a symbol in the Symbol column of Instruments: saving it downloads its history.",
+          "Unavailable: no instrument with a history that can be valued carries this symbol",
+        none: "No instrument has a symbol and a history that can be valued yet. Give one a symbol in the Symbol column of Instruments: saving it downloads its history.",
       },
+    },
+    externalData: {
+      title: EXTERNAL_DATA,
+      desc: "What Quoin downloads from outside. Each source updates on its own.",
+      refresh: REFRESH_NOW,
+      refreshing: "Updating…",
+      lastChecked: (when: string): string => `Last updated: ${when}`,
+      neverChecked: "Never updated",
+      dataUntil: (date: string): string => `Data up to ${date}`,
+      dataUntilFor: (date: string, name: string): string =>
+        `Data up to ${date}, held back by ${name}`,
+      noData: "No data yet",
+      prices: {
+        label: "Prices",
+        hint: "Yahoo Finance: open positions and the benchmark",
+      },
+      inflation: { label: "CPI", hint: "INE: national and Bizkaia" },
+      rates: {
+        label: "Exchange rates",
+        hint: "European Central Bank: currencies in use",
+      },
+    },
+  },
+  fx: {
+    unrated: (
+      names: readonly string[],
+      currencies: readonly string[],
+    ): string => {
+      const one = names.length === 1;
+      return `No recent exchange rate: ${names.join(", ")}. ${one ? "It is" : "They are"} quoted in ${currencies.join(", ")} and there is no ECB rate from the last week, so ${one ? "it is" : "they are"} left unvalued, like an instrument with no price. To value ${one ? "it" : "them"}, ${REFRESH_RATES}.`;
+    },
+    noClosesInBase: `Its price history is in another currency and there is no exchange rate for any of those dates, so it cannot be drawn in euros. To see it, ${REFRESH_RATES}.`,
+    ratesUnavailableFor: (names: string): string =>
+      `The ECB did not respond, so the history of ${names} was not downloaded: it is quoted in a currency with no rates stored. Try again later with “${REDOWNLOAD}” in Instruments.`,
+    unratedCloses: (count: number): string =>
+      count === 1
+        ? "1 close is not shown: there is no exchange rate for that week."
+        : `${count} closes are not shown: there is no exchange rate for those weeks.`,
+    quotedIn: (currency: string): string =>
+      `Quoted in ${currency}: valued in euros at the ECB rate.`,
+    noRateSeries: (currency: string): string =>
+      `The ECB publishes no rates for ${currency}, so this symbol cannot be valued. Pick its line on another venue.`,
+    noRateSeriesHistory: (symbol: string, currency: string): string =>
+      `The history of ${symbol} comes in ${currency} and the ECB publishes no rates for that currency, so nothing was changed.`,
+    noRateSeriesCount: (count: number): string =>
+      count === 1
+        ? "1 symbol is quoted in a currency the ECB publishes no rates for, and its history was not downloaded. Change it in the Symbol column of Instruments."
+        : `${count} symbols are quoted in currencies the ECB publishes no rates for, and their history was not downloaded. Change them in the Symbol column of Instruments.`,
+    sync: {
+      loading: "Updating ECB rates…",
+      upToDate: "Exchange rates were already up to date.",
+      added: (n: number): string =>
+        n === 1 ? "1 exchange rate added" : `${n} exchange rates added`,
+      none: "No currency other than the euro is in use.",
+      error: "Exchange rates could not be updated.",
+      unavailable: "The ECB is not responding. Try again later.",
+      conflict: (currencies: readonly string[]): string =>
+        `The ECB has revised rates already stored for ${currencies.join(", ")}: nothing was written for ${currencies.length === 1 ? "that currency" : "those currencies"}.`,
     },
   },
   glossary: {
@@ -303,7 +369,7 @@ export const en: Copy = {
       error: "The CPI could not be synced.",
       unavailable: "INE is not responding. Try again later.",
       rebase: (series: string): string =>
-        `${series}: INE changed the base year. Replace the series with pnpm ipc:sync --force-rebase.`,
+        `${series}: INE has republished the CPI against a new base year. Quoin does not mix levels from two bases and cannot yet replace the series from the app, so this series is not updated: real mode keeps the months it already had.`,
     },
   },
   pagination: {
@@ -453,7 +519,7 @@ export const en: Copy = {
     unresolvedBody:
       "It is not spread across the known currencies: doing so would invent an exposure you do not have. This is where leaves with no resolved canonical identity land, along with share classes listed in more than one country (no single currency is the answer) and the part of your funds the issuer does not break down.",
     unresolvedFix:
-      "Run pnpm identity:resolve --refresh to fill in the identities that have no primary market stored yet.",
+      "Some identities were resolved before Quoin stored their primary market and still have none. Resolving them again cannot be done from the app yet, so their value stays here, undetermined.",
     hedged: (count: number): string =>
       count === 1
         ? "1 euro-hedged instrument counts as euro, not as the currency of its underlying."
@@ -675,8 +741,6 @@ export const en: Copy = {
         "This symbol has no closes on the dates of your trades, so they cannot be compared.",
       noDailyHistory:
         "Yahoo has no daily history for this symbol. Look for its ticker on a euro exchange (.DE, .AS…).",
-      notEur: (currency: string): string =>
-        `This symbol quotes in ${currency}. Quoin only values euro histories today: choose the euro line of the same fund on another venue (.DE, .MI, .PA, .AS).`,
       hasHistory:
         "This instrument already has stored prices. Change its symbol in the Symbol column of Instruments: the new history is downloaded there before the old one is removed.",
       pending: (count: number): string =>
@@ -723,10 +787,6 @@ export const en: Copy = {
         count === 1
           ? "1 instrument still has no symbol and cannot be valued."
           : `${count} instruments still have no symbol and cannot be valued.`,
-      notEurWarning: (count: number): string =>
-        count === 1
-          ? "1 symbol does not quote in euros and its history was not downloaded: only euro histories are valued today. Change it in the Symbol column of Instruments."
-          : `${count} symbols do not quote in euros and their history was not downloaded: only euro histories are valued today. Change them in the Symbol column of Instruments.`,
       staleWarning: (count: number): string =>
         count === 1
           ? "1 symbol returned an old quote: check the venue."
@@ -834,11 +894,10 @@ export const en: Copy = {
         count === 1
           ? `1 price saved from ${first}.`
           : `${count} prices saved from ${first}.`,
-      noLive: "Yahoo returned no quote for today: press “Refresh prices” in Portfolio later.",
+      noLive:
+        "Yahoo returned no quote for today: press “Refresh prices” in Portfolio later.",
       noHistory: (symbol: string): string =>
         `Yahoo has no daily history for ${symbol}. Look for its ticker on a euro exchange (.DE, .AS…). Nothing was changed.`,
-      notEur: (symbol: string, currency: string): string =>
-        `The history of ${symbol} is in ${currency}. Quoin only values euro histories today, so nothing was changed.`,
       failed: "The download failed. Nothing was changed.",
       rebuild: "Rebuild all histories",
       rebuildConfirm: (count: number): string =>
@@ -872,7 +931,6 @@ export const en: Copy = {
       problem: {
         "no-quote": "no answer",
         stale: "stale quote",
-        "not-eur": "not quoted in euros",
         unavailable: "Yahoo could not be reached",
         error: "unexpected error",
       },
@@ -944,9 +1002,9 @@ export const en: Copy = {
       "There is no target in force to project. Define your savings plan in Target and come back here.",
     fromTarget: "Simulates your current plan",
     noHistory:
-      "No line of your plan has price history, so there is nothing to resample. Map their symbols with pnpm prices:map and download the history with pnpm prices:backfill.",
+      "No line of your plan has price history, so there is nothing to resample. Give them a symbol in the Symbol column of Instruments: saving it downloads its history.",
     noWindow:
-      "The lines of your plan share not a single month of history, so there is no common window to resample. Extend the shortest history with pnpm prices:backfill.",
+      `The lines of your plan share not a single month of history, so there is no common window to resample. Extend the shortest history in Instruments with “${REDOWNLOAD}” and a longer range.`,
     thinWindow: {
       title: "No figures yet: the window is too short",
       body: (months: number, minimum: number, instrument: string): string =>
@@ -954,7 +1012,7 @@ export const en: Copy = {
       why: (months: number, years: number): string =>
         `This is not a warning you can skip: resampling ${months} months of one particular stretch of market and compounding them ${years * 12} months forward does not project your portfolio, it extrapolates that stretch. A figure like that reads as a forecast however many notes sit under it, and deciding how much to contribute on top of it would mean deciding on those ${months} months.`,
       fix: (instrument: string): string =>
-        `Run pnpm prices:backfill on ${instrument} (it fetches 5 years by default) and come back. As soon as the window reaches the minimum, the screen gives figures.`,
+        `In Instruments, open ${instrument} and use “${REDOWNLOAD}” with a longer range (the default is 5 years). As soon as the window reaches the minimum, the screen gives figures.`,
     },
     form: {
       horizon: "Horizon (years)",
@@ -986,7 +1044,7 @@ export const en: Copy = {
         "90th percentile: only one in ten simulations ends above this figure. It is estimated from the fewest paths, so it is the one that moves most when the seed changes.",
       real: (amount: string): string => `${amount} in today's euros`,
       noReal:
-        "Without CPI data this cannot be expressed in today's euros. Run pnpm ipc:sync.",
+        `Without CPI data this cannot be expressed in today's euros. To get it, ${REFRESH_CPI}.`,
     },
     contributed: (amount: string): string =>
       `Of that, ${amount} comes out of your pocket: what you already hold simulated, plus every contribution over the horizon.`,
@@ -1012,7 +1070,7 @@ export const en: Copy = {
         "Everything you hold is named by the plan, so there is nothing to simulate separately.",
     },
     excluded: (names: string, coverage: string): string =>
-      `No price history, so these are left out of the simulation: ${names}. The remaining weights split 100% between them, so what is projected is ${coverage} of your plan, not the whole plan. Run pnpm prices:backfill before trusting the range.`,
+      `No price history, so these are left out of the simulation: ${names}. The remaining weights split 100% between them, so what is projected is ${coverage} of your plan, not the whole plan. Download its history in Instruments with “${REDOWNLOAD}” before trusting the range.`,
     unsimulated: (names: string, amount: string): string =>
       `${amount} in off-plan positions with less history than the window: ${names}. They are not in the figures above and are not added at the end. Freezing them at 0% for twenty years would be as false a claim as lending them the plan's return. The plan fixing the window is what stops a recent purchase from shrinking it for everything else.`,
     unpriced: (count: number): string =>
@@ -1332,7 +1390,7 @@ export const en: Copy = {
     unmapped: (symbol: string): string =>
       `No instrument is mapped to ${symbol}, so there is no index to compare against. Pick one of your instruments with price history in Settings.`,
     noHistory: (symbol: string): string =>
-      `${symbol} has no price history in euros. Run pnpm prices:backfill <ISIN> max to download it.`,
+      `${symbol} has no price history that can be valued in euros. In Instruments, use “${REDOWNLOAD}” on its row with the longest range.`,
     chooseBenchmark: "Choose another index in Settings",
     empty: {
       title: "No purchases yet",
@@ -1376,7 +1434,7 @@ export const en: Copy = {
       "no-window":
         "The plan's instruments share not a single month of history, so there is nothing to resample.",
       "thin-window": (months: number, name: string): string =>
-        `The common history is ${months} months and 60 are needed. The one setting the limit is ${name}: extend it with pnpm prices:backfill.`,
+        `The common history is ${months} months and 60 are needed. The one setting the limit is ${name}: extend it in Instruments with “${REDOWNLOAD}”.`,
     },
     table: {
       title: "By position",

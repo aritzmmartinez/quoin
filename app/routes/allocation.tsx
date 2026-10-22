@@ -7,7 +7,6 @@ import {
   PrismaHoldingsRepository,
   PrismaInstrumentRepository,
   PrismaLedgerRepository,
-  PrismaPriceRepository,
   PrismaSecurityIdentityRepository,
   PrismaTargetRepository,
 } from "~/adapters/persistence";
@@ -43,11 +42,13 @@ import {
   copyFromMatches,
   currencyByLeaf,
   heldValuesByInstrument,
+  intlTag,
   isCashLine,
   parseAllocationView,
   parseContribution,
   parseDriftThreshold,
   parseIncludeSold,
+  parseLocale,
   parseOverlapMode,
   parseThreshold,
   readingFor,
@@ -62,7 +63,10 @@ import {
   useCopy,
   useFormat,
 } from "~/lib";
+import { UnratedNotice } from "~/components/ui/UnratedNotice";
+import { loadValuation } from "~/lib/rate-book.server";
 import { createServerTiming } from "~/lib/server-timing";
+import { openInstrumentIds, unratedNames } from "~/lib/unrated";
 
 export function meta({ matches }: Route.MetaArgs) {
   const t = copyFromMatches(matches);
@@ -97,8 +101,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   const instruments = await timing.time("db-instruments", () =>
     new PrismaInstrumentRepository().list(),
   );
-  const prices = await timing.time("db-prices-latest", () =>
-    new PrismaPriceRepository().latest(),
+  const valuation = await timing.time("db-prices-latest", () =>
+    loadValuation(),
   );
   const holdings = await timing.time("db-holdings", () =>
     new PrismaHoldingsRepository().all(),
@@ -122,7 +126,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const positions = timing.time("positions", () => computePositions(events));
   const marketValues = timing.time("valuation", () =>
-    computeMarketValues(positions, prices, BASE_CURRENCY),
+    computeMarketValues(positions, valuation.prices, BASE_CURRENCY),
   );
 
   const resolutions = timing.time(
@@ -248,6 +252,12 @@ export async function loader({ request }: Route.LoaderArgs) {
       driftThreshold,
       hasTarget: target !== null,
       plan,
+      unrated: unratedNames(
+        valuation.unrated,
+        instruments,
+        openInstrumentIds(positions),
+        intlTag(parseLocale(request.headers.get("Cookie"))),
+      ),
     },
     { headers: timing.headers() },
   );
@@ -277,6 +287,7 @@ export default function Allocation({ loaderData }: Route.ComponentProps) {
     currency,
     hedgedCount,
     overlap,
+    unrated,
   } = loaderData;
   const copy = t.allocation;
 
@@ -290,6 +301,7 @@ export default function Allocation({ loaderData }: Route.ComponentProps) {
     return (
       <>
         <ViewTabs value={view} />
+        <UnratedNotice unrated={unrated} className="mb-4" />
         <Card>
           <SetupChecklist
             icon={SETUP_ICONS[view]}
@@ -306,6 +318,7 @@ export default function Allocation({ loaderData }: Route.ComponentProps) {
     return (
       <>
         <ViewTabs value={view} />
+        <UnratedNotice unrated={unrated} className="mb-4" />
         <CurrencyPanel exposure={currency} hedgedCount={hedgedCount} />
       </>
     );
@@ -315,6 +328,7 @@ export default function Allocation({ loaderData }: Route.ComponentProps) {
     return (
       <>
         <ViewTabs value={view} />
+        <UnratedNotice unrated={unrated} className="mb-4" />
         <OverlapPanel
           funds={overlap.funds}
           pairs={overlap.pairs}
@@ -329,6 +343,7 @@ export default function Allocation({ loaderData }: Route.ComponentProps) {
     return (
       <>
         <ViewTabs value={view} />
+        <UnratedNotice unrated={unrated} className="mb-4" />
         <RebalancePanel
           plan={plan}
           hasTarget={hasTarget}
@@ -341,6 +356,7 @@ export default function Allocation({ loaderData }: Route.ComponentProps) {
   return (
     <>
       <ViewTabs value={view} />
+      <UnratedNotice unrated={unrated} className="mb-4" />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
         <div className="flex flex-col gap-4">
           <ReadingCard reading={reading} threshold={threshold} />

@@ -7,6 +7,7 @@ import type { Instrument } from "~/core/domain";
 import type { HistoryRange, MarketDataProvider, Quote } from "~/core/ports";
 
 import { isCoarseSeries } from "./coarse-candles";
+import type { EnsureRates } from "./fx-sync";
 import { replaceQuoteHistory } from "./price-history";
 
 type Persistence = typeof import("~/adapters/persistence");
@@ -139,9 +140,12 @@ function deps(market: MarketDataProvider) {
     instruments: new persistence.PrismaInstrumentRepository(),
     prices: new persistence.PrismaPriceRepository(),
     provider: market,
+    rates: NO_RATES,
     now: NOW,
   };
 }
+
+const NO_RATES: EnsureRates = async () => ({ book: new Map(), unavailable: [] });
 
 describe("replaceQuoteHistory (integration)", () => {
   it("leaves only the new symbol's daily candles plus today's quote, and the ledger as it was", async () => {

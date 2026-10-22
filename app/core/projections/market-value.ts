@@ -19,10 +19,10 @@ export interface MarketValue {
  * prices, keyed by instrument id (same convention as computePositions).
  *
  * A position is left unpriced (all fields null) when there is no snapshot for its
- * instrument, or when the snapshot is not in the base currency — we don't convert
- * FX here, so a foreign-currency quote is treated as "no usable price" rather than
- * silently mixing currencies. Weight is each priced position's share of the total
- * priced market value, so weights sum to 1 across priced holdings.
+ * instrument. A snapshot in another currency throws: prices are converted by
+ * pricesInBase before they get here, and that is where a price with no rate is
+ * left unvalued. Weight is each priced position's share of the total priced
+ * market value, so weights sum to 1 across priced holdings.
  *
  * Pure and deterministic.
  */
@@ -41,9 +41,14 @@ export function computeMarketValues(
     const key = position.instrumentId;
     const price = prices.get(key);
 
-    if (!price || price.currency !== baseCurrency) {
+    if (!price) {
       partial.set(key, { marketValue: null, unrealizedPnL: null });
       continue;
+    }
+    if (price.currency !== baseCurrency) {
+      throw new Error(
+        `Price of ${key} is in ${price.currency}, not ${baseCurrency}; pass prices through pricesInBase() first`,
+      );
     }
 
     const marketValue = Money.fromString(price.price).scaleBy(

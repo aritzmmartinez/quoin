@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { LedgerEvent } from "~/core/domain";
+import { rateBookFrom } from "~/core/fx";
 import type {
   HistoryRange,
   HistorySpan,
@@ -19,8 +20,15 @@ import {
   tradesDisagree,
   type TradeComparison,
 } from "./symbol-check";
+import type { EnsureRates } from "./fx-sync";
 
 const NOW = new Date("2026-07-13T12:00:00.000Z");
+
+const NO_RATES: EnsureRates = async () => ({ book: new Map(), unavailable: [] });
+
+const USD_BOOK = rateBookFrom([
+  { source: "ECB", base: "EUR", quote: "USD", day: "2025-07-31", rate: "1.25" },
+]);
 
 const quote = (over: Partial<Quote> = {}): Quote => ({
   symbol: "TEST.DE",
@@ -38,12 +46,17 @@ describe("checkSymbol", () => {
     expect(check.currency).toBe("EUR");
     expect(check.fresh).toBe(true);
     expect(check.closed).toBe(false);
-    expect(check.foreignCurrency).toBeNull();
+    expect(check.rateSeries).toBe("base");
   });
 
-  it("names the currency of a quote that is not in euros", () => {
-    const check = checkSymbol(quote({ currency: "USD" }), "1", NOW);
-    expect(check.foreignCurrency).toBe("USD");
+  it("carries whether the ECB publishes rates for a quote not in euros", () => {
+    const usd = quote({ currency: "USD" });
+    expect(checkSymbol(usd, "1", NOW, [], 0, true, "published").rateSeries).toBe(
+      "published",
+    );
+    expect(checkSymbol(usd, "1", NOW, [], 0, true, "none").rateSeries).toBe(
+      "none",
+    );
   });
 
   it("flags a stale market timestamp — the mark of a wrong or illiquid venue", () => {
@@ -142,6 +155,23 @@ describe("recentTradeMarks", () => {
     ]);
   });
 
+  it("takes a trade booked in another currency at its euro amount", () => {
+    const [mark] = recentTradeMarks(
+      [
+        trade("2025-07-31T10:00:00Z", "10", "298.88", {
+          currency: "USD",
+          fxSource: "ECB",
+          fxRate: "1.25",
+          fxDirection: "QUOTE_PER_BASE",
+          fxDate: "2025-07-31",
+        }),
+      ],
+      ID,
+    );
+
+    expect(mark?.price).toBe("23.91");
+  });
+
   it("is empty for an instrument never traded", () => {
     expect(recentTradeMarks([], ID)).toEqual([]);
   });
@@ -186,6 +216,22 @@ describe("compareTrades", () => {
     ).toEqual([]);
     expect(
       compareTrades([mark], [close("2025-07-20T07:00:00Z", "23.88")]),
+    ).toEqual([]);
+  });
+
+  it("converts a close in another currency at the ECB rate of the trade's day", () => {
+    const [row] = compareTrades(
+      [mark],
+      [close("2025-07-31T07:00:00Z", "29.85", "USD")],
+      USD_BOOK,
+    );
+
+    expect(row).toMatchObject({ close: "23.88", off: false });
+  });
+
+  it("skips a trade whose day has no rate rather than compare across currencies", () => {
+    expect(
+      compareTrades([mark], [close("2025-07-31T07:00:00Z", "29.85", "USD")]),
     ).toEqual([]);
   });
 
@@ -252,7 +298,13 @@ describe("checkQuoteAgainstLedger", () => {
       close("2025-07-31T07:00:00Z", "23.88"),
     ]);
 
-    const check = await checkQuoteAgainstLedger(market, events, ID, "TEST.DE");
+    const check = await checkQuoteAgainstLedger(
+      market,
+      events,
+      ID,
+      "TEST.DE",
+      NO_RATES,
+    );
 
     expect(check?.closed).toBe(true);
     expect(check?.trades).toHaveLength(2);
@@ -272,6 +324,7 @@ describe("checkQuoteAgainstLedger", () => {
       [],
       ID,
       "TEST.DE",
+      NO_RATES,
     );
     expect(none.asked).toEqual([DAILY_HISTORY_PROBE]);
     expect(check?.dailyHistory).toBe(true);
@@ -284,6 +337,7 @@ describe("checkQuoteAgainstLedger", () => {
       [trade("2025-07-31T10:00:00Z", "1", "23.91")],
       ID,
       "XS00TEST0001.SG",
+      NO_RATES,
     );
 
     expect(check?.dailyHistory).toBe(false);
@@ -302,6 +356,7 @@ describe("checkQuoteAgainstLedger", () => {
       [trade("2019-07-31T10:00:00Z", "1", "23.91")],
       ID,
       "TEST.DE",
+      NO_RATES,
     );
 
     expect(check?.dailyHistory).toBe(true);
@@ -309,21 +364,50 @@ describe("checkQuoteAgainstLedger", () => {
     expect(check?.trades).toEqual([]);
   });
 
-  it("does not ask for any history for a quote outside euros", async () => {
-    const usd = provider({ ...live, currency: "USD" }, []);
+  it("compares a quote in another currency against the trades in euros, asking for the rates of their span", async () => {
+    const usd = provider({ ...live, currency: "USD" }, [
+      close("2025-07-31T07:00:00Z", "29.85", "USD"),
+    ]);
+    const asked: [string, string][] = [];
+    const rates: EnsureRates = async (needs) => {
+      asked.push(...needs);
+      return { book: USD_BOOK, unavailable: [] };
+    };
+
     const check = await checkQuoteAgainstLedger(
       usd.provider,
       [trade("2025-07-31T10:00:00Z", "1", "23.91")],
       ID,
       "TEST",
+      rates,
     );
-    expect(usd.asked).toEqual([]);
-    expect(check?.tradesAsked).toBe(1);
+
+    expect(asked).toEqual([["USD", "2025-07-24"]]);
+    expect(check?.rateSeries).toBe("published");
+    expect(check?.trades).toMatchObject([{ close: "23.88", off: false }]);
+  });
+
+  it("asks for no trade history for a currency the ECB publishes no rates for", async () => {
+    const xyz = provider({ ...live, currency: "XYZ" }, [
+      close("2026-10-07T07:00:00Z", "25.00", "XYZ"),
+    ]);
+    const check = await checkQuoteAgainstLedger(
+      xyz.provider,
+      [trade("2025-07-31T10:00:00Z", "1", "23.91")],
+      ID,
+      "TEST",
+      NO_RATES,
+    );
+
+    expect(xyz.asked).toEqual([DAILY_HISTORY_PROBE]);
+    expect(check?.rateSeries).toBe("none");
     expect(check?.trades).toEqual([]);
   });
 
   it("is null when the provider has no quote", async () => {
     const { provider: market } = provider(null, []);
-    expect(await checkQuoteAgainstLedger(market, [], ID, "NOPE")).toBeNull();
+    expect(
+      await checkQuoteAgainstLedger(market, [], ID, "NOPE", NO_RATES),
+    ).toBeNull();
   });
 });

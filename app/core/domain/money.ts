@@ -1,14 +1,8 @@
 /**
  * The currency every projection reports in. Positions quoted elsewhere are
- * converted to it (once FX exists) or excluded from valuation — never mixed.
+ * converted to it at an ECB rate (core/fx) or left unvalued — never mixed.
  */
 export const BASE_CURRENCY = "EUR";
-
-export function foreignCurrency(
-  quotes: readonly { currency: string }[],
-): string | null {
-  return quotes.find((q) => q.currency !== BASE_CURRENCY)?.currency ?? null;
-}
 
 import Decimal from "decimal.js";
 

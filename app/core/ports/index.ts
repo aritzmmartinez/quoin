@@ -2,6 +2,7 @@ export * from "./repository";
 export * from "./instrument-repository";
 export * from "./market-data-provider";
 export * from "./price-repository";
+export * from "./price-sync-repository";
 export * from "./inflation-repository";
 export * from "./inflation-provider";
 export * from "./holdings-repository";

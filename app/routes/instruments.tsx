@@ -14,6 +14,7 @@ import {
   PrismaPriceRepository,
 } from "~/adapters/persistence";
 import { Card, InstrumentsTable, RebuildHistories } from "~/components";
+import { UnratedNotice } from "~/components/ui/UnratedNotice";
 import {
   BASE_CURRENCY,
   KINDS_NEEDING_LEAF,
@@ -33,6 +34,8 @@ import {
   toInstrumentListItems,
   useCopy,
 } from "~/lib";
+import { loadValuation } from "~/lib/rate-book.server";
+import { openInstrumentIds, unratedNames } from "~/lib/unrated";
 
 export function meta({ matches }: Route.MetaArgs) {
   const t = copyFromMatches(matches);
@@ -46,18 +49,28 @@ export const handle = { title: (t: Copy) => t.instruments.title };
 
 export async function loader({ request }: Route.LoaderArgs) {
   const priceRepository = new PrismaPriceRepository();
-  const [events, instruments, prices, holdings, candleTimes, dailyHistoryIds] =
-    await Promise.all([
-      new PrismaLedgerRepository().list(),
-      new PrismaInstrumentRepository().list(),
-      priceRepository.latest(),
-      new PrismaHoldingsRepository().all(),
-      priceRepository.candleTimes(),
-      priceRepository.dailyHistoryIds(),
-    ]);
+  const [
+    events,
+    instruments,
+    valuation,
+    holdings,
+    candleTimes,
+    dailyHistoryIds,
+  ] = await Promise.all([
+    new PrismaLedgerRepository().list(),
+    new PrismaInstrumentRepository().list(),
+    loadValuation(),
+    new PrismaHoldingsRepository().all(),
+    priceRepository.candleTimes(),
+    priceRepository.dailyHistoryIds(),
+  ]);
 
   const positions = computePositions(events);
-  const marketValues = computeMarketValues(positions, prices, BASE_CURRENCY);
+  const marketValues = computeMarketValues(
+    positions,
+    valuation.prices,
+    BASE_CURRENCY,
+  );
   const tag = createFormat(parseLocale(request.headers.get("Cookie"))).tag;
   const items = toInstrumentListItems(
     instruments,
@@ -69,7 +82,16 @@ export async function loader({ request }: Route.LoaderArgs) {
     dailyHistoryIds,
   );
 
-  return { items, unmapped: needsMapping(items).length };
+  return {
+    items,
+    unmapped: needsMapping(items).length,
+    unrated: unratedNames(
+      valuation.unrated,
+      instruments,
+      openInstrumentIds(positions),
+      tag,
+    ),
+  };
 }
 
 const exposureForm = z.object({
@@ -175,7 +197,7 @@ async function importHoldings(t: Copy, form: Record<string, unknown>) {
 
 export default function Instruments({ loaderData }: Route.ComponentProps) {
   const t = useCopy();
-  const { items, unmapped } = loaderData;
+  const { items, unmapped, unrated } = loaderData;
   const coarse = items.filter((item) => item.coarseHistory);
   const rebuildable = items.flatMap((item) =>
     item.quoteSymbol
@@ -209,6 +231,8 @@ export default function Instruments({ loaderData }: Route.ComponentProps) {
           <RebuildHistories targets={rebuildable} />
         </div>
       </header>
+
+      <UnratedNotice unrated={unrated} className="mb-4" />
 
       <Card className="overflow-hidden">
         <InstrumentsTable items={items} />
