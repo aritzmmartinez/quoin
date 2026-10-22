@@ -6,13 +6,17 @@ const AT_80K = { price: "80000", currency: "EUR" };
 
 function row(over: Partial<KrakenRow> = {}): KrakenRow {
   return {
+    txid: "L1",
     refid: "R1",
     time: "2025-11-13 18:04:48",
     type: "deposit",
+    aclass: "currency",
     subclass: "fiat",
     asset: "EUR",
+    wallet: "spot / main",
     amount: "100",
     fee: "0",
+    balance: "0",
     ...over,
   };
 }

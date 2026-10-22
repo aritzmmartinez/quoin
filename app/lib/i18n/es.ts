@@ -680,6 +680,14 @@ export const es = {
     failed: "La importación ha fallado.",
     invalidEvent: (date: string, type: string, currency: string): string =>
       `La operación ${type} del ${date} en ${currency} no cumple las reglas del registro. Es un fallo de Quoin al leer este export, no del fichero: no se ha importado nada.`,
+    krakenLegacyExport:
+      "Es un export antiguo de Kraken, sin la columna wallet, y Quoin solo lee el formato actual. Descarga uno nuevo desde Kraken e impórtalo. No se ha importado nada.",
+    krakenBalanceMismatch: (
+      asset: string,
+      wallet: string,
+      date: string,
+    ): string =>
+      `El saldo de ${asset} en «${wallet}» del ${date} no sale de las filas anteriores. Quoin no está leyendo este fichero como Kraken lo escribió, así que no se ha importado nada.`,
     analysing: "Analizando el fichero…",
     importing: "Importando…",
     retrying: "Valorando las recompensas…",

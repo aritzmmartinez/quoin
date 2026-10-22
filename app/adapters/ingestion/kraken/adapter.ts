@@ -11,6 +11,7 @@ import {
   type MappedBatch,
 } from "../ingest";
 import { rateLookupFor, type RateBookLoader } from "../fx";
+import { KrakenBalanceMismatchError, findBalanceMismatch } from "./balance";
 import { groupByRefid, mapGroup, priceLookupFrom } from "./map";
 import { parseKrakenCsv } from "./row";
 
@@ -24,6 +25,14 @@ export class KrakenCsvAdapter {
 
   async plan(csv: string): Promise<MappedBatch> {
     const rows = parseKrakenCsv(csv);
+    const mismatch = findBalanceMismatch(rows);
+    if (mismatch) {
+      throw new KrakenBalanceMismatchError(
+        mismatch.asset,
+        mismatch.wallet,
+        mismatch.date,
+      );
+    }
     const groups = groupByRefid(rows);
     const btcHistory = this.prices ? await this.prices.historyFor("BTC") : [];
     const priceAt = priceLookupFrom(btcHistory);

@@ -670,6 +670,14 @@ export const en: Copy = {
     failed: "The import failed.",
     invalidEvent: (date: string, type: string, currency: string): string =>
       `The ${type} of ${date} in ${currency} breaks the ledger's rules. This is a fault in how Quoin reads this export, not in the file: nothing was imported.`,
+    krakenLegacyExport:
+      "This is an old Kraken export, without the wallet column, and Quoin reads only the current format. Download a new one from Kraken and import it. Nothing was imported.",
+    krakenBalanceMismatch: (
+      asset: string,
+      wallet: string,
+      date: string,
+    ): string =>
+      `The ${asset} balance in “${wallet}” on ${date} does not follow from the rows before it. Quoin is not reading this file the way Kraken wrote it, so nothing was imported.`,
     analysing: "Analysing the file…",
     importing: "Importing…",
     retrying: "Valuing the rewards…",

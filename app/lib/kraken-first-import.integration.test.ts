@@ -3,6 +3,7 @@ import { mkdirSync, rmSync } from "node:fs";
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
+import { krakenCsv } from "~/adapters/ingestion/kraken/csv-fixture";
 import type { HistoryRange, MarketDataProvider, Quote } from "~/core/ports";
 
 import type { EnsureRates } from "./fx-sync";
@@ -35,24 +36,19 @@ const NO_RATES: EnsureRates = async () => ({ book: new Map(), unavailable: [] })
 const tmpDir = "./.tmp-kraken-first-import";
 const dbPath = `${tmpDir}/it-${Date.now()}.sqlite`;
 
-const HEADER =
-  "txid,refid,time,type,subtype,aclass,subclass,asset,wallet,amount,fee,balance";
+const BUYS_AND_REWARDS = krakenCsv([
+  { refid: "D1", time: "2026-02-02 09:00:00", type: "deposit", subclass: "fiat", asset: "EUR", amount: "500.0000" },
+  { refid: "B1", time: "2026-02-03 10:00:00", type: "spend", subclass: "fiat", asset: "EUR", amount: "-100.0000" },
+  { refid: "B1", time: "2026-02-03 10:00:00", type: "receive", subclass: "crypto", asset: "BTC", amount: "0.0012500000" },
+  { refid: "R1", time: "2026-03-01 05:52:00", type: "reward", subclass: "crypto", asset: "BTC", amount: "0.0000020000" },
+  { refid: "R2", time: "2026-03-08 05:52:00", type: "reward", subclass: "crypto", asset: "BTC", amount: "0.0000030000" },
+  { refid: "R3", time: "2026-03-15 05:52:00", type: "reward", subtype: "welcomebonus", subclass: "crypto", asset: "BTC", amount: "0.0000050000" },
+]);
 
-const BUYS_AND_REWARDS = [
-  HEADER,
-  `"k1","D1","2026-02-02 09:00:00","deposit","","currency","fiat","EUR","spot / main",500.0000,0,500`,
-  `"k2","B1","2026-02-03 10:00:00","spend","","currency","fiat","EUR","spot / main",-100.0000,0,400`,
-  `"k3","B1","2026-02-03 10:00:00","receive","","currency","crypto","BTC","spot / main",0.0012500000,0,0.00125`,
-  `"k4","R1","2026-03-01 05:52:00","reward","","currency","crypto","BTC","spot / main",0.0000020000,0,0.001252`,
-  `"k5","R2","2026-03-08 05:52:00","reward","","currency","crypto","BTC","spot / main",0.0000030000,0,0.001255`,
-  `"k6","R3","2026-03-15 05:52:00","reward","welcomebonus","currency","crypto","BTC","spot / main",0.0000050000,0,0.00126`,
-].join("\n");
-
-const REWARDS_ONLY = [
-  HEADER,
-  `"r1","R1","2026-03-01 05:52:00","reward","welcomebonus","currency","crypto","BTC","spot / main",0.0000020000,0,0.000002`,
-  `"r2","R2","2026-03-08 05:52:00","reward","","currency","crypto","BTC","spot / main",0.0000030000,0,0.000005`,
-].join("\n");
+const REWARDS_ONLY = krakenCsv([
+  { refid: "R1", time: "2026-03-01 05:52:00", type: "reward", subtype: "welcomebonus", subclass: "crypto", asset: "BTC", amount: "0.0000020000" },
+  { refid: "R2", time: "2026-03-08 05:52:00", type: "reward", subclass: "crypto", asset: "BTC", amount: "0.0000030000" },
+]);
 
 const candleFor = (day: number) => String(80000 + day * 10);
 
@@ -305,12 +301,11 @@ const dailyFrom = (start: Date, days: number) =>
   Array.from({ length: days }, (_, i) => new Date(start.getTime() + i * 86_400_000));
 
 describe("candle spacing and the 7-day lookup (integration)", () => {
-  const LATE_NOVEMBER = [
-    HEADER,
-    `"n1","B1","2025-11-13 18:04:48","spend","","currency","fiat","EUR","spot / main",-150.0000,0,0`,
-    `"n2","B1","2025-11-13 18:04:48","receive","","currency","crypto","BTC","spot / main",0.0020000000,0,0.002`,
-    `"n3","R1","2025-11-26 05:52:00","reward","","currency","crypto","BTC","spot / main",0.0000040000,0,0.002004`,
-  ].join("\n");
+  const LATE_NOVEMBER = krakenCsv([
+    { refid: "B1", time: "2025-11-13 18:04:48", type: "spend", subclass: "fiat", asset: "EUR", amount: "-150.0000" },
+    { refid: "B1", time: "2025-11-13 18:04:48", type: "receive", subclass: "crypto", asset: "BTC", amount: "0.0020000000" },
+    { refid: "R1", time: "2025-11-26 05:52:00", type: "reward", subclass: "crypto", asset: "BTC", amount: "0.0000040000" },
+  ]);
 
   it("leaves a reward unpriced when the nearest earlier candle is a month away, and prices it from daily candles", async () => {
     const adapter = new ingestion.KrakenCsvAdapter(
@@ -344,12 +339,11 @@ describe("candle spacing and the 7-day lookup (integration)", () => {
   });
 
   it("prices a reward older than the instrument's first written trade", async () => {
-    const BONUS_BEFORE_BUY = [
-      HEADER,
-      `"o1","R0","2026-02-02 05:52:00","reward","welcomebonus","currency","crypto","BTC","spot / main",0.0000020000,0,0.000002`,
-      `"o2","B1","2026-02-10 10:00:00","spend","","currency","fiat","EUR","spot / main",-100.0000,0,0`,
-      `"o3","B1","2026-02-10 10:00:00","receive","","currency","crypto","BTC","spot / main",0.0012500000,0,0.001252`,
-    ].join("\n");
+    const BONUS_BEFORE_BUY = krakenCsv([
+      { refid: "R0", time: "2026-02-02 05:52:00", type: "reward", subtype: "welcomebonus", subclass: "crypto", asset: "BTC", amount: "0.0000020000" },
+      { refid: "B1", time: "2026-02-10 10:00:00", type: "spend", subclass: "fiat", asset: "EUR", amount: "-100.0000" },
+      { refid: "B1", time: "2026-02-10 10:00:00", type: "receive", subclass: "crypto", asset: "BTC", amount: "0.0012500000" },
+    ]);
 
     const { first, merged } = await firstImportFlow(BONUS_BEFORE_BUY);
 

@@ -24,22 +24,30 @@ const trCryptoBuy: TradeRepublicRow = {
 
 const krakenBuy: KrakenRow[] = [
   {
+    txid: "L1",
     refid: "K1",
     time: "2026-02-04 10:00:00",
     type: "spend",
+    aclass: "currency",
     subclass: "fiat",
     asset: "EUR",
+    wallet: "spot / main",
     amount: "-60",
     fee: "0",
+    balance: "0",
   },
   {
+    txid: "L2",
     refid: "K1",
     time: "2026-02-04 10:00:00",
     type: "receive",
+    aclass: "currency",
     subclass: "crypto",
     asset: "BTC",
+    wallet: "spot / main",
     amount: "0.001",
     fee: "0",
+    balance: "0",
   },
 ];
 

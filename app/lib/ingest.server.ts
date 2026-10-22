@@ -1,6 +1,8 @@
 import {
   InvalidLedgerEventError,
+  KrakenBalanceMismatchError,
   KrakenCsvAdapter,
+  KrakenLegacyExportError,
   TradeRepublicCsvAdapter,
   detectBroker,
   persistBatch,
@@ -76,6 +78,14 @@ async function plan(
     if (error instanceof InvalidLedgerEventError) {
       throw new IngestError(
         t.ingest.invalidEvent(error.date, error.type, error.currency),
+      );
+    }
+    if (error instanceof KrakenLegacyExportError) {
+      throw new IngestError(t.ingest.krakenLegacyExport);
+    }
+    if (error instanceof KrakenBalanceMismatchError) {
+      throw new IngestError(
+        t.ingest.krakenBalanceMismatch(error.asset, error.wallet, error.date),
       );
     }
     throw error;

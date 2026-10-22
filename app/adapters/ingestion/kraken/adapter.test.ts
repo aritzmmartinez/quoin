@@ -19,6 +19,8 @@ import { rateBookFrom } from "~/core/fx";
 
 import { AFFECTS_POSITION, DISCARD_REASONS } from "../discard";
 import { KrakenCsvAdapter } from "./adapter";
+import { KrakenBalanceMismatchError } from "./balance";
+import { krakenCsv } from "./csv-fixture";
 
 class FakeInstrumentRepository implements InstrumentRepository {
   upserted: Instrument[] = [];
@@ -100,19 +102,66 @@ class FakePriceRepository implements PriceRepository {
   }
 }
 
-const HEADER =
-  "txid,refid,time,type,subtype,aclass,subclass,asset,wallet,amount,fee,balance";
-
-const CSV = [
-  HEADER,
-  `"x1","T1","2025-11-13 18:04:48","spend","","currency","fiat","EUR","spot / main",-150.0000,0,0.0`,
-  `"x2","T1","2025-11-13 18:04:48","receive","","currency","crypto","BTC","spot / main",0.0030000000,0,0.003`,
-  `"x3","D1","2025-11-17 13:38:00","deposit","","currency","fiat","EUR","spot / main",500.0000,0,500.0`,
-  `"x4","RW1","2025-11-25 23:25:20","reward","welcomebonus","currency","crypto","BTC","spot / main",0.0000057100,0,0.003`,
-  `"x5","RW2","2025-11-14 00:06:13","reward","welcomebonus","currency","crypto","SOL","spot / main",0.0017288700,0,0.001`,
-  `"x6","S1","2025-11-20 11:55:11","spend","","currency","crypto","PEPE","spot / main",-629732.00,0,0.68`,
-  `"x7","S1","2025-11-20 11:55:11","receive","","currency","crypto","SOL","spot / main",0.0208900000,0,0.02`,
-].join("\n");
+const CSV = krakenCsv([
+  {
+    refid: "T1",
+    time: "2025-11-13 18:04:48",
+    type: "spend",
+    subclass: "fiat",
+    asset: "EUR",
+    amount: "-150.0000",
+  },
+  {
+    refid: "T1",
+    time: "2025-11-13 18:04:48",
+    type: "receive",
+    subclass: "crypto",
+    asset: "BTC",
+    amount: "0.0030000000",
+  },
+  {
+    refid: "D1",
+    time: "2025-11-17 13:38:00",
+    type: "deposit",
+    subclass: "fiat",
+    asset: "EUR",
+    amount: "500.0000",
+  },
+  {
+    refid: "RW1",
+    time: "2025-11-25 23:25:20",
+    type: "reward",
+    subtype: "welcomebonus",
+    subclass: "crypto",
+    asset: "BTC",
+    amount: "0.0000057100",
+  },
+  {
+    refid: "RW2",
+    time: "2025-11-14 00:06:13",
+    type: "reward",
+    subtype: "welcomebonus",
+    subclass: "crypto",
+    asset: "SOL",
+    amount: "0.0017288700",
+  },
+  {
+    refid: "S1",
+    time: "2025-11-20 11:55:11",
+    type: "spend",
+    subclass: "crypto",
+    asset: "PEPE",
+    amount: "-629732.00",
+  },
+  {
+    refid: "S1",
+    time: "2025-11-20 11:55:11",
+    type: "receive",
+    subclass: "crypto",
+    asset: "SOL",
+    amount: "0.0208900000",
+  },
+]);
 
 describe("KrakenCsvAdapter", () => {
   let instruments: FakeInstrumentRepository;
@@ -187,13 +236,41 @@ describe("KrakenCsvAdapter", () => {
 });
 
 describe("KrakenCsvAdapter in another fiat currency", () => {
-  const USD_CSV = [
-    HEADER,
-    `"u1","U1","2026-01-05 10:00:00","deposit","","currency","fiat","USD","spot / main",500.0000,0,500`,
-    `"u2","B1","2026-01-06 10:00:00","spend","","currency","fiat","USD","spot / main",-100.0000,-0.4,400`,
-    `"u3","B1","2026-01-06 10:00:00","receive","","currency","crypto","BTC","spot / main",0.0010000000,0,0.001`,
-    `"u4","R1","2026-01-07 05:52:00","reward","","currency","crypto","BTC","spot / main",0.0000010000,0,0.001`,
-  ].join("\n");
+  const USD_CSV = krakenCsv([
+    {
+      refid: "U1",
+      time: "2026-01-05 10:00:00",
+      type: "deposit",
+      subclass: "fiat",
+      asset: "USD",
+      amount: "500.0000",
+    },
+    {
+      refid: "B1",
+      time: "2026-01-06 10:00:00",
+      type: "spend",
+      subclass: "fiat",
+      asset: "USD",
+      amount: "-100.0000",
+      fee: "0.4",
+    },
+    {
+      refid: "B1",
+      time: "2026-01-06 10:00:00",
+      type: "receive",
+      subclass: "crypto",
+      asset: "BTC",
+      amount: "0.0010000000",
+    },
+    {
+      refid: "R1",
+      time: "2026-01-07 05:52:00",
+      type: "reward",
+      subclass: "crypto",
+      asset: "BTC",
+      amount: "0.0000010000",
+    },
+  ]);
 
   const usdBtc = (day: string, price: string): PriceSnapshot => ({
     instrumentId: "BTC",
@@ -230,7 +307,9 @@ describe("KrakenCsvAdapter in another fiat currency", () => {
 
     expect(asked).toEqual([["USD"]]);
     expect(summary.discarded).toEqual({});
-    expect(ledger.appended.map((e) => [e.type, e.currency, e.fxSource, e.fxDate])).toEqual([
+    expect(
+      ledger.appended.map((e) => [e.type, e.currency, e.fxSource, e.fxDate]),
+    ).toEqual([
       ["DEPOSIT", "USD", "ECB", "2026-01-05"],
       ["BUY", "USD", "ECB", "2026-01-06"],
       ["BUY", "USD", "ECB", "2026-01-07"],
@@ -257,23 +336,126 @@ describe("KrakenCsvAdapter in another fiat currency", () => {
 });
 
 describe("KrakenCsvAdapter discards", () => {
-  const MIXED = [
-    HEADER,
-    `"m1","B1","2026-01-05 10:00:00","spend","","currency","fiat","EUR","spot / main",-100.0000,0,0`,
-    `"m2","B1","2026-01-05 10:00:00","receive","","currency","crypto","BTC","spot / main",0.0010000000,0,0.001`,
-    `"m3","E1","2026-01-11 05:52:10","earn","reward","currency","crypto","SOL","earn / flexible",0.0004000000,0,0.01`,
-    `"m4","E2","2026-01-12 05:52:40","reward","welcomebonus","currency","crypto","ETH","spot / main",0.0002000000,0,0.0002`,
-    `"m5","D1","2026-02-01 09:00:00","deposit","","currency","crypto","BTC","spot / main",0.0050000000,0,0.006`,
-    `"m6","W1","2026-02-03 09:00:00","withdrawal","","currency","crypto","BTC","spot / main",-0.0020000000,0.00001,0.004`,
-    `"m7","D2","2026-02-04 09:00:00","deposit","","currency","crypto","ETH","spot / main",0.1000000000,0,0.1002`,
-    `"m8","S1","2026-02-10 12:00:00","spend","","currency","crypto","ETH","spot / main",-0.0500000000,0,0.0502`,
-    `"m9","S1","2026-02-10 12:00:00","receive","","currency","crypto","BTC","spot / main",0.0015000000,0.000003,0.0055`,
-    `"m10","S2","2026-02-11 12:00:00","spend","","currency","crypto","BTC","spot / main",-0.0010000000,0,0.0045`,
-    `"m11","S2","2026-02-11 12:00:00","receive","","currency","crypto","SOL","spot / main",0.4000000000,0.001,0.41`,
-    `"m12","T1","2026-02-12 12:00:00","spend","","currency","fiat","EUR","spot / main",-50.0000,0,0`,
-    `"m13","T1","2026-02-12 12:00:00","receive","","currency","crypto","ETH","spot / main",0.0200000000,0,0.07`,
-    `"m14","R1","2026-03-01 05:52:00","reward","","currency","crypto","BTC","spot / main",0.0000010000,0,0.0045`,
-  ].join("\n");
+  const MIXED = krakenCsv([
+    {
+      refid: "B1",
+      time: "2026-01-05 10:00:00",
+      type: "spend",
+      subclass: "fiat",
+      asset: "EUR",
+      amount: "-100.0000",
+    },
+    {
+      refid: "B1",
+      time: "2026-01-05 10:00:00",
+      type: "receive",
+      subclass: "crypto",
+      asset: "BTC",
+      amount: "0.0010000000",
+    },
+    {
+      refid: "E1",
+      time: "2026-01-11 05:52:10",
+      type: "earn",
+      subtype: "reward",
+      subclass: "crypto",
+      asset: "SOL",
+      wallet: "earn / flexible",
+      amount: "0.0004000000",
+    },
+    {
+      refid: "E2",
+      time: "2026-01-12 05:52:40",
+      type: "reward",
+      subtype: "welcomebonus",
+      subclass: "crypto",
+      asset: "ETH",
+      amount: "0.0002000000",
+    },
+    {
+      refid: "D1",
+      time: "2026-02-01 09:00:00",
+      type: "deposit",
+      subclass: "crypto",
+      asset: "BTC",
+      amount: "0.0050000000",
+    },
+    {
+      refid: "W1",
+      time: "2026-02-03 09:00:00",
+      type: "withdrawal",
+      subclass: "crypto",
+      asset: "BTC",
+      amount: "-0.0020000000",
+      fee: "0.00001",
+    },
+    {
+      refid: "D2",
+      time: "2026-02-04 09:00:00",
+      type: "deposit",
+      subclass: "crypto",
+      asset: "ETH",
+      amount: "0.1000000000",
+    },
+    {
+      refid: "S1",
+      time: "2026-02-10 12:00:00",
+      type: "spend",
+      subclass: "crypto",
+      asset: "ETH",
+      amount: "-0.0500000000",
+    },
+    {
+      refid: "S1",
+      time: "2026-02-10 12:00:00",
+      type: "receive",
+      subclass: "crypto",
+      asset: "BTC",
+      amount: "0.0015000000",
+      fee: "0.000003",
+    },
+    {
+      refid: "S2",
+      time: "2026-02-11 12:00:00",
+      type: "spend",
+      subclass: "crypto",
+      asset: "BTC",
+      amount: "-0.0010000000",
+    },
+    {
+      refid: "S2",
+      time: "2026-02-11 12:00:00",
+      type: "receive",
+      subclass: "crypto",
+      asset: "SOL",
+      amount: "0.4000000000",
+      fee: "0.001",
+    },
+    {
+      refid: "T1",
+      time: "2026-02-12 12:00:00",
+      type: "spend",
+      subclass: "fiat",
+      asset: "EUR",
+      amount: "-50.0000",
+    },
+    {
+      refid: "T1",
+      time: "2026-02-12 12:00:00",
+      type: "receive",
+      subclass: "crypto",
+      asset: "ETH",
+      amount: "0.0200000000",
+    },
+    {
+      refid: "R1",
+      time: "2026-03-01 05:52:00",
+      type: "reward",
+      subclass: "crypto",
+      asset: "BTC",
+      amount: "0.0000010000",
+    },
+  ]);
 
   const detail = (
     date: string,
@@ -329,5 +511,51 @@ describe("KrakenCsvAdapter discards", () => {
       "fx-unavailable",
       "invalid-crypto-code",
     ]);
+  });
+});
+
+describe("KrakenCsvAdapter and the balance column", () => {
+  it("refuses the whole file when a balance does not follow, naming where", async () => {
+    const ledger = new FakeLedgerRepository();
+    const instruments = new FakeInstrumentRepository();
+    const csv = krakenCsv([
+      {
+        refid: "D1",
+        time: "2026-01-05 10:00:00",
+        type: "deposit",
+        subclass: "fiat",
+        asset: "EUR",
+        amount: "500",
+      },
+      {
+        refid: "B1",
+        time: "2026-01-06 10:00:00",
+        type: "spend",
+        subclass: "fiat",
+        asset: "EUR",
+        amount: "-100",
+        fee: "1",
+        balance: "400",
+      },
+      {
+        refid: "B1",
+        time: "2026-01-06 10:00:00",
+        type: "receive",
+        subclass: "crypto",
+        asset: "BTC",
+        amount: "0.001",
+      },
+    ]);
+
+    const plan = new KrakenCsvAdapter(instruments, ledger).import(csv);
+
+    await expect(plan).rejects.toBeInstanceOf(KrakenBalanceMismatchError);
+    await expect(plan).rejects.toMatchObject({
+      asset: "EUR",
+      wallet: "spot / main",
+      date: "2026-01-06 10:00:00 UTC",
+    });
+    expect(ledger.appended).toEqual([]);
+    expect(instruments.upserted).toEqual([]);
   });
 });

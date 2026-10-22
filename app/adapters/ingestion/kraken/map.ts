@@ -14,7 +14,7 @@ import { atOrBefore } from "~/core/series";
 
 import { cryptoInstrumentId } from "../crypto-id";
 import type { DiscardReason, MappedItem } from "../ingest";
-import type { KrakenRow } from "./row";
+import { parseTime, type KrakenRow } from "./row";
 
 function discard(
   reason: DiscardReason,
@@ -82,10 +82,6 @@ function cryptoInstrument(code: string, name: string): Instrument {
 }
 
 const BTC = cryptoInstrument("BTC", "Bitcoin");
-
-function parseTime(time: string): Date {
-  return new Date(`${time.replace(" ", "T")}Z`);
-}
 
 function isFiat(row: KrakenRow): boolean {
   return row.subclass === "fiat";
