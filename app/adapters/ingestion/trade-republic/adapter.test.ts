@@ -347,3 +347,52 @@ describe("TradeRepublicCsvAdapter with a row in another currency", () => {
     expect(ledger.appended).toEqual([]);
   });
 });
+
+describe("TradeRepublicCsvAdapter with crypto", () => {
+  const CRYPTO_CSV = [
+    HEADER,
+    `"2026-01-02T05:30:00Z","CASH","BENEFITS_SAVEBACK","","Bitcoin","BTC","","","2.000000","","-0.380000","EUR","s-btc"`,
+    `"2026-01-05T09:00:00Z","TRADING","BUY","CRYPTO","Bitcoin","BTC","0.00003","54000","-1.62","","","EUR","b-btc"`,
+    `"2026-02-02T05:30:00Z","CASH","BENEFITS_SAVEBACK","","Bitcoin","XF000BTC0017","","","2.000000","","-0.380000","EUR","s-bad"`,
+    `"2026-02-05T09:00:00Z","TRADING","BUY","CRYPTO","Bitcoin","XF000BTC0017","0.00003","54000","-1.62","","","EUR","b-bad"`,
+    `"2026-03-01T10:00:00Z","TRADING","SELL","CRYPTO","Bitcoin","XF000BTC0017","0.00001","50000","0.50","","","EUR","t-bad"`,
+    `"2026-03-02T10:00:00Z","TRADING","SELL","CRYPTO","Bitcoin","BTC","0.00001","50000","0.50","","","EUR","t-btc"`,
+  ].join("\n");
+
+  it("books crypto under its asset code, a paired saveback included", async () => {
+    const ledger = new FakeLedgerRepository();
+    await new TradeRepublicCsvAdapter(
+      new FakeInstrumentRepository(),
+      ledger,
+    ).import(CRYPTO_CSV);
+
+    for (const id of ["s-btc", "b-btc", "t-btc"]) {
+      expect(ledger.appended.find((e) => e.externalId === id)).toMatchObject({
+        instrumentId: "BTC",
+      });
+    }
+  });
+
+  it("sets aside each row with an invalid code by name and imports the rest", async () => {
+    const instruments = new FakeInstrumentRepository();
+    const ledger = new FakeLedgerRepository();
+
+    const summary = await new TradeRepublicCsvAdapter(
+      instruments,
+      ledger,
+    ).import(CRYPTO_CSV);
+
+    expect(summary.imported).toBe(2);
+    expect(summary.errors).toBe(0);
+    expect(summary.discarded).toEqual({ "invalid-crypto-code": 2 });
+    expect(
+      summary.discardedDetails["invalid-crypto-code"]?.map((d) => d.instrument),
+    ).toEqual(["XF000BTC0017", "XF000BTC0017"]);
+    expect(instruments.upserted.map((i) => i.id)).toEqual(["BTC"]);
+    expect(ledger.appended.map((e) => e.externalId).sort()).toEqual([
+      "b-btc",
+      "s-btc",
+      "t-btc",
+    ]);
+  });
+});

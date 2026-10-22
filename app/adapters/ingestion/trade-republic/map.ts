@@ -12,6 +12,7 @@ import {
 
 import type { TradeRepublicRow } from "./row";
 
+import { cryptoInstrumentId } from "../crypto-id";
 import type { MappedItem } from "../ingest";
 
 function abs(value: string): string {
@@ -38,9 +39,15 @@ function assetClassToType(assetClass: string): InstrumentType {
   }
 }
 
-function toInstrument(row: TradeRepublicRow): Instrument {
+function instrumentIdOf(row: TradeRepublicRow): string | null {
+  return row.asset_class === "CRYPTO"
+    ? cryptoInstrumentId(row.symbol)
+    : row.symbol;
+}
+
+function toInstrument(row: TradeRepublicRow, id: string): Instrument {
   return instrumentSchema.parse({
-    id: row.symbol,
+    id,
     name: row.name,
     type: assetClassToType(row.asset_class),
     assetClass: row.asset_class || null,
@@ -76,36 +83,55 @@ function base(row: TradeRepublicRow) {
  * discarded as "unsupported" so they surface in the import summary instead of
  * being silently mis-booked.
  */
+function invalidCryptoCode(row: TradeRepublicRow): MappedItem {
+  return {
+    kind: "discard",
+    reason: "invalid-crypto-code",
+    detail: {
+      date: row.datetime,
+      type: row.type,
+      subtype: null,
+      instrument: row.symbol || row.name || null,
+    },
+  };
+}
+
 export function mapRow(row: TradeRepublicRow): MappedItem {
   switch (`${row.category}|${row.type}`) {
     case "TRADING|BUY":
-    case "TRADING|SELL":
+    case "TRADING|SELL": {
+      const id = instrumentIdOf(row);
+      if (id === null) return invalidCryptoCode(row);
       return {
         kind: "domain",
-        instrument: toInstrument(row),
+        instrument: toInstrument(row, id),
         event: tradeEventSchema.parse({
           ...base(row),
           type: row.type,
-          instrumentId: row.symbol,
+          instrumentId: id,
           quantity: abs(row.shares),
           price: row.price,
           grossAmount: abs(row.amount),
           fees: absOrZero(row.fee),
         }),
       };
+    }
 
-    case "CASH|DIVIDEND":
+    case "CASH|DIVIDEND": {
+      const id = instrumentIdOf(row);
+      if (id === null) return invalidCryptoCode(row);
       return {
         kind: "domain",
-        instrument: toInstrument(row),
+        instrument: toInstrument(row, id),
         event: dividendEventSchema.parse({
           ...base(row),
           type: "DIVIDEND",
-          instrumentId: row.symbol,
+          instrumentId: id,
           grossAmount: abs(row.amount),
           taxWithheld: absOrZero(row.tax),
         }),
       };
+    }
 
     case "CASH|INTEREST_PAYMENT":
       return {
@@ -166,6 +192,8 @@ export function mapSavebackPurchase(
   saveback: TradeRepublicRow,
 ): MappedItem[] {
   const purchase = mapRow(buy);
+  if (purchase.kind === "discard" && purchase.reason === "invalid-crypto-code")
+    return [purchase];
   if (purchase.kind !== "domain" || purchase.event.type !== "BUY") {
     throw new Error(
       `Saveback ${saveback.transaction_id} paired with a non-buy`,
@@ -179,7 +207,7 @@ export function mapSavebackPurchase(
       event: dividendEventSchema.parse({
         ...base(saveback),
         type: "DIVIDEND",
-        instrumentId: buy.symbol,
+        instrumentId: purchase.event.instrumentId,
         grossAmount: abs(saveback.amount),
         taxWithheld: new Decimal(absOrZero(saveback.tax))
           .plus(absOrZero(buy.tax))

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import type { DividendEvent, Instrument, TradeEvent } from "~/core/domain";
 import { computeTaxHistory } from "~/core/tax";
+import { mapRow } from "~/adapters/ingestion/trade-republic/map";
+import type { TradeRepublicRow } from "~/adapters/ingestion/trade-republic/row";
 
 import {
   buildTaxYearView,
@@ -345,5 +347,50 @@ describe("taxExclusions", () => {
   it("names nothing when every trade has a rate", () => {
     const events = [trade("BUY", "IE00TEST0001", "1", "100")];
     expect(taxExclusions(events, [])).toEqual([]);
+  });
+});
+
+describe("crypto from Trade Republic in the tax view", () => {
+  const trRow = (over: Partial<TradeRepublicRow>): TradeRepublicRow => ({
+    datetime: "2026-01-10T10:00:00.000Z",
+    category: "TRADING",
+    type: "BUY",
+    asset_class: "CRYPTO",
+    name: "Bitcoin",
+    symbol: "BTC",
+    shares: "0.01",
+    price: "60000",
+    amount: "-600",
+    fee: "",
+    tax: "",
+    currency: "EUR",
+    transaction_id: "tr-buy",
+    ...over,
+  });
+
+  it("reaches the tax view as a CRYPTO sale", () => {
+    const mapped = [
+      mapRow(trRow({})),
+      mapRow(
+        trRow({
+          datetime: "2026-05-08T16:39:00.000Z",
+          type: "SELL",
+          price: "50000",
+          amount: "500",
+          transaction_id: "tr-sell",
+        }),
+      ),
+    ].flatMap((item) => (item.kind === "domain" ? [item] : []));
+    const events = mapped.map((item) => item.event);
+    const crypto = mapped.flatMap((item) =>
+      item.instrument ? [item.instrument] : [],
+    );
+
+    const view = buildTaxYearView(events, crypto, 2026);
+
+    expect([...unlistedInstrumentIds(crypto)]).toEqual(["BTC"]);
+    expect(view.sales).toHaveLength(1);
+    expect(view.sales[0]!.name).toBe("Bitcoin");
+    expect(view.computableNet).toBe("-100");
   });
 });

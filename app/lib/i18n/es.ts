@@ -29,6 +29,7 @@ const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
   "crypto-transfer": "Transferencias de BTC",
   "reward-unpriced": "Recompensas de BTC sin precio",
   "fx-unavailable": "Operaciones sin tipo de cambio del día",
+  "invalid-crypto-code": "Cripto con un código de activo no válido",
   "unmodelled-asset": "Activos que Quoin no modela",
   "card-spending": "Pagos con tarjeta",
   "saveback-unpaired": "Saveback sin compra emparejada",
@@ -38,9 +39,10 @@ const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
 const DISCARD_REASON_HELP: Record<DiscardReason, string | null> = {
   "crypto-swap": null,
   "crypto-transfer": null,
-  "reward-unpriced":
-    `No hay precio de BTC de esas fechas, así que estas recompensas no se han registrado y tu posición de BTC no las incluye. En Instrumentos, abre el símbolo de BTC y pulsa «${REDOWNLOAD}» con un rango que llegue a esas fechas. Después vuelve a importar este mismo fichero: lo ya registrado no se duplica.`,
+  "reward-unpriced": `No hay precio de BTC de esas fechas, así que estas recompensas no se han registrado y tu posición de BTC no las incluye. En Instrumentos, abre el símbolo de BTC y pulsa «${REDOWNLOAD}» con un rango que llegue a esas fechas. Después vuelve a importar este mismo fichero: lo ya registrado no se duplica.`,
   "fx-unavailable": `El BCE no tenía tipo para el día de estas operaciones en otra divisa (una de hoy antes de las 16:00, o una divisa que no publica), o no se ha podido consultar, así que no se han importado y no cuentan en sus posiciones. Más tarde, ${REFRESH_RATES} y vuelve a importar este mismo fichero: lo ya registrado no se duplica.`,
+  "invalid-crypto-code":
+    "Quoin identifica cada cripto por su código de activo (BTC, ETH…), el mismo en todos los brókers, para que sus compras y ventas formen una sola posición. Estas filas traían otra cosa en ese lugar, así que no se han importado y su posición no las incluye.",
   "unmodelled-asset": null,
   "card-spending": null,
   "saveback-unpaired":
@@ -1014,8 +1016,7 @@ export const es = {
     fromTarget: "Simula tu plan actual",
     noHistory:
       "Ninguna línea de tu plan tiene histórico de precios, así que no hay nada que remuestrear. Asígnales un símbolo en la columna Símbolo de Instrumentos: al guardarlo se descarga su histórico.",
-    noWindow:
-      `Las líneas de tu plan no comparten ni un solo mes de histórico, así que no hay ventana común que remuestrear. Amplía el histórico más corto en Instrumentos con «${REDOWNLOAD}» y un rango más largo.`,
+    noWindow: `Las líneas de tu plan no comparten ni un solo mes de histórico, así que no hay ventana común que remuestrear. Amplía el histórico más corto en Instrumentos con «${REDOWNLOAD}» y un rango más largo.`,
     thinWindow: {
       title: "Sin cifras todavía: la ventana es demasiado corta",
       body: (months: number, minimum: number, instrument: string): string =>

@@ -21,6 +21,7 @@ const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
   "crypto-transfer": "BTC transfers",
   "reward-unpriced": "BTC rewards without a price",
   "fx-unavailable": "Trades with no exchange rate for their day",
+  "invalid-crypto-code": "Crypto with an invalid asset code",
   "unmodelled-asset": "Assets Quoin does not model",
   "card-spending": "Card payments",
   "saveback-unpaired": "Saveback with no paired purchase",
@@ -30,9 +31,10 @@ const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
 const DISCARD_REASON_HELP: Record<DiscardReason, string | null> = {
   "crypto-swap": null,
   "crypto-transfer": null,
-  "reward-unpriced":
-    `There is no BTC price for those dates, so these rewards were not recorded and your BTC position does not include them. In Instruments, open BTC's symbol and use “${REDOWNLOAD}” with a range that reaches those dates. Then import this same file again: what is already recorded is not duplicated.`,
+  "reward-unpriced": `There is no BTC price for those dates, so these rewards were not recorded and your BTC position does not include them. In Instruments, open BTC's symbol and use “${REDOWNLOAD}” with a range that reaches those dates. Then import this same file again: what is already recorded is not duplicated.`,
   "fx-unavailable": `The ECB had no rate for the day of these trades in another currency (one from today before 16:00, or a currency it does not publish), or could not be reached, so they were not imported and do not count towards their positions. Later, ${REFRESH_RATES} and import this same file again: what is already recorded is not duplicated.`,
+  "invalid-crypto-code":
+    "Quoin identifies each crypto asset by its asset code (BTC, ETH…), the same at every broker, so that its purchases and sales form a single position. These rows carried something else in its place, so they were not imported and their position does not include them.",
   "unmodelled-asset": null,
   "card-spending": null,
   "saveback-unpaired":
@@ -1003,8 +1005,7 @@ export const en: Copy = {
     fromTarget: "Simulates your current plan",
     noHistory:
       "No line of your plan has price history, so there is nothing to resample. Give them a symbol in the Symbol column of Instruments: saving it downloads its history.",
-    noWindow:
-      `The lines of your plan share not a single month of history, so there is no common window to resample. Extend the shortest history in Instruments with “${REDOWNLOAD}” and a longer range.`,
+    noWindow: `The lines of your plan share not a single month of history, so there is no common window to resample. Extend the shortest history in Instruments with “${REDOWNLOAD}” and a longer range.`,
     thinWindow: {
       title: "No figures yet: the window is too short",
       body: (months: number, minimum: number, instrument: string): string =>
@@ -1043,8 +1044,7 @@ export const en: Copy = {
       p90Hint:
         "90th percentile: only one in ten simulations ends above this figure. It is estimated from the fewest paths, so it is the one that moves most when the seed changes.",
       real: (amount: string): string => `${amount} in today's euros`,
-      noReal:
-        `Without CPI data this cannot be expressed in today's euros. To get it, ${REFRESH_CPI}.`,
+      noReal: `Without CPI data this cannot be expressed in today's euros. To get it, ${REFRESH_CPI}.`,
     },
     contributed: (amount: string): string =>
       `Of that, ${amount} comes out of your pocket: what you already hold simulated, plus every contribution over the horizon.`,

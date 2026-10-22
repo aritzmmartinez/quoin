@@ -327,6 +327,7 @@ describe("KrakenCsvAdapter discards", () => {
       "crypto-transfer",
       "reward-unpriced",
       "fx-unavailable",
+      "invalid-crypto-code",
     ]);
   });
 });

@@ -11,6 +11,7 @@ import {
 import type { PriceSnapshot } from "~/core/ports";
 import { atOrBefore } from "~/core/series";
 
+import { cryptoInstrumentId } from "../crypto-id";
 import type { DiscardReason, MappedItem } from "../ingest";
 import type { KrakenRow } from "./row";
 
@@ -60,22 +61,23 @@ export function priceLookupFrom(snapshots: readonly PriceSnapshot[]): PriceAt {
   return (instrumentId, ts) => {
     const history = byInstrument.get(instrumentId);
     if (!history) return null;
-    const close = atOrBefore(
-      history,
-      asOfTime,
-      ts.getTime(),
-      MAX_PRICE_AGE_MS,
-    );
+    const close = atOrBefore(history, asOfTime, ts.getTime(), MAX_PRICE_AGE_MS);
     return close ? { price: close.price, currency: close.currency } : null;
   };
 }
 
-const BTC: Instrument = instrumentSchema.parse({
-  id: "BTC",
-  name: "Bitcoin",
-  type: "CRYPTO",
-  assetClass: "crypto",
-});
+function cryptoInstrument(code: string, name: string): Instrument {
+  const id = cryptoInstrumentId(code);
+  if (id === null) throw new Error(`Not a crypto asset code: "${code}"`);
+  return instrumentSchema.parse({
+    id,
+    name,
+    type: "CRYPTO",
+    assetClass: "crypto",
+  });
+}
+
+const BTC = cryptoInstrument("BTC", "Bitcoin");
 
 function parseTime(time: string): Date {
   return new Date(`${time.replace(" ", "T")}Z`);
@@ -166,7 +168,7 @@ function trade(
       id: crypto.randomUUID(),
       ts: parseTime(fiat.time),
       type,
-      instrumentId: "BTC",
+      instrumentId: BTC.id,
       quantity: btc.toFixed(),
       price: btc.isZero() ? "0" : paid.dividedBy(btc).toFixed(),
       grossAmount: paid.toFixed(),
@@ -192,7 +194,7 @@ function trade(
  */
 function reward(refid: string, row: KrakenRow, priceAt: PriceAt): MappedItem[] {
   const ts = parseTime(row.time);
-  const priced = priceAt("BTC", ts);
+  const priced = priceAt(BTC.id, ts);
   if (priced === null)
     return [{ ...discard("reward-unpriced", row), instrument: BTC }];
 
@@ -207,7 +209,7 @@ function reward(refid: string, row: KrakenRow, priceAt: PriceAt): MappedItem[] {
       id: crypto.randomUUID(),
       ts,
       type: "BUY",
-      instrumentId: "BTC",
+      instrumentId: BTC.id,
       quantity,
       price,
       grossAmount,
@@ -228,7 +230,7 @@ function reward(refid: string, row: KrakenRow, priceAt: PriceAt): MappedItem[] {
       id: crypto.randomUUID(),
       ts,
       type: "DIVIDEND",
-      instrumentId: "BTC",
+      instrumentId: BTC.id,
       grossAmount,
       taxWithheld: "0",
       funding: "IN_KIND",
