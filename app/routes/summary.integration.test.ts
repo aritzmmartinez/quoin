@@ -24,14 +24,12 @@ const instruments: Instrument[] = [
     id: PRICED,
     name: "Synthetic Priced Fund",
     type: "ETF",
-    currency: "EUR",
     thesis: "CORE",
   },
   {
     id: UNPRICED,
     name: "Synthetic Unpriced Fund",
     type: "ETF",
-    currency: "EUR",
     thesis: "CORE",
   },
 ];
@@ -52,7 +50,6 @@ function buy(
     grossAmount,
     fees: "0",
     currency: "EUR",
-    fxToBase: "1",
     account: "trade-republic",
     source: "TR_CSV",
     externalId: `${instrumentId}-${ts}`,

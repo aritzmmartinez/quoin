@@ -16,6 +16,10 @@ import { isHistoryRange, rangeSince } from "~/lib/prices-backfill";
 import { clearQuoteSymbol } from "~/lib/quote-symbol";
 import { checkQuoteAgainstLedger } from "~/lib/symbol-check";
 
+import { ensureRatesNow } from "~/lib/fx-sync.server";
+
+import { announceDatabase } from "./lib/db-target";
+
 const USAGE = `Usage:
   pnpm prices:map <ISIN>                    show the current quote symbol
   pnpm prices:map <ISIN> <SYMBOL> [range]   set the symbol and replace the history
@@ -29,6 +33,7 @@ async function preview(symbol: string, instrumentId: string): Promise<void> {
       await new PrismaLedgerRepository().list(),
       instrumentId,
       symbol,
+      ensureRatesNow,
     );
     if (!check) {
       console.log(
@@ -54,9 +59,19 @@ async function preview(symbol: string, instrumentId: string): Promise<void> {
         "  ⚠ your trades and this symbol's closes disagree: likely the wrong venue or share class.",
       );
     }
-    if (check.foreignCurrency) {
+    if (check.rateSeries === "published") {
       console.log(
-        `  ⚠ quotes in ${check.foreignCurrency}: only EUR histories are valued, so the history will be refused. Pick the EUR line on another venue.`,
+        `  → quotes in ${check.currency}: valued in euros at the ECB rate; the closes above are converted at the rate of each trade's day.`,
+      );
+    }
+    if (check.rateSeries === "none") {
+      console.log(
+        `  ⚠ quotes in ${check.currency}: the ECB publishes no rates for it, so the history will be refused. Pick a line on another venue.`,
+      );
+    }
+    if (check.rateSeries === "unavailable") {
+      console.log(
+        `  ⚠ quotes in ${check.currency}: the ECB could not be reached, so its rates are unknown. Try again later.`,
       );
     }
     console.log(
@@ -73,6 +88,7 @@ async function preview(symbol: string, instrumentId: string): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  announceDatabase();
   const [id, symbolArg] = argv.slice(2);
   if (!id) {
     console.error(USAGE);
@@ -118,15 +134,20 @@ async function main(): Promise<void> {
       instruments: repo,
       prices,
       provider: new YahooMarketDataProvider(),
+      rates: ensureRatesNow,
     },
     { instrumentId: id, symbol: symbolArg, range },
   );
 
   if (!outcome.ok) {
     const why =
-      outcome.reason === "not-eur"
-        ? `history is in ${outcome.currency}; only EUR histories are valued`
-        : "no daily history returned";
+      outcome.reason === "no-rate-series"
+        ? `history is in ${outcome.currency}, which the ECB publishes no rates for`
+        : outcome.reason === "rates-unavailable"
+          ? `history is in ${outcome.currency} and the ECB could not be reached`
+          : outcome.reason === "unavailable"
+            ? "Yahoo could not be reached"
+            : "no daily history returned";
     console.error(`
 ${symbolArg}: ${why}. Nothing was changed.`);
     exit(1);

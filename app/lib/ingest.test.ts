@@ -113,7 +113,8 @@ describe("retryAfterFill", () => {
     first: null,
     last: null,
     currency: "EUR",
-    foreignCurrency: null,
+    noRateSeries: null,
+    ratesUnavailable: null,
     weekly: false,
     unavailable: null,
   });
@@ -123,7 +124,8 @@ describe("retryAfterFill", () => {
     synced: 0,
     stale: 0,
     noQuote: 0,
-    notEur: 0,
+    noRateSeries: 0,
+    ratesUnavailable: [],
     unavailable: [],
   });
 

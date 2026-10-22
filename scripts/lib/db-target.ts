@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -86,5 +87,52 @@ export function assertScratchDatabase(action: string): string {
     );
   }
 
+  return target;
+}
+
+export type DatabaseTarget =
+  | { kind: "ledger" | "scratch" | "other"; path: string }
+  | { kind: "unresolved"; url: string | undefined };
+
+export function classifyDatabase(
+  url = process.env.DATABASE_URL,
+): DatabaseTarget {
+  const path = databasePath(url);
+  if (path === null) return { kind: "unresolved", url };
+  if (isRealDatabase(path)) return { kind: "ledger", path };
+  if (isScratchDatabase(path)) return { kind: "scratch", path };
+  return { kind: "other", path };
+}
+
+const KIND_LABEL = {
+  ledger: "LIVE LEDGER, real trades",
+  scratch: "scratch database",
+} as const;
+
+export function describeDatabase(
+  target: DatabaseTarget,
+  exists: boolean,
+): string {
+  if (target.kind === "unresolved") {
+    const url = target.url ? `"${target.url}"` : "not set";
+    return `Database: DATABASE_URL is ${url}, which does not resolve to a local SQLite file`;
+  }
+
+  const missing = exists ? "" : ", does not exist yet";
+  if (target.kind === "other") {
+    return (
+      `Database: ${target.path} — not the live ledger (${REAL_DATABASE_FILE}) ` +
+      `nor the scratch database (${SCRATCH_DATABASE_FILE})${missing}`
+    );
+  }
+  return `Database: ${target.path} (${KIND_LABEL[target.kind]}${missing})`;
+}
+
+export function announceDatabase(
+  url = process.env.DATABASE_URL,
+): DatabaseTarget {
+  const target = classifyDatabase(url);
+  const exists = target.kind !== "unresolved" && existsSync(target.path);
+  console.error(describeDatabase(target, exists));
   return target;
 }

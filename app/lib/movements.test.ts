@@ -9,7 +9,6 @@ const INSTRUMENTS: Instrument[] = [
     id: "IE00BK5BQT80",
     name: "FTSE All-World",
     type: "ETF",
-    currency: "EUR",
     assetClass: "Equity",
     quoteSymbol: null,
     thesis: "CORE",
@@ -18,7 +17,6 @@ const INSTRUMENTS: Instrument[] = [
 
 const base = {
   currency: "EUR",
-  fxToBase: "1",
   account: "TR",
   source: "trade-republic",
 };
@@ -128,7 +126,10 @@ describe("toMovementRows", () => {
       [
         buy({
           currency: "USD",
-          fxToBase: "0.5",
+          fxSource: "ECB",
+          fxRate: "0.5",
+          fxDirection: "BASE_PER_QUOTE",
+          fxDate: "2025-01-01",
           grossAmount: "100",
           fees: "2",
         }),
@@ -194,5 +195,30 @@ describe("netCashFlow", () => {
 
   it("is zero for no rows", () => {
     expect(netCashFlow([])).toBe("0.00");
+  });
+});
+
+describe("a row with no rate to euros", () => {
+  it("shows no amount, no costs and no price, and says why", () => {
+    const [row] = toMovementRows(
+      [buy({ currency: "USD", fees: "2" })],
+      INSTRUMENTS,
+    );
+    expect(row).toMatchObject({
+      amount: null,
+      costs: null,
+      price: null,
+      quantity: "10",
+      currency: "USD",
+      noRate: true,
+    });
+  });
+
+  it("is left out of the net cash flow instead of counted at 1:1", () => {
+    const rows = toMovementRows(
+      [buy({ id: "b1" }), buy({ id: "b2", currency: "USD" })],
+      INSTRUMENTS,
+    );
+    expect(netCashFlow(rows)).toBe("-896.40");
   });
 });

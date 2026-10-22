@@ -32,7 +32,6 @@ const instrument = (id: string, name: string): Instrument => ({
   id,
   name,
   type: "ETF",
-  currency: "EUR",
   thesis: "CORE",
 });
 

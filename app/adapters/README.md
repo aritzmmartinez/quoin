@@ -13,6 +13,7 @@ Contents:
 - `identity/`    `OpenFigiIdentityResolver` behind the `SecurityIdentityResolver` port; maps an ISIN or a venue-qualified ticker to a share-class FIGI so the same company stops being two leaves
 - `inflation/`   `ine/`, the monthly consumer price index from INE's Tempus3 API (national and Bizkaia); the fetch is one file and `parseIneSeries` is another, pure and tested without a network. The levels land through `InflationRepository`, implemented in `persistence/`
 - `fx/`          (planned) exchange rates for non-EUR quotes (e.g. ECB / `EURUSD=X`)
+- `http/`        `withTimeout`, the one bound every provider request goes through
 
 ## holdings/ — no per-issuer branch
 

@@ -19,8 +19,8 @@ import {
   taxYearOf,
   type RealizedGainDetail,
 } from "~/core/tax";
-import { unlistedInstrumentIds } from "~/lib/tax";
-import { databasePath } from "./lib/db-target";
+import { taxExclusions, unlistedInstrumentIds } from "~/lib/tax";
+import { announceDatabase } from "./lib/db-target";
 
 const YEAR = Number(
   process.argv.find((a) => /^\d{4}$/.test(a)) ??
@@ -91,13 +91,23 @@ function printSale(gain: RealizedGainDetail, names: Map<string, string>): void {
 }
 
 async function main(): Promise<void> {
-  console.log(`Database: ${databasePath() ?? "(unset)"}\n`);
+  announceDatabase();
 
   const [events, instruments] = await Promise.all([
     new PrismaLedgerRepository().list(),
     new PrismaInstrumentRepository().list(),
   ]);
   const names = new Map(instruments.map((i) => [i.id, i.name]));
+
+  const excluded = taxExclusions(events, instruments);
+  if (excluded.length > 0) {
+    console.log(
+      `! No exchange rate: ${excluded.join(", ")}.\n` +
+        "  Their trades could not be converted to euros and are not part of\n" +
+        "  this calculation. Check them before using these figures in a tax\n" +
+        "  return.\n",
+    );
+  }
 
   const history = computeTaxHistory(events, {
     unlistedInstrumentIds: unlistedInstrumentIds(instruments),

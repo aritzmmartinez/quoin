@@ -1,4 +1,11 @@
-import type { Instrument, LedgerEvent } from "~/core/domain";
+import { dayOf } from "~/core/calendar";
+import {
+  fxSourceSchema,
+  isUnconvertedForeign,
+  ledgerEventWriteSchema,
+  type Instrument,
+  type LedgerEvent,
+} from "~/core/domain";
 import {
   ledgerDedupKey,
   type InstrumentRepository,
@@ -6,6 +13,7 @@ import {
 } from "~/core/ports";
 
 import type { DiscardDetail, DiscardReason } from "./discard";
+import { noRates, type RateAt } from "./fx";
 
 export type { DiscardDetail, DiscardReason } from "./discard";
 
@@ -29,6 +37,7 @@ export interface MappedBatch {
   discarded: DiscardCounts;
   discardedDetails: DiscardDetails;
   errors: number;
+  ratesNeeded: Map<string, string>;
 }
 
 export interface ImportSummary {
@@ -41,7 +50,23 @@ export interface ImportSummary {
   instruments: number;
 }
 
+export class InvalidLedgerEventError extends Error {
+  constructor(
+    readonly date: string,
+    readonly type: string,
+    readonly currency: string,
+  ) {
+    super(
+      `A ${type} on ${date} in ${currency} breaks the ledger's FX rule; nothing was imported`,
+    );
+    this.name = "InvalidLedgerEventError";
+  }
+}
+
 export class BatchBuilder {
+  constructor(private readonly rateAt: RateAt = noRates) {}
+
+  private invalid: InvalidLedgerEventError | null = null;
   private readonly events: LedgerEvent[] = [];
   private readonly operationOf: number[] = [];
   private operations = 0;
@@ -49,6 +74,7 @@ export class BatchBuilder {
   private readonly discarded: DiscardCounts = {};
   private readonly discardedDetails: DiscardDetails = {};
   private errors = 0;
+  private readonly ratesNeeded = new Map<string, string>();
 
   add(item: MappedItem): void {
     this.addOperation([item]);
@@ -57,7 +83,45 @@ export class BatchBuilder {
   addOperation(items: readonly MappedItem[]): void {
     const operation = this.operations;
     this.operations += 1;
-    for (const item of items) this.addItem(item, operation);
+
+    const converted: MappedItem[] = [];
+    for (const item of items) {
+      if (item.kind !== "domain" || !isUnconvertedForeign(item.event)) {
+        converted.push(item);
+        continue;
+      }
+      const rate = this.rateAt(item.event.currency, item.event.ts);
+      if (rate === null) {
+        this.needRate(item.event.currency, dayOf(item.event.ts));
+        this.addItem(unratedDiscard(item), operation);
+        return;
+      }
+      converted.push({
+        ...item,
+        event: {
+          ...item.event,
+          fxSource: fxSourceSchema.parse(rate.source),
+          fxRate: rate.rate,
+          fxDirection: "QUOTE_PER_BASE",
+          fxDate: rate.day,
+        },
+      });
+    }
+
+    for (const item of converted) {
+      if (
+        item.kind === "domain" &&
+        this.invalid === null &&
+        !ledgerEventWriteSchema.safeParse(item.event).success
+      ) {
+        this.invalid = new InvalidLedgerEventError(
+          dayOf(item.event.ts),
+          item.event.type,
+          item.event.currency,
+        );
+      }
+      this.addItem(item, operation);
+    }
   }
 
   private addItem(item: MappedItem, operation: number): void {
@@ -80,11 +144,17 @@ export class BatchBuilder {
     this.operationOf.push(operation);
   }
 
+  private needRate(currency: string, day: string): void {
+    const held = this.ratesNeeded.get(currency);
+    if (held === undefined || day < held) this.ratesNeeded.set(currency, day);
+  }
+
   addError(): void {
     this.errors += 1;
   }
 
   build(total: number): MappedBatch {
+    if (this.invalid) throw this.invalid;
     return {
       total,
       instruments: [...this.instruments.values()],
@@ -93,8 +163,26 @@ export class BatchBuilder {
       discarded: this.discarded,
       discardedDetails: this.discardedDetails,
       errors: this.errors,
+      ratesNeeded: this.ratesNeeded,
     };
   }
+}
+
+function unratedDiscard(
+  item: Extract<MappedItem, { kind: "domain" }>,
+): MappedItem {
+  const { event } = item;
+  const name = item.instrument?.name ?? null;
+  return {
+    kind: "discard",
+    reason: "fx-unavailable",
+    detail: {
+      date: event.ts.toISOString(),
+      type: event.type,
+      subtype: null,
+      instrument: name ? `${name} (${event.currency})` : event.currency,
+    },
+  };
 }
 
 export function countOperations(

@@ -32,7 +32,6 @@ function trade(
     grossAmount,
     fees: opts.fees ?? "0",
     currency: "EUR",
-    fxToBase: "1",
     account: "test",
     source: "TEST",
   };

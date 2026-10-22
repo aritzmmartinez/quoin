@@ -20,7 +20,6 @@ const instrument = (over: Partial<Instrument> = {}): Instrument => ({
   id: "IE00BK5BQT80",
   name: "FTSE All-World",
   type: "ETF",
-  currency: "EUR",
   assetClass: "FUND",
   quoteSymbol: null,
   exposureKind: null,
@@ -456,7 +455,6 @@ describe("one contribution per instrument", () => {
     grossAmount: gross,
     fees: "0",
     currency: "EUR",
-    fxToBase: "1",
     account: "test",
     source: "TEST",
   });

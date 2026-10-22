@@ -6,6 +6,7 @@ import {
   type Revalue,
   type TradeEvent,
 } from "../domain";
+import { baseOf, bookable } from "../fx";
 
 export interface FifoLot {
   id: string;
@@ -63,7 +64,7 @@ function compareText(a: string, b: string): number {
 }
 
 export function sortTrades(events: readonly LedgerEvent[]): TradeEvent[] {
-  return events.filter(isTrade).sort(compareTrades);
+  return bookable(events).filter(isTrade).sort(compareTrades);
 }
 
 export function walkFifo(
@@ -85,14 +86,8 @@ export function walkFifo(
     }
 
     const quantity = new Decimal(trade.quantity);
-    const gross = restate(
-      Money.fromString(trade.grossAmount).scaleBy(trade.fxToBase),
-      trade.ts,
-    );
-    const fees = restate(
-      Money.fromString(trade.fees).scaleBy(trade.fxToBase),
-      trade.ts,
-    );
+    const gross = restate(baseOf(trade, "grossAmount"), trade.ts);
+    const fees = restate(baseOf(trade, "fees"), trade.ts);
 
     if (trade.type === "BUY") {
       const unitCost = quantity.isZero()

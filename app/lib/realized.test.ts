@@ -40,7 +40,6 @@ describe("toRealizedRows", () => {
         id: "X",
         name: "Fondo Global",
         type: "ETF" as const,
-        currency: "EUR",
         thesis: "CORE" as const,
       },
     ];

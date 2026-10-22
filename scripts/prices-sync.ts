@@ -4,14 +4,19 @@ import { exit } from "node:process";
 
 import { prisma } from "~/adapters/persistence";
 import { inTurn } from "~/lib/in-turn";
+import { describeFailure } from "~/lib/describe-failure";
 import {
   failedSync,
+  haltsSync,
   syncInstrumentPrices,
   syncProblemOf,
 } from "~/lib/prices-sync";
 import { defaultDeps, syncTargets } from "~/lib/prices-sync.server";
 
+import { announceDatabase } from "./lib/db-target";
+
 async function main(): Promise<void> {
+  announceDatabase();
   const { targets, unmapped } = await syncTargets();
 
   console.log(
@@ -36,6 +41,7 @@ async function main(): Promise<void> {
     (target) => syncInstrumentPrices(deps, target),
     {
       onError: (error, target) => {
+        if (haltsSync(error)) throw error;
         console.error(
           `  ${target.id}  failed: ${error instanceof Error ? error.message : String(error)}`,
         );
@@ -65,10 +71,7 @@ async function main(): Promise<void> {
 
 main()
   .catch((error: unknown) => {
-    console.error(
-      "\nPrice sync failed:",
-      error instanceof Error ? error.message : error,
-    );
+    console.error("\nPrice sync stopped:", describeFailure(error));
     exit(1);
   })
   .finally(() => prisma.$disconnect());

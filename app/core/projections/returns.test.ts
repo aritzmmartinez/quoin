@@ -15,7 +15,6 @@ function trade(
     type: "BUY",
     instrumentId: "VWCE",
     currency: "EUR",
-    fxToBase: "1",
     account: "trade-republic",
     source: "trade-republic",
     price: "0",

@@ -7,6 +7,7 @@ import {
   type Revalue,
   type TradeEvent,
 } from "../domain";
+import { baseOf, bookable } from "../fx";
 import type { InvestedVsValuePoint } from "./invested-vs-value";
 import { xirr, YEAR_MS, type CashFlow } from "./xirr";
 
@@ -59,12 +60,10 @@ export function computeTotalContributed(
   revalue?: Revalue,
 ): string {
   let total = Money.zero();
-  for (const e of events) {
+  for (const e of bookable(events)) {
     if (e.type !== "BUY" || isInKind(e)) continue;
     const paid = Money.fromString(
-      baseAmount(e.grossAmount, e.fxToBase)
-        .plus(baseAmount(e.fees, e.fxToBase))
-        .toString(),
+      baseAmount(e, "grossAmount").plus(baseAmount(e, "fees")).toString(),
     );
     total = total.add(revalue ? revalue(paid, e.ts) : paid);
   }
@@ -84,8 +83,8 @@ function isTrade(e: LedgerEvent): e is TradeEvent {
   return e.type === "BUY" || e.type === "SELL";
 }
 
-function baseAmount(value: string, fxToBase: string): Decimal {
-  return new Decimal(value).mul(fxToBase);
+function baseAmount(trade: TradeEvent, field: "grossAmount" | "fees"): Decimal {
+  return new Decimal(baseOf(trade, field).toString());
 }
 
 export function computeReturns(
@@ -94,7 +93,7 @@ export function computeReturns(
   currentPrice: string | null,
   now: Date = new Date(),
 ): ReturnsSummary {
-  const trades = events
+  const trades = bookable(events)
     .filter(isTrade)
     .filter((t) => t.instrumentId === instrumentId)
     .slice()
@@ -104,9 +103,7 @@ export function computeReturns(
 
   const totalInvested = buys.reduce(
     (sum, b) =>
-      sum
-        .plus(baseAmount(b.grossAmount, b.fxToBase))
-        .plus(baseAmount(b.fees, b.fxToBase)),
+      sum.plus(baseAmount(b, "grossAmount")).plus(baseAmount(b, "fees")),
     new Decimal(0),
   );
   const buyCount = buys.length;
@@ -128,7 +125,7 @@ export function computeReturns(
       t: t.ts.getTime(),
       price: new Decimal(t.quantity).isZero()
         ? new Decimal(0)
-        : baseAmount(t.grossAmount, t.fxToBase).div(t.quantity),
+        : baseAmount(t, "grossAmount").div(t.quantity),
     }));
     marks.push({ t: now.getTime(), price });
 
@@ -155,8 +152,8 @@ export function computeReturns(
     const flows: CashFlow[] = [];
     for (const t of trades) {
       if (isInKind(t)) continue;
-      const gross = baseAmount(t.grossAmount, t.fxToBase);
-      const fees = baseAmount(t.fees, t.fxToBase);
+      const gross = baseAmount(t, "grossAmount");
+      const fees = baseAmount(t, "fees");
       if (t.type === "BUY") {
         flows.push({ t: t.ts.getTime(), amount: -gross.plus(fees).toNumber() });
       } else {
@@ -202,11 +199,11 @@ interface PortfolioFlow {
 }
 
 function portfolioFlows(events: readonly LedgerEvent[]): PortfolioFlow[] {
-  return events
+  return bookable(events)
     .filter(isTrade)
     .map((t) => {
-      const gross = baseAmount(t.grossAmount, t.fxToBase);
-      const fees = baseAmount(t.fees, t.fxToBase);
+      const gross = baseAmount(t, "grossAmount");
+      const fees = baseAmount(t, "fees");
       const inKind = isInKind(t);
       return t.type === "BUY"
         ? { t: t.ts.getTime(), gross, net: gross.plus(fees).neg(), inKind }

@@ -1,12 +1,14 @@
 import Decimal from "decimal.js";
 
 import { isFreshQuote } from "~/adapters/marketdata";
+import { dayOf, shiftDay } from "~/core/calendar";
 import {
+  Amount,
   BASE_CURRENCY,
-  foreignCurrency,
   type LedgerEvent,
   type TradeEvent,
 } from "~/core/domain";
+import { baseOf, bookingRate, hasRate, type RateBook } from "~/core/fx";
 import type {
   HistoryRange,
   HistorySpan,
@@ -14,12 +16,16 @@ import type {
   Quote,
 } from "~/core/ports";
 import { computePositions } from "~/core/projections";
+import { atOrBefore } from "~/core/series";
+
+import { rateSeriesOf, type EnsureRates, type RateSeries } from "./fx-sync";
 
 export const TRADE_CHECKS = 3;
 export const TRADE_DEVIATION_LIMIT = "0.1";
 const LOOKBACK_MS = 7 * 86_400_000;
 const REWARD_NOTE = "kraken-reward";
 export const DAILY_HISTORY_PROBE: HistoryRange = "1y";
+export const RATE_PROBE_DAYS = 30;
 
 export interface TradeMark {
   ts: Date;
@@ -44,7 +50,7 @@ export interface SymbolCheck {
   quantity: string;
   impliedValue: string;
   closed: boolean;
-  foreignCurrency: string | null;
+  rateSeries: RateSeries;
   dailyHistory: boolean;
   trades: TradeComparison[];
   tradesAsked: number;
@@ -58,6 +64,9 @@ export function checkSymbol(
   trades: TradeComparison[] = [],
   tradesAsked = trades.length,
   dailyHistory = true,
+  rateSeries: RateSeries = quote.currency === BASE_CURRENCY
+    ? "base"
+    : "published",
 ): SymbolCheck {
   const held = new Decimal(quantity);
 
@@ -71,7 +80,7 @@ export function checkSymbol(
     quantity: held.toString(),
     impliedValue: new Decimal(quote.price).mul(held).toFixed(2),
     closed: held.isZero(),
-    foreignCurrency: foreignCurrency([quote]),
+    rateSeries,
     dailyHistory,
     trades,
     tradesAsked,
@@ -87,7 +96,7 @@ function isComparableTrade(
     (event.type === "BUY" || event.type === "SELL") &&
     event.instrumentId === instrumentId &&
     event.note !== REWARD_NOTE &&
-    event.currency === BASE_CURRENCY &&
+    hasRate(event) &&
     new Decimal(event.quantity).gt(0)
   );
 }
@@ -103,7 +112,7 @@ export function recentTradeMarks(
     .slice(0, count)
     .map((trade) => ({
       ts: trade.ts,
-      price: new Decimal(trade.grossAmount)
+      price: new Decimal(baseOf(trade, "grossAmount").toString())
         .div(trade.quantity)
         .toDecimalPlaces(6)
         .toString(),
@@ -119,26 +128,45 @@ export function tradeSpan(marks: readonly TradeMark[]): HistorySpan | null {
   };
 }
 
+function closeInBase(
+  candle: Quote,
+  book: RateBook,
+  tradedAt: Date,
+): string | null {
+  if (candle.currency === BASE_CURRENCY) return candle.price;
+  const rate = bookingRate(book, candle.currency, dayOf(tradedAt));
+  if (rate === null) return null;
+  return Amount.of(candle.price, candle.currency)
+    .inBase(rate.rate, "QUOTE_PER_BASE")
+    .toString();
+}
+
 export function compareTrades(
   marks: readonly TradeMark[],
   candles: readonly Quote[],
+  book: RateBook = new Map(),
 ): TradeComparison[] {
-  const sorted = [...candles].sort(
-    (a, b) => a.asOf.getTime() - b.asOf.getTime(),
-  );
+  const asOfTime = (quote: Quote) => quote.asOf.getTime();
+  const sorted = [...candles].sort((a, b) => asOfTime(a) - asOfTime(b));
   const limit = new Decimal(TRADE_DEVIATION_LIMIT);
 
   return marks.flatMap((mark) => {
-    const at = mark.ts.getTime();
-    const candle = sorted.filter((c) => c.asOf.getTime() <= at).at(-1);
-    if (!candle || at - candle.asOf.getTime() > LOOKBACK_MS) return [];
+    const candle = atOrBefore(
+      sorted,
+      asOfTime,
+      mark.ts.getTime(),
+      LOOKBACK_MS,
+    );
+    if (!candle) return [];
+    const close = closeInBase(candle, book, mark.ts);
+    if (close === null) return [];
 
-    const deviation = new Decimal(candle.price).div(mark.price).minus(1);
+    const deviation = new Decimal(close).div(mark.price).minus(1);
     return [
       {
         ts: mark.ts.toISOString(),
         traded: mark.price,
-        close: candle.price,
+        close: new Decimal(close).toDecimalPlaces(6).toString(),
         deviation: deviation.toDecimalPlaces(6).toString(),
         off: deviation.abs().gt(limit),
       },
@@ -166,26 +194,39 @@ export async function checkQuoteAgainstLedger(
   events: readonly LedgerEvent[],
   instrumentId: string,
   symbol: string,
+  rates: EnsureRates,
   now?: Date,
 ): Promise<SymbolCheck | null> {
   const quote = await provider.getQuote(symbol);
   if (!quote) return null;
 
-  const foreign = foreignCurrency([quote]) !== null;
   const marks = recentTradeMarks(events, instrumentId);
   const span = tradeSpan(marks);
+  const ensured = await rates(
+    new Map([
+      [
+        quote.currency,
+        span
+          ? dayOf(span.from)
+          : shiftDay(dayOf(now ?? new Date()), -RATE_PROBE_DAYS),
+      ],
+    ]),
+  );
+  const rateSeries = rateSeriesOf(ensured, quote.currency);
+  const valued = rateSeries === "base" || rateSeries === "published";
   const candles =
-    span && !foreign ? await provider.getHistory(symbol, span) : [];
+    span && valued ? await provider.getHistory(symbol, span) : [];
   const dailyHistory =
-    foreign || candles.length > 0 || (await hasDailyHistory(provider, symbol));
+    candles.length > 0 || (await hasDailyHistory(provider, symbol));
 
   return checkSymbol(
     quote,
     heldQuantity(computePositions([...events]), instrumentId),
     now,
-    compareTrades(marks, candles),
+    compareTrades(marks, candles, ensured.book),
     marks.length,
     dailyHistory,
+    rateSeries,
   );
 }
 

@@ -11,7 +11,6 @@ export interface PortfolioRow {
   name: string;
   type: InstrumentType | null;
   thesis: Thesis;
-  currency: string | null;
   assetClass: string | null;
   quantity: string;
   averageCost: string;
@@ -96,7 +95,6 @@ export function toPortfolioRows(
         name: instrument?.name ?? p.instrumentId,
         type: instrument?.type ?? null,
         thesis: instrument?.thesis ?? "CORE",
-        currency: instrument?.currency ?? null,
         assetClass: instrument?.assetClass ?? null,
         quantity: p.quantity,
         averageCost: p.averageCost,

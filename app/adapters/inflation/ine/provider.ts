@@ -1,8 +1,11 @@
-import type { InflationPoint } from "~/core/ports";
+import { type InflationPoint, InflationUnavailableError } from "~/core/ports";
+
+import { withTimeout } from "~/adapters/http";
 
 import { deriveBaseYear, parseIneSeries } from "./parse";
 
 const BASE = "https://servicios.ine.es/wstempus/js/ES/DATOS_SERIE";
+export const INE_TIMEOUT_MS = 20_000;
 
 const ALL_POINTS = 1000;
 
@@ -25,19 +28,40 @@ export const SERIES_IDS = Object.keys(INE_SERIES) as SeriesId[];
 
 export const DEFAULT_SERIES: SeriesId = "ES";
 
+export interface IneOptions {
+  timeoutMs?: number;
+}
+
 export class IneInflationProvider {
   readonly source = "INE";
+
+  private readonly timeoutMs: number;
+
+  constructor(options: IneOptions = {}) {
+    this.timeoutMs = options.timeoutMs ?? INE_TIMEOUT_MS;
+  }
 
   async getSeries(series: SeriesId): Promise<InflationPoint[]> {
     const cod = INE_SERIES[series];
     const url = `${BASE}/${cod}?nult=${ALL_POINTS}`;
 
-    const res = await fetch(url);
-    if (!res.ok) {
-      throw new Error(`INE returned ${res.status} for ${series} (${cod})`);
+    let body: unknown;
+    try {
+      body = await withTimeout(this.timeoutMs, async (signal) => {
+        const res = await fetch(url, { signal });
+        if (!res.ok) throw new InflationUnavailableError(series, res.status);
+        try {
+          return (await res.json()) as unknown;
+        } catch (cause) {
+          throw new InflationUnavailableError(series, res.status, { cause });
+        }
+      });
+    } catch (cause) {
+      if (cause instanceof InflationUnavailableError) throw cause;
+      throw new InflationUnavailableError(series, null, { cause });
     }
 
-    const points = parseIneSeries(await res.json());
+    const points = parseIneSeries(body);
     if (points.length === 0) {
       throw new Error(`INE returned no usable data for ${series} (${cod})`);
     }

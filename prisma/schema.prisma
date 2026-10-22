@@ -13,7 +13,6 @@ model Instrument {
   id         String   @id
   name       String
   type       String // ETF | STOCK | CRYPTO | BOND | COMMODITY | ...
-  currency   String // ISO 4217 (instrument's denomination currency)
   assetClass String? // from TR: FUND | STOCK | CRYPTO | SYNTHETIC ...
   quoteSymbol String? // provider symbol for price quotes (e.g. "VWCE.DE"); set manually, never from ingestion
   exposureKind   String? // COMPANY | EQUITY_FUND | BOND_FUND | COMMODITY | CRYPTO; set manually, never from ingestion
@@ -65,8 +64,21 @@ model LedgerEntry {
   fees        String  @default("0")
   taxWithheld String  @default("0")
 
-  currency String // operation currency (ISO 4217)
-  fxToBase String  @default("1") // rate to EUR at operation time
+  currency String // the currency grossAmount, fees and taxWithheld are in
+
+  /// How `grossAmount` (in `currency`) becomes euros, frozen when the row is
+  /// booked: IDENTITY | BROKER | ECB | MARKET | MANUAL, CHECK-constrained to those
+  /// values in migration SQL. Which source fits which currency and rate is the
+  /// domain's rule, enforced when a row is written (`ledgerEventWriteSchema`), not
+  /// here: older ledgers may hold rows that break it.
+  fxSource    String  @default("IDENTITY")
+  fxDate      String? // "YYYY-MM-DD", the source's day for `fxRate`
+  fxRate      String? // the rate exactly as published
+  fxDirection String? // QUOTE_PER_BASE (the ECB's: currency per euro) | BASE_PER_QUOTE
+  /// The amount and currency the broker quoted the operation in, when it settled
+  /// in another one. Informational: nothing fiscal reads them.
+  originalAmount   String?
+  originalCurrency String?
 
   /// CASH | IN_KIND — CHECK-constrained in migration SQL, same reason as `type`.
   /// IN_KIND on a BUY: units that arrived without money leaving the bank (a
@@ -146,6 +158,46 @@ model InflationIndex {
 /// records the question (did we ask?), not the answer (did data change?).
 model InflationSync {
   series    String   @id
+  checkedAt DateTime
+}
+
+/// When each instrument's prices were last asked for. Same reason as
+/// InflationSync: PriceSnapshot.createdAt only moves when a row is written.
+/// No foreign key, like FxSync: it records a question, not a fact of the
+/// instrument.
+model PriceSync {
+  instrumentId String   @id
+  checkedAt    DateTime
+}
+
+/// A published exchange rate: units of `quote` per one `base`, for one day,
+/// exactly as the source printed it.
+///
+/// A cache, not a fact of the portfolio: every ledger row freezes the rate it
+/// was booked at, so a booked amount never reads from here again. Valuation
+/// does, to put a price quoted in another currency into euros, and so does an
+/// import, to book a row. A rate that
+/// arrives different for a day already stored is still refused and reported,
+/// never overwritten: the cache must not change in silence, and the next
+/// import would book at the new figure.
+model FxRate {
+  id     String @id @default(uuid())
+  base   String // "EUR"
+  quote  String // "USD", or a stablecoin code: not limited to ISO 4217
+  day    String // "YYYY-MM-DD", the source's reference date
+  rate   String // decimal string, never a float
+  source String // "ECB"
+
+  createdAt DateTime @default(now())
+
+  @@unique([source, base, quote, day])
+  @@index([quote])
+}
+
+/// When each rate series was last asked for, found anything or not. Same
+/// reason as InflationSync.
+model FxSync {
+  series    String   @id // "ECB:EUR:USD"
   checkedAt DateTime
 }
 

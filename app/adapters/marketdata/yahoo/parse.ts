@@ -1,4 +1,21 @@
+import Decimal from "decimal.js";
+
 import type { Quote } from "~/core/ports";
+
+const MINOR_UNITS: Readonly<Record<string, string>> = {
+  GBp: "GBP",
+  ZAc: "ZAR",
+  ILA: "ILS",
+};
+
+export function inMajorUnit(
+  price: string,
+  currency: string,
+): { price: string; currency: string } {
+  const major = MINOR_UNITS[currency];
+  if (major === undefined) return { price, currency };
+  return { price: new Decimal(price).div(100).toFixed(), currency: major };
+}
 
 interface YahooChartResponse {
   chart?: {
@@ -46,8 +63,7 @@ export function parseYahooChart(json: unknown, symbol: string): Quote | null {
 
   return {
     symbol,
-    price: regularMarketPrice.toFixed(6),
-    currency,
+    ...inMajorUnit(regularMarketPrice.toFixed(6), currency),
     asOf: new Date(regularMarketTime * 1000),
     ...(name ? { name } : {}),
   };
@@ -77,8 +93,7 @@ export function parseYahooChartHistory(json: unknown, symbol: string): Quote[] {
     }
     quotes.push({
       symbol,
-      price: close.toFixed(6),
-      currency,
+      ...inMajorUnit(close.toFixed(6), currency),
       asOf: new Date(timestamp * 1000),
     });
   }

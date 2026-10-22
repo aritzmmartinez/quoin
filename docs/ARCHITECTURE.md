@@ -211,8 +211,9 @@ The fold is over **contributions, never over leaves**: one company held directly
 through a hedged fund is one leaf and two different currency exposures, so folding at the
 leaf would have to pick one. Hedging is a property of the vehicle and is in no market data
 — `Instrument.hedgedToBase` is set by hand and excluded from `InstrumentWriteData`, like
-`ter`. There is no FX and none is needed: every amount is already EUR by the valuation
-invariant, so this labels and sums, it never converts.
+`ter`. This view converts nothing: valuation has already put every price in euros at the
+ECB rate (`pricesInBase`), so it labels and sums, and the currency it reports comes from
+the leaf, never from the currency the quote line trades in.
 
 #### Fund overlap: `Σ min(weight)`, and the residual never crosses
 
@@ -320,7 +321,7 @@ trust nobody earned.
 ```bash
 cp .env.example .env    # DATABASE_URL -> data/quoin.sqlite
 pnpm install            # builds better-sqlite3 + generates the client (postinstall)
-pnpm run db:migrate     # creates the database and the first migration
+pnpm run db:deploy      # creates the database and applies every migration
 pnpm run db:studio      # (optional) GUI to inspect the data
 ```
 

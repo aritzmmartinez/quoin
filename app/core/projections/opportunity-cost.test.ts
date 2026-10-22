@@ -29,7 +29,6 @@ function trade(
     grossAmount,
     fees,
     currency: "EUR",
-    fxToBase: "1",
     account: "test",
     source: "test",
   };
@@ -152,10 +151,12 @@ describe("computeOpportunityCost", () => {
     );
 
     expect(result.truncated).toEqual({
-      earliestDay: "2025-01-15",
-      excludedFlowCount: 1,
-      excludedAmount: "402",
+      firstDay: "2025-01-15",
+      count: 1,
+      amount: "402",
     });
+    expect(result.stale).toBeNull();
+    expect(result.gaps).toBeNull();
     expect(result.benchmarkValue).toBe("1500");
     expect(lineFor(result, "OLD")?.contributed).toBe("1407");
   });
@@ -175,14 +176,23 @@ describe("computeOpportunityCost", () => {
     expect(result.benchmarkValue).toBe("1500");
   });
 
-  it("treats a quote in another currency as no price at all", () => {
-    const result = run(
-      [trade("BUY", "USD", "2025-01-15T10:00:00Z", "10", "1000", "5")],
-      new Map([["USD", { price: "150", currency: "USD" }]]),
-    );
+  it("throws on a quote in another currency, which pricesInBase converts first", () => {
+    expect(() =>
+      run(
+        [trade("BUY", "USD", "2025-01-15T10:00:00Z", "10", "1000", "5")],
+        new Map([["USD", { price: "150", currency: "USD" }]]),
+      ),
+    ).toThrow(/pricesInBase/);
+  });
 
-    expect(result.unpricedInstrumentIds).toEqual(["USD"]);
-    expect(result.realValue).toBe("0");
+  it("throws on a benchmark close in another currency, which historyInBase converts first", () => {
+    expect(() =>
+      run(
+        [trade("BUY", "PRICED", "2025-01-15T10:00:00Z", "10", "1000", "5")],
+        prices({ PRICED: "150" }),
+        [{ ...close("2025-01-15T17:30:00Z", "100"), currency: "USD" }],
+      ),
+    ).toThrow(/historyInBase/);
   });
 
   it("buys at the close of the trade's Madrid day, not its UTC day", () => {
@@ -201,6 +211,57 @@ describe("computeOpportunityCost", () => {
     );
 
     expect(result.benchmarkValue).toBe("1200");
+  });
+
+  it("buys at its own day's close even when that close comes after the purchase", () => {
+    const result = run(
+      [trade("BUY", "MORNING", "2025-03-17T08:00:00Z", "10", "1000", "0")],
+      prices({ MORNING: "0" }),
+    );
+
+    expect(result.benchmarkValue).toBe("1200");
+  });
+
+  it("still buys on a close exactly a week before the purchase", () => {
+    const result = run(
+      [trade("BUY", "WEEK", "2025-03-24T10:00:00Z", "10", "1000", "0")],
+      prices({ WEEK: "0" }),
+    );
+
+    expect(result.benchmarkValue).toBe("1200");
+    expect(result.gaps).toBeNull();
+  });
+
+  it("sets aside a purchase in a gap of more than a week inside the history", () => {
+    const result = run(
+      [
+        trade("BUY", "GAP", "2025-03-25T10:00:00Z", "10", "1000", "0"),
+        trade("BUY", "GAP", "2025-04-30T10:00:00Z", "5", "600", "2"),
+      ],
+      prices({ GAP: "0" }),
+    );
+
+    expect(result.gaps).toEqual({ count: 2, amount: "1602" });
+    expect(result.truncated).toBeNull();
+    expect(result.stale).toBeNull();
+    expect(result.benchmarkValue).toBe("0");
+    expect(lineFor(result, "GAP")?.contributed).toBe("1602");
+  });
+
+  it("sets aside a purchase more than a week after the last close as stale", () => {
+    const result = run(
+      [trade("BUY", "LATE", "2025-06-10T10:00:00Z", "10", "1000", "0")],
+      prices({ LATE: "0" }),
+      HISTORY.filter((snapshot) => snapshot.asOf < new Date("2025-07-01")),
+    );
+
+    expect(result.stale).toEqual({
+      lastDay: "2025-06-02",
+      count: 1,
+      amount: "1000",
+    });
+    expect(result.gaps).toBeNull();
+    expect(result.truncated).toBeNull();
   });
 
   it("refuses a benchmark with no price history rather than valuing it at zero", () => {

@@ -85,16 +85,31 @@ columns. Importing the same file again adds nothing.
   container keeps it. Removing the volume deletes it.
 - **Every start applies pending migrations.** When a new image brings migrations and a
   ledger already exists, it is backed up first.
-- **Back up by hand** with `docker exec quoin npm run db:backup`. Snapshots go to
+- **Back up by hand** with `docker exec quoin db-backup`. Snapshots go to
   `data/backups/` inside the same volume, so copy them off it to protect against losing
   the volume: `docker cp quoin:/app/data/backups ./quoin-backups`.
 - **OpenFIGI key:** pass `-e OPENFIGI_API_KEY=…` to `docker run` if you have one.
 
-Everything else runs from the app's screens. Apart from `db:backup`, the CLI commands
+Everything else runs from the app's screens. Apart from `db-backup`, the CLI commands
 below are not in the image: with Docker, the wizard is the way to import.
 
-To update: `docker pull aritzmmartinez/quoin:latest`, then `docker rm -f quoin` and run
-the same `docker run` again. The volume carries over.
+With Docker Compose, the same container is:
+
+```yaml
+services:
+  quoin:
+    image: aritzmmartinez/quoin:latest
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - quoin-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  quoin-data:
+```
+
+To update, see *Updating* below.
 
 ### From source
 
@@ -143,15 +158,15 @@ language, layout or number format without a rule per provider. There is no comma
 for it on purpose.
 
 Quote symbols and exposure classifications live only in your local database (never in
-the repo), so a public clone never discloses your holdings. Only symbols quoted in euros
-are accepted for now (`.DE`, `.AS`, `.MC`…); other currencies come with multi-currency
-support. Use the exchange ticker, not the ISIN: Yahoo answers `<ISIN>.SG` with a current
-price but no daily history.
+the repo), so a public clone never discloses your holdings. A symbol quoted in another
+currency is accepted as long as the European Central Bank publishes reference rates for
+it, and is valued in euros at that rate. Use the exchange ticker, not the ISIN: Yahoo
+answers `<ISIN>.SG` with a current price but no daily history.
 
 The opportunity-cost screen replays every contribution into a benchmark ETF, `VWCE.DE`
 by default. Pick another under *Benchmark index* in `/settings` — the list offers
 only instruments you have mapped to a symbol, in the import wizard or on Instruments,
-and given EUR price history.
+with a price history in euros or in a currency the ECB publishes rates for.
 
 Two databases, on purpose. `data/quoin.sqlite` is the ledger — real trades, and the only
 thing here that cannot be regenerated. `data/dev.sqlite` is scratch: point `DATABASE_URL`
@@ -185,7 +200,7 @@ pnpm run typecheck      # react-router typegen + tsc
 pnpm run lint           # eslint (includes the layer boundaries)
 pnpm run build          # production build
 pnpm run db:generate    # regenerate the Prisma client after a schema change
-pnpm run db:migrate     # development only: create a migration from a schema change
+pnpm run db:migrate     # development only: create a migration; refuses the ledger
 pnpm run db:studio      # Prisma Studio (GUI to inspect the data)
 pnpm run db:backup      # VACUUM INTO data/backups/, keeping the last 30
 pnpm run db:seed        # synthetic portfolio -> the scratch database
@@ -198,18 +213,51 @@ pnpm run test:integration   # migrations against a temporary SQLite database
 
 ### Updating
 
-With Docker, see the steps under *With Docker*: a new image backs up the ledger and
-migrates it on its own.
+With Docker Compose:
 
-From source, pull the new version, then back up and migrate:
+```bash
+docker compose pull
+```
+```bash
+docker compose up -d
+```
+
+With `docker run`: pull the image, remove the container and run the same command again.
+
+```bash
+docker pull aritzmmartinez/quoin:latest
+```
+```bash
+docker rm -f quoin
+```
+
+Then the same `docker run` as above. Either way:
+
+- **Your data is in the volume, not the container.** Removing the container keeps it;
+  the new one opens the same ledger.
+- **A new image backs up before it migrates.** When it brings migrations and a ledger
+  exists, it takes the same snapshot as `db-backup` into `data/backups/` first, and does
+  not start if that backup fails.
+- **From 0.13.0 on, going back needs that backup.** An older image cannot open a database
+  migrated by a newer one. To go back, stop the container, copy the snapshot taken before
+  the update over the ledger with the older image, and start the older image:
+
+```bash
+docker run --rm -v quoin-data:/app/data --entrypoint cp aritzmmartinez/quoin:0.12.1 /app/data/backups/quoin-YYYYMMDD-HHMM.sqlite /app/data/quoin.sqlite
+```
+
+From source, pull the new version, then migrate:
 
 ```bash
 pnpm install
-pnpm run db:backup      # snapshot the ledger first
-pnpm run db:deploy      # prisma migrate deploy: apply pending migrations, nothing else
+pnpm run db:deploy      # backs up the ledger if a migration is pending, then applies it
 ```
 
-Never update a ledger with `db:migrate`. It is `prisma migrate dev`, meant for writing
+`db:deploy` first prints the database it is about to migrate and whether it is the
+ledger. When it is, and a migration is pending, it takes the same backup as `db:backup`
+before migrating, and stops without migrating if that backup fails.
+
+`db:migrate` refuses the ledger. It is `prisma migrate dev`, meant for writing
 migrations: when it finds the schema out of step, it can offer to reset the database.
 
 ## Architecture
@@ -252,7 +300,8 @@ on with decimal.js; data and secrets are never committed.
 - [x] English interface alongside Spanish, with figures and dates formatted per locale
 - [x] Docker image for amd64 and arm64, published on every release
 - [x] Import onboarding: symbol column on Instruments, in-kind rewards and saveback, gap-free daily prices
-- [ ] Docker image without npm: back up with `docker exec quoin db-backup` (0.13.0)
+- [x] Docker image without npm: back up with `docker exec quoin db-backup` (0.13.0)
+- [x] Multi-currency: other currencies converted at the ECB's reference rate (0.13.0)
 - [ ] Display currency: show every amount converted, with historical rates
 - [ ] Watchlist and trade journal
 - [ ] DCF valuation module

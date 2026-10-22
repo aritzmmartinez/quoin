@@ -8,7 +8,9 @@ import {
   type TradeEvent,
 } from "../domain";
 import { dayOf } from "../calendar";
+import { baseOf, bookable } from "../fx";
 import type { PriceSnapshot } from "../ports";
+import { onOrBeforeDay } from "../series";
 import type { PriceLike } from "./market-value";
 import { xirr, type CashFlow } from "./xirr";
 
@@ -20,10 +22,9 @@ export interface OpportunityCostLine {
   difference: string;
 }
 
-export interface OpportunityCostTruncation {
-  earliestDay: string;
-  excludedFlowCount: number;
-  excludedAmount: string;
+export interface ExcludedPurchases {
+  count: number;
+  amount: string;
 }
 
 export interface OpportunityCostResult {
@@ -36,7 +37,9 @@ export interface OpportunityCostResult {
   mwrDifference: string | null;
   lines: OpportunityCostLine[];
   unpricedInstrumentIds: string[];
-  truncated: OpportunityCostTruncation | null;
+  truncated: (ExcludedPurchases & { firstDay: string }) | null;
+  stale: (ExcludedPurchases & { lastDay: string }) | null;
+  gaps: ExcludedPurchases | null;
 }
 
 export interface OpportunityCostInput {
@@ -61,7 +64,11 @@ function closesFrom(
   const byDay = new Map<string, { t: number; price: Decimal }>();
   for (const snapshot of history) {
     if (snapshot.instrumentId !== instrumentId) continue;
-    if (snapshot.currency !== baseCurrency) continue;
+    if (snapshot.currency !== baseCurrency) {
+      throw new Error(
+        `Benchmark close on ${snapshot.asOf.toISOString()} is in ${snapshot.currency}, not ${baseCurrency}; pass the history through historyInBase() first`,
+      );
+    }
     const day = dayOf(snapshot.asOf);
     const t = snapshot.asOf.getTime();
     const seen = byDay.get(day);
@@ -73,29 +80,17 @@ function closesFrom(
     .sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
 }
 
+const MAX_CLOSE_AGE_DAYS = 7;
+
 function closeOn(closes: readonly Close[], day: string): Decimal | null {
-  let lo = 0;
-  let hi = closes.length - 1;
-  let found: Decimal | null = null;
-  while (lo <= hi) {
-    const mid = (lo + hi) >> 1;
-    const candidate = closes[mid]!;
-    if (candidate.day <= day) {
-      found = candidate.price;
-      lo = mid + 1;
-    } else {
-      hi = mid - 1;
-    }
-  }
-  return found;
+  return (
+    onOrBeforeDay(closes, (close) => close.day, day, MAX_CLOSE_AGE_DAYS)
+      ?.price ?? null
+  );
 }
 
 function isTrade(event: LedgerEvent): event is TradeEvent {
   return event.type === "BUY" || event.type === "SELL";
-}
-
-function baseAmount(value: string, fxToBase: string): Money {
-  return Money.fromString(value).scaleBy(fxToBase);
 }
 
 interface Bucket {
@@ -106,6 +101,21 @@ interface Bucket {
   units: Decimal;
   flows: CashFlow[];
   benchmarkFlows: CashFlow[];
+}
+
+class Exclusions {
+  private count = 0;
+  private amount = Money.zero();
+
+  add(spent: Money): void {
+    this.count += 1;
+    this.amount = this.amount.add(spent);
+  }
+
+  with<T extends object>(extra: T): (ExcludedPurchases & T) | null {
+    if (this.count === 0) return null;
+    return { count: this.count, amount: this.amount.toString(), ...extra };
+  }
 }
 
 export function computeOpportunityCost(
@@ -134,14 +144,17 @@ export function computeOpportunityCost(
     );
   }
 
-  const trades = events
+  const trades = bookable(events)
     .filter(isTrade)
     .slice()
     .sort((a, b) => a.ts.getTime() - b.ts.getTime());
 
   const buckets = new Map<string, Bucket>();
-  let excludedFlowCount = 0;
-  let excludedAmount = Money.zero();
+  const excluded = {
+    truncated: new Exclusions(),
+    stale: new Exclusions(),
+    gaps: new Exclusions(),
+  };
 
   for (const trade of trades) {
     let bucket = buckets.get(trade.instrumentId);
@@ -158,8 +171,8 @@ export function computeOpportunityCost(
       buckets.set(trade.instrumentId, bucket);
     }
 
-    const gross = baseAmount(trade.grossAmount, trade.fxToBase);
-    const fees = baseAmount(trade.fees, trade.fxToBase);
+    const gross = baseOf(trade, "grossAmount");
+    const fees = baseOf(trade, "fees");
     const t = trade.ts.getTime();
 
     if (trade.type === "SELL") {
@@ -176,10 +189,16 @@ export function computeOpportunityCost(
     bucket.contributed = bucket.contributed.add(spent);
     bucket.flows.push({ t, amount: spent.negate().toNumber() });
 
-    const close = closeOn(closes, dayOf(trade.ts));
+    const day = dayOf(trade.ts);
+    const close = closeOn(closes, day);
     if (close === null || close.isZero()) {
-      excludedFlowCount += 1;
-      excludedAmount = excludedAmount.add(spent);
+      const reason =
+        day < firstClose.day
+          ? excluded.truncated
+          : day > lastClose.day
+            ? excluded.stale
+            : excluded.gaps;
+      reason.add(spent);
       continue;
     }
     bucket.units = bucket.units.plus(new Decimal(gross.toString()).div(close));
@@ -196,7 +215,12 @@ export function computeOpportunityCost(
 
   for (const bucket of buckets.values()) {
     const price = prices.get(bucket.instrumentId);
-    const priced = price !== undefined && price.currency === baseCurrency;
+    if (price !== undefined && price.currency !== baseCurrency) {
+      throw new Error(
+        `Price of ${bucket.instrumentId} is in ${price.currency}, not ${baseCurrency}; pass prices through pricesInBase() first`,
+      );
+    }
+    const priced = price !== undefined;
 
     if (bucket.quantity.gt(0) && !priced) {
       unpricedInstrumentIds.push(bucket.instrumentId);
@@ -244,14 +268,9 @@ export function computeOpportunityCost(
         : new Decimal(realMwr).minus(benchmarkMwr).toFixed(6),
     lines,
     unpricedInstrumentIds: unpricedInstrumentIds.sort(),
-    truncated:
-      excludedFlowCount === 0
-        ? null
-        : {
-            earliestDay: firstClose.day,
-            excludedFlowCount,
-            excludedAmount: excludedAmount.toString(),
-          },
+    truncated: excluded.truncated.with({ firstDay: firstClose.day }),
+    stale: excluded.stale.with({ lastDay: lastClose.day }),
+    gaps: excluded.gaps.with({}),
   };
 }
 

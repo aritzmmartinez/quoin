@@ -30,7 +30,12 @@ import {
   rewardRetryIds,
   unpricedRewards,
 } from "~/lib";
+import { ensureRatesNow } from "~/lib/fx-sync.server";
+import { planWithRates } from "~/lib/ingest-rates";
 import { fillPrices } from "~/lib/ingest.server";
+import { loadRateBook } from "~/lib/rate-book.server";
+
+import { announceDatabase } from "./lib/db-target";
 
 const USAGE = `Usage: pnpm ingest --broker=<${BROKERS.join("|")}> <file.csv> [--yes]`;
 
@@ -80,6 +85,7 @@ async function ask(question: string): Promise<boolean> {
 async function retryRewards(
   adapter: KrakenCsvAdapter | TradeRepublicCsvAdapter,
   instruments: PrismaInstrumentRepository,
+  ledger: PrismaLedgerRepository,
   csv: string,
   first: ImportSummary,
   yes: boolean,
@@ -107,17 +113,28 @@ async function retryRewards(
 
   const fill = await fillPrices(ids, range);
   console.log(`\n  candles written    : ${fill.candles}`);
-  if (fill.notEur > 0) {
+  if (fill.noRateSeries > 0) {
     console.log(
-      `  not in EUR         : ${fill.notEur} (history refused; only EUR histories are valued)`,
+      `  no ECB rates       : ${fill.noRateSeries} (history refused: the ECB publishes no rates for its currency)`,
     );
   }
-  const merged = mergeRewardRetry(first, await adapter.import(csv));
+  if (fill.ratesUnavailable.length > 0) {
+    console.log(
+      `  ECB unreachable    : ${fill.ratesUnavailable.join(", ")} (history not downloaded; try again later)`,
+    );
+  }
+  const retried = await persistBatch(
+    instruments,
+    ledger,
+    await planWithRates(() => adapter.plan(csv), ensureRatesNow),
+  );
+  const merged = mergeRewardRetry(first, retried);
   console.log(`  rewards recovered  : ${merged.recovered}`);
   printSummary("After re-import", merged.summary);
 }
 
 async function main(): Promise<void> {
+  announceDatabase();
   const { values, positionals } = parseArgs({
     args: argv.slice(2),
     options: {
@@ -139,12 +156,17 @@ async function main(): Promise<void> {
   const ledger = new PrismaLedgerRepository();
   const adapter =
     broker === "kraken"
-      ? new KrakenCsvAdapter(instruments, ledger, new PrismaPriceRepository())
-      : new TradeRepublicCsvAdapter(instruments, ledger);
+      ? new KrakenCsvAdapter(
+          instruments,
+          ledger,
+          new PrismaPriceRepository(),
+          loadRateBook,
+        )
+      : new TradeRepublicCsvAdapter(instruments, ledger, loadRateBook);
 
   const csv = readFileSync(resolve(file), "utf8");
 
-  const batch = await adapter.plan(csv);
+  const batch = await planWithRates(() => adapter.plan(csv), ensureRatesNow);
   const preview = await previewBatch(ledger, batch);
   printSummary(`Preview (${broker})`, preview);
 
@@ -160,7 +182,7 @@ async function main(): Promise<void> {
 
   const result = await persistBatch(instruments, ledger, batch);
   printSummary("Imported", result);
-  await retryRewards(adapter, instruments, csv, result, values.yes);
+  await retryRewards(adapter, instruments, ledger, csv, result, values.yes);
 }
 
 main()

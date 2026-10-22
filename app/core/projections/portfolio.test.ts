@@ -345,7 +345,6 @@ describe("one instrument, one line", () => {
     grossAmount: gross,
     fees: "0",
     currency: "EUR",
-    fxToBase: "1",
     account: "test",
     source: "TEST",
   });

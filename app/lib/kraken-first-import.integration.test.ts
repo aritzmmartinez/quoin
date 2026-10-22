@@ -5,6 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import type { HistoryRange, MarketDataProvider, Quote } from "~/core/ports";
 
+import type { EnsureRates } from "./fx-sync";
 import { copyFor } from "./i18n";
 import {
   earliestUnpricedReward,
@@ -28,6 +29,8 @@ type Server = typeof import("./ingest.server");
 let persistence: Persistence;
 let ingestion: Ingestion;
 let server: Server;
+
+const NO_RATES: EnsureRates = async () => ({ book: new Map(), unavailable: [] });
 
 const tmpDir = "./.tmp-kraken-first-import";
 const dbPath = `${tmpDir}/it-${Date.now()}.sqlite`;
@@ -128,13 +131,21 @@ async function firstImportFlow(csv: string) {
 
   const ids = rewardRetryIds(first);
   for (const id of ids) {
-    await assignQuoteSymbol(instruments, prices, btcQuote, id, "BTC-EUR");
+    await assignQuoteSymbol(
+      instruments,
+      prices,
+      btcQuote,
+      id,
+      "BTC-EUR",
+      NO_RATES,
+    );
   }
   await backfillInstruments(
     provider,
     prices,
     ids.map((id) => ({ id, quoteSymbol: "BTC-EUR" })),
     rangeCovering(earliestUnpricedReward(first)!, new Date()),
+    NO_RATES,
   );
 
   const retry = await adapter.import(csv);
@@ -276,6 +287,7 @@ async function priceAndRetry(
       btcQuote,
       "BTC",
       "BTC-EUR",
+      NO_RATES,
     );
   }
   await backfillInstruments(
@@ -283,6 +295,7 @@ async function priceAndRetry(
     prices,
     [{ id: "BTC", quoteSymbol: "BTC-EUR" }],
     "max",
+    NO_RATES,
   );
   return mergeRewardRetry(first, await adapter.import(csv));
 }

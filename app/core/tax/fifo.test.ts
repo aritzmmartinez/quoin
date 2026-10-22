@@ -14,7 +14,7 @@ function trade(
   opts: {
     fees?: string;
     ts?: string;
-    fxToBase?: string;
+    eurPerUnit?: string;
     externalId?: string;
   } = {},
 ): TradeEvent {
@@ -27,8 +27,15 @@ function trade(
     price: "0",
     grossAmount,
     fees: opts.fees ?? "0",
-    currency: "EUR",
-    fxToBase: opts.fxToBase ?? "1",
+    ...(opts.eurPerUnit
+      ? {
+          currency: "USD",
+          fxSource: "ECB" as const,
+          fxRate: opts.eurPerUnit,
+          fxDirection: "BASE_PER_QUOTE" as const,
+          fxDate: "2025-01-01",
+        }
+      : { currency: "EUR" }),
     account: "test",
     source: "TEST",
     externalId: opts.externalId,

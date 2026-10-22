@@ -1,16 +1,19 @@
 import { isFreshQuote } from "~/adapters/marketdata";
 import { dayOf, shiftDay } from "~/core/calendar";
-import { foreignCurrency, type Instrument } from "~/core/domain";
+import type { Instrument } from "~/core/domain";
 import {
   MarketDataUnavailableError,
   type MarketDataProvider,
   type PriceRepository,
   type PriceSnapshot,
+  type PriceSyncRepository,
   type Quote,
 } from "~/core/ports";
 import { liveSource } from "~/core/prices";
 
+import { describeFailure } from "./describe-failure";
 import type { Copy } from "./i18n";
+import { inTurn } from "./in-turn";
 
 export const SYNC_OVERLAP_DAYS = 7;
 
@@ -39,12 +42,7 @@ export function toSyncTargets(
   return { targets, unmapped };
 }
 
-export type SyncProblem =
-  | "no-quote"
-  | "stale"
-  | "not-eur"
-  | "unavailable"
-  | "error";
+export type SyncProblem = "no-quote" | "stale" | "unavailable" | "error";
 
 export interface InstrumentSync {
   instrumentId: string;
@@ -58,6 +56,7 @@ export interface InstrumentSync {
 export interface SyncDeps {
   prices: PriceRepository;
   provider: MarketDataProvider;
+  checks?: PriceSyncRepository;
   now?: Date;
 }
 
@@ -112,15 +111,12 @@ export async function syncInstrumentPrices(
   });
 
   const candles = await gapCandles(deps, target, now);
-  if (foreignCurrency(candles)) {
-    return result({ inserted: 0, corrected: 0, live: false }, "not-eur");
-  }
-
   const quote = await provider.getQuote(target.quoteSymbol);
+  await deps.checks?.markChecked(target.id);
+
   let problem: SyncProblem | null = null;
   let live: PriceSnapshot | null = null;
   if (!quote) problem = "no-quote";
-  else if (foreignCurrency([quote])) problem = "not-eur";
   else if (!isFreshQuote(quote, now)) problem = "stale";
   else live = toSnapshot(target.id, quote, liveSource(provider.source));
 
@@ -134,6 +130,50 @@ export async function syncInstrumentPrices(
 
 export function syncProblemOf(error: unknown): SyncProblem {
   return error instanceof MarketDataUnavailableError ? "unavailable" : "error";
+}
+
+export function haltsSync(error: unknown): boolean {
+  return syncProblemOf(error) === "error";
+}
+
+export class SyncHaltedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SyncHaltedError";
+  }
+}
+
+export interface SyncRun {
+  steps: InstrumentSync[];
+  halted: string | null;
+}
+
+export async function syncInTurn<T extends Pick<SyncTarget, "id" | "name">>(
+  targets: readonly T[],
+  step: (target: T) => Promise<InstrumentSync>,
+  options: { onStart?: (target: T, index: number) => void; stopped?: () => boolean } = {},
+): Promise<SyncRun> {
+  let halted: string | null = null;
+  let index = 0;
+  const steps = await inTurn(
+    targets,
+    (target) => {
+      options.onStart?.(target, index);
+      index += 1;
+      return step(target);
+    },
+    {
+      onError: (error, target) => {
+        halted =
+          error instanceof SyncHaltedError
+            ? error.message
+            : describeFailure(error);
+        return failedSync(target);
+      },
+      stopped: () => halted !== null || (options.stopped?.() ?? false),
+    },
+  );
+  return { steps: halted === null ? steps : steps.slice(0, -1), halted };
 }
 
 export function failedSync(

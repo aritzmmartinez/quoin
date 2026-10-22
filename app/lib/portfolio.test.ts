@@ -21,21 +21,18 @@ const instruments: Instrument[] = [
     id: "IE00TEST0031",
     name: "Test World Equity",
     type: "ETF",
-    currency: "EUR",
     thesis: "CORE",
   },
   {
     id: "NL00TEST0032",
     name: "Test Semiconductors NV",
     type: "STOCK",
-    currency: "EUR",
     thesis: "CONVICTION",
   },
   {
     id: "BTC",
     name: "Bitcoin",
     type: "CRYPTO",
-    currency: "EUR",
     thesis: "TACTICAL",
   },
 ];
@@ -83,7 +80,6 @@ describe("toPortfolioRows", () => {
     expect(rows[0]).toMatchObject({
       name: "Test World Equity",
       type: "ETF",
-      currency: "EUR",
       tradeCount: 3,
       marketValue: "1200",
       unrealizedPnL: "200",

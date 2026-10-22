@@ -4,6 +4,7 @@ import { data } from "react-router";
 import type { Route } from "./+types/projection";
 
 import { Card, ProjectionPanel, SetupChecklist } from "~/components";
+import { UnratedNotice } from "~/components/ui/UnratedNotice";
 import {
   computeProjection,
   projectionWindow,
@@ -57,7 +58,10 @@ export async function loader({ request }: Route.LoaderArgs) {
     tradesStep(context.hasTrades),
     targetStep(context.plan !== null),
   ];
-  return data({ view, setup }, { headers: timing.headers() });
+  return data(
+    { view, setup, unrated: context.plan?.unrated ?? null },
+    { headers: timing.headers() },
+  );
 }
 
 function projectionView(
@@ -172,7 +176,7 @@ function projectionView(
 
 export default function Projection({ loaderData }: Route.ComponentProps) {
   const t = useCopy();
-  const { view, setup } = loaderData;
+  const { view, setup, unrated } = loaderData;
 
   if (setupPending(setup)) {
     return (
@@ -187,7 +191,12 @@ export default function Projection({ loaderData }: Route.ComponentProps) {
     );
   }
 
-  return <ProjectionPanel view={view} />;
+  return (
+    <>
+      <UnratedNotice unrated={unrated} className="mb-4" />
+      <ProjectionPanel view={view} />
+    </>
+  );
 }
 
 export { ErrorBoundary } from "~/components/ui/ErrorBoundary";

@@ -1,8 +1,12 @@
-import type {
-  IdentityResolution,
-  RawIdentity,
-  SecurityIdentityResolver,
+import {
+  type IdentityResolution,
+  type IdentityResolutionBatch,
+  IdentityResolutionUnavailableError,
+  type RawIdentity,
+  type SecurityIdentityResolver,
 } from "~/core/ports";
+
+import { withTimeout } from "~/adapters/http";
 
 import {
   batch,
@@ -25,8 +29,17 @@ const ENDPOINT = "https://api.openfigi.com/v3/mapping";
  * the first requests either way.
  */
 const LIMITS = {
-  anonymous: { jobsPerRequest: 10, minIntervalMs: 2_400 },
-  authenticated: { jobsPerRequest: 100, minIntervalMs: 240 },
+  anonymous: { jobsPerRequest: 10, minIntervalMs: 2_400, timeoutMs: 30_000 },
+  authenticated: {
+    jobsPerRequest: 100,
+    minIntervalMs: 240,
+    timeoutMs: 120_000,
+  },
+} as const;
+
+export const OPENFIGI_TIMEOUT_MS = {
+  anonymous: LIMITS.anonymous.timeoutMs,
+  authenticated: LIMITS.authenticated.timeoutMs,
 } as const;
 
 export interface OpenFigiOptions {
@@ -34,6 +47,7 @@ export interface OpenFigiOptions {
   maxIdentities?: number;
   fetchImpl?: typeof fetch;
   minIntervalMs?: number;
+  timeoutMs?: number;
   onProgress?: (done: number, total: number) => void;
 }
 
@@ -47,6 +61,7 @@ export class OpenFigiIdentityResolver implements SecurityIdentityResolver {
   private readonly maxIdentities: number;
   private readonly fetchImpl: typeof fetch;
   private readonly minIntervalMs: number | undefined;
+  private readonly timeoutMs: number | undefined;
   private readonly onProgress:
     | ((done: number, total: number) => void)
     | undefined;
@@ -56,15 +71,17 @@ export class OpenFigiIdentityResolver implements SecurityIdentityResolver {
     this.maxIdentities = options.maxIdentities ?? Number.POSITIVE_INFINITY;
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.minIntervalMs = options.minIntervalMs;
+    this.timeoutMs = options.timeoutMs;
     this.onProgress = options.onProgress;
   }
 
   async resolve(
     identities: readonly RawIdentity[],
-  ): Promise<Map<string, IdentityResolution>> {
+  ): Promise<IdentityResolutionBatch> {
     const limits = this.apiKey ? LIMITS.authenticated : LIMITS.anonymous;
+    const timeoutMs = this.timeoutMs ?? limits.timeoutMs;
     const wanted = identities.slice(0, this.maxIdentities);
-    const resolved = new Map<string, IdentityResolution>();
+    const resolutions = new Map<string, IdentityResolution>();
 
     const batches = batch(wanted, limits.jobsPerRequest);
     let done = 0;
@@ -73,47 +90,61 @@ export class OpenFigiIdentityResolver implements SecurityIdentityResolver {
       const gap = this.minIntervalMs ?? limits.minIntervalMs;
       if (index > 0 && gap > 0) await sleep(gap);
 
+      let results: MappingResult[];
       try {
-        const results = await this.request(group);
-        for (const [value, resolution] of parseMappingResponse(
-          group,
-          results,
-        )) {
-          resolved.set(value, resolution);
-        }
-      } catch {
-        for (const identity of group) {
-          resolved.set(identity.value, { status: "not-found" });
-        }
+        results = await this.request(group, timeoutMs);
+      } catch (cause) {
+        const unavailable =
+          cause instanceof IdentityResolutionUnavailableError
+            ? cause
+            : new IdentityResolutionUnavailableError(null, { cause });
+        return { resolutions, unavailable };
+      }
+
+      for (const [value, resolution] of parseMappingResponse(group, results)) {
+        resolutions.set(value, resolution);
       }
 
       done += group.length;
       this.onProgress?.(done, wanted.length);
     }
 
-    return resolved;
+    return { resolutions, unavailable: null };
   }
 
-  private async request(
+  private request(
     identities: readonly RawIdentity[],
+    timeoutMs: number,
   ): Promise<MappingResult[]> {
-    const response = await this.fetchImpl(ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(this.apiKey ? { "X-OPENFIGI-APIKEY": this.apiKey } : {}),
-      },
-      body: JSON.stringify(toMappingJobs(identities)),
+    return withTimeout(timeoutMs, async (signal) => {
+      const response = await this.fetchImpl(ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(this.apiKey ? { "X-OPENFIGI-APIKEY": this.apiKey } : {}),
+        },
+        body: JSON.stringify(toMappingJobs(identities)),
+        signal,
+      });
+
+      if (!response.ok) {
+        throw new IdentityResolutionUnavailableError(response.status);
+      }
+
+      let body: unknown;
+      try {
+        body = await response.json();
+      } catch (cause) {
+        throw new IdentityResolutionUnavailableError(response.status, {
+          cause,
+        });
+      }
+      if (!Array.isArray(body)) {
+        throw new IdentityResolutionUnavailableError(response.status, {
+          cause: new Error("OpenFIGI returned an unexpected payload"),
+        });
+      }
+      return body as MappingResult[];
     });
-
-    if (!response.ok) {
-      throw new Error(`OpenFIGI responded ${response.status}`);
-    }
-
-    const body: unknown = await response.json();
-    if (!Array.isArray(body)) {
-      throw new Error("OpenFIGI returned an unexpected payload");
-    }
-    return body as MappingResult[];
   }
 }

@@ -9,7 +9,7 @@ function trade(
   instrumentId: string,
   quantity: string,
   grossAmount: string,
-  opts: { fees?: string; ts?: string; fxToBase?: string } = {},
+  opts: { fees?: string; ts?: string; eurPerUnit?: string } = {},
 ): TradeEvent {
   return {
     id: `evt-${seq++}`,
@@ -20,8 +20,15 @@ function trade(
     price: "0",
     grossAmount,
     fees: opts.fees ?? "0",
-    currency: "EUR",
-    fxToBase: opts.fxToBase ?? "1",
+    ...(opts.eurPerUnit
+      ? {
+          currency: "USD",
+          fxSource: "ECB" as const,
+          fxRate: opts.eurPerUnit,
+          fxDirection: "BASE_PER_QUOTE" as const,
+          fxDate: "2025-01-01",
+        }
+      : { currency: "EUR" }),
     account: "test",
     source: "TEST",
   };
@@ -130,9 +137,9 @@ describe("computePositions (AVCO)", () => {
     );
   });
 
-  it("converts amounts to base currency via fxToBase", () => {
+  it("converts amounts to base currency at the rate it was booked at", () => {
     const p = only(
-      computePositions([trade("BUY", "X", "10", "1000", { fxToBase: "0.9" })]),
+      computePositions([trade("BUY", "X", "10", "1000", { eurPerUnit: "0.9" })]),
     );
     expect(p.costBasis).toBe("900");
   });
@@ -148,7 +155,6 @@ describe("computePositions (AVCO)", () => {
         grossAmount: "50",
         taxWithheld: "10",
         currency: "EUR",
-        fxToBase: "1",
         account: "test",
         source: "TEST",
       },
@@ -158,7 +164,6 @@ describe("computePositions (AVCO)", () => {
         type: "DEPOSIT",
         grossAmount: "1000",
         currency: "EUR",
-        fxToBase: "1",
         account: "test",
         source: "TEST",
       },
@@ -166,5 +171,16 @@ describe("computePositions (AVCO)", () => {
     const p = only(computePositions(events));
     expect(p.quantity).toBe("10");
     expect(p.costBasis).toBe("1000");
+  });
+});
+
+describe("an instrument with a trade it cannot convert to euros", () => {
+  it("has no position at all, rather than one costed at 1:1", () => {
+    const positions = computePositions([
+      trade("BUY", "IE00TEST0001", "10", "1000"),
+      trade("BUY", "US00TEST0002", "5", "500"),
+      { ...trade("BUY", "US00TEST0002", "5", "500"), currency: "USD" },
+    ]);
+    expect(positions.map((p) => p.instrumentId)).toEqual(["IE00TEST0001"]);
   });
 });

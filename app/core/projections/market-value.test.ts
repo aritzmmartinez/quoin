@@ -45,16 +45,13 @@ describe("computeMarketValues", () => {
     });
   });
 
-  it("ignores a snapshot that is not in the base currency (no FX here)", () => {
+  it("throws on a snapshot not in the base currency, which pricesInBase converts first", () => {
     const prices = new Map<string, PriceLike>([
       ["A", { price: "120", currency: "USD" }],
     ]);
-    const result = computeMarketValues(
-      [position({ instrumentId: "A" })],
-      prices,
-      "EUR",
-    );
-    expect(result.get(key("A"))?.marketValue).toBeNull();
+    expect(() =>
+      computeMarketValues([position({ instrumentId: "A" })], prices, "EUR"),
+    ).toThrow(/pricesInBase/);
   });
 
   it("weights each priced holding as its share of the total, summing to 1", () => {

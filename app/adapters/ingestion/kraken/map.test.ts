@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import { mapGroup, priceLookupFrom } from "./map";
 import type { KrakenRow } from "./row";
 
+const AT_80K = { price: "80000", currency: "EUR" };
+
 function row(over: Partial<KrakenRow> = {}): KrakenRow {
   return {
     refid: "R1",
@@ -80,6 +82,111 @@ describe("Kraken mapGroup", () => {
     expect(item!.kind === "domain" && item!.event.type).toBe("DEPOSIT");
   });
 
+  it("books a BTC purchase paid in another fiat in that currency, for the batch to convert", () => {
+    const result = mapGroup([
+      row({
+        refid: "F1",
+        type: "spend",
+        subclass: "fiat",
+        asset: "USD",
+        amount: "-150",
+        fee: "1.5",
+      }),
+      row({
+        refid: "F1",
+        type: "receive",
+        subclass: "crypto",
+        asset: "BTC",
+        amount: "0.003",
+      }),
+    ]);
+    expect(result).toHaveLength(1);
+    const [item] = result;
+    expect(item?.kind === "domain" && item.event).toMatchObject({
+      type: "BUY",
+      instrumentId: "BTC",
+      quantity: "0.003",
+      price: "50000",
+      grossAmount: "150",
+      fees: "1.5",
+      currency: "USD",
+    });
+    expect(item?.kind === "domain" && item.event.fxSource).toBeUndefined();
+  });
+
+  it("books a BTC sale received in another fiat in that currency", () => {
+    const result = mapGroup([
+      row({
+        refid: "F2",
+        type: "spend",
+        subclass: "crypto",
+        asset: "BTC",
+        amount: "-0.003",
+      }),
+      row({
+        refid: "F2",
+        type: "receive",
+        subclass: "fiat",
+        asset: "USD",
+        amount: "180",
+      }),
+    ]);
+    const [item] = result;
+    expect(item?.kind === "domain" && item.event).toMatchObject({
+      type: "SELL",
+      grossAmount: "180",
+      currency: "USD",
+    });
+  });
+
+  it.each([
+    ["deposit", "DEPOSIT"],
+    ["withdrawal", "WITHDRAWAL"],
+  ])(
+    "books a %s in another fiat as cash in that currency",
+    (type, booked) => {
+      const [item] = mapGroup([
+        row({ refid: "F3", type, asset: "USD", amount: "500" }),
+      ]);
+      expect(item?.kind === "domain" && item.event).toMatchObject({
+        type: booked,
+        grossAmount: "500",
+        currency: "USD",
+      });
+    },
+  );
+
+  it("treats a stablecoin as crypto, not as fiat", () => {
+    const result = mapGroup([
+      row({
+        refid: "F4",
+        type: "spend",
+        subclass: "stable_coin",
+        asset: "USDG",
+        amount: "-150",
+      }),
+      row({
+        refid: "F4",
+        type: "receive",
+        subclass: "crypto",
+        asset: "BTC",
+        amount: "0.003",
+      }),
+    ]);
+    expect(result).toEqual([
+      {
+        kind: "discard",
+        reason: "crypto-swap",
+        detail: {
+          date: "2025-11-13T18:04:48.000Z",
+          type: "receive",
+          subtype: null,
+          instrument: "USDG → BTC",
+        },
+      },
+    ]);
+  });
+
   const rewardRow = (over: Partial<KrakenRow> = {}) =>
     row({
       refid: "RW1",
@@ -92,7 +199,7 @@ describe("Kraken mapGroup", () => {
     });
 
   it("values a BTC reward at the market price when it was received", () => {
-    const result = mapGroup([rewardRow()], () => "80000");
+    const result = mapGroup([rewardRow()], () => AT_80K);
 
     expect(result).toHaveLength(2);
     const [buy, income] = result;
@@ -112,7 +219,7 @@ describe("Kraken mapGroup", () => {
   });
 
   it("marks both legs of a reward as in kind: no money left the bank", () => {
-    const [buy, income] = mapGroup([rewardRow()], () => "80000");
+    const [buy, income] = mapGroup([rewardRow()], () => AT_80K);
     for (const item of [buy, income]) {
       expect(item!.kind === "domain" && "funding" in item!.event).toBe(true);
       if (item!.kind === "domain" && "funding" in item!.event)
@@ -121,7 +228,7 @@ describe("Kraken mapGroup", () => {
   });
 
   it("gives the BUY and the income row distinct externalIds so both survive dedup", () => {
-    const [buy, income] = mapGroup([rewardRow()], () => "80000");
+    const [buy, income] = mapGroup([rewardRow()], () => AT_80K);
 
     expect(buy!.kind === "domain" && buy!.event.externalId).toBe("RW1");
     expect(income!.kind === "domain" && income!.event.externalId).toBe(
@@ -132,7 +239,7 @@ describe("Kraken mapGroup", () => {
   it("keeps a sub-cent reward's value instead of rounding it away", () => {
     const [buy, income] = mapGroup(
       [rewardRow({ amount: "0.00000001" })],
-      () => "80000",
+      () => AT_80K,
     );
 
     expect(
@@ -169,8 +276,22 @@ describe("Kraken mapGroup", () => {
     expect(item?.kind === "discard" && item.instrument?.id).toBe("BTC");
   });
 
+  it("books a reward priced from a history in another currency in that currency", () => {
+    const [buy, income] = mapGroup([rewardRow()], () => ({
+      price: "90000",
+      currency: "USD",
+    }));
+
+    for (const item of [buy, income]) {
+      expect(item?.kind === "domain" && item.event).toMatchObject({
+        grossAmount: "0.513",
+        currency: "USD",
+      });
+    }
+  });
+
   it("prices an earn the same way as a reward", () => {
-    const result = mapGroup([rewardRow({ type: "earn" })], () => "80000");
+    const result = mapGroup([rewardRow({ type: "earn" })], () => AT_80K);
 
     expect(result).toHaveLength(2);
     expect(result[0]!.kind === "domain" && result[0]!.event.type).toBe("BUY");
@@ -278,13 +399,24 @@ describe("priceLookupFrom", () => {
   it("takes the last close at or before the moment asked for", () => {
     const priceAt = priceLookupFrom(history);
 
-    expect(priceAt("BTC", new Date("2025-11-25T23:25:20Z"))).toBe("80000");
+    expect(priceAt("BTC", new Date("2025-11-25T23:25:20Z"))).toEqual(AT_80K);
+  });
+
+  it("carries the close's currency with its price", () => {
+    const priceAt = priceLookupFrom([
+      { ...snapshot("2025-11-25T00:00:00Z", "90000"), currency: "USD" },
+    ]);
+
+    expect(priceAt("BTC", new Date("2025-11-25T12:00:00Z"))).toEqual({
+      price: "90000",
+      currency: "USD",
+    });
   });
 
   it("never reaches forward for a closer candle", () => {
     const priceAt = priceLookupFrom(history);
 
-    expect(priceAt("BTC", new Date("2025-11-25T23:59:59Z"))).toBe("80000");
+    expect(priceAt("BTC", new Date("2025-11-25T23:59:59Z"))).toEqual(AT_80K);
     expect(priceAt("BTC", new Date("2025-11-23T00:00:00Z"))).toBeNull();
   });
 
@@ -293,7 +425,9 @@ describe("priceLookupFrom", () => {
       snapshot("2025-11-01T00:00:00Z", "70000"),
     ]);
 
-    expect(priceAt("BTC", new Date("2025-11-05T00:00:00Z"))).toBe("70000");
+    expect(priceAt("BTC", new Date("2025-11-05T00:00:00Z"))?.price).toBe(
+      "70000",
+    );
     expect(priceAt("BTC", new Date("2025-11-25T00:00:00Z"))).toBeNull();
   });
 
@@ -308,6 +442,6 @@ describe("priceLookupFrom", () => {
 
     expect(
       priceLookupFrom(shuffled)("BTC", new Date("2025-11-25T12:00:00Z")),
-    ).toBe("80000");
+    ).toEqual(AT_80K);
   });
 });

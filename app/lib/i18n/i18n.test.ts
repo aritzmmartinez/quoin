@@ -83,3 +83,17 @@ describe("locale parity", () => {
     );
   });
 });
+
+describe("the no-rate notice", () => {
+  it.each([
+    [es, ["A"], "Tiene operaciones", "queda fuera"],
+    [es, ["A", "B"], "Tienen operaciones", "quedan fuera"],
+    [en, ["A"], "It has trades", "it is left out"],
+    [en, ["A", "B"], "They have trades", "they are left out"],
+  ])("agrees with how many instruments it names", (copy, names, verb, rest) => {
+    const text = copy.common.noRateExcluded(names);
+    expect(text).toContain(verb);
+    expect(text).toContain(rest);
+    expect(text).toContain(names.join(", "));
+  });
+});

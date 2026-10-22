@@ -4,7 +4,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   assertScratchDatabase,
+  classifyDatabase,
   databasePath,
+  describeDatabase,
   isRealDatabase,
   isScratchDatabase,
   PROJECT_ROOT,
@@ -174,5 +176,117 @@ describe("assertScratchDatabase", () => {
         SCRATCH_DATABASE_FILE,
       );
     }
+  });
+});
+
+describe("classifyDatabase", () => {
+  it("names the live ledger", () => {
+    expect(classifyDatabase(`file:./${REAL_DATABASE_FILE}`)).toEqual({
+      kind: "ledger",
+      path: realDatabasePath(),
+    });
+  });
+
+  it("names the scratch database", () => {
+    expect(classifyDatabase(SCRATCH)).toEqual({
+      kind: "scratch",
+      path: scratchDatabasePath(),
+    });
+  });
+
+  it("names the ledger reached by another spelling", () => {
+    expect(
+      classifyDatabase(
+        `file:${resolve(PROJECT_ROOT, "./data/../data/quoin.sqlite")}`,
+      ).kind,
+    ).toBe("ledger");
+  });
+
+  it("names the ledger in another case only on Windows, where it is one file", () => {
+    expect(
+      classifyDatabase(`file:${realDatabasePath().toUpperCase()}`).kind,
+    ).toBe(process.platform === "win32" ? "ledger" : "other");
+  });
+
+  it.each([
+    [
+      "a backup of the ledger",
+      "file:./data/backups/quoin-20260809-2233.sqlite",
+    ],
+    ["the showcase artefact", "file:./data/showcase.sqlite"],
+    ["a near-miss typo", "file:./data/quoin.sqlit"],
+  ])("calls %s other, never scratch", (_label, url) => {
+    expect(classifyDatabase(url).kind).toBe("other");
+  });
+
+  it.each([
+    ["empty", ""],
+    ["in-memory", "file::memory:"],
+    ["a remote datasource", "postgresql://localhost:5432/quoin"],
+  ])("cannot resolve a URL that is %s", (_label, url) => {
+    expect(classifyDatabase(url)).toEqual({ kind: "unresolved", url });
+  });
+
+  describe("with no argument", () => {
+    withoutDatabaseUrl();
+
+    it("reads DATABASE_URL", () => {
+      process.env.DATABASE_URL = `file:./${REAL_DATABASE_FILE}`;
+      expect(classifyDatabase().kind).toBe("ledger");
+    });
+
+    it("cannot resolve DATABASE_URL when it is unset", () => {
+      expect(classifyDatabase()).toEqual({
+        kind: "unresolved",
+        url: undefined,
+      });
+    });
+  });
+});
+
+describe("describeDatabase", () => {
+  it("shouts the live ledger", () => {
+    expect(
+      describeDatabase({ kind: "ledger", path: realDatabasePath() }, true),
+    ).toBe(`Database: ${realDatabasePath()} (LIVE LEDGER, real trades)`);
+  });
+
+  it("names the scratch database", () => {
+    expect(
+      describeDatabase({ kind: "scratch", path: scratchDatabasePath() }, true),
+    ).toBe(`Database: ${scratchDatabasePath()} (scratch database)`);
+  });
+
+  it("names both known paths when a file is neither, so it says what scratch is", () => {
+    expect(describeDatabase({ kind: "other", path: "/x.sqlite" }, true)).toBe(
+      `Database: /x.sqlite — not the live ledger (${REAL_DATABASE_FILE}) ` +
+        `nor the scratch database (${SCRATCH_DATABASE_FILE})`,
+    );
+  });
+
+  it("says when another file does not exist yet", () => {
+    expect(describeDatabase({ kind: "other", path: "/x.sqlite" }, false)).toMatch(
+      /\(data\/dev\.sqlite\), does not exist yet$/,
+    );
+  });
+
+  it("says when the file does not exist, because Prisma would create it", () => {
+    expect(
+      describeDatabase({ kind: "scratch", path: scratchDatabasePath() }, false),
+    ).toMatch(/, does not exist yet\)$/);
+  });
+
+  it("quotes a URL it cannot resolve", () => {
+    expect(
+      describeDatabase({ kind: "unresolved", url: "file::memory:" }, false),
+    ).toBe(
+      'Database: DATABASE_URL is "file::memory:", which does not resolve to a local SQLite file',
+    );
+  });
+
+  it("says when DATABASE_URL is not set", () => {
+    expect(
+      describeDatabase({ kind: "unresolved", url: undefined }, false),
+    ).toMatch(/DATABASE_URL is not set/);
   });
 });

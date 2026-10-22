@@ -43,9 +43,15 @@ function toInstrument(row: TradeRepublicRow): Instrument {
     id: row.symbol,
     name: row.name,
     type: assetClassToType(row.asset_class),
-    currency: row.currency,
     assetClass: row.asset_class || null,
   });
+}
+
+function originals(row: TradeRepublicRow) {
+  const amount = row.original_amount?.trim() ?? "";
+  const currency = row.original_currency?.trim() ?? "";
+  if (amount === "" || currency === "") return {};
+  return { originalAmount: abs(amount), originalCurrency: currency };
 }
 
 function base(row: TradeRepublicRow) {
@@ -53,7 +59,7 @@ function base(row: TradeRepublicRow) {
     id: crypto.randomUUID(),
     ts: new Date(row.datetime),
     currency: row.currency,
-    fxToBase: "1",
+    ...originals(row),
     account: "trade-republic",
     source: "TR_CSV",
     externalId: row.transaction_id,

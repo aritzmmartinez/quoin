@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { RawIdentity } from "~/core/ports";
+import { IdentityResolutionUnavailableError, type RawIdentity } from "~/core/ports";
 
-import { OpenFigiIdentityResolver } from "./provider";
+import { OPENFIGI_TIMEOUT_MS, OpenFigiIdentityResolver } from "./provider";
 
 const ticker = (value: string): RawIdentity => ({ value, kind: "TICKER" });
 
@@ -28,12 +28,14 @@ function fakeFetch(shareClassFIGI = "BBG001S5S399") {
 describe("OpenFigiIdentityResolver", () => {
   it("resolves an ISIN and a ticker to the same canonical id", async () => {
     const { impl } = fakeFetch("BBG001S5S399");
-    const resolved = await new OpenFigiIdentityResolver({
-      minIntervalMs: 0,
-      fetchImpl: impl,
-      apiKey: "k",
-    }).resolve([{ value: "US67066G1040", kind: "ISIN" }, ticker("NVDA.US")]);
+    const { resolutions: resolved, unavailable } =
+      await new OpenFigiIdentityResolver({
+        minIntervalMs: 0,
+        fetchImpl: impl,
+        apiKey: "k",
+      }).resolve([{ value: "US67066G1040", kind: "ISIN" }, ticker("NVDA.US")]);
 
+    expect(unavailable).toBeNull();
     expect(resolved.get("US67066G1040")).toEqual(resolved.get("NVDA.US"));
     expect(resolved.get("NVDA.US")).toEqual({
       status: "resolved",
@@ -100,34 +102,124 @@ describe("OpenFigiIdentityResolver", () => {
     expect(calls[0]?.jobs).toHaveLength(12);
   });
 
-  it("degrades a failed batch to misses instead of failing the import", async () => {
-    const impl = vi.fn(async () => ({
-      ok: false,
-      status: 429,
-    })) as unknown as typeof fetch;
-    const resolved = await new OpenFigiIdentityResolver({
-      minIntervalMs: 0,
-      fetchImpl: impl,
-      apiKey: "k",
-    }).resolve([ticker("A.US"), ticker("B.US")]);
+  it.each([400, 429, 500, 503])(
+    "reports HTTP %i as unavailable and never as a miss",
+    async (status) => {
+      const impl = vi.fn(async () => ({
+        ok: false,
+        status,
+      })) as unknown as typeof fetch;
+      const { resolutions, unavailable } = await new OpenFigiIdentityResolver(
+        { minIntervalMs: 0, fetchImpl: impl, apiKey: "k" },
+      ).resolve([ticker("A.US"), ticker("B.US")]);
 
-    expect(resolved.get("A.US")).toEqual({ status: "not-found" });
-    expect(resolved.size).toBe(2);
-  });
+      expect(resolutions.size).toBe(0);
+      expect(unavailable).toBeInstanceOf(IdentityResolutionUnavailableError);
+      expect(unavailable?.status).toBe(status);
+    },
+  );
 
-  it("degrades when the payload is not the array the API promises", async () => {
+  it("reports a payload that is not the array the API promises as unavailable", async () => {
     const impl = vi.fn(async () => ({
       ok: true,
       status: 200,
       json: async () => ({ unexpected: true }),
     })) as unknown as typeof fetch;
 
-    const resolved = await new OpenFigiIdentityResolver({
+    const { resolutions, unavailable } = await new OpenFigiIdentityResolver({
       minIntervalMs: 0,
       fetchImpl: impl,
       apiKey: "k",
     }).resolve([ticker("A.US")]);
-    expect(resolved.get("A.US")).toEqual({ status: "not-found" });
+
+    expect(resolutions.size).toBe(0);
+    expect(unavailable?.status).toBe(200);
+  });
+
+  it("reports a network failure as unavailable, keeping the cause", async () => {
+    const cause = new TypeError("fetch failed");
+    const impl = vi.fn(() => Promise.reject(cause)) as unknown as typeof fetch;
+
+    const { unavailable } = await new OpenFigiIdentityResolver({
+      minIntervalMs: 0,
+      fetchImpl: impl,
+      apiKey: "k",
+    }).resolve([ticker("A.US")]);
+
+    expect(unavailable?.status).toBeNull();
+    expect(unavailable?.cause).toBe(cause);
+  });
+
+  it("stops at the first batch that is not answered and keeps the ones before it", async () => {
+    const { impl: answers } = fakeFetch();
+    let call = 0;
+    const impl = vi.fn(async (url: string, init?: RequestInit) => {
+      call += 1;
+      if (call === 2) return { ok: false, status: 503 } as Response;
+      return answers(url, init);
+    }) as unknown as typeof fetch;
+    const seen: number[] = [];
+
+    const { resolutions, unavailable } = await new OpenFigiIdentityResolver({
+      minIntervalMs: 0,
+      fetchImpl: impl,
+      apiKey: undefined,
+      onProgress: (done) => seen.push(done),
+    }).resolve(Array.from({ length: 25 }, (_, i) => ticker(`T${i}.US`)));
+
+    expect(call).toBe(2);
+    expect(resolutions.size).toBe(10);
+    expect(resolutions.has("T10.US")).toBe(false);
+    expect(unavailable?.status).toBe(503);
+    expect(seen).toEqual([10]);
+  });
+
+  it("gives every request a signal", async () => {
+    const { impl } = fakeFetch();
+    await new OpenFigiIdentityResolver({
+      minIntervalMs: 0,
+      fetchImpl: impl,
+      apiKey: "k",
+    }).resolve([ticker("A.US")]);
+
+    const init = vi.mocked(impl).mock.calls[0]?.[1];
+    expect(init?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("waits longer for a hundred jobs with a key than for ten without", () => {
+    expect(OPENFIGI_TIMEOUT_MS).toEqual({
+      anonymous: 30_000,
+      authenticated: 120_000,
+    });
+  });
+
+  it("turns a request that does not answer into unavailable, with the timeout as cause", async () => {
+    vi.useFakeTimers();
+    try {
+      const impl = vi.fn(
+        (_url: string, init?: RequestInit) =>
+          new Promise<Response>((_, reject) => {
+            init?.signal?.addEventListener("abort", () =>
+              reject(init.signal?.reason),
+            );
+          }),
+      ) as unknown as typeof fetch;
+
+      const result = new OpenFigiIdentityResolver({
+        minIntervalMs: 0,
+        fetchImpl: impl,
+        apiKey: "k",
+        timeoutMs: 1_000,
+      }).resolve([ticker("A.US")]);
+      await vi.advanceTimersByTimeAsync(1_000);
+      const { resolutions, unavailable } = await result;
+
+      expect(resolutions.size).toBe(0);
+      expect(unavailable?.status).toBeNull();
+      expect(unavailable?.cause).toMatchObject({ name: "TimeoutError" });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("reports progress, since an unauthenticated run takes minutes", async () => {
@@ -145,7 +237,7 @@ describe("OpenFigiIdentityResolver", () => {
 
   it("does nothing, and calls nothing, for an empty batch", async () => {
     const { impl, calls } = fakeFetch();
-    const resolved = await new OpenFigiIdentityResolver({
+    const { resolutions: resolved } = await new OpenFigiIdentityResolver({
       minIntervalMs: 0,
       fetchImpl: impl,
     }).resolve([]);

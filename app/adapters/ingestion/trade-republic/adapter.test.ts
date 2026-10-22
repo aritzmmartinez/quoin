@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
   ExposureKind,
@@ -12,6 +12,9 @@ import type {
   LedgerRepository,
 } from "~/core/ports";
 
+import { rateBookFrom } from "~/core/fx";
+
+import { BatchBuilder, InvalidLedgerEventError, previewBatch } from "../ingest";
 import { TradeRepublicCsvAdapter } from "./adapter";
 
 class FakeInstrumentRepository implements InstrumentRepository {
@@ -203,5 +206,144 @@ describe("TradeRepublicCsvAdapter", () => {
     expect(
       ledger.appended.filter((e) => e.externalId === "b-old"),
     ).toHaveLength(1);
+  });
+});
+
+describe("TradeRepublicCsvAdapter with the original amount columns", () => {
+  const WIDE_HEADER = `${HEADER},original_amount,original_currency,fx_rate`;
+
+  it("keeps a row's original amount and currency when the export carries them", async () => {
+    const ledger = new FakeLedgerRepository();
+    const adapter = new TradeRepublicCsvAdapter(
+      new FakeInstrumentRepository(),
+      ledger,
+    );
+
+    await adapter.import(
+      [
+        WIDE_HEADER,
+        `"2025-03-03T10:00:00Z","TRADING","BUY","STOCK","Some Stock","US000AAA","2","45","-90","-1","","EUR","o1","-99.99","USD","1.111000"`,
+        `"2025-03-04T10:00:00Z","TRADING","BUY","FUND","World ETF","IE00AAA","1","100","-100","","","EUR","o2","","",""`,
+      ].join("\n"),
+    );
+
+    const [withOriginals, without] = ledger.appended;
+    expect(withOriginals).toMatchObject({
+      currency: "EUR",
+      grossAmount: "90",
+      originalAmount: "99.99",
+      originalCurrency: "USD",
+    });
+    expect(withOriginals?.fxSource ?? "IDENTITY").toBe("IDENTITY");
+    expect(without?.originalAmount).toBeUndefined();
+    expect(without?.originalCurrency).toBeUndefined();
+  });
+
+  it("still sets an international card payment aside as card spending", async () => {
+    const adapter = new TradeRepublicCsvAdapter(
+      new FakeInstrumentRepository(),
+      new FakeLedgerRepository(),
+    );
+
+    const summary = await adapter.import(
+      [
+        WIDE_HEADER,
+        `"2025-03-05T10:00:00Z","CASH","CARD_TRANSACTION_INTERNATIONAL","","Shop","","","","-9.99","","","EUR","c1","-10.99","USD","1.100000"`,
+      ].join("\n"),
+    );
+
+    expect(summary.imported).toBe(0);
+    expect(summary.discarded).toEqual({ "card-spending": 1 });
+  });
+});
+
+describe("TradeRepublicCsvAdapter with a row in another currency", () => {
+  const FOREIGN_CSV = [
+    HEADER,
+    `"2025-01-01T10:00:00Z","TRADING","BUY","FUND","World ETF","IE00AAA","1","100","-100","","","EUR","t1"`,
+    `"2025-01-02T10:00:00Z","TRADING","BUY","STOCK","Some Stock","US000AAA","2","50","-100","-1","","USD","t2"`,
+    `"2025-01-05T10:00:00Z","CASH","CUSTOMER_INPAYMENT","","","","","","500","","","EUR","t3"`,
+  ].join("\n");
+
+  let instruments: FakeInstrumentRepository;
+  let ledger: FakeLedgerRepository;
+  let adapter: TradeRepublicCsvAdapter;
+
+  beforeEach(() => {
+    instruments = new FakeInstrumentRepository();
+    ledger = new FakeLedgerRepository();
+    adapter = new TradeRepublicCsvAdapter(instruments, ledger);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("converts that row at the ECB rate of its day when the rate is stored", async () => {
+    const asked: string[][] = [];
+    const converting = new TradeRepublicCsvAdapter(
+      instruments,
+      ledger,
+      async (currencies) => {
+        asked.push([...currencies]);
+        return rateBookFrom([
+          { source: "ECB", base: "EUR", quote: "USD", day: "2025-01-02", rate: "1.04" },
+        ]);
+      },
+    );
+
+    const summary = await converting.import(FOREIGN_CSV);
+
+    expect(asked).toEqual([["USD"]]);
+    expect(summary.imported).toBe(3);
+    expect(summary.discarded).toEqual({});
+    expect(ledger.appended.find((e) => e.externalId === "t2")).toMatchObject({
+      currency: "USD",
+      grossAmount: "100",
+      fees: "1",
+      fxSource: "ECB",
+      fxRate: "1.04",
+      fxDirection: "QUOTE_PER_BASE",
+      fxDate: "2025-01-02",
+    });
+  });
+
+  it("sets that row aside as fx-unavailable with no rate, imports the rest and says what it needs", async () => {
+    const batch = await adapter.plan(FOREIGN_CSV);
+    expect(batch.ratesNeeded).toEqual(new Map([["USD", "2025-01-02"]]));
+
+    const summary = await adapter.import(FOREIGN_CSV);
+
+    expect(summary.imported).toBe(2);
+    expect(summary.discarded).toEqual({ "fx-unavailable": 1 });
+    expect(summary.discardedDetails["fx-unavailable"]).toEqual([
+      {
+        date: "2025-01-02T10:00:00.000Z",
+        type: "BUY",
+        subtype: null,
+        instrument: "Some Stock (USD)",
+      },
+    ]);
+    expect(ledger.appended.map((e) => e.externalId)).toEqual(["t1", "t3"]);
+    expect(instruments.upserted.map((i) => i.id)).toEqual(["IE00AAA"]);
+  });
+
+  it("previews exactly what it then imports", async () => {
+    const preview = await previewBatch(ledger, await adapter.plan(FOREIGN_CSV));
+    const imported = await adapter.import(FOREIGN_CSV);
+
+    expect(preview).toEqual(imported);
+  });
+
+  it("writes nothing at all, instruments included, when a row breaks the rule otherwise", async () => {
+    vi.spyOn(BatchBuilder.prototype, "build").mockImplementation(() => {
+      throw new InvalidLedgerEventError("2025-01-02", "BUY", "USD");
+    });
+
+    await expect(adapter.import(FOREIGN_CSV)).rejects.toBeInstanceOf(
+      InvalidLedgerEventError,
+    );
+    expect(instruments.upserted).toEqual([]);
+    expect(ledger.appended).toEqual([]);
   });
 });

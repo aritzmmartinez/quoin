@@ -1,6 +1,7 @@
 import {
   instrumentSchema,
   ledgerEventSchema,
+  ledgerEventWriteSchema,
   type Instrument,
   type LedgerEvent,
 } from "~/core/domain";
@@ -16,7 +17,12 @@ export interface LedgerEntryRow {
   fees: string;
   taxWithheld: string;
   currency: string;
-  fxToBase: string;
+  fxSource: string;
+  fxDate: string | null;
+  fxRate: string | null;
+  fxDirection: string | null;
+  originalAmount: string | null;
+  originalCurrency: string | null;
   account: string;
   source: string;
   externalId: string | null;
@@ -31,7 +37,12 @@ export function rowToEvent(row: LedgerEntryRow): LedgerEvent {
     id: row.id,
     ts: row.ts,
     currency: row.currency,
-    fxToBase: row.fxToBase,
+    fxSource: row.fxSource,
+    fxDate: row.fxDate,
+    fxRate: row.fxRate,
+    fxDirection: row.fxDirection,
+    originalAmount: row.originalAmount,
+    originalCurrency: row.originalCurrency,
     account: row.account,
     source: row.source,
     externalId: row.externalId,
@@ -74,11 +85,17 @@ export function rowToEvent(row: LedgerEntryRow): LedgerEvent {
 }
 
 export function eventToCreateData(event: LedgerEvent): LedgerEntryCreateData {
+  ledgerEventWriteSchema.parse(event);
   const base = {
     id: event.id,
     ts: event.ts,
     currency: event.currency,
-    fxToBase: event.fxToBase,
+    fxSource: event.fxSource ?? "IDENTITY",
+    fxDate: event.fxDate ?? null,
+    fxRate: event.fxRate ?? null,
+    fxDirection: event.fxDirection ?? null,
+    originalAmount: event.originalAmount ?? event.grossAmount,
+    originalCurrency: event.originalCurrency ?? event.currency,
     account: event.account,
     source: event.source,
     externalId: event.externalId ?? null,
@@ -132,7 +149,6 @@ export interface InstrumentRow {
   id: string;
   name: string;
   type: string;
-  currency: string;
   assetClass: string | null;
   quoteSymbol: string | null;
   exposureKind: string | null;
@@ -157,7 +173,6 @@ export function rowToInstrument(row: InstrumentRow): Instrument {
     id: row.id,
     name: row.name,
     type: row.type,
-    currency: row.currency,
     assetClass: row.assetClass,
     quoteSymbol: row.quoteSymbol ?? null,
     exposureKind: row.exposureKind ?? null,
@@ -175,7 +190,6 @@ export function instrumentToWriteData(
     id: instrument.id,
     name: instrument.name,
     type: instrument.type,
-    currency: instrument.currency,
     assetClass: instrument.assetClass ?? null,
   };
 }

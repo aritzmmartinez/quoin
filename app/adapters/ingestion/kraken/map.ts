@@ -9,6 +9,7 @@ import {
   type Instrument,
 } from "~/core/domain";
 import type { PriceSnapshot } from "~/core/ports";
+import { atOrBefore } from "~/core/series";
 
 import type { DiscardReason, MappedItem } from "../ingest";
 import type { KrakenRow } from "./row";
@@ -34,9 +35,16 @@ function unsupported(row: KrakenRow): MappedItem {
   return discard("unsupported", row);
 }
 
-export type PriceAt = (instrumentId: string, ts: Date) => string | null;
+export interface PricedAt {
+  price: string;
+  currency: string;
+}
 
-const MAX_PRICE_AGE_DAYS = 7;
+export type PriceAt = (instrumentId: string, ts: Date) => PricedAt | null;
+
+const MAX_PRICE_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+const asOfTime = (snapshot: PriceSnapshot) => snapshot.asOf.getTime();
 
 export function priceLookupFrom(snapshots: readonly PriceSnapshot[]): PriceAt {
   const byInstrument = new Map<string, PriceSnapshot[]>();
@@ -46,23 +54,19 @@ export function priceLookupFrom(snapshots: readonly PriceSnapshot[]): PriceAt {
     byInstrument.set(snapshot.instrumentId, list);
   }
   for (const list of byInstrument.values()) {
-    list.sort((a, b) => a.asOf.getTime() - b.asOf.getTime());
+    list.sort((a, b) => asOfTime(a) - asOfTime(b));
   }
 
   return (instrumentId, ts) => {
     const history = byInstrument.get(instrumentId);
     if (!history) return null;
-
-    let candidate: PriceSnapshot | null = null;
-    for (const snapshot of history) {
-      if (snapshot.asOf.getTime() > ts.getTime()) break;
-      candidate = snapshot;
-    }
-    if (!candidate) return null;
-
-    const ageDays =
-      (ts.getTime() - candidate.asOf.getTime()) / (24 * 60 * 60 * 1000);
-    return ageDays > MAX_PRICE_AGE_DAYS ? null : candidate.price;
+    const close = atOrBefore(
+      history,
+      asOfTime,
+      ts.getTime(),
+      MAX_PRICE_AGE_MS,
+    );
+    return close ? { price: close.price, currency: close.currency } : null;
   };
 }
 
@@ -70,7 +74,6 @@ const BTC: Instrument = instrumentSchema.parse({
   id: "BTC",
   name: "Bitcoin",
   type: "CRYPTO",
-  currency: "EUR",
   assetClass: "crypto",
 });
 
@@ -109,11 +112,11 @@ export function mapGroup(
   const receive = rows.find((r) => r.type === "receive");
 
   if (spend && receive) {
+    const pair = `${spend.asset} → ${receive.asset}`;
     if (isBtc(receive) && isFiat(spend))
       return [trade(refid, "BUY", spend, receive)];
     if (isBtc(spend) && isFiat(receive))
       return [trade(refid, "SELL", receive, spend)];
-    const pair = `${spend.asset} → ${receive.asset}`;
     return [
       discard(
         isBtc(spend) || isBtc(receive) ? "crypto-swap" : "unmodelled-asset",
@@ -154,7 +157,7 @@ function trade(
   fiat: KrakenRow,
   cryptoLeg: KrakenRow,
 ): MappedItem {
-  const eur = new Decimal(abs(fiat.amount));
+  const paid = new Decimal(abs(fiat.amount));
   const btc = new Decimal(abs(cryptoLeg.amount));
   return {
     kind: "domain",
@@ -165,11 +168,10 @@ function trade(
       type,
       instrumentId: "BTC",
       quantity: btc.toFixed(),
-      price: btc.isZero() ? "0" : eur.dividedBy(btc).toFixed(),
-      grossAmount: eur.toFixed(),
+      price: btc.isZero() ? "0" : paid.dividedBy(btc).toFixed(),
+      grossAmount: paid.toFixed(),
       fees: abs(fiat.fee),
-      currency: "EUR",
-      fxToBase: "1",
+      currency: fiat.asset,
       account: "kraken",
       source: "KRAKEN_CSV",
       externalId: refid,
@@ -190,10 +192,11 @@ function trade(
  */
 function reward(refid: string, row: KrakenRow, priceAt: PriceAt): MappedItem[] {
   const ts = parseTime(row.time);
-  const price = priceAt("BTC", ts);
-  if (price === null)
+  const priced = priceAt("BTC", ts);
+  if (priced === null)
     return [{ ...discard("reward-unpriced", row), instrument: BTC }];
 
+  const { price, currency } = priced;
   const quantity = abs(row.amount);
   const grossAmount = Money.fromString(price).scaleBy(quantity).toString();
 
@@ -210,8 +213,7 @@ function reward(refid: string, row: KrakenRow, priceAt: PriceAt): MappedItem[] {
       grossAmount,
       fees: "0",
       funding: "IN_KIND",
-      currency: "EUR",
-      fxToBase: "1",
+      currency,
       account: "kraken",
       source: "KRAKEN_CSV",
       externalId: refid,
@@ -230,8 +232,7 @@ function reward(refid: string, row: KrakenRow, priceAt: PriceAt): MappedItem[] {
       grossAmount,
       taxWithheld: "0",
       funding: "IN_KIND",
-      currency: "EUR",
-      fxToBase: "1",
+      currency,
       account: "kraken",
       source: "KRAKEN_CSV",
       externalId: `${refid}:income`,
@@ -242,6 +243,14 @@ function reward(refid: string, row: KrakenRow, priceAt: PriceAt): MappedItem[] {
   return [acquisition, income];
 }
 
+/**
+ * A deposit or withdrawal in another fiat currency is booked in euros at the
+ * ECB rate of its own day, like the trade it funds, so Movements shows the
+ * money arriving that the purchase then spends. What is not modelled is the
+ * balance held in that currency in between: Quoin keeps no cash position per
+ * currency, so the gain or loss from the rate moving between the deposit and
+ * the purchase (or the sale and the withdrawal) appears nowhere.
+ */
 function cash(
   refid: string,
   row: KrakenRow,
@@ -256,7 +265,6 @@ function cash(
       type,
       grossAmount: abs(row.amount),
       currency: row.asset,
-      fxToBase: "1",
       account: "kraken",
       source: "KRAKEN_CSV",
       externalId: refid,

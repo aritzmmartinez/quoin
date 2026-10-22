@@ -54,8 +54,8 @@ pnpm test:integration             # migrate deploy against a temp sqlite db
 pnpm verify                       # lint + typecheck + build + test (the four unit-level checks)
 pnpm verify:full                  # verify + test:integration — the full CI gate, run before a tag
 pnpm db:generate                  # prisma generate
-pnpm db:migrate                   # prisma migrate dev — development only
-pnpm db:deploy                    # prisma migrate deploy — apply pending migrations to a ledger
+pnpm db:migrate                   # prisma migrate dev — development only, refuses the ledger
+pnpm db:deploy                    # prisma migrate deploy — backs up the ledger first if pending
 pnpm db:studio
 pnpm db:backup                    # VACUUM INTO data/backups/, keeps the last 30
 pnpm db:seed [--anchor=YYYY-MM-DD]   # synthetic portfolio into the scratch database
@@ -68,6 +68,7 @@ pnpm exposure:map                 # list how every instrument resolves
 pnpm exposure:map <ISIN> <KIND> [LEAF]           # e.g. XS00TEST0003 COMMODITY XAU
 pnpm identity:resolve [--limit N] [--all] [--retry-ambiguous] [--refresh] [--report]
 pnpm ipc:sync [--force-rebase]        # INE consumer price index, national + Bizkaia
+pnpm fx:sync [CODE…]                  # ECB reference rates; default: every non-EUR currency in use
 pnpm target:set                       # show the savings-plan target in force today
 pnpm target:set <file> [--from=YYYY-MM-DD] [--name=…] [--note=…]   # record a version
 pnpm projection:converge              # seed-to-seed spread of p10/p50/p90 at several N
@@ -126,8 +127,9 @@ file at once vs. a preview, a commit and two follow-up steps).
   with fakes); `app/lib/x.server.ts` builds them from Prisma and the real provider. **No
   `*.server.ts` is exported from `app/lib/index.ts`** — that barrel is what components
   import, and one such export pulls Prisma into the client bundle. That exclusion covers
-  all seven `*.server.ts` files, including `real.server.ts` and `version.server.ts`, which
-  have no pure half at all; it is the rule, not a special case for any one of them.
+  every `*.server.ts` file, including `real.server.ts`, `rate-book.server.ts` and
+  `version.server.ts`, which have no pure half at all; it is the rule, not a special case
+  for any one of them.
 - **A destructive option stays CLI-only.** `ipc:sync --force-rebase` replaces a series
   wholesale, so `scripts/ipc-sync.ts` owns the flag and `syncInflation` cannot rebase at
   all: it *reports* `rebaseBlocked`, and the endpoint names the affected series without
@@ -172,6 +174,14 @@ This has caused misdirected generation more than once:
   good symbol. Callers keep going past one: sync reports `unavailable`, the wizard's fill
   and "Rebuild all histories" carry on and name it, `api/ingest` answers 503 and logs it.
   The port is `getQuote(symbol)`, one symbol, because no caller ever asked for two.
+- **Every request to a provider goes through `withTimeout` in `adapters/http`**, which
+  bounds the whole request, body included, and fails it as that provider's unavailable
+  error with the `TimeoutError` as `cause`. Each adapter has its own constant, set from a
+  measurement made on 2026-10-21: Yahoo 15 s (a `max` history 0.46–0.88 s), INE 20 s
+  (0.24–0.58 s), ECB 60 s (41–52 s for the whole history), OpenFIGI 30 s for ten jobs
+  (7.4–8.6 s for ten large-cap ISINs) and 120 s for a hundred, which is extrapolated: no
+  key was used to measure it. The timer is a `setTimeout`, not `AbortSignal.timeout`, so
+  fake timers control it. It also takes an outside signal; no port carries one yet.
 - **`range=max` is not daily, whatever `interval` says.** Measured 2026-10-08: Yahoo
   answers `interval=1d&range=max` with monthly candles for a crypto pair and weekly ones
   for an ETF, each dated at the start of its period but carrying the period's last close — a
@@ -195,6 +205,13 @@ This has caused misdirected generation more than once:
   sync's. Run backfill first and sync second — the requirement is that **both** run;
   ending on the sync just means the last row written is also the newest in time.
 - `PriceSnapshot` is idempotent via `@@unique([instrumentId, asOf])`.
+- **"The last value at or before" is one function: `lastOnOrBefore` in `core/series`**,
+  with `atOrBefore` (instants) and `onOrBeforeDay` (Madrid days) over it. The caller
+  sets the maximum age; the series must be ascending by its key, and an unsorted one
+  returns a wrong value without an error. Kraken rewards, the symbol check and the
+  opportunity cost go through it; write a new lookup through it, never as a fresh loop.
+  The sweeps that carry a last value forward (`computeInvestedVsValueSeries`, the
+  portfolio merge) are not lookups and stay as they are.
 - **A sync fills gaps, then writes at most one live row per Madrid day.** `prices:sync` and
   "Refresh prices" share `syncInstrumentPrices`, one instrument at a time (`inTurn` on the
   client, as "Rebuild all"). It asks Yahoo for daily candles from the Madrid day of the
@@ -204,6 +221,12 @@ This has caused misdirected generation more than once:
   by the clock — on a Saturday it is Friday's close and belongs to Friday. The overlap is
   what heals rows written before `YAHOO_LIVE` existed: they cannot be told apart from
   candles, and nothing tries to.
+- **A sync stops on a failure that is not the provider's.** `haltsSync`: anything but
+  `MarketDataUnavailableError` (the database, a bug) is common to every instrument, so
+  `syncInTurn` (Refresh prices and its row in External data), the wizard's price step
+  and `prices:sync` stop there and say it once with the cause, instead of listing every
+  instrument as an error. `syncInstrumentPrices` records a `PriceSync` check once Yahoo
+  has answered, which is what External data shows as the last update.
 - **Once a day has its candle, that candle is the day's only row** (`planDailyWrite`, applied
   by `PriceRepository.saveDaily` in one transaction). Any other row that Madrid day is
   deleted by id, `YAHOO` or `YAHOO_LIVE`; a candle on an `asOf` already stored updates it.
@@ -226,20 +249,33 @@ This has caused misdirected generation more than once:
   symbol together — an integration test pins that. Two symbols' prices must never share
   a series, so a symbol change only ever goes through it.
 - **`replaceQuoteHistory` fetches everything before it writes anything.** Daily candles
-  first; none, or any not in EUR, returns a failure and touches nothing — a failed Yahoo
-  call must leave the old series intact. Then today's quote, kept only if fresh, in EUR
-  and newer than the last candle, because the newest daily candle can arrive without a
-  close. If that quote is missing and the symbol is unchanged, rows newer than the last
+  first; none returns a failure and touches nothing — a failed Yahoo call must leave the
+  old series intact. Then the rates of the history's currency, from its first day
+  (`ensureRates`): a currency the ECB publishes nothing for fails as `no-rate-series`, an
+  ECB that does not answer as `rates-unavailable`, and neither writes. Then today's quote,
+  kept only if fresh, in the history's own currency and newer than the last candle,
+  because the newest daily candle can arrive without a close. If that quote is missing and the symbol is unchanged, rows newer than the last
   candle are kept (`keepAfter`), so `latest()` never moves back. On a symbol change it
   may: the old rows belong to another security.
-- **"Only EUR is valued" is one function: `foreignCurrency` in `core/domain/money.ts`.**
-  `replaceQuoteHistory` refuses with it, `backfillInstrument` stores nothing and reports
-  `foreignCurrency` (so the wizard's `fill` skips that instrument's sync too),
-  `checkSymbol` carries it so the symbol check warns and `canSave` refuses, and
-  `assignQuoteSymbol` asks the provider for a quote and refuses on the server too, so the
-  `map` endpoint holds when called without the screen. `syncInstrumentPrices` writes
-  nothing when a gap candle is foreign and no live row when the quote is. Write any new
-  check through this function, never as a literal `"EUR"`.
+- **A rate is used two ways, and `core/fx/rates.ts` keeps them apart.** `bookingRate`
+  books a ledger row: the rate of its own TARGET day (`rateDayFor`, a weekend or closing
+  day falls back to the last business day) or nothing, never an older one, because a
+  booked amount is frozen. `valuationRate` values a price: the last rate published on or
+  before the day, at most `VALUATION_RATE_MAX_AGE_DAYS` (7) old, because the day's rate
+  appears around 16:00 and the longest closure (Easter) is under a week. Today's value and
+  every past close go through the same `valuationRate`; today is just `day = today`.
+- **Prices reach euros in one place: `pricesInBase` / `historyInBase` in `core/fx`.** A
+  price with no rate within the week is left out and reported in `unrated`, the
+  `unpricedCount` rule. `computeMarketValues` and `computeOpportunityCost` throw on a
+  price that is not in euros instead of reading it as unpriced, so a loader that skipped
+  the conversion fails loudly. Loaders read prices through `loadValuation`
+  (`rate-book.server.ts`), and `UnratedNotice` names the open positions left out.
+- **The write paths refuse only a currency with no ECB series.** `ensureRates` syncs a
+  currency from the day it is needed and `rateSeriesOf` tells base, published, none and
+  unavailable apart, so an ECB outage is never read as "no rates". Assigning, replacing,
+  backfilling and the symbol check go through it; `syncInstrumentPrices` writes a foreign
+  history as it arrives. Write any new check through `rateSeriesOf`, never as a literal
+  `"EUR"`.
 - **The wizard's `map` only assigns; it cannot replace.** `assignQuoteSymbol` refuses an
   instrument that already has prices and the endpoint sends the user to Instruments.
   Changing a symbol is the `replace` intent, which carries the range and goes through
@@ -298,6 +334,15 @@ ledger while that rule is in force. Useful, but do not mistake it for a sandbox.
   says the statement ran, not that the result opens — and a bad snapshot that still
   counted as one would push the oldest good backup out of the 30-file window, so a single
   corrupt copy would cost two. A failed verification deletes the copy and exits non-zero.
+- **Every script that opens the database calls `announceDatabase()` first**, on stderr:
+  the file, and whether it is the ledger, scratch or neither. It is information, not a
+  fourth defence — `pnpm db:deploy` once went to the ledger while it was believed to go to
+  `dev.sqlite`, and nothing said so. A new script that opens the database calls it too.
+  `scripts/db-which.ts` does it for Prisma's own commands: `deploy` backs the ledger up
+  first when `migrate status` is non-zero (the entrypoint's rule, through the same
+  `backupDatabase` as `db:backup`), `migrate` refuses the ledger. It spawns Prisma as
+  `node_modules/prisma/build/index.js` under `process.execPath`, never through a shell:
+  the checkout path has a space in it.
 - The seed is **synthetic and stays synthetic** — same reason fixtures are (see *Privacy*).
   It encodes the shapes that have caused bugs: `fees ≠ 0`, an unpriced position, a fund
   with no holdings, two funds sharing constituents, a partial sell.
@@ -348,8 +393,9 @@ that caused it. Same failure mode as `LedgerEntry.type`, same defence.
 
 ## Yahoo symbol mapping traps
 
-An ISIN trades on many venues. Always map the **EUR-denominated venue line**, never the
-ISIN itself, and always sanity-check the price magnitude.
+An ISIN trades on many venues. Map a **venue line**, never the ISIN itself, prefer the
+one in euros when there is one (a line in another currency is valued at the ECB rate, and
+picks up that currency's moves), and always sanity-check the price magnitude.
 
 - **Never map an ISIN as a `quoteSymbol`** (e.g. `XS00TEST0003.SG`). Yahoo resolves the
   ISIN to a quote, but has no historical series under that key — `timestamps` and `closes`
@@ -362,14 +408,16 @@ ISIN itself, and always sanity-check the price magnitude.
   `YAHOO_LIVE` rows. `historyStart` counts them on purpose: `SymbolPanel` reads it to
   choose between assigning and replacing, and `assignQuoteSymbol` refuses any instrument
   with a price.
-- **Verify the price magnitude, not just the currency.** Several symbols quote in EUR and
-  pass the currency filter yet are a different fund tracking the same index, or the same
+- **Verify the price magnitude, not just the currency.** Several symbols quote in the
+  expected currency yet are a different fund tracking the same index, or the same
   fund with a different entitlement per certificate — observed at 5.5x, 0.5x and 0.4x the
   correct line. Check the candidate price against the broker's own `amount / quantity` for
   a real trade before committing the mapping.
 - **The symbol check does that comparison itself** (`checkQuoteAgainstLedger`): the last
-  three EUR trades of the instrument, `grossAmount / quantity` against the last close at
-  or before each trade, within a week, never a later one. It downloads only that date
+  three trades of the instrument that have a rate, at their euro amount (`baseOf`) over
+  the quantity, against the last close at or before each trade, within a week, never a
+  later one, converted at the booking rate of the trade's own day; a day with no rate is
+  skipped, never compared across currencies. It downloads only that date
   span. The warning is on the **median** deviation above 10%, so one odd fill does not
   trip it while a 0.4x or 5.5x line always does. Kraken reward buys are excluded: they
   were valued from a price history, so comparing them with one proves nothing.
@@ -479,10 +527,15 @@ manual aliasing was abandoned — 726 confirmations is not a system.
   that does not exist.
 - **OpenFIGI v3 renamed the "not found" key from `error` to `warning`** (v2 shut down
   2026-07-01). Checking only `error` swallows every miss in silence.
-- Resolution happens **at import**, is cached permanently including misses, and runs in
-  **descending weight order** — unauthenticated the endpoint allows 10 jobs per request and
-  25 requests a minute, so five thousand leaves is twenty minutes; ordering by weight means
-  a couple of hundred lookups already cover every row that is drawn.
+- Resolution happens in **`pnpm identity:resolve`**, not when a composition is dropped on
+  Instruments. It is cached permanently including misses, and runs in **descending weight
+  order** — unauthenticated the endpoint allows 10 jobs per request and 25 requests a
+  minute, so five thousand leaves is twenty minutes; ordering by weight means a couple of
+  hundred lookups already cover every row that is drawn.
+- **A miss is an answer; an unanswered request is not.** Because misses are cached for
+  good, a batch that fails (status, network, timeout, a payload that is not an array) must
+  never become `not-found`, as it once did. `resolve` returns `{ resolutions, unavailable }`
+  and stops at the first such batch; the script saves only what was answered.
 
 ## Currency exposure
 
@@ -528,9 +581,27 @@ manual aliasing was abandoned — 726 confirmations is not a system.
   through a hedged fund is one leaf and two different currency exposures; folding at the
   leaf would have to pick one and be wrong for the other. This is the payoff of
   contributions being kept rather than summed.
-- **No FX, and none is needed.** Every amount arriving is already EUR by the valuation
-  invariant. This labels and sums; it never converts. `app/adapters/fx` is still a
-  placeholder, and the IPC pipeline is a price index, not a rate source.
+- **Currency exposure converts nothing.** Every amount arriving is already in euros,
+  because valuation converted each price before it got here (`pricesInBase`). This labels
+  and sums. The currency it reports comes from the leaf, never from the currency the
+  quote line happens to trade in. The IPC pipeline is a price index, not a rate source.
+- **ECB rates: one currency per request, and the sync restarts from the last day
+  stored.** Measured 2026-10-20: asking for several at once (`USD+XYZ`) drops an unknown
+  one silently; alone, it is a 404 with `title: "Not Found"`. A rate for day D appears
+  around 16:00 Madrid, so a sync in the morning finds none for D; restarting from the
+  last day in `FxRate`, never from the last check in `FxSync`, is what asks for D again.
+  A rate that arrives different for a stored day refuses the whole batch.
+- **A series starts a week before its currency was first used, never in 1999.** First
+  use is the earliest `LedgerEntry.ts` or `PriceSnapshot.asOf` in that currency; the
+  week covers a closing as long as Easter. A cold ECB query costs about 1.4 s per year
+  of range (measured 2026-10-20; the whole history since 1999 took 41–52 s), so asking
+  for nothing older than the portfolio is what keeps the sync usable behind a button.
+  A code given by hand and not in use goes back 30 days. The sync goes back again only
+  when a currency's first use is older than its first stored day — an older export
+  imported later — never because the margin fell on days with no rate.
+- **Until 2012 the ECB printed closing days as rows with an empty rate** (`OBS_STATUS=H`
+  in the full detail; `dataonly` shows only the empty value). The parser drops a row
+  with an empty rate and still refuses any other malformed one.
 - A leaf with no known currency lands in its own bucket at full value and is never
   pro-rated — same rule as `UNRESOLVED`, `unpricedCount` and a missing CPI month.
 
@@ -658,9 +729,12 @@ manual aliasing was abandoned — 726 confirmations is not a system.
   a real return against nominal money. The Summary loader builds a second, un-deflated
   series for it. Portfolio TWR is **not** an average of the per-instrument TWRs — a return
   is not additive.
-- Valuation is **EUR-base only, no FX**. Every mapped instrument quotes in EUR. A fund
-  named "USD Acc" states the fund's *denomination* currency, not the currency of the line
-  being bought — it needs no conversion.
+- **Valuation is in euros, and a price in another currency is converted, never mixed.**
+  Today's value uses the last rate published, at most a week old; each past close uses its
+  own day's (`valuationRate`). A position whose currency has no rate in that week is left
+  unvalued exactly like an unpriced one and named. A fund named "USD Acc" states the fund's
+  *denomination* currency, not the currency of the line being bought — a euro line of it
+  needs no conversion.
 - Positions without a usable price are excluded from **both** `totalValue` and
   `totalInvested` (= `pricedCost`, what `returnPct` and the all-time hero change measure
   against), and reported via `unpricedCount` / `unpricedCost`. Adding a cost without its
@@ -873,8 +947,10 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
 - Scope is still BTC-only by choice (`isBtc` in `map.ts`). Measured on a real export:
   most refid groups are set aside — `earn` rewards and `welcomebonus` in other assets. **A discard is classified by what it does to a modelled position, not by asset.**
   `unmodelled-asset` is noise (rewards, transfers and trades of assets Quoin does not
-  track); `crypto-swap` (BTC ↔ another crypto, in either direction), `crypto-transfer`
-  (BTC on-chain in or out) and `reward-unpriced` each leave the BTC position wrong, and
+  track); `crypto-swap` (BTC ↔ another crypto, in either direction — a `stable_coin` is
+  crypto, not fiat), `crypto-transfer` (BTC on-chain in or out), `fx-unavailable` (a row
+  in another currency with no ECB rate for its day, from any adapter, see *CSV
+  ingestion*) and `reward-unpriced` each leave the BTC position wrong, and
   `AFFECTS_POSITION` flags them so the wizard and `pnpm ingest` warn. Every Kraken discard
   carries a per-group detail (date, type, subtype, asset or pair — never amounts).
   `DiscardReason` is a union and its labels are `Record<DiscardReason, string>` in both
@@ -939,7 +1015,40 @@ adding it in **both** places, in the same change.
   is the measured case: `migrate dev` generated a rebuild for a plain new column, so it was
   written with `--create-only` as `ADD COLUMN`. `funding` has its own CHECK
   (`CASH | IN_KIND`), same reason as `type`.
-
+- **Which `fxSource` fits which row is the domain's rule, checked at write, and never a
+  database CHECK.** `ledgerEventWriteSchema` (called by `eventToCreateData`, the only
+  ledger write path) allows `IDENTITY` only for a row in EUR with no `fxRate`,
+  `fxDirection` or `fxDate`, and any other source only for a row in another currency
+  with all three — so nothing new can count a foreign amount one-to-one, as the Kraken
+  mapper once did. The migration CHECKs only the values of `fxSource` and `fxDirection`.
+  A CHECK naming `currency` was written and withdrawn: an existing row that breaks it
+  makes the `ADD COLUMN` itself fail, and ledgers outside this one hold Kraken USD
+  deposits booked at 1:1 before `foreign-fiat` existed — that container would never
+  start. An integration test applies the migration over such a row. Reads stay lenient
+  (`ledgerEventSchema`), the `LedgerEntry.type` lesson: an old row that breaks the rule is
+  read, and `toBase` answers it with an explicit `no-rate` rather than throwing or counting
+  it 1:1. `originalAmount` and `originalCurrency` are informational and constrained by
+  nothing.
+- **Every ledger amount reaches euros through `toBase(event, field)` in `core/fx`**, never
+  a multiplication at the call site. `IDENTITY` returns the amount untouched — a Kraken
+  reward worth a fraction of a cent keeps it. A converted amount divides by `fxRate`
+  (`QUOTE_PER_BASE`, the ECB's currency per euro) or multiplies by it (`BASE_PER_QUOTE`)
+  and is rounded to the cent, `ROUND_HALF_UP`, field by field — dividing by the
+  published rate is exact up to that rounding, where storing its inverse was not, which
+  is why `fxToBase` was dropped.
+- **A row with no rate is excluded and named, never valued at 1:1** — the `unpricedCount`
+  rule, one step earlier. `toBase` returns `{ ok: false, reason: "no-rate" }` for an
+  `IDENTITY` row not in EUR or a conversion missing its rate or direction. `bookable`
+  drops **every** row of an instrument with a trade like that — dropping one trade would
+  unbalance AVCO and FIFO — and a dividend or cash row like that alone. Every core entry
+  point that values the ledger runs it itself (`walkAvco`, `sortTrades` and so FIFO and
+  the tax history, the cost line, contributions, TWR/MWR, the opportunity cost, in-kind
+  income), so no screen can forget it; they then read amounts through `baseOf`, which
+  throws only if that invariant is broken. What is excluded is named: Portfolio and
+  Summary through `unconvertibleInstrumentIds`; the tax view of `/realized` and
+  `pnpm tax:explain` through `taxExclusions`, because a holding missing from a tax
+  report in silence is the worst place for it; Movements keeps the row with "—" and
+  "No exchange rate" instead of an amount, and leaves it out of the net cash flow.
 ## CSV ingestion
 
 **The broker is detected from the header row, never from the filename and never by
@@ -956,6 +1065,23 @@ and are applied defensively to every adapter:
 2. a pre-validation filter dropping any row without a `type` field
 
 Append is idempotent: dedup by `source` + `externalId`.
+
+**`BatchBuilder` converts and applies `ledgerEventWriteSchema` while planning, for every
+adapter.** An event in another currency with no conversion gets the ECB rate of its Madrid
+day through `bookingRate` (`fxSource` ECB, rate, `QUOTE_PER_BASE`, day). With no rate the
+whole operation is set aside as `fx-unavailable` — so a saveback pair is never cut in
+half — the currency and earliest day go into `ratesNeeded`, and the rest of the file
+imports. `planWithRates` plans, syncs what was missing and plans again; the preview,
+the commit, the reward retry and `pnpm ingest` all go through it, so they agree. Kraken
+books a trade, deposit or withdrawal in its own fiat and the batch converts it; the
+balance held in that currency, and its gain or loss, are not modelled. Trade Republic
+keeps its own EUR charge (`IDENTITY`) and stores `original_amount` / `original_currency`
+when both are present; `fx_rate` is not stored. Any other break of the rule
+is a bug in the adapter: `build()` throws `InvalidLedgerEventError` (date, type, currency,
+never amounts), which `api/ingest` turns into a 400 before anything is written,
+instruments included. It throws from `build()`, outside the adapters' per-row `try`,
+because those count an exception as one bad row and carry on. `eventToCreateData` still
+validates as the last line.
 
 ## URL as state
 
@@ -1064,7 +1190,7 @@ the two controls sitting side by side behave differently on purpose.
   that round trip too — still not worth optimising away.
 - **The benchmark setting is a list of eligible instruments, never free text.** Eligible
   is exactly what `loadOpportunityCost` refuses without: a `quoteSymbol` plus at least
-  one EUR close (`benchmarkCandidates`). A stored symbol that stops qualifying stays
+  one close that can be valued in euros (`benchmarkCandidates` over `convertibleStarts`). A stored symbol that stops qualifying stays
   selected and flagged; substituting the first valid option would compare against an
   index nobody chose.
 - **`Copy` is `typeof es`, and `es` is deliberately NOT `as const`.** Literal types there
@@ -1191,7 +1317,7 @@ The image is **public**. Everything below was found by running it, not by readin
   Backing up on every start would rotate the 30-file window out during a restart loop.
   A failed backup stops the start: an unbackupable ledger is never migrated.
 - **`prisma` and `tsx` are `dependencies`, not `devDependencies`.** The runtime stage installs
-  `--prod`, and it needs `prisma migrate deploy` and `tsx` for `db:backup`. Move either back
+  `--prod`, and it needs `prisma migrate deploy` and `tsx` for `db-backup`. Move either back
   and the image builds fine and fails at start.
 - **`*.sh` is forced to LF by `.gitattributes`.** With `core.autocrlf=true` a Windows
   checkout hands `sh` a `\r` on every line.
@@ -1199,18 +1325,18 @@ The image is **public**. Everything below was found by running it, not by readin
   an amd64 runner it took over 25 minutes, nearly all of it `vite build`. Each platform
   pushes by digest and a `merge` job joins them; do not fold the matrix back into one
   `platforms: linux/amd64,linux/arm64` build to "simplify" it.
-- **Only `db:backup` ships as a CLI** (`docker exec quoin npm run db:backup`; the image
-  has no pnpm). Every other command has a screen, except the CLI-only destructive options
-  above (`ipc:sync --force-rebase`, `prices:map --clear`). Adding one means copying its script and
-  every file it imports, and `~/` imports need the tsconfig and `app/` too.
-- **npm stays in the runtime only for `npm run db:backup`, pinned at 11.21.1.** The
-  base image's npm bundles brace-expansion, undici and http-cache-semantics with High
-  CVEs, and so does npm 12.2.0 (latest at the time) — "upgrade to latest" reintroduces
-  them. 0.13.0 removes npm, npx, corepack and yarn and ships a `db-backup` wrapper
-  instead; the entrypoint and the README move with it.
-- **Both `FROM` lines pin `node:24-trixie-slim@sha256:…`** with a `Node x.y.z, Debian n`
-  comment beside them. No `ARG` in a `FROM`: Dependabot cannot resolve it and stops
-  opening the digest PRs that bring Debian fixes. Its PR does not update the comment.
+- **The image carries no npm, npx, corepack, yarn or pnpm, and its only CLI is
+  `db-backup`** (`docker exec quoin db-backup`, `db-backup.sh`), which calls tsx directly.
+  Adding another command to the image means copying its script and every file it
+  imports, and `~/` imports need the tsconfig and `app/` too.
+- **Both `FROM` lines pin `node:24-trixie-slim@sha256:…`** with a `Node n, Debian n`
+  comment beside them, majors only: Dependabot's digest PR does not update the comment, so
+  a patch version there goes stale. No `ARG` in a `FROM`: Dependabot cannot resolve it and
+  stops opening the digest PRs that bring Debian fixes.
+- **The Node major lives in `.node-version`** (CI reads it through `node-version-file`) and
+  is bumped by hand, in one change, there, in both `FROM` lines, in `@types/node` and in the
+  `engines.node` floor; Dependabot ignores its majors and `scripts/node-version.test.ts`
+  fails while any of them disagree.
 - **`docker.yml` fails on a Critical or High with a fix (`only-fixed`), not on every
   one.** A CVE with no fix anywhere would leave the pipeline red with nothing to do.
   Dependabot's PRs run with Dependabot's secrets, not the repository's, so the scan

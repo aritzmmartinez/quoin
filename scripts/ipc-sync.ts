@@ -4,11 +4,15 @@ import { argv, exit } from "node:process";
 
 import { IneInflationProvider } from "~/adapters/inflation";
 import { PrismaInflationRepository, prisma } from "~/adapters/persistence";
+import { describeFailure } from "~/lib/describe-failure";
 import { runInflationSync } from "~/lib/ipc-sync.server";
+
+import { announceDatabase } from "./lib/db-target";
 
 const FORCE_REBASE = "--force-rebase";
 
 async function main(): Promise<void> {
+  announceDatabase();
   const force = argv.includes(FORCE_REBASE);
 
   const result = await runInflationSync();
@@ -54,8 +58,8 @@ async function main(): Promise<void> {
   const repository = new PrismaInflationRepository();
   const provider = new IneInflationProvider();
   for (const series of result.rebaseBlocked) {
-    await repository.deleteSeries(series);
     const incoming = await provider.getSeries(series);
+    await repository.deleteSeries(series);
     const count = await repository.saveMany(incoming);
     await repository.markChecked(series);
     console.log(
@@ -66,10 +70,7 @@ async function main(): Promise<void> {
 
 main()
   .catch((error: unknown) => {
-    console.error(
-      "\nIPC sync failed:",
-      error instanceof Error ? error.message : error,
-    );
+    console.error("\nIPC sync failed:", describeFailure(error));
     exit(1);
   })
   .finally(() => prisma.$disconnect());

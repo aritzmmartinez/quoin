@@ -1,6 +1,6 @@
 {
   "name": "quoin",
-  "version": "0.12.1",
+  "version": "0.13.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,8 +10,8 @@
     "typecheck": "react-router typegen && tsc",
     "lint": "eslint .",
     "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
-    "db:deploy": "prisma migrate deploy",
+    "db:migrate": "tsx scripts/db-which.ts migrate && prisma migrate dev",
+    "db:deploy": "tsx scripts/db-which.ts deploy && prisma migrate deploy",
     "db:studio": "prisma studio",
     "db:backup": "tsx scripts/db-backup.ts",
     "db:seed": "tsx scripts/db-guard.ts \"seed the demo database\" && prisma migrate deploy && tsx scripts/seed-demo.ts",
@@ -21,6 +21,7 @@
     "prices:backfill": "tsx scripts/prices-backfill.ts",
     "prices:rebuild": "tsx scripts/prices-rebuild.ts",
     "ipc:sync": "tsx scripts/ipc-sync.ts",
+    "fx:sync": "tsx scripts/fx-sync.ts",
     "exposure:map": "tsx scripts/exposure-map.ts",
     "target:set": "tsx scripts/target-set.ts",
     "twr:explain": "tsx scripts/twr-explain.ts",
@@ -41,37 +42,40 @@
     "@react-router/serve": "8.4.0",
     "better-sqlite3": "^12.11.1",
     "decimal.js": "^10.6.0",
-    "dotenv": "^18.0.3",
+    "dotenv": "^18.0.8",
     "isbot": "^5.2.2",
-    "lucide-react": "^1.47.0",
+    "lucide-react": "^1.58.0",
     "papaparse": "^5.7.0",
     "prisma": "^7.10.1",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "react-router": "8.4.0",
     "recharts": "^3.10.1",
     "sonner": "^2.0.8",
     "tsx": "^4.23.15",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@react-router/dev": "8.4.0",
     "@tailwindcss/vite": "^4.3.3",
     "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^22.20.1",
+    "@types/node": "^24.19.2",
     "@types/papaparse": "^5.5.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "eslint": "^10.11.0",
+    "eslint": "^10.13.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.70.1",
-    "vite": "^8.3.0",
-    "vitest": "^5.0.1"
+    "typescript-eslint": "^8.71.2",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.5"
   },
   "description": "Personal, open-source, local-first investment platform with portquoin analytics, look-through exposure and Bizkaia foral tax support.",
   "license": "AGPL-3.0-only",
+  "engines": {
+    "node": ">=24"
+  },
   "packageManager": "pnpm@12.6.0"
 }

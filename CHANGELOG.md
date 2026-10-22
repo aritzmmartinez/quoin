@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-10-22
+
+### Upgrading
+- After this update, an older version can no longer open the database. The Docker image backs up the ledger before migrating; to go back, restore that backup (see *Updating* in the README).
+- If you hold anything quoted in another currency, open Settings → External data and update exchange rates.
+
+### Added
+- Multi-currency: instruments and trades in other currencies are converted to euros at the European Central Bank's reference rate, each trade at its own day's rate and today's value at the latest one.
+- Kraken and Trade Republic imports convert trades in other currencies instead of setting them aside.
+- Settings → External data: prices, CPI and exchange rates in one place, each with its last update and an Update now button.
+- The benchmark can be an instrument in any currency the ECB publishes.
+
+### Changed
+- Opportunity cost no longer uses a benchmark close more than a week older than a purchase, and names the purchases it leaves out.
+- From source: every command says which database it uses, `db:deploy` backs up the ledger before migrating, `db:migrate` refuses to touch it, and `pnpm fx:sync` downloads exchange rates.
+
+### Removed
+- npm, npx, corepack and yarn from the Docker image. Back up with `docker exec quoin db-backup`.
+
+### Fixed
+- Kraken trades, deposits and withdrawals in another currency were recorded as if they were in euros.
+- Entries in another currency with no exchange rate counted as euros. They are now left out and named.
+- A provider that did not answer (Yahoo, INE, OpenFIGI) could leave the app waiting with no end. Requests now time out.
+- `identity:resolve` no longer marks as not found what OpenFIGI failed to answer.
+- Notices no longer tell you to run commands the Docker image does not have.
+- Clearer messages: the ECB is named when it is the one failing, a failure common to every instrument is reported once, and prices in the symbol check are formatted like every other amount.
+
 ## [0.12.1] - 2026-10-18
 
 ### Upgrading
@@ -383,7 +410,8 @@ fund holdings must be supplied as CSV rather than the Excel most issuers publish
 Design rationale lives beside the code it explains, in `docs/ARCHITECTURE.md` and in the
 commit history — not here.
 
-[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.12.1...HEAD
+[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/aritzmmartinez/quoin/compare/v0.12.1...v0.13.0
 [0.12.1]: https://github.com/aritzmmartinez/quoin/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/aritzmmartinez/quoin/compare/v0.11.1...v0.12.0
 [0.11.1]: https://github.com/aritzmmartinez/quoin/compare/v0.11.0...v0.11.1

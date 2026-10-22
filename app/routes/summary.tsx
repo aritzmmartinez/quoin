@@ -12,6 +12,7 @@ import {
   AllocationCard,
   BasisNotice,
   Card,
+  Explainer,
   PortfolioEmpty,
   SetupChecklist,
   SummaryHero,
@@ -44,6 +45,8 @@ import {
   exposureKindLabel,
   filterByRange,
   heldValuesByInstrument,
+  intlTag,
+  namesOf,
   parseBenchmark,
   parseLocale,
   parseRange,
@@ -52,9 +55,13 @@ import {
   useCopy,
 } from "~/lib";
 
+import { UnratedNotice } from "~/components/ui/UnratedNotice";
 import { BASE_CURRENCY, type Revalue } from "~/core/domain";
+import { historyInBase, unconvertibleInstrumentIds } from "~/core/fx";
 import { firstEventByInstrument } from "~/lib/history-start";
 import { loadOpportunityCost } from "~/lib/opportunity-cost.server";
+import { loadValuation } from "~/lib/rate-book.server";
+import { openInstrumentIds, unratedNames } from "~/lib/unrated";
 import { resolveRealView } from "~/lib/real.server";
 import { createServerTiming } from "~/lib/server-timing";
 
@@ -80,7 +87,8 @@ export function headers({ loaderHeaders }: Route.HeadersArgs) {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const range = parseRange(new URL(request.url).searchParams);
-  const t = copyFor(parseLocale(request.headers.get("Cookie")));
+  const locale = parseLocale(request.headers.get("Cookie"));
+  const t = copyFor(locale);
   const priceRepository = new PrismaPriceRepository();
   const timing = createServerTiming();
 
@@ -90,9 +98,11 @@ export async function loader({ request }: Route.LoaderArgs) {
   const instruments = await timing.time("db-instruments", () =>
     new PrismaInstrumentRepository().list(),
   );
-  const prices = await timing.time("db-prices-latest", () =>
-    priceRepository.latest(),
+  const now = new Date();
+  const valuation = await timing.time("db-prices-latest", () =>
+    loadValuation(now),
   );
+  const { prices } = valuation;
 
   const real = await timing.time("real-view", () =>
     resolveRealView(request, events),
@@ -146,22 +156,20 @@ export async function loader({ request }: Route.LoaderArgs) {
     ),
   );
 
-  const now = new Date();
+  const marks = histories.map((history) =>
+    historyInBase(history, valuation.book).history.map((snapshot) => ({
+      asOf: snapshot.asOf,
+      price: snapshot.price,
+    })),
+  );
   const buildSeries = (revalue?: Revalue) =>
     computePortfolioInvestedVsValueSeries(
       heldIds.map((id, index) =>
         computeInvestedVsValueSeries(
           included,
           id,
-          (histories[index] ?? [])
-            .filter((snapshot) => snapshot.currency === BASE_CURRENCY)
-            .map((snapshot) => ({
-              asOf: snapshot.asOf,
-              price: snapshot.price,
-            })),
-          prices.get(id)?.currency === BASE_CURRENCY
-            ? (prices.get(id)?.price ?? null)
-            : null,
+          marks[index] ?? [],
+          prices.get(id)?.price ?? null,
           now,
           revalue,
         ),
@@ -184,7 +192,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     loadOpportunityCost(
       events,
       instruments,
-      prices,
+      valuation,
       parseBenchmark(request.headers.get("Cookie")),
       now,
     ),
@@ -218,6 +226,13 @@ export async function loader({ request }: Route.LoaderArgs) {
       allocation,
       top,
       range,
+      noRate: namesOf(unconvertibleInstrumentIds(events), instruments),
+      unrated: unratedNames(
+        valuation.unrated,
+        instruments,
+        openInstrumentIds(positions),
+        intlTag(locale),
+      ),
       real: {
         basis: real.basis,
         active: real.active,
@@ -251,6 +266,8 @@ export default function Summary({ loaderData }: Route.ComponentProps) {
     change,
     series,
     real,
+    noRate,
+    unrated,
   } = loaderData;
   const t = useCopy();
   const hasPositions = summary.pricedCount > 0 || summary.unpricedCount > 0;
@@ -279,6 +296,11 @@ export default function Summary({ loaderData }: Route.ComponentProps) {
   return (
     <div className="flex flex-col gap-6">
       <BasisNotice {...real} />
+
+      {noRate.length > 0 && (
+        <Explainer tone="notice">{t.common.noRateExcluded(noRate)}</Explainer>
+      )}
+      <UnratedNotice unrated={unrated} />
 
       <SummaryHero
         totalValue={summary.totalValue}

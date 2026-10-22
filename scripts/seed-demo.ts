@@ -28,7 +28,6 @@ interface DemoInstrument {
   id: string;
   name: string;
   type: string;
-  currency: string;
   assetClass: string | null;
   quoteSymbol: string | null;
   exposureKind: string | null;
@@ -46,7 +45,6 @@ const INSTRUMENTS: readonly DemoInstrument[] = [
     id: "IE00DEMO0001",
     name: "Demo World Equity UCITS ETF Acc",
     type: "ETF",
-    currency: "EUR",
     assetClass: "FUND",
     quoteSymbol: "DEMOW.DE",
     exposureKind: "EQUITY_FUND",
@@ -60,7 +58,6 @@ const INSTRUMENTS: readonly DemoInstrument[] = [
     id: "IE00DEMO0002",
     name: "Demo Physical Gold ETC",
     type: "ETF",
-    currency: "EUR",
     assetClass: "SYNTHETIC",
     quoteSymbol: "DEMOG.DE",
     exposureKind: "COMMODITY",
@@ -75,7 +72,6 @@ const INSTRUMENTS: readonly DemoInstrument[] = [
     id: "NL00DEMO0003",
     name: "Demo Semiconductors NV",
     type: "STOCK",
-    currency: "EUR",
     assetClass: "STOCK",
     quoteSymbol: "DEMS.AS",
     exposureKind: "COMPANY",
@@ -90,7 +86,6 @@ const INSTRUMENTS: readonly DemoInstrument[] = [
     id: "BTC",
     name: "Bitcoin",
     type: "CRYPTO",
-    currency: "EUR",
     assetClass: "CRYPTO",
     quoteSymbol: "BTC-EUR",
     exposureKind: "CRYPTO",
@@ -105,7 +100,6 @@ const INSTRUMENTS: readonly DemoInstrument[] = [
     id: "IE00DEMO0005",
     name: "Demo Europe Small Cap UCITS ETF",
     type: "ETF",
-    currency: "EUR",
     assetClass: "FUND",
     quoteSymbol: "DEMOE.DE",
     exposureKind: "EQUITY_FUND",
@@ -119,7 +113,6 @@ const INSTRUMENTS: readonly DemoInstrument[] = [
     id: "LU00DEMO0006",
     name: "Demo Global Aggregate Bond Fund",
     type: "ETF",
-    currency: "EUR",
     assetClass: "FUND",
     quoteSymbol: null,
     exposureKind: "BOND_FUND",
@@ -233,7 +226,6 @@ interface LedgerRow {
   fees: string;
   taxWithheld: string;
   currency: string;
-  fxToBase: string;
   account: string;
   source: string;
   externalId: string;
@@ -278,7 +270,6 @@ function buildLedger(
       fees: fee.toFixed(2),
       taxWithheld: "0",
       currency: "EUR",
-      fxToBase: "1",
       account: "demo-broker",
       source: "DEMO",
       externalId: `DEMO-${id}`,
@@ -306,7 +297,6 @@ function buildLedger(
       fees: "0",
       taxWithheld: taxWithheld.toFixed(2),
       currency: "EUR",
-      fxToBase: "1",
       account: "demo-broker",
       source: "DEMO",
       externalId: `DEMO-${id}`,
@@ -387,7 +377,6 @@ function buildLedger(
     fees: "1.00",
     taxWithheld: "0",
     currency: "EUR",
-    fxToBase: "1",
     account: "demo-broker",
     source: "DEMO",
     externalId: "DEMO-9001",
@@ -519,7 +508,13 @@ async function main(): Promise<void> {
   );
 
   const ledger = buildLedger(anchor, seriesById);
-  await prisma.ledgerEntry.createMany({ data: ledger });
+  await prisma.ledgerEntry.createMany({
+    data: ledger.map((row) => ({
+      ...row,
+      originalAmount: row.grossAmount,
+      originalCurrency: row.currency,
+    })),
+  });
 
   let snapshots = 0;
   for (const [instrumentId, series] of seriesById) {

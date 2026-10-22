@@ -151,3 +151,44 @@ describe("parseYahooChartHistory", () => {
     expect(parseYahooChartHistory(null, "X")).toEqual([]);
   });
 });
+
+describe("minor currency units", () => {
+  const quoted = (currency: string, regularMarketPrice: number) => ({
+    chart: {
+      result: [
+        {
+          meta: {
+            currency,
+            regularMarketPrice,
+            regularMarketTime: 1_751_363_100,
+          },
+          timestamp: [1_751_363_100],
+          indicators: { quote: [{ close: [regularMarketPrice] }] },
+        },
+      ],
+    },
+  });
+
+  it.each([
+    ["GBp", "GBP"],
+    ["ZAc", "ZAR"],
+    ["ILA", "ILS"],
+  ])("states a %s price in %s, a hundredth of the figure", (minor, major) => {
+    const json = quoted(minor, 1234.5);
+
+    expect(parseYahooChart(json, "X")).toMatchObject({
+      price: "12.345",
+      currency: major,
+    });
+    expect(parseYahooChartHistory(json, "X")).toMatchObject([
+      { price: "12.345", currency: major },
+    ]);
+  });
+
+  it("keeps a price already in a major unit exactly as it was", () => {
+    expect(parseYahooChart(quoted("GBP", 12.345), "X")).toMatchObject({
+      price: "12.345000",
+      currency: "GBP",
+    });
+  });
+});

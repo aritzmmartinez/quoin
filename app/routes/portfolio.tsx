@@ -5,18 +5,20 @@ import type { Route } from "./+types/portfolio";
 
 import {
   Card,
+  Explainer,
   IngestModal,
   PortfolioEmpty,
   PortfolioTable,
   SignedMoney,
   SyncPricesButton,
 } from "~/components";
+import { UnratedNotice } from "~/components/ui/UnratedNotice";
 import {
   PrismaInstrumentRepository,
   PrismaLedgerRepository,
-  PrismaPriceRepository,
 } from "~/adapters/persistence";
 import { BASE_CURRENCY } from "~/core/domain";
+import { unconvertibleInstrumentIds } from "~/core/fx";
 import {
   computeMarketValues,
   computePositions,
@@ -26,6 +28,8 @@ import {
   type Copy,
   copyFor,
   copyFromMatches,
+  intlTag,
+  namesOf,
   parseLocale,
   parseSort,
   sortPortfolioRows,
@@ -38,6 +42,8 @@ import {
   useCopy,
   useFormat,
 } from "~/lib";
+import { loadValuation } from "~/lib/rate-book.server";
+import { unratedNames } from "~/lib/unrated";
 
 export function meta({ matches }: Route.MetaArgs) {
   const t = copyFromMatches(matches);
@@ -53,15 +59,20 @@ export async function loader({ request }: Route.LoaderArgs) {
   const sort = parseSort(new URL(request.url).searchParams);
   const locale = parseLocale(request.headers.get("Cookie"));
 
-  const [events, instruments, prices] = await Promise.all([
+  const [events, instruments, valuation] = await Promise.all([
     new PrismaLedgerRepository().list(),
     new PrismaInstrumentRepository().list(),
-    new PrismaPriceRepository().latest(),
+    loadValuation(),
   ]);
+  const { latest: prices } = valuation;
 
   const positions = computePositions(events);
   const tradeMeta = computeTradeMeta(events);
-  const marketValues = computeMarketValues(positions, prices, BASE_CURRENCY);
+  const marketValues = computeMarketValues(
+    positions,
+    valuation.prices,
+    BASE_CURRENCY,
+  );
 
   const rows = sortPortfolioRows(
     toPortfolioRows(positions, instruments, tradeMeta, marketValues),
@@ -94,6 +105,13 @@ export async function loader({ request }: Route.LoaderArgs) {
     value: totalMarketValue(rows),
     unrealized: totalUnrealizedPnL(rows),
     updatedAt,
+    noRate: namesOf(unconvertibleInstrumentIds(events), instruments),
+    unrated: unratedNames(
+      valuation.unrated,
+      instruments,
+      openIds,
+      intlTag(locale),
+    ),
   };
 }
 
@@ -109,6 +127,8 @@ export default function Portfolio({ loaderData }: Route.ComponentProps) {
     updatedAt,
     syncTargets,
     unmapped,
+    noRate,
+    unrated,
   } = loaderData;
   const navigation = useNavigation();
   const busy = navigation.state === "loading";
@@ -121,7 +141,9 @@ export default function Portfolio({ loaderData }: Route.ComponentProps) {
             {rows.length > 0 && (
               <span className="text-[13px] text-muted">
                 {t.portfolio.summary(rows.length, formatMoney(invested))}
-                {value !== null && <> · {t.portfolio.value(formatMoney(value))}</>}
+                {value !== null && (
+                  <> · {t.portfolio.value(formatMoney(value))}</>
+                )}
               </span>
             )}
             {unrealized !== null && (
@@ -146,6 +168,13 @@ export default function Portfolio({ loaderData }: Route.ComponentProps) {
           </div>
         )}
       </header>
+
+      {noRate.length > 0 && (
+        <Explainer tone="notice" className="mb-4">
+          {t.common.noRateExcluded(noRate)}
+        </Explainer>
+      )}
+      <UnratedNotice unrated={unrated} className="mb-4" />
 
       <Card>
         {rows.length === 0 ? (

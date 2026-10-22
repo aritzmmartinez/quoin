@@ -129,11 +129,23 @@ function Cell({
     case "costs":
       return (
         <span className="text-muted">
-          {Number(row.costs) === 0 ? DASH : formatMoney(row.costs)}
+          {row.costs === null || Number(row.costs) === 0
+            ? DASH
+            : formatMoney(row.costs)}
         </span>
       );
 
     case "amount":
-      return <span className="font-medium">{formatMoney(row.amount)}</span>;
+      return row.amount === null ? (
+        <span
+          className="whitespace-nowrap text-muted"
+          title={t.movements.noRate(row.currency)}
+          aria-label={t.movements.noRate(row.currency)}
+        >
+          {DASH} {t.movements.noRateLabel}
+        </span>
+      ) : (
+        <span className="font-medium">{formatMoney(row.amount)}</span>
+      );
   }
 }
