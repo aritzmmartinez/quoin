@@ -3,6 +3,7 @@ import Decimal from "decimal.js";
 import {
   Money,
   isInKind,
+  isSwapLeg,
   type LedgerEvent,
   type Revalue,
   type TradeEvent,
@@ -61,7 +62,7 @@ export function computeTotalContributed(
 ): string {
   let total = Money.zero();
   for (const e of bookable(events)) {
-    if (e.type !== "BUY" || isInKind(e)) continue;
+    if (e.type !== "BUY" || isInKind(e) || isSwapLeg(e)) continue;
     const paid = Money.fromString(
       baseAmount(e, "grossAmount").plus(baseAmount(e, "fees")).toString(),
     );
@@ -99,7 +100,9 @@ export function computeReturns(
     .slice()
     .sort((a, b) => a.ts.getTime() - b.ts.getTime());
 
-  const buys = trades.filter((t) => t.type === "BUY" && !isInKind(t));
+  const buys = trades.filter(
+    (t) => t.type === "BUY" && !isInKind(t) && !isSwapLeg(t),
+  );
 
   const totalInvested = buys.reduce(
     (sum, b) =>
@@ -201,6 +204,7 @@ interface PortfolioFlow {
 function portfolioFlows(events: readonly LedgerEvent[]): PortfolioFlow[] {
   return bookable(events)
     .filter(isTrade)
+    .filter((t) => !isSwapLeg(t))
     .map((t) => {
       const gross = baseAmount(t, "grossAmount");
       const fees = baseAmount(t, "fees");

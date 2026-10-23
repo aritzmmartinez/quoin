@@ -4,6 +4,7 @@ import {
   BASE_CURRENCY,
   Money,
   isInKind,
+  isSwapLeg,
   type LedgerEvent,
   type TradeEvent,
 } from "../domain";
@@ -177,6 +178,7 @@ export function computeOpportunityCost(
 
     if (trade.type === "SELL") {
       bucket.quantity = bucket.quantity.minus(trade.quantity);
+      if (isSwapLeg(trade)) continue;
       const net = gross.subtract(fees);
       bucket.proceeds = bucket.proceeds.add(net);
       bucket.flows.push({ t, amount: net.toNumber() });
@@ -184,7 +186,7 @@ export function computeOpportunityCost(
     }
 
     bucket.quantity = bucket.quantity.plus(trade.quantity);
-    if (isInKind(trade)) continue;
+    if (isInKind(trade) || isSwapLeg(trade)) continue;
     const spent = gross.add(fees);
     bucket.contributed = bucket.contributed.add(spent);
     bucket.flows.push({ t, amount: spent.negate().toNumber() });

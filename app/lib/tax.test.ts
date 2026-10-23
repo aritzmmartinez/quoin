@@ -126,6 +126,31 @@ describe("buildTaxYearView", () => {
     expect(Number(view.quota)).toBeGreaterThan(0);
   });
 
+  it("states no scale and no quota for a year the scale table does not cover, but still the base", () => {
+    const link = { linkId: "refid-1", linkKind: "swap" };
+    const events = [
+      trade("BUY", "ETH", "10", "1000", { ts: "2025-01-05" }),
+      { ...trade("SELL", "ETH", "4", "480", { ts: "2025-03-10" }), ...link },
+      {
+        ...trade("BUY", "BTC", "0.0099", "470", { ts: "2025-03-10", fees: "5" }),
+        ...link,
+      },
+    ];
+    const view = buildTaxYearView(
+      events,
+      [
+        instrument("ETH", "Ether", "CRYPTO"),
+        instrument("BTC", "Bitcoin", "CRYPTO"),
+      ],
+      2025,
+    );
+
+    expect(view.sales).toHaveLength(1);
+    expect(view.netSavingsBase).toBe("75");
+    expect(view.scale).toBeNull();
+    expect(view.quota).toBeNull();
+  });
+
   it("shows a deferred loss with its breakdown and the units that carry it", () => {
     const buy1 = trade("BUY", "X", "10", "1000", { ts: "2025-01-01" });
     const sell = trade("SELL", "X", "10", "700", { ts: "2025-06-01" });
