@@ -73,8 +73,9 @@ docker run -d --name quoin -p 127.0.0.1:3000:3000 -v quoin-data:/app/data --rest
 ```
 
 Then open http://localhost:3000 and bring in your trades with **Import trades** on the
-Portfolio screen: drop the CSV export from Trade Republic or Kraken (Kraken: BTC only for
-now; other assets are listed as discarded), exactly as you downloaded it, and the wizard
+Portfolio screen: drop the CSV export from Trade Republic or Kraken (Kraken: every asset
+bought or sold against fiat; swaps between two crypto assets are not supported yet and are
+listed as discarded), exactly as you downloaded it, and the wizard
 takes it through symbols, prices and a summary. The broker is detected from the file's
 columns. Importing the same file again adds nothing.
 

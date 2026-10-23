@@ -10,8 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Tax: a loss sale whose repurchase window is still open says until when, since a purchase before then can still defer it.
 - Tax: a sale of a bond, commodity or cash instrument is named, since no repurchase rule covers it.
+- Kraken: every asset bought or sold against fiat is imported, not only Bitcoin. Swaps between two crypto assets are still set aside.
+- Kraken: rewards in any asset are valued at the figure Kraken gives in the export, and at the price history only when it gives none.
+- Kraken: moves between your own Kraken wallets create nothing, and a transfer with another account is stored as cash and flagged.
+- Kraken: the mapping step suggests `<CODE>-EUR` for each crypto asset, and says what to try when Yahoo has no price for it.
+- Each ledger row records where its value came from.
 
 ### Changed
+- Kraken: an export without the wallet column, the older format, is refused. Download a new one from Kraken.
+- Kraken: a file whose balances do not follow from its rows is refused whole, naming the asset, wallet and time, before anything is written.
+- Kraken: an import no longer renames an instrument that already exists.
 - Tax: from 2025, a crypto loss with a purchase of the same asset in the two months before or after is deferred (Art. 43.i, NF 6/2025), whichever broker each trade was at. Crypto sold before 2025 is unchanged.
 - Import: a crypto row whose symbol is not an asset code is set aside and named instead of becoming an instrument of its own.
 
@@ -20,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Quantities are shown to ten decimals without losing digits on large holdings.
 - A Kraken reward was valued at the close of its own day, published hours after it; it now takes the last close already published. Rewards already imported are not revalued.
 - The symbol check compared each trade with a close published after it; it now uses the last one before.
+- Unit prices below a cent are shown with significant digits in Portfolio, the instrument chart, Instruments and Realised.
+- The symbol check compares against Kraken rewards only when Kraken valued them.
 
 ## [0.13.0] - 2026-10-22
 
