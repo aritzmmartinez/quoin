@@ -231,7 +231,9 @@ function InstrumentRow({ item }: { item: InstrumentListItem }) {
 
       {item.noDailyHistory && !mapping && (
         <p className="px-gutter pb-3 text-[12px] text-body">
-          {copy.noDailyHistory}
+          {item.type === "CRYPTO"
+            ? copy.noDailyHistoryCrypto(item.id)
+            : copy.noDailyHistory}
         </p>
       )}
 

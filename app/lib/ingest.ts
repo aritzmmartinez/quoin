@@ -1,4 +1,7 @@
 import type { Broker, ImportSummary } from "~/adapters/ingestion";
+import type { Instrument } from "~/core/domain";
+
+import type { Copy } from "./i18n";
 
 import type { BackfillReport } from "./prices-backfill";
 
@@ -6,6 +9,48 @@ export interface PendingMapping {
   instrumentId: string;
   name: string;
   quantity: string;
+  suggested: string | null;
+  cryptoCode: string | null;
+}
+
+/**
+ * Yahoo quotes a crypto asset as `<CODE>-EUR`, except where the code is shared
+ * and Yahoo appends its own number, or no euro line exists. Each exception is
+ * checked by hand before it goes in; the symbol check still decides.
+ *
+ * - PEPE: `PEPE24478-EUR` answers 404 and `PEPE24478-USD` has daily history
+ *   (measured 2026-10-22); the dollar line is valued at the ECB rate.
+ */
+const CRYPTO_SYMBOLS: Readonly<Record<string, string>> = {
+  PEPE: "PEPE24478-USD",
+};
+
+export function cryptoCodeOf(instrument: Instrument): string | null {
+  return instrument.type === "CRYPTO" ? instrument.id : null;
+}
+
+export function noQuoteMessage(
+  t: Copy,
+  cryptoCode: string | null,
+  symbol: string,
+): string {
+  return cryptoCode === null
+    ? t.ingest.map.noQuote(symbol)
+    : t.ingest.map.noQuoteCrypto(symbol, cryptoCode);
+}
+
+export function noDailyHistoryMessage(
+  t: Copy,
+  cryptoCode: string | null,
+): string {
+  return cryptoCode === null
+    ? t.ingest.map.noDailyHistory
+    : t.ingest.map.noDailyHistoryCrypto(cryptoCode);
+}
+
+export function suggestedQuoteSymbol(instrument: Instrument): string | null {
+  if (instrument.type !== "CRYPTO") return null;
+  return CRYPTO_SYMBOLS[instrument.id] ?? `${instrument.id}-EUR`;
 }
 
 export interface IngestPreview {

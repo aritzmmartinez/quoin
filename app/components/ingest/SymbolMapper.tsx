@@ -2,7 +2,7 @@ import { useReducer } from "react";
 
 import type { SymbolCheck } from "~/lib/symbol-check";
 
-import { useCopy, useFormat } from "~/lib";
+import { noDailyHistoryMessage, useCopy, useFormat } from "~/lib";
 import { Button } from "../ui/Button";
 import { postIngest } from "./api";
 import {
@@ -19,6 +19,8 @@ import {
 export function SymbolMapper({
   instrumentId,
   stored,
+  suggested = null,
+  cryptoCode = null,
   saveLabel,
   disabled = false,
   onSave,
@@ -27,6 +29,8 @@ export function SymbolMapper({
 }: {
   instrumentId: string;
   stored: string | null;
+  suggested?: string | null;
+  cryptoCode?: string | null;
   saveLabel: string;
   disabled?: boolean;
   onSave: (symbol: string) => Promise<string | null>;
@@ -40,7 +44,7 @@ export function SymbolMapper({
   const copy = t.ingest.map;
   const [state, dispatch] = useReducer(
     mapperReducer,
-    stored ?? "",
+    stored ?? suggested ?? "",
     initialMapper,
   );
   const symbol = trimmedSymbol(state);
@@ -110,7 +114,9 @@ export function SymbolMapper({
         )}
       </div>
 
-      {isVerified(state) && state.check && <CheckDetail check={state.check} />}
+      {isVerified(state) && state.check && (
+        <CheckDetail check={state.check} cryptoCode={cryptoCode} />
+      )}
 
       {state.error && (
         <p className="mt-2 text-[12px] text-negative">{state.error}</p>
@@ -119,11 +125,16 @@ export function SymbolMapper({
   );
 }
 
-function CheckDetail({ check }: { check: SymbolCheck }) {
+function CheckDetail({
+  check,
+  cryptoCode,
+}: {
+  check: SymbolCheck;
+  cryptoCode: string | null;
+}) {
   const {
     formatAmount,
     formatDate,
-    formatMoney,
     formatPercent,
     formatPrice,
     formatRelativeTime,
@@ -160,7 +171,9 @@ function CheckDetail({ check }: { check: SymbolCheck }) {
         <p className="mt-1 text-negative">{t.fx.sync.unavailable}</p>
       )}
       {!check.dailyHistory && (
-        <p className="mt-1 text-negative">{copy.noDailyHistory}</p>
+        <p className="mt-1 text-negative">
+          {noDailyHistoryMessage(t, cryptoCode)}
+        </p>
       )}
       {!check.fresh && <p className="mt-1 text-negative">{copy.stale}</p>}
 
@@ -175,8 +188,8 @@ function CheckDetail({ check }: { check: SymbolCheck }) {
               >
                 {copy.tradeLine(
                   formatDate(trade.ts),
-                  formatMoney(trade.traded),
-                  formatMoney(trade.close),
+                  formatPrice(trade.traded),
+                  formatPrice(trade.close),
                   formatPercent(trade.deviation, 1, { signed: true }),
                 )}
               </li>

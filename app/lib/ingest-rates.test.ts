@@ -11,6 +11,7 @@ const batch = (needed: [string, string][], total: number): MappedBatch => ({
   operationOf: [],
   discarded: {},
   discardedDetails: {},
+  noticed: {},
   errors: 0,
   ratesNeeded: new Map(needed),
 });

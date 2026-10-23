@@ -4,7 +4,7 @@ export const DISCARD_REASONS = [
   "reward-unpriced",
   "fx-unavailable",
   "invalid-crypto-code",
-  "unmodelled-asset",
+  "internal-move",
   "card-spending",
   "saveback-unpaired",
   "unsupported",
@@ -18,11 +18,18 @@ export const AFFECTS_POSITION: Record<DiscardReason, boolean> = {
   "reward-unpriced": true,
   "fx-unavailable": true,
   "invalid-crypto-code": true,
-  "unmodelled-asset": false,
+  "internal-move": false,
   "card-spending": false,
   "saveback-unpaired": false,
   unsupported: false,
 };
+
+export const NOTICE_REASONS = [
+  "account-transfer",
+  "internal-booked-as-reward",
+] as const;
+
+export type NoticeReason = (typeof NOTICE_REASONS)[number];
 
 export interface DiscardDetail {
   date: string;

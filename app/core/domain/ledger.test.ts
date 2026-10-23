@@ -111,6 +111,28 @@ describe("ledgerEventWriteSchema", () => {
     ).toBe(true);
   });
 
+  it.each(["kraken-amountusd", "yahoo"])(
+    "accepts the valuation source %s, and a row with none",
+    (valuationSource) => {
+      expect(
+        ledgerEventWriteSchema.safeParse({ ...baseTrade, valuationSource })
+          .success,
+      ).toBe(true);
+      expect(
+        ledgerEventWriteSchema.safeParse({
+          ...baseTrade,
+          valuationSource: null,
+        }).success,
+      ).toBe(true);
+    },
+  );
+
+  it("refuses a valuation source it does not know at write, and still reads it", () => {
+    const row = { ...baseTrade, valuationSource: "guess" };
+    expect(ledgerEventWriteSchema.safeParse(row).success).toBe(false);
+    expect(ledgerEventSchema.safeParse(row).success).toBe(true);
+  });
+
   it("accepts an amount in another currency with its rate, direction and day", () => {
     expect(
       ledgerEventWriteSchema.safeParse({ ...baseTrade, ...converted }).success,

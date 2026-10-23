@@ -20,6 +20,7 @@ const identity = (amount: string) => ({
   fxDirection: null,
   originalAmount: amount,
   originalCurrency: "EUR",
+  valuationSource: null,
 });
 
 const trade: LedgerEvent = {
@@ -122,6 +123,7 @@ describe("ledger mappers", () => {
       fxDirection: _direction,
       originalAmount: _amount,
       originalCurrency: _currency,
+      valuationSource: _valuation,
       ...unstated
     } = trade;
     expect(eventToCreateData(unstated as LedgerEvent)).toMatchObject(
@@ -141,6 +143,22 @@ describe("ledger mappers", () => {
       originalCurrency: "USD",
     } as LedgerEvent;
     expect(roundTripEvent(converted)).toEqual(converted);
+  });
+
+  it("round-trips where a reward's value came from", () => {
+    const reward = {
+      ...trade,
+      funding: "IN_KIND",
+      note: "kraken-reward",
+      valuationSource: "kraken-amountusd",
+    } as LedgerEvent;
+    expect(roundTripEvent(reward)).toEqual(reward);
+  });
+
+  it("refuses to write a valuation source the domain does not know", () => {
+    expect(() =>
+      eventToCreateData({ ...trade, valuationSource: "guess" } as LedgerEvent),
+    ).toThrow();
   });
 
   it("rejects a row with an unknown conversion source or direction", () => {

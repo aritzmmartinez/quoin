@@ -1,6 +1,8 @@
 import {
   InvalidLedgerEventError,
+  KrakenBalanceMismatchError,
   KrakenCsvAdapter,
+  KrakenLegacyExportError,
   TradeRepublicCsvAdapter,
   detectBroker,
   persistBatch,
@@ -20,7 +22,11 @@ import { computePositions } from "~/core/projections";
 
 import type { Copy } from "./i18n";
 import {
+  cryptoCodeOf,
+  noDailyHistoryMessage,
+  noQuoteMessage,
   rewardRetryIds,
+  suggestedQuoteSymbol,
   type IngestPreview,
   type IngestResult,
   type PendingMapping,
@@ -78,6 +84,14 @@ async function plan(
         t.ingest.invalidEvent(error.date, error.type, error.currency),
       );
     }
+    if (error instanceof KrakenLegacyExportError) {
+      throw new IngestError(t.ingest.krakenLegacyExport);
+    }
+    if (error instanceof KrakenBalanceMismatchError) {
+      throw new IngestError(
+        t.ingest.krakenBalanceMismatch(error.asset, error.wallet, error.date),
+      );
+    }
     throw error;
   }
 }
@@ -125,6 +139,8 @@ async function pendingMappings(batch: MappedBatch): Promise<PendingMapping[]> {
       instrumentId: i.id,
       name: i.name,
       quantity: heldQuantity(positions, i.id),
+      suggested: suggestedQuoteSymbol(i),
+      cryptoCode: cryptoCodeOf(i),
     }));
 }
 
@@ -140,7 +156,11 @@ export async function checkQuoteSymbol(
     symbol,
     ensureRatesNow,
   );
-  if (!check) throw new IngestError(t.ingest.map.noQuote(symbol));
+  if (!check) {
+    throw new IngestError(
+      noQuoteMessage(t, await cryptoCodeFor(instrumentId), symbol),
+    );
+  }
   return check;
 }
 
@@ -162,14 +182,23 @@ export async function mapQuoteSymbol(
     case "has-history":
       throw new IngestError(t.ingest.map.hasHistory);
     case "no-quote":
-      throw new IngestError(t.ingest.map.noQuote(symbol));
+      throw new IngestError(
+        noQuoteMessage(t, await cryptoCodeFor(instrumentId), symbol),
+      );
     case "no-rate-series":
       throw new IngestError(t.fx.noRateSeries(result.currency));
     case "rates-unavailable":
       throw new IngestError(t.fx.sync.unavailable);
     case "no-history":
-      throw new IngestError(t.ingest.map.noDailyHistory);
+      throw new IngestError(
+        noDailyHistoryMessage(t, await cryptoCodeFor(instrumentId)),
+      );
   }
+}
+
+async function cryptoCodeFor(instrumentId: string): Promise<string | null> {
+  const instrument = await new PrismaInstrumentRepository().get(instrumentId);
+  return instrument ? cryptoCodeOf(instrument) : null;
 }
 
 export async function replaceHistory(

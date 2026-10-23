@@ -38,8 +38,9 @@ export function InstrumentPriceChart({
   data: PriceChartPoint[];
   unrated?: boolean;
 }) {
-  const { formatMoney, formatDate, formatTimeTick } = useFormat();
-  const axisEur = (v: number) => formatMoney(String(v), 0);
+  const { formatMoney, formatPrice, formatDate, formatTimeTick } = useFormat();
+  const axisEur = (v: number) =>
+    Math.abs(v) >= 1 ? formatMoney(String(v), 0) : formatPrice(String(v));
   const hydrated = useHydrated();
   const [range, setRange] = useState<Range>("all");
 
@@ -125,7 +126,7 @@ export function InstrumentPriceChart({
               formatter={(value, name, item) =>
                 item.dataKey === "t" || value == null
                   ? null
-                  : [formatMoney(String(value)), name]
+                  : [formatPrice(String(value)), name]
               }
             />
             <Legend wrapperStyle={{ fontSize: 12 }} itemSorter={LEGEND_ORDER} />

@@ -26,7 +26,8 @@ function ChevronRight() {
 }
 
 export function PortfolioRowItem({ row }: { row: PortfolioRow }) {
-  const { formatMoney, formatQuantity, formatPercent } = useFormat();
+  const { formatMoney, formatPrice, formatQuantity, formatPercent } =
+    useFormat();
   const { labels } = useCopy();
   return (
     <li className={TABLE_DIVIDER}>
@@ -57,7 +58,7 @@ export function PortfolioRowItem({ row }: { row: PortfolioRow }) {
           {formatQuantity(row.quantity)}
         </div>
         <div className={`${TABLE_NUM} text-right`}>
-          {formatMoney(row.averageCost)}
+          {formatPrice(row.averageCost)}
         </div>
         <div className={`${TABLE_NUM} text-right`}>
           {formatMoney(row.costBasis)}

@@ -27,6 +27,7 @@ export function TaxSaleItem({ sale }: { sale: TaxSaleRow }) {
     formatQuantity,
     formatDate,
     formatPercent,
+    formatPrice,
     formatSignedMoney,
   } = useFormat();
   const t = useCopy();
@@ -144,7 +145,7 @@ export function TaxSaleItem({ sale }: { sale: TaxSaleRow }) {
                 {formatQuantity(lot.quantity)}
               </span>
               <span className={`${TABLE_NUM} text-right`}>
-                {formatMoney(lot.unitCost, 4)}
+                {formatPrice(lot.unitCost)}
               </span>
             </div>
           ))}

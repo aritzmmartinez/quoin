@@ -1,4 +1,4 @@
-import type { DiscardReason } from "~/adapters/ingestion/discard";
+import type { DiscardReason, NoticeReason } from "~/adapters/ingestion/discard";
 import type {
   ExposureKind,
   InstrumentType,
@@ -26,12 +26,12 @@ const REFRESH_RATES = `pulsa «${REFRESH_NOW}» en los tipos de cambio de ${EXTE
 const REFRESH_CPI = `pulsa «${REFRESH_NOW}» en el IPC de ${EXTERNAL_DATA} (${SETTINGS})`;
 
 const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
-  "crypto-swap": "Intercambios con BTC",
-  "crypto-transfer": "Transferencias de BTC",
-  "reward-unpriced": "Recompensas de BTC sin precio",
+  "crypto-swap": "Intercambios entre criptos",
+  "crypto-transfer": "Transferencias de cripto",
+  "reward-unpriced": "Recompensas sin precio",
   "fx-unavailable": "Operaciones sin tipo de cambio del día",
   "invalid-crypto-code": "Cripto con un código de activo no válido",
-  "unmodelled-asset": "Activos que Quoin no modela",
+  "internal-move": "Movimientos entre tus monederos de Kraken",
   "card-spending": "Pagos con tarjeta",
   "saveback-unpaired": "Saveback sin compra emparejada",
   unsupported: "Sin soporte",
@@ -40,15 +40,29 @@ const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
 const DISCARD_REASON_HELP: Record<DiscardReason, string | null> = {
   "crypto-swap": null,
   "crypto-transfer": null,
-  "reward-unpriced": `No hay precio de BTC de esas fechas, así que estas recompensas no se han registrado y tu posición de BTC no las incluye. En Instrumentos, abre el símbolo de BTC y pulsa «${REDOWNLOAD}» con un rango que llegue a esas fechas. Después vuelve a importar este mismo fichero: lo ya registrado no se duplica.`,
+  "reward-unpriced": `No hay precio de esas fechas para el activo de estas recompensas, así que no se han registrado y su posición no las incluye. En Instrumentos, abre el símbolo de ese activo y pulsa «${REDOWNLOAD}» con un rango que llegue a esas fechas. Después vuelve a importar este mismo fichero: lo ya registrado no se duplica.`,
   "fx-unavailable": `El BCE no tenía tipo para el día de estas operaciones en otra divisa (una de hoy antes de las 16:00, o una divisa que no publica), o no se ha podido consultar, así que no se han importado y no cuentan en sus posiciones. Más tarde, ${REFRESH_RATES} y vuelve a importar este mismo fichero: lo ya registrado no se duplica.`,
   "invalid-crypto-code":
     "Quoin identifica cada cripto por su código de activo (BTC, ETH…), el mismo en todos los brókers, para que sus compras y ventas formen una sola posición. Estas filas traían otra cosa en ese lugar, así que no se han importado y su posición no las incluye.",
-  "unmodelled-asset": null,
+  "internal-move":
+    "Pasos entre tus propios monederos de Kraken, como asignar a Earn o retirar de ahí. No cambian lo que tienes, así que no se registran.",
   "card-spending": null,
   "saveback-unpaired":
     "No se ha encontrado la compra que pagó este saveback (una compra del mismo importe en los 7 días siguientes, y solo una). Si esa compra está en el fichero, cuenta como aportación tuya. Si está en otro export, importa uno que cubra las dos fechas.",
   unsupported: null,
+};
+
+const NOTICE_LABELS: Record<NoticeReason, string> = {
+  "account-transfer": "Transferencias con otra cuenta",
+  "internal-booked-as-reward":
+    "Movimientos internos registrados antes como recompensa",
+};
+
+const NOTICE_HELP: Record<NoticeReason, string> = {
+  "account-transfer":
+    "Efectivo que sale de esta cuenta de Kraken hacia otra cuenta, o que llega de ella. Se registra como retirada o como ingreso.",
+  "internal-booked-as-reward":
+    "Una versión anterior de Quoin registró estos pasos entre tus monederos de Kraken como recompensas, y siguen en el registro como compras en especie. No cambian lo que tienes, así que esa posición incluye unidades de más.",
 };
 
 const THESIS_LABELS: Record<Thesis, string> = {
@@ -680,6 +694,14 @@ export const es = {
     failed: "La importación ha fallado.",
     invalidEvent: (date: string, type: string, currency: string): string =>
       `La operación ${type} del ${date} en ${currency} no cumple las reglas del registro. Es un fallo de Quoin al leer este export, no del fichero: no se ha importado nada.`,
+    krakenLegacyExport:
+      "Es un export antiguo de Kraken, sin la columna wallet, y Quoin solo lee el formato actual. Descarga uno nuevo desde Kraken e impórtalo. No se ha importado nada.",
+    krakenBalanceMismatch: (
+      asset: string,
+      wallet: string,
+      date: string,
+    ): string =>
+      `El saldo de ${asset} en «${wallet}» del ${date} no sale de las filas anteriores. Quoin no está leyendo este fichero como Kraken lo escribió, así que no se ha importado nada.`,
     analysing: "Analizando el fichero…",
     importing: "Importando…",
     retrying: "Valorando las recompensas…",
@@ -699,11 +721,14 @@ export const es = {
       reasonHelp: DISCARD_REASON_HELP,
       details: (count: number): string =>
         count === 1 ? "1 operación" : `${count} operaciones`,
-      pendingPrice: "Recompensas de BTC pendientes de precio",
+      pendingPrice: "Recompensas pendientes de precio",
       pendingPriceNote:
         "Se valorarán después del paso de precios, volviendo a importar el fichero.",
       positionWarning:
-        "Estas operaciones cambian tu saldo de BTC y Quoin no las registra, así que la posición de BTC no las refleja y puede no cuadrar con la del bróker.",
+        "Estas operaciones cambian tu saldo de ese activo y Quoin no las registra, así que su posición no las refleja y puede no cuadrar con la del bróker.",
+      noticed: "Avisos",
+      notices: NOTICE_LABELS,
+      noticeHelp: NOTICE_HELP,
       noInstrument: "Sin instrumento",
     },
     nothingNew:
@@ -737,6 +762,8 @@ export const es = {
       invalid: "Símbolo no válido.",
       noQuote: (symbol: string): string =>
         `Yahoo no devuelve precio para ${symbol}. Prueba otra plaza (.DE, .MI, .PA, .AS).`,
+      noQuoteCrypto: (symbol: string, code: string): string =>
+        `Yahoo no devuelve precio para ${symbol}. Para una cripto, prueba ${code}-USD, que se valora con el tipo del BCE, o el ticker con el número que Yahoo añade cuando el código está repetido, como PEPE24478-USD. Un ticker repetido puede ser otra moneda con el mismo código: comprueba el nombre y el valor implícito antes de guardar.`,
       price: "Precio",
       impliedValue: "Valor implícito",
       quantity: "Unidades",
@@ -756,6 +783,8 @@ export const es = {
         "No hay cierres de este símbolo en las fechas de tus operaciones, así que no se pueden comparar.",
       noDailyHistory:
         "Yahoo no tiene histórico diario de este símbolo. Busca su ticker en una bolsa en euros (.DE, .AS…).",
+      noDailyHistoryCrypto: (code: string): string =>
+        `Yahoo no tiene histórico diario de este símbolo. Para una cripto, prueba ${code}-USD, que se valora con el tipo del BCE, o el ticker con el número que Yahoo añade cuando el código está repetido, como PEPE24478-USD. Un ticker repetido puede ser otra moneda con el mismo código: comprueba el nombre y el valor implícito antes de guardar.`,
       hasHistory:
         "Este instrumento ya tiene precios guardados. Cambia su símbolo en la columna Símbolo de Instrumentos: allí se descarga el histórico nuevo antes de borrar el anterior.",
       pending: (count: number): string =>
@@ -783,7 +812,7 @@ export const es = {
     done: {
       title: "Resumen de la importación",
       rewardsNeedMapping:
-        "Las recompensas de BTC siguen sin valorar porque BTC no tiene símbolo. Vuelve al paso de mapeo, asígnale uno y continúa: el asistente descargará sus precios y volverá a importar el fichero.",
+        "Algunas recompensas siguen sin valorar porque su activo no tiene símbolo. Vuelve al paso de mapeo, asígnale uno y continúa: el asistente descargará sus precios y volverá a importar el fichero.",
       recovered: (count: number): string =>
         count === 1
           ? "1 recompensa recuperada al valorarla con los precios descargados"
@@ -892,6 +921,8 @@ export const es = {
     noSymbol: "Sin símbolo",
     noDailyHistory:
       "Este símbolo no tiene histórico diario. Vuelve a descargarlo o cambia el símbolo por su ticker en una bolsa en euros.",
+    noDailyHistoryCrypto: (code: string): string =>
+      `Este símbolo no tiene histórico diario. Para una cripto, prueba ${code}-USD, que se valora con el tipo del BCE, o el ticker con el número que Yahoo añade cuando el código está repetido, como PEPE24478-USD. Un ticker repetido puede ser otra moneda con el mismo código: comprueba el nombre y el valor implícito antes de guardar.`,
     obsoleteVenues:
       "Esta composición se importó con códigos de país antiguos y no se fusiona con otros fondos. Vuelve a soltar su archivo en esta fila.",
     resolves: RESOLVES_LABELS,
