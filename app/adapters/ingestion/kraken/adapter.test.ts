@@ -520,6 +520,7 @@ describe("KrakenCsvAdapter discards", () => {
       "reward-unpriced",
       "fx-unavailable",
       "invalid-crypto-code",
+      "earn-return-unverified",
     ]);
   });
 });
@@ -1007,5 +1008,91 @@ describe("KrakenCsvAdapter and swaps", () => {
       new FakeLedgerRepository(),
     ).import(wrong);
     await expect(plan).rejects.toBeInstanceOf(KrakenBalanceMismatchError);
+  });
+});
+
+describe("KrakenCsvAdapter and money moved to Earn", () => {
+  const BOUGHT: KrakenFixtureRow[] = [
+    {
+      refid: "D1",
+      time: "2026-10-20 08:00:00",
+      type: "deposit",
+      subclass: "fiat",
+      asset: "EUR",
+      amount: "600",
+    },
+    {
+      refid: "B1",
+      time: "2026-10-20 11:25:09",
+      type: "spend",
+      subclass: "fiat",
+      asset: "EUR",
+      amount: "-500",
+    },
+    {
+      refid: "B1",
+      time: "2026-10-20 11:25:09",
+      type: "receive",
+      subclass: "stable_coin",
+      asset: "USDC",
+      amount: "554.9",
+    },
+  ];
+  const OUT: KrakenFixtureRow = {
+    refid: "H1",
+    time: "2026-10-20 11:25:11",
+    type: "hybridearnwithdrawal",
+    subclass: "stable_coin",
+    asset: "USDC",
+    amount: "-554.9",
+  };
+  const BACK: KrakenFixtureRow = {
+    refid: "H2",
+    time: "2026-10-27 09:00:00",
+    type: "hybridearnwithdrawal",
+    subclass: "stable_coin",
+    asset: "USDC",
+    amount: "556.2",
+  };
+
+  async function run(rows: KrakenFixtureRow[]) {
+    const ledger = new FakeLedgerRepository();
+    const summary = await new KrakenCsvAdapter(
+      new FakeInstrumentRepository(),
+      ledger,
+    ).import(krakenCsv(rows));
+    return { summary, ledger };
+  }
+
+  it("keeps the purchase and its position when the units go to Earn, flagging nothing", async () => {
+    const { summary, ledger } = await run([...BOUGHT, OUT]);
+
+    expect(summary.imported).toBe(2);
+    expect(summary.discarded).toEqual({ "internal-move": 1 });
+    expect(
+      ledger.appended.map((e) => [e.externalId, e.type]),
+    ).toEqual([
+      ["D1", "DEPOSIT"],
+      ["B1", "BUY"],
+    ]);
+    expect(
+      DISCARD_REASONS.filter(
+        (reason) => summary.discarded[reason] && AFFECTS_POSITION[reason],
+      ),
+    ).toEqual([]);
+  });
+
+  it("sets a return from Earn aside by name and flags the position, since it may carry yield", async () => {
+    const { summary, ledger } = await run([...BOUGHT, OUT, BACK]);
+
+    expect(summary.discarded).toEqual({
+      "internal-move": 1,
+      "earn-return-unverified": 1,
+    });
+    expect(summary.discardedDetails["earn-return-unverified"]).toMatchObject([
+      { type: "hybridearnwithdrawal", instrument: "USDC" },
+    ]);
+    expect(ledger.appended).toHaveLength(2);
+    expect(AFFECTS_POSITION["earn-return-unverified"]).toBe(true);
   });
 });

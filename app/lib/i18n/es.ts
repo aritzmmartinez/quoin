@@ -31,6 +31,7 @@ const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
   "reward-unpriced": "Recompensas sin precio",
   "fx-unavailable": "Operaciones sin tipo de cambio del día",
   "invalid-crypto-code": "Cripto con un código de activo no válido",
+  "earn-return-unverified": "Vueltas de Earn sin verificar",
   "internal-move": "Movimientos entre tus monederos de Kraken",
   "card-spending": "Pagos con tarjeta",
   "saveback-unpaired": "Saveback sin compra emparejada",
@@ -44,6 +45,8 @@ const DISCARD_REASON_HELP: Record<DiscardReason, string | null> = {
   "fx-unavailable": `El BCE no tenía tipo para el día de estas operaciones en otra divisa (una de hoy antes de las 16:00, o una divisa que no publica), o no se ha podido consultar, así que no se han importado y no cuentan en sus posiciones. Más tarde, ${REFRESH_RATES} y vuelve a importar este mismo fichero: lo ya registrado no se duplica.`,
   "invalid-crypto-code":
     "Quoin identifica cada cripto por su código de activo (BTC, ETH…), el mismo en todos los brókers, para que sus compras y ventas formen una sola posición. Estas filas traían otra cosa en ese lugar, así que no se han importado y su posición no las incluye.",
+  "earn-return-unverified":
+    "Dinero que vuelve de Earn a tu monedero de spot. Puede incluir el rendimiento además de lo que pusiste, y Quoin aún no ha comprobado cómo lo informa Kraken, así que no se ha registrado: tratarlo como un paso entre tus propios monederos perdería el rendimiento sin avisar. Tu posición de ese activo puede no cuadrar con la del bróker.",
   "internal-move":
     "Pasos entre tus propios monederos de Kraken, como asignar a Earn o retirar de ahí. No cambian lo que tienes, así que no se registran.",
   "card-spending": null,

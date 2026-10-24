@@ -23,6 +23,7 @@ const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
   "reward-unpriced": "Rewards without a price",
   "fx-unavailable": "Trades with no exchange rate for their day",
   "invalid-crypto-code": "Crypto with an invalid asset code",
+  "earn-return-unverified": "Returns from Earn not yet verified",
   "internal-move": "Moves between your Kraken wallets",
   "card-spending": "Card payments",
   "saveback-unpaired": "Saveback with no paired purchase",
@@ -36,6 +37,8 @@ const DISCARD_REASON_HELP: Record<DiscardReason, string | null> = {
   "fx-unavailable": `The ECB had no rate for the day of these trades in another currency (one from today before 16:00, or a currency it does not publish), or could not be reached, so they were not imported and do not count towards their positions. Later, ${REFRESH_RATES} and import this same file again: what is already recorded is not duplicated.`,
   "invalid-crypto-code":
     "Quoin identifies each crypto asset by its asset code (BTC, ETH…), the same at every broker, so that its purchases and sales form a single position. These rows carried something else in its place, so they were not imported and their position does not include them.",
+  "earn-return-unverified":
+    "Money coming back from Earn to your spot wallet. It can include the yield as well as what you put in, and Quoin has not yet checked how Kraken reports it, so it was not recorded: treating it as a move between your own wallets would lose the yield without a word. Your position of that asset may not match the broker's.",
   "internal-move":
     "Steps between your own Kraken wallets, such as allocating to Earn or taking back from it. They do not change what you hold, so they are not recorded.",
   "card-spending": null,

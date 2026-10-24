@@ -130,8 +130,28 @@ export function groupByRefid(rows: KrakenRow[]): Map<string, KrakenRow[]> {
   return groups;
 }
 
+function isSpotWallet(row: KrakenRow): boolean {
+  return row.wallet.split(" / ")[0] === "spot";
+}
+
+/**
+ * Units that leave spot for Earn are still the user's, so no event. This is
+ * checked against a real export for the one shape seen, a negative
+ * `hybridearnwithdrawal` in a spot wallet, and not widened by the name: the
+ * opposite direction can carry yield as well as the principal, and counting it
+ * as internal would lose the yield without a word (`earn-return-unverified`).
+ */
+function isSpotToEarn(row: KrakenRow): boolean {
+  return (
+    row.type === "hybridearnwithdrawal" &&
+    isSpotWallet(row) &&
+    new Decimal(row.amount || "0").isNegative()
+  );
+}
+
 export function isInternalMove(row: KrakenRow): boolean {
   if (row.type === "transfer") return row.subtype !== "useraccounttransfer";
+  if (isSpotToEarn(row)) return true;
   return row.type === "earn" && INTERNAL_EARN.has(row.subtype ?? "");
 }
 
@@ -190,6 +210,8 @@ export function mapGroup(
       return first.subtype === "reward"
         ? reward(refid, first, priceAt)
         : [unsupported(first)];
+    case "hybridearnwithdrawal":
+      return [discard("earn-return-unverified", first)];
     default:
       return [unsupported(first)];
   }

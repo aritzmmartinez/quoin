@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mapGroup, priceLookupFrom } from "./map";
+import { isInternalMove, mapGroup, priceLookupFrom } from "./map";
 import type { KrakenRow } from "./row";
 
 const AT_80K = { price: "80000", currency: "EUR" };
@@ -694,6 +694,44 @@ describe("Kraken mapGroup", () => {
       ]);
       expect(swap).toMatchObject([
         { kind: "discard", reason: "invalid-crypto-code" },
+      ]);
+    });
+  });
+
+  describe("money moving between spot and Earn", () => {
+    const earn = (over: Partial<KrakenRow> = {}) =>
+      row({
+        refid: "H1",
+        type: "hybridearnwithdrawal",
+        subclass: "stable_coin",
+        asset: "USDC",
+        wallet: "spot / main",
+        amount: "-554.9",
+        ...over,
+      });
+
+    it("is an internal move when it leaves a spot wallet: nothing is recorded and nothing is flagged", () => {
+      const moved = mapGroup([earn()]);
+      expect(moved).toMatchObject([{ kind: "discard", reason: "internal-move" }]);
+      expect(isInternalMove(earn())).toBe(true);
+    });
+
+    it.each([
+      ["a positive amount, which can carry yield", { amount: "560" }],
+      ["a zero amount", { amount: "0" }],
+      ["a wallet that is not spot", { wallet: "earn / flexible" }],
+    ])("is a named discard that flags the position for %s", (_label, over) => {
+      const result = mapGroup([earn(over)]);
+      expect(result).toMatchObject([
+        { kind: "discard", reason: "earn-return-unverified" },
+      ]);
+      expect(isInternalMove(earn(over))).toBe(false);
+    });
+
+    it("does not widen to another type by its name", () => {
+      expect(isInternalMove(earn({ type: "hybridearndeposit" }))).toBe(false);
+      expect(mapGroup([earn({ type: "hybridearndeposit" })])).toMatchObject([
+        { kind: "discard", reason: "unsupported" },
       ]);
     });
   });
