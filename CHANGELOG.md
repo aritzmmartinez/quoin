@@ -33,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unit prices below a cent are shown with significant digits in Portfolio, the instrument chart, Instruments and Realised.
 - The symbol check compares against Kraken rewards only when Kraken valued them.
 
+### Security
+- body-parser updated to 2.4.0 (CVE-2026-111181, denial of service via an uncaught exception).
+
 ## [0.13.0] - 2026-10-22
 
 ### Upgrading
