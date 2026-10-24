@@ -10,9 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Tax: a loss sale whose repurchase window is still open says until when, since a purchase before then can still defer it.
 - Tax: a sale of a bond, commodity or cash instrument is named, since no repurchase rule covers it.
-- Kraken: every asset bought or sold against fiat is imported, not only Bitcoin. Swaps between two crypto assets are still set aside.
+- Kraken: every asset bought or sold against fiat is imported, not only Bitcoin.
+- Kraken: a swap between two crypto assets is imported as a sale and a linked purchase, each valued on its own. For tax, both take the Bizkaia rule's value: the greater of what was delivered and the gross value received, less the fee taken from what is received. A swap with a leg that has no price is set aside whole and recovered by downloading prices and importing the same file again.
+- A swap moves no money in or out, so it counts towards neither total contributed nor returns, nor the net cash flow in Movements.
 - Kraken: rewards in any asset are valued at the figure Kraken gives in the export, and at the price history only when it gives none.
-- Kraken: moves between your own Kraken wallets create nothing, and a transfer with another account is stored as cash and flagged.
+- Kraken: moves between your own Kraken wallets create nothing, including money sent from spot to Earn, and a transfer with another account is stored as cash and flagged. Money coming back from Earn is set aside by name and flagged, since it can include yield.
 - Kraken: the mapping step suggests `<CODE>-EUR` for each crypto asset, and says what to try when Yahoo has no price for it.
 - Each ledger row records where its value came from.
 
@@ -30,6 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The symbol check compared each trade with a close published after it; it now uses the last one before.
 - Unit prices below a cent are shown with significant digits in Portfolio, the instrument chart, Instruments and Realised.
 - The symbol check compares against Kraken rewards only when Kraken valued them.
+
+### Security
+- body-parser updated to 2.4.0 (CVE-2026-111181, denial of service via an uncaught exception).
 
 ## [0.13.0] - 2026-10-22
 

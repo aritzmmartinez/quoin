@@ -28,6 +28,7 @@ export type MappedItem =
       reason: DiscardReason;
       detail?: DiscardDetail;
       instrument?: Instrument;
+      related?: readonly Instrument[];
     }
   | { kind: "notice"; reason: NoticeReason; detail: DiscardDetail };
 
@@ -147,8 +148,8 @@ export class BatchBuilder {
         list.push(item.detail);
         this.discardedDetails[item.reason] = list;
       }
-      if (item.instrument) {
-        this.instruments.set(item.instrument.id, item.instrument);
+      for (const instrument of [item.instrument, ...(item.related ?? [])]) {
+        if (instrument) this.instruments.set(instrument.id, instrument);
       }
       return;
     }

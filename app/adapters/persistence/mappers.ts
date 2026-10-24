@@ -24,6 +24,8 @@ export interface LedgerEntryRow {
   originalAmount: string | null;
   originalCurrency: string | null;
   valuationSource: string | null;
+  linkId: string | null;
+  linkKind: string | null;
   account: string;
   source: string;
   externalId: string | null;
@@ -45,6 +47,8 @@ export function rowToEvent(row: LedgerEntryRow): LedgerEvent {
     originalAmount: row.originalAmount,
     originalCurrency: row.originalCurrency,
     valuationSource: row.valuationSource,
+    linkId: row.linkId,
+    linkKind: row.linkKind,
     account: row.account,
     source: row.source,
     externalId: row.externalId,
@@ -99,6 +103,8 @@ export function eventToCreateData(event: LedgerEvent): LedgerEntryCreateData {
     originalAmount: event.originalAmount ?? event.grossAmount,
     originalCurrency: event.originalCurrency ?? event.currency,
     valuationSource: event.valuationSource ?? null,
+    linkId: event.linkId ?? null,
+    linkKind: event.linkKind ?? null,
     account: event.account,
     source: event.source,
     externalId: event.externalId ?? null,

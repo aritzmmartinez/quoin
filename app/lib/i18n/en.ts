@@ -18,11 +18,12 @@ const REFRESH_RATES = `use “${REFRESH_NOW}” on exchange rates in ${EXTERNAL_
 const REFRESH_CPI = `use “${REFRESH_NOW}” on the CPI in ${EXTERNAL_DATA} (${SETTINGS})`;
 
 const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
-  "crypto-swap": "Swaps between crypto assets",
+  "swap-unpriced": "Swaps between crypto assets without a price",
   "crypto-transfer": "Crypto transfers",
   "reward-unpriced": "Rewards without a price",
   "fx-unavailable": "Trades with no exchange rate for their day",
   "invalid-crypto-code": "Crypto with an invalid asset code",
+  "earn-return-unverified": "Returns from Earn not yet verified",
   "internal-move": "Moves between your Kraken wallets",
   "card-spending": "Card payments",
   "saveback-unpaired": "Saveback with no paired purchase",
@@ -30,12 +31,14 @@ const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
 };
 
 const DISCARD_REASON_HELP: Record<DiscardReason, string | null> = {
-  "crypto-swap": null,
+  "swap-unpriced": `There is no price for those dates for one of the assets in these swaps, so they were not recorded and their positions do not include them. In Instruments, open the symbol of that asset and use “${REDOWNLOAD}” with a range that reaches those dates. Then import this same file again: what is already recorded is not duplicated.`,
   "crypto-transfer": null,
   "reward-unpriced": `There is no price for those dates for the asset of these rewards, so they were not recorded and its position does not include them. In Instruments, open that asset's symbol and use “${REDOWNLOAD}” with a range that reaches those dates. Then import this same file again: what is already recorded is not duplicated.`,
   "fx-unavailable": `The ECB had no rate for the day of these trades in another currency (one from today before 16:00, or a currency it does not publish), or could not be reached, so they were not imported and do not count towards their positions. Later, ${REFRESH_RATES} and import this same file again: what is already recorded is not duplicated.`,
   "invalid-crypto-code":
     "Quoin identifies each crypto asset by its asset code (BTC, ETH…), the same at every broker, so that its purchases and sales form a single position. These rows carried something else in its place, so they were not imported and their position does not include them.",
+  "earn-return-unverified":
+    "Money coming back from Earn to your spot wallet. It can include the yield as well as what you put in, and Quoin has not yet checked how Kraken reports it, so it was not recorded: treating it as a move between your own wallets would lose the yield without a word. Your position of that asset may not match the broker's.",
   "internal-move":
     "Steps between your own Kraken wallets, such as allocating to Earn or taking back from it. They do not change what you hold, so they are not recorded.",
   "card-spending": null,
@@ -693,7 +696,7 @@ export const en: Copy = {
       `The ${asset} balance in “${wallet}” on ${date} does not follow from the rows before it. Quoin is not reading this file the way Kraken wrote it, so nothing was imported.`,
     analysing: "Analysing the file…",
     importing: "Importing…",
-    retrying: "Valuing the rewards…",
+    retrying: "Valuing the rewards and swaps…",
     brokerLabel: (broker: string): string =>
       broker === "kraken" ? "Kraken" : "Trade Republic",
     detected: (broker: string): string => `${broker} detected`,
@@ -710,7 +713,7 @@ export const en: Copy = {
       reasonHelp: DISCARD_REASON_HELP,
       details: (count: number): string =>
         count === 1 ? "1 transaction" : `${count} transactions`,
-      pendingPrice: "Rewards awaiting a price",
+      pendingPrice: "Rewards and swaps awaiting a price",
       pendingPriceNote:
         "They will be valued after the price step, by importing the file again.",
       positionWarning:
@@ -722,7 +725,7 @@ export const en: Copy = {
     },
     nothingNew:
       "Nothing new to import: every trade in this file was already in the ledger.",
-    confirmPending: "Continue to value the rewards",
+    confirmPending: "Continue to value the rewards and swaps",
     confirmCount: (count: number): string =>
       count === 1 ? "Import 1 trade" : `Import ${count} trades`,
     appliesNow:
@@ -801,11 +804,11 @@ export const en: Copy = {
     done: {
       title: "Import summary",
       rewardsNeedMapping:
-        "Some rewards are still unvalued because their asset has no symbol. Go back to the mapping step, give it one and carry on: the wizard will download its prices and import the file again.",
+        "Some rewards or swaps are still unvalued because their asset has no symbol. Go back to the mapping step, give it one and carry on: the wizard will download its prices and import the file again.",
       recovered: (count: number): string =>
         count === 1
-          ? "1 reward recovered by valuing it with the downloaded prices"
-          : `${count} rewards recovered by valuing them with the downloaded prices`,
+          ? "1 reward or swap recovered by valuing it with the downloaded prices"
+          : `${count} rewards and swaps recovered by valuing them with the downloaded prices`,
       imported: (count: number): string =>
         count === 1 ? "1 trade imported" : `${count} trades imported`,
       duplicates: (count: number): string =>

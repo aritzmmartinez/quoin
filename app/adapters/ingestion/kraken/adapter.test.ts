@@ -16,11 +16,12 @@ import type {
 } from "~/core/ports";
 
 import { rateBookFrom } from "~/core/fx";
+import { tradeAmounts } from "~/core/swap";
 
 import { AFFECTS_POSITION, DISCARD_REASONS } from "../discard";
 import { KrakenCsvAdapter } from "./adapter";
 import { KrakenBalanceMismatchError } from "./balance";
-import { krakenCsv } from "./csv-fixture";
+import { krakenCsv, type KrakenFixtureRow } from "./csv-fixture";
 
 class FakeInstrumentRepository implements InstrumentRepository {
   upserted: Instrument[] = [];
@@ -193,11 +194,12 @@ describe("KrakenCsvAdapter", () => {
     expect(summary.imported).toBe(3);
     expect(summary.discarded).toEqual({
       "reward-unpriced": 1,
-      "crypto-swap": 1,
+      "swap-unpriced": 1,
     });
-    expect(summary.instruments).toBe(2);
+    expect(summary.instruments).toBe(3);
     expect(instruments.upserted.map((i) => i.id).sort()).toEqual([
       "BTC",
+      "PEPE",
       "SOL",
     ]);
     expect(ledger.appended).toHaveLength(4);
@@ -235,7 +237,7 @@ describe("KrakenCsvAdapter", () => {
 
     expect(summary.discarded).toEqual({
       "reward-unpriced": 2,
-      "crypto-swap": 1,
+      "swap-unpriced": 1,
     });
     expect(summary.imported).toBe(2);
   });
@@ -483,7 +485,7 @@ describe("KrakenCsvAdapter discards", () => {
     expect(summary.discarded).toEqual({
       "reward-unpriced": 3,
       "crypto-transfer": 3,
-      "crypto-swap": 2,
+      "swap-unpriced": 2,
     });
     expect(summary.discardedDetails).toEqual({
       "reward-unpriced": [
@@ -496,9 +498,15 @@ describe("KrakenCsvAdapter discards", () => {
         detail("2026-02-03T09:00:00.000Z", "withdrawal", null, "BTC"),
         detail("2026-02-04T09:00:00.000Z", "deposit", null, "ETH"),
       ],
-      "crypto-swap": [
-        detail("2026-02-10T12:00:00.000Z", "receive", null, "ETH → BTC"),
-        detail("2026-02-11T12:00:00.000Z", "receive", null, "BTC → SOL"),
+      "swap-unpriced": [
+        {
+          ...detail("2026-02-10T12:00:00.000Z", "receive", null, "ETH → BTC"),
+          unpriced: ["ETH", "BTC"],
+        },
+        {
+          ...detail("2026-02-11T12:00:00.000Z", "receive", null, "BTC → SOL"),
+          unpriced: ["BTC", "SOL"],
+        },
       ],
     });
   });
@@ -507,11 +515,12 @@ describe("KrakenCsvAdapter discards", () => {
     expect(
       DISCARD_REASONS.filter((reason) => AFFECTS_POSITION[reason]),
     ).toEqual([
-      "crypto-swap",
+      "swap-unpriced",
       "crypto-transfer",
       "reward-unpriced",
       "fx-unavailable",
       "invalid-crypto-code",
+      "earn-return-unverified",
     ]);
   });
 });
@@ -805,5 +814,285 @@ describe("KrakenCsvAdapter and instruments already known", () => {
       ["DOGE", "DOGE"],
       ["ETH", "Ethereum"],
     ]);
+  });
+});
+
+describe("KrakenCsvAdapter and swaps", () => {
+  const usd = rateBookFrom(
+    ["2026-03-04", "2026-03-05"].map((day) => ({
+      source: "ECB",
+      base: "EUR",
+      quote: "USD",
+      day,
+      rate: "1.25",
+    })),
+  );
+  const closeOf = (instrumentId: string, price: string): PriceSnapshot => ({
+    instrumentId,
+    price,
+    currency: "EUR",
+    asOf: new Date("2026-03-03T00:00:00Z"),
+    source: "YAHOO",
+  });
+  type Leg = Pick<
+    KrakenFixtureRow,
+    "asset" | "amount" | "fee" | "amountusd" | "feeusd"
+  >;
+  const pair = (
+    refid: string,
+    time: string,
+    spend: Leg,
+    receive: Leg,
+  ): KrakenFixtureRow[] => [
+    { refid, time, type: "spend", subclass: "crypto", ...spend },
+    { refid, time, type: "receive", subclass: "crypto", ...receive },
+  ];
+
+  const rows: KrakenFixtureRow[] = [
+    {
+      refid: "D0",
+      time: "2026-03-01 09:00:00",
+      type: "deposit",
+      subclass: "crypto",
+      asset: "ETH",
+      amount: "0.1",
+    },
+    ...pair(
+      "S1",
+      "2026-03-04 10:00:00",
+      { asset: "ETH", amount: "-0.05", amountusd: "-165", feeusd: "0" },
+      {
+        asset: "BTC",
+        amount: "0.0015",
+        fee: "0.000003",
+        amountusd: "163.5",
+        feeusd: "0.33",
+      },
+    ),
+    ...pair(
+      "S2",
+      "2026-03-05 10:00:00",
+      {
+        asset: "BTC",
+        amount: "-0.001",
+        fee: "0.00001",
+        amountusd: "-110",
+        feeusd: "1.10",
+      },
+      { asset: "SOL", amount: "0.5", amountusd: "109" },
+    ),
+    ...pair(
+      "S3",
+      "2026-03-06 10:00:00",
+      { asset: "SOL", amount: "-0.2" },
+      { asset: "DOGE", amount: "100" },
+    ),
+    ...pair(
+      "S4",
+      "2026-03-07 10:00:00",
+      { asset: "DOGE", amount: "-10" },
+      { asset: "PEPE", amount: "1000" },
+    ),
+  ];
+  const EXPORT = krakenCsv(rows);
+
+  async function run() {
+    const ledger = new FakeLedgerRepository();
+    const instruments = new FakeInstrumentRepository();
+    const summary = await new KrakenCsvAdapter(
+      instruments,
+      ledger,
+      new FakePriceRepository([closeOf("SOL", "150"), closeOf("DOGE", "0.2")]),
+      async () => usd,
+    ).import(EXPORT);
+    return { summary, ledger, instruments };
+  }
+
+  it("imports each swap as two linked rows, leaves out the one it cannot value, and still reconciles the balances", async () => {
+    const { summary, ledger } = await run();
+
+    expect(summary.imported).toBe(3);
+    expect(summary.discarded).toEqual({
+      "crypto-transfer": 1,
+      "swap-unpriced": 1,
+    });
+    expect(summary.discardedDetails["swap-unpriced"]).toMatchObject([
+      { instrument: "DOGE → PEPE", unpriced: ["PEPE"] },
+    ]);
+    expect(
+      ledger.appended.map((e) => [e.externalId, e.type, e.linkId]),
+    ).toEqual([
+      ["S1:sell", "SELL", "S1"],
+      ["S1:buy", "BUY", "S1"],
+      ["S2:sell", "SELL", "S2"],
+      ["S2:buy", "BUY", "S2"],
+      ["S3:sell", "SELL", "S3"],
+      ["S3:buy", "BUY", "S3"],
+    ]);
+  });
+
+  it("books each leg at the ECB rate of its day, or at the history's own currency", async () => {
+    const { ledger } = await run();
+    const byId = (id: string) =>
+      ledger.appended.find((e) => e.externalId === id);
+    expect(byId("S1:sell")).toMatchObject({
+      currency: "USD",
+      fxSource: "ECB",
+      fxDate: "2026-03-04",
+      valuationSource: "kraken-amountusd",
+    });
+    expect(byId("S3:sell")).toMatchObject({
+      currency: "EUR",
+      grossAmount: "30",
+      valuationSource: "yahoo",
+    });
+    expect(byId("S3:buy")).toMatchObject({
+      quantity: "100",
+      grossAmount: "20",
+      valuationSource: "yahoo",
+    });
+  });
+
+  it("gives the cost of the real case: the delivered side is worth more, so both legs carry its value less the fee", async () => {
+    const { ledger } = await run();
+    const swap = ledger.appended.filter((e) => e.linkId === "S1");
+    const trades = swap.filter(
+      (e): e is Extract<LedgerEvent, { type: "BUY" | "SELL" }> =>
+        e.type === "BUY" || e.type === "SELL",
+    );
+    const amountsOf = tradeAmounts(trades);
+    const sell = trades.find((e) => e.type === "SELL")!;
+    const buy = trades.find((e) => e.type === "BUY")!;
+
+    expect(amountsOf(sell).gross.toString()).toBe("132");
+    expect(amountsOf(sell).fees.toString()).toBe("0.26");
+    expect(amountsOf(buy).gross.toString()).toBe("131.74");
+    expect(buy.quantity).toBe("0.001497");
+  });
+
+  it("charges nothing twice when the fee was on the delivered leg", async () => {
+    const { ledger } = await run();
+    const trades = ledger.appended.filter(
+      (e): e is Extract<LedgerEvent, { type: "BUY" | "SELL" }> =>
+        e.linkId === "S2" && (e.type === "BUY" || e.type === "SELL"),
+    );
+    const amountsOf = tradeAmounts(trades);
+    const sell = trades.find((e) => e.type === "SELL")!;
+    const buy = trades.find((e) => e.type === "BUY")!;
+
+    expect(sell.quantity).toBe("0.00101");
+    expect(amountsOf(sell).gross.toString()).toBe("88.88");
+    expect(amountsOf(sell).fees.toString()).toBe("0");
+    expect(amountsOf(buy).gross.toString()).toBe("88.88");
+  });
+
+  it("carries both assets of the swap it set aside, so the mapping step can reach them", async () => {
+    const { instruments } = await run();
+    expect(instruments.upserted.map((i) => i.id).sort()).toEqual([
+      "BTC",
+      "DOGE",
+      "ETH",
+      "PEPE",
+      "SOL",
+    ]);
+  });
+
+  it("still refuses the file when a balance of a swap does not follow", async () => {
+    const wrong = krakenCsv(
+      rows.map((r) =>
+        r.refid === "S1" && r.type === "receive" ? { ...r, balance: "9" } : r,
+      ),
+    );
+    const plan = new KrakenCsvAdapter(
+      new FakeInstrumentRepository(),
+      new FakeLedgerRepository(),
+    ).import(wrong);
+    await expect(plan).rejects.toBeInstanceOf(KrakenBalanceMismatchError);
+  });
+});
+
+describe("KrakenCsvAdapter and money moved to Earn", () => {
+  const BOUGHT: KrakenFixtureRow[] = [
+    {
+      refid: "D1",
+      time: "2026-10-20 08:00:00",
+      type: "deposit",
+      subclass: "fiat",
+      asset: "EUR",
+      amount: "600",
+    },
+    {
+      refid: "B1",
+      time: "2026-10-20 11:25:09",
+      type: "spend",
+      subclass: "fiat",
+      asset: "EUR",
+      amount: "-500",
+    },
+    {
+      refid: "B1",
+      time: "2026-10-20 11:25:09",
+      type: "receive",
+      subclass: "stable_coin",
+      asset: "USDC",
+      amount: "554.9",
+    },
+  ];
+  const OUT: KrakenFixtureRow = {
+    refid: "H1",
+    time: "2026-10-20 11:25:11",
+    type: "hybridearnwithdrawal",
+    subclass: "stable_coin",
+    asset: "USDC",
+    amount: "-554.9",
+  };
+  const BACK: KrakenFixtureRow = {
+    refid: "H2",
+    time: "2026-10-27 09:00:00",
+    type: "hybridearnwithdrawal",
+    subclass: "stable_coin",
+    asset: "USDC",
+    amount: "556.2",
+  };
+
+  async function run(rows: KrakenFixtureRow[]) {
+    const ledger = new FakeLedgerRepository();
+    const summary = await new KrakenCsvAdapter(
+      new FakeInstrumentRepository(),
+      ledger,
+    ).import(krakenCsv(rows));
+    return { summary, ledger };
+  }
+
+  it("keeps the purchase and its position when the units go to Earn, flagging nothing", async () => {
+    const { summary, ledger } = await run([...BOUGHT, OUT]);
+
+    expect(summary.imported).toBe(2);
+    expect(summary.discarded).toEqual({ "internal-move": 1 });
+    expect(
+      ledger.appended.map((e) => [e.externalId, e.type]),
+    ).toEqual([
+      ["D1", "DEPOSIT"],
+      ["B1", "BUY"],
+    ]);
+    expect(
+      DISCARD_REASONS.filter(
+        (reason) => summary.discarded[reason] && AFFECTS_POSITION[reason],
+      ),
+    ).toEqual([]);
+  });
+
+  it("sets a return from Earn aside by name and flags the position, since it may carry yield", async () => {
+    const { summary, ledger } = await run([...BOUGHT, OUT, BACK]);
+
+    expect(summary.discarded).toEqual({
+      "internal-move": 1,
+      "earn-return-unverified": 1,
+    });
+    expect(summary.discardedDetails["earn-return-unverified"]).toMatchObject([
+      { type: "hybridearnwithdrawal", instrument: "USDC" },
+    ]);
+    expect(ledger.appended).toHaveLength(2);
+    expect(AFFECTS_POSITION["earn-return-unverified"]).toBe(true);
   });
 });

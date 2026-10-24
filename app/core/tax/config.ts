@@ -6,6 +6,9 @@ import { Money } from "../domain";
 /** Spanish IRPF territories only (foral and común) — not a multi-country abstraction. */
 export type Territory = "bizkaia";
 
+/** The one territory Quoin files in; core entry points that need one default to it. */
+export const DEFAULT_TERRITORY: Territory = "bizkaia";
+
 export type RepurchaseAssetClass =
   "listed-security" | "fungible-crypto" | "unclassified";
 
@@ -91,6 +94,55 @@ export function repurchaseRuleFor(
         rule.assetClass === assetClass &&
         (rule.from === null || rule.from <= day) &&
         (rule.to === null || day <= rule.to),
+    ) ?? null
+  );
+}
+
+/**
+ * How the two legs of a swap are valued for tax, as data like a repurchase rule.
+ * Bizkaia (NF 13/2013, consolidated at 01/01/2026, as given by Aritz): the value
+ * of what is delivered is the greater of its market value and the gross value of
+ * what is received (Art. 47.1.i, which NF 6/2025 does not modify and which
+ * predates 2025), and that same value is the acquisition value of what is
+ * received (Art. 45.1.a, real amount). Art. 47.1.p, introduced by NF 6/2025 with
+ * effect from 1 January 2025 (Disposición Final Segunda, Primero.Dos), values
+ * crypto-assets at market value, or the agreed price if higher. The norm does
+ * not say "the greater" of the two legs in so many words; it is a reasoned
+ * criterion, chosen so that one gain is not taxed twice, and `swapPairValue`
+ * carries the reasoning.
+ *
+ * `from` / `to` are Madrid calendar days of the swap, inclusive; null is open,
+ * which is what applies while no start date is settled. No entry in force
+ * leaves each leg at its own market value.
+ */
+export interface SwapValuationRule {
+  territory: Territory;
+  from: string | null;
+  to: string | null;
+  source: string;
+}
+
+export const SWAP_VALUATION_RULES: readonly SwapValuationRule[] = [
+  {
+    territory: "bizkaia",
+    from: null,
+    to: null,
+    source:
+      "Arts. 47.1.i, 45.1 y 45.3 NF 13/2013 de Bizkaia; Art. 47.1.p, redacción de la NF 6/2025",
+  },
+];
+
+export function swapValuationRuleFor(
+  territory: Territory,
+  swapDay: string,
+  rules: readonly SwapValuationRule[] = SWAP_VALUATION_RULES,
+): SwapValuationRule | null {
+  return (
+    rules.find(
+      (rule) =>
+        rule.territory === territory &&
+        (rule.from === null || rule.from <= swapDay) &&
+        (rule.to === null || swapDay <= rule.to),
     ) ?? null
   );
 }

@@ -1,9 +1,10 @@
 export const DISCARD_REASONS = [
-  "crypto-swap",
+  "swap-unpriced",
   "crypto-transfer",
   "reward-unpriced",
   "fx-unavailable",
   "invalid-crypto-code",
+  "earn-return-unverified",
   "internal-move",
   "card-spending",
   "saveback-unpaired",
@@ -13,11 +14,12 @@ export const DISCARD_REASONS = [
 export type DiscardReason = (typeof DISCARD_REASONS)[number];
 
 export const AFFECTS_POSITION: Record<DiscardReason, boolean> = {
-  "crypto-swap": true,
+  "swap-unpriced": true,
   "crypto-transfer": true,
   "reward-unpriced": true,
   "fx-unavailable": true,
   "invalid-crypto-code": true,
+  "earn-return-unverified": true,
   "internal-move": false,
   "card-spending": false,
   "saveback-unpaired": false,
@@ -36,4 +38,5 @@ export interface DiscardDetail {
   type: string;
   subtype: string | null;
   instrument: string | null;
+  unpriced?: string[];
 }

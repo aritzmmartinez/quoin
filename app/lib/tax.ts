@@ -11,6 +11,7 @@ import { toIsoDate } from "~/core/calendar";
 import { Money, isInKind, type DividendEvent } from "~/core/domain";
 import { baseOf, bookable, unconvertibleInstrumentIds } from "~/core/fx";
 import {
+  DEFAULT_TERRITORY,
   carryforwardFrom,
   computeSavingsQuota,
   computeTaxHistory,
@@ -101,7 +102,7 @@ export function taxYearHref(params: URLSearchParams, year: number): string {
   return `?${next.toString()}`;
 }
 
-export const TAX_TERRITORY: Territory = "bizkaia";
+export const TAX_TERRITORY: Territory = DEFAULT_TERRITORY;
 
 export function repurchaseAssetClassOf(
   type: InstrumentType,

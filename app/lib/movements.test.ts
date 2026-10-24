@@ -222,3 +222,19 @@ describe("a row with no rate to euros", () => {
     expect(netCashFlow(rows)).toBe("-896.40");
   });
 });
+
+describe("a swap in the net cash flow", () => {
+  it("shows both legs and leaves them out of the net, since no money crossed the bank", () => {
+    const link = { linkId: "refid-1", linkKind: "swap" };
+    const rows = toMovementRows(
+      [
+        buy({ id: "b1", fees: "0", grossAmount: "1000" }),
+        buy({ id: "s1", type: "SELL", grossAmount: "480", fees: "5", ...link }),
+        buy({ id: "s2", grossAmount: "470", fees: "5", ...link }),
+      ],
+      INSTRUMENTS,
+    );
+    expect(rows.filter((row) => row.swap)).toHaveLength(2);
+    expect(netCashFlow(rows)).toBe("-1000.00");
+  });
+});

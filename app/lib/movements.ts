@@ -2,6 +2,7 @@ import Decimal from "decimal.js";
 
 import {
   isInKind,
+  isSwapLeg,
   type Instrument,
   type LedgerEvent,
   type LedgerEventType,
@@ -13,6 +14,7 @@ export interface MovementRow {
   t: string;
   type: LedgerEventType;
   inKind: boolean;
+  swap: boolean;
   instrumentId: string | null;
   instrumentName: string | null;
   quantity: string | null;
@@ -79,6 +81,7 @@ export function toMovementRows(
         t: event.ts.toISOString(),
         type: event.type,
         inKind: isInKind(event),
+        swap: isSwapLeg(event),
         instrumentId,
         instrumentName: instrumentId
           ? (byId.get(instrumentId)?.name ?? instrumentId)
@@ -96,7 +99,8 @@ export function toMovementRows(
 export function netCashFlow(rows: readonly MovementRow[]): string {
   return rows
     .reduce(
-      (sum, r) => (r.amount === null ? sum : sum.plus(new Decimal(r.amount))),
+      (sum, r) =>
+        r.amount === null || r.swap ? sum : sum.plus(new Decimal(r.amount)),
       new Decimal(0),
     )
     .toFixed(2);
