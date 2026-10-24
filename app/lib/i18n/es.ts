@@ -26,7 +26,7 @@ const REFRESH_RATES = `pulsa «${REFRESH_NOW}» en los tipos de cambio de ${EXTE
 const REFRESH_CPI = `pulsa «${REFRESH_NOW}» en el IPC de ${EXTERNAL_DATA} (${SETTINGS})`;
 
 const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
-  "crypto-swap": "Intercambios entre criptos",
+  "swap-unpriced": "Intercambios entre criptos sin precio",
   "crypto-transfer": "Transferencias de cripto",
   "reward-unpriced": "Recompensas sin precio",
   "fx-unavailable": "Operaciones sin tipo de cambio del día",
@@ -38,7 +38,7 @@ const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
 };
 
 const DISCARD_REASON_HELP: Record<DiscardReason, string | null> = {
-  "crypto-swap": null,
+  "swap-unpriced": `No hay precio de esas fechas para uno de los activos de estos intercambios, así que no se han registrado y sus posiciones no los incluyen. En Instrumentos, abre el símbolo de ese activo y pulsa «${REDOWNLOAD}» con un rango que llegue a esas fechas. Después vuelve a importar este mismo fichero: lo ya registrado no se duplica.`,
   "crypto-transfer": null,
   "reward-unpriced": `No hay precio de esas fechas para el activo de estas recompensas, así que no se han registrado y su posición no las incluye. En Instrumentos, abre el símbolo de ese activo y pulsa «${REDOWNLOAD}» con un rango que llegue a esas fechas. Después vuelve a importar este mismo fichero: lo ya registrado no se duplica.`,
   "fx-unavailable": `El BCE no tenía tipo para el día de estas operaciones en otra divisa (una de hoy antes de las 16:00, o una divisa que no publica), o no se ha podido consultar, así que no se han importado y no cuentan en sus posiciones. Más tarde, ${REFRESH_RATES} y vuelve a importar este mismo fichero: lo ya registrado no se duplica.`,
@@ -704,7 +704,7 @@ export const es = {
       `El saldo de ${asset} en «${wallet}» del ${date} no sale de las filas anteriores. Quoin no está leyendo este fichero como Kraken lo escribió, así que no se ha importado nada.`,
     analysing: "Analizando el fichero…",
     importing: "Importando…",
-    retrying: "Valorando las recompensas…",
+    retrying: "Valorando las recompensas y los intercambios…",
     brokerLabel: (broker: string): string =>
       broker === "kraken" ? "Kraken" : "Trade Republic",
     detected: (broker: string): string => `${broker} detectado`,
@@ -721,7 +721,7 @@ export const es = {
       reasonHelp: DISCARD_REASON_HELP,
       details: (count: number): string =>
         count === 1 ? "1 operación" : `${count} operaciones`,
-      pendingPrice: "Recompensas pendientes de precio",
+      pendingPrice: "Recompensas e intercambios pendientes de precio",
       pendingPriceNote:
         "Se valorarán después del paso de precios, volviendo a importar el fichero.",
       positionWarning:
@@ -733,7 +733,7 @@ export const es = {
     },
     nothingNew:
       "Nada nuevo que importar: todas las operaciones de este fichero ya estaban en el registro.",
-    confirmPending: "Continuar para valorar las recompensas",
+    confirmPending: "Continuar para valorar las recompensas y los intercambios",
     confirmCount: (count: number): string =>
       count === 1 ? "Importar 1 operación" : `Importar ${count} operaciones`,
     appliesNow:
@@ -812,11 +812,11 @@ export const es = {
     done: {
       title: "Resumen de la importación",
       rewardsNeedMapping:
-        "Algunas recompensas siguen sin valorar porque su activo no tiene símbolo. Vuelve al paso de mapeo, asígnale uno y continúa: el asistente descargará sus precios y volverá a importar el fichero.",
+        "Algunas recompensas o intercambios siguen sin valorar porque su activo no tiene símbolo. Vuelve al paso de mapeo, asígnale uno y continúa: el asistente descargará sus precios y volverá a importar el fichero.",
       recovered: (count: number): string =>
         count === 1
-          ? "1 recompensa recuperada al valorarla con los precios descargados"
-          : `${count} recompensas recuperadas al valorarlas con los precios descargados`,
+          ? "1 recompensa o intercambio recuperado al valorarlo con los precios descargados"
+          : `${count} recompensas e intercambios recuperados al valorarlos con los precios descargados`,
       imported: (count: number): string =>
         count === 1
           ? "1 operación importada"

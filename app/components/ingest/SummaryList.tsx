@@ -107,17 +107,18 @@ function NoticeGroupItem({ group }: { group: Notice }) {
 
 export function SummaryList({
   summary,
-  pendingRewards = false,
+  pendingPrice = false,
 }: {
   summary: ImportSummary;
-  pendingRewards?: boolean;
+  pendingPrice?: boolean;
 }) {
   const t = useCopy();
   const copy = t.ingest.summary;
   const discarded = discardGroups(summary);
   const notices = noticeGroups(summary);
   const isPending = (reason: Group["reason"]) =>
-    pendingRewards && reason === "reward-unpriced";
+    pendingPrice &&
+    (reason === "reward-unpriced" || reason === "swap-unpriced");
 
   return (
     <>

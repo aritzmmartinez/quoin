@@ -5,11 +5,11 @@ import type { Broker, ImportSummary } from "~/adapters/ingestion";
 import type { PendingMapping, PriceFillResult } from "~/lib/ingest";
 
 import {
-  earliestUnpricedReward,
-  mergeRewardRetry,
+  earliestUnpriced,
+  mergeRetry,
   retryAfterFill,
   rangeSince,
-  rewardsNeedMapping,
+  unpricedNeedMapping,
   useCopy,
 } from "~/lib";
 import { postIngest } from "./api";
@@ -114,7 +114,7 @@ export function IngestStepper({
     go(response.pending.length === 0 ? "prices" : "mapping");
   }
 
-  async function retryRewards(first: ImportSummary): Promise<void> {
+  async function retryUnpriced(first: ImportSummary): Promise<void> {
     if (!file) return;
     setBusy(copy.retrying);
     const response = await postIngest(t, { intent: "commit", csv: file.csv });
@@ -126,7 +126,7 @@ export function IngestStepper({
     }
     if (response.step !== "commit") return;
 
-    const merged = mergeRewardRetry(first, response.summary);
+    const merged = mergeRetry(first, response.summary);
     setSummary(merged.summary);
     setRecovered((count) => count + merged.recovered);
   }
@@ -199,13 +199,13 @@ export function IngestStepper({
           <PricesStep
             instrumentIds={priceIds}
             initialRange={rangeSince(
-              summary ? earliestUnpricedReward(summary) : null,
+              summary ? earliestUnpriced(summary) : null,
               new Date(),
             )}
             onDone={async (result) => {
               setFill(result);
               if (summary && retryAfterFill(summary, result)) {
-                await retryRewards(summary);
+                await retryUnpriced(summary);
               }
               go("done");
             }}
@@ -218,7 +218,7 @@ export function IngestStepper({
             fill={fill}
             unmapped={unmapped}
             recovered={recovered}
-            needsMapping={rewardsNeedMapping(summary, pending, mapped)}
+            needsMapping={unpricedNeedMapping(summary, pending, mapped)}
           />
         )}
 

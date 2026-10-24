@@ -150,7 +150,7 @@ export function mapGroup(
     const pair = `${spend.asset} → ${receive.asset}`;
     if (isFiat(spend) && isFiat(receive)) return [unsupported(receive)];
     if (!isFiat(spend) && !isFiat(receive))
-      return [discard("crypto-swap", receive, pair)];
+      return swap(refid, spend, receive, pair, priceAt);
     const crypto = isFiat(spend) ? receive : spend;
     const instrument = cryptoInstrument(crypto.asset);
     if (instrument === null) return [discard("invalid-crypto-code", crypto)];
@@ -258,6 +258,126 @@ function sell(
       new Decimal(abs(fiat.amount)),
     ),
   };
+}
+
+interface SwapLegValue {
+  gross: Decimal;
+  fee: Decimal;
+  currency: string;
+  valuationSource: ValuationSource;
+}
+
+function swapLegValue(
+  row: KrakenRow,
+  instrument: Instrument,
+  priceAt: PriceAt,
+  received: boolean,
+): SwapLegValue | null {
+  const fee = new Decimal(row.fee || "0");
+  const amount = new Decimal(row.amount || "0").abs();
+
+  if (row.amountusd && (fee.isZero() || row.feeusd)) {
+    const usd = new Decimal(row.amountusd).abs();
+    const feeUsd = new Decimal(row.feeusd || "0");
+    return {
+      gross: received ? usd : usd.plus(feeUsd),
+      fee: received ? feeUsd : new Decimal(0),
+      currency: "USD",
+      valuationSource: "kraken-amountusd",
+    };
+  }
+
+  const priced = priceAt(instrument.id, parseTime(row.time));
+  if (priced === null) return null;
+  const worth = (quantity: Decimal) =>
+    new Decimal(
+      Money.fromString(priced.price).scaleBy(quantity.toFixed()).toString(),
+    );
+  return {
+    gross: received ? worth(amount) : worth(amount.plus(fee)),
+    fee: received ? worth(fee) : new Decimal(0),
+    currency: priced.currency,
+    valuationSource: "yahoo",
+  };
+}
+
+function swap(
+  refid: string,
+  spend: KrakenRow,
+  receive: KrakenRow,
+  pair: string,
+  priceAt: PriceAt,
+): MappedItem[] {
+  const delivered = cryptoInstrument(spend.asset);
+  const arrived = cryptoInstrument(receive.asset);
+  if (delivered === null) return [discard("invalid-crypto-code", spend)];
+  if (arrived === null) return [discard("invalid-crypto-code", receive)];
+
+  const deliveredQuantity = net(spend).abs();
+  const receivedQuantity = net(receive);
+  if (deliveredQuantity.isZero() || !receivedQuantity.isPositive())
+    return [unsupported(receive)];
+
+  const out = swapLegValue(spend, delivered, priceAt, false);
+  const into = swapLegValue(receive, arrived, priceAt, true);
+  if (out === null || into === null) {
+    const unpriced = [
+      ...(out === null ? [delivered.id] : []),
+      ...(into === null ? [arrived.id] : []),
+    ];
+    return [
+      {
+        kind: "discard",
+        reason: "swap-unpriced",
+        detail: {
+          ...detailOf(receive, pair),
+          unpriced,
+        },
+        instrument: delivered,
+        related: [arrived],
+      },
+    ];
+  }
+
+  const leg = (
+    type: "BUY" | "SELL",
+    row: KrakenRow,
+    instrument: Instrument,
+    quantity: Decimal,
+    value: SwapLegValue,
+    suffix: "buy" | "sell",
+  ) =>
+    tradeEventSchema.parse({
+      id: crypto.randomUUID(),
+      ts: parseTime(row.time),
+      type,
+      instrumentId: instrument.id,
+      quantity: quantity.toFixed(),
+      price: value.gross.minus(value.fee).dividedBy(quantity).toFixed(),
+      grossAmount: value.gross.toFixed(),
+      fees: value.fee.toFixed(),
+      currency: value.currency,
+      account: "kraken",
+      source: "KRAKEN_CSV",
+      externalId: `${refid}:${suffix}`,
+      note: null,
+      linkId: refid,
+      linkKind: "swap",
+      valuationSource: value.valuationSource,
+    });
+
+  return [
+    {
+      kind: "domain",
+      instrument: delivered,
+      event: leg("SELL", spend, delivered, deliveredQuantity, out, "sell"),
+    },
+    {
+      kind: "domain",
+      instrument: arrived,
+      event: leg("BUY", receive, arrived, receivedQuantity, into, "buy"),
+    },
+  ];
 }
 
 interface RewardValue {

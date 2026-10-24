@@ -146,21 +146,18 @@ describe("Kraken mapGroup", () => {
   it.each([
     ["deposit", "DEPOSIT"],
     ["withdrawal", "WITHDRAWAL"],
-  ])(
-    "books a %s in another fiat as cash in that currency",
-    (type, booked) => {
-      const [item] = mapGroup([
-        row({ refid: "F3", type, asset: "USD", amount: "500" }),
-      ]);
-      expect(item?.kind === "domain" && item.event).toMatchObject({
-        type: booked,
-        grossAmount: "500",
-        currency: "USD",
-      });
-    },
-  );
+  ])("books a %s in another fiat as cash in that currency", (type, booked) => {
+    const [item] = mapGroup([
+      row({ refid: "F3", type, asset: "USD", amount: "500" }),
+    ]);
+    expect(item?.kind === "domain" && item.event).toMatchObject({
+      type: booked,
+      grossAmount: "500",
+      currency: "USD",
+    });
+  });
 
-  it("treats a stablecoin as crypto, not as fiat", () => {
+  it("treats a stablecoin as crypto, not as fiat: a swap, not a purchase against fiat", () => {
     const result = mapGroup([
       row({
         refid: "F4",
@@ -168,6 +165,7 @@ describe("Kraken mapGroup", () => {
         subclass: "stable_coin",
         asset: "USDG",
         amount: "-150",
+        amountusd: "-150",
       }),
       row({
         refid: "F4",
@@ -175,19 +173,14 @@ describe("Kraken mapGroup", () => {
         subclass: "crypto",
         asset: "BTC",
         amount: "0.003",
+        amountusd: "149",
       }),
     ]);
-    expect(result).toEqual([
-      {
-        kind: "discard",
-        reason: "crypto-swap",
-        detail: {
-          date: "2025-11-13T18:04:48.000Z",
-          type: "receive",
-          subtype: null,
-          instrument: "USDG → BTC",
-        },
-      },
+    expect(
+      result.map((item) => item.kind === "domain" && item.event),
+    ).toMatchObject([
+      { type: "SELL", instrumentId: "USDG", linkKind: "swap" },
+      { type: "BUY", instrumentId: "BTC", linkKind: "swap" },
     ]);
   });
 
@@ -526,35 +519,183 @@ describe("Kraken mapGroup", () => {
     expect(moved).toMatchObject([{ kind: "discard", reason: "internal-move" }]);
   });
 
-  it("sets aside a swap between two crypto assets", () => {
-    const swap = mapGroup([
+  describe("a swap between two crypto assets", () => {
+    const spend = (over: Partial<KrakenRow> = {}) =>
       row({
         refid: "S1",
         type: "spend",
         subclass: "crypto",
-        asset: "PEPE",
-        amount: "-629732",
-      }),
+        asset: "ETH",
+        amount: "-0.05",
+        ...over,
+      });
+    const receive = (over: Partial<KrakenRow> = {}) =>
       row({
         refid: "S1",
         type: "receive",
         subclass: "crypto",
-        asset: "SOL",
-        amount: "0.02",
-      }),
-    ]);
-    expect(swap).toEqual([
-      {
-        kind: "discard",
-        reason: "crypto-swap",
-        detail: {
-          date: "2025-11-13T18:04:48.000Z",
-          type: "receive",
-          subtype: null,
-          instrument: "PEPE → SOL",
+        asset: "BTC",
+        amount: "0.0015",
+        ...over,
+      });
+    const events = (items: ReturnType<typeof mapGroup>) =>
+      items.map((item) => (item.kind === "domain" ? item.event : item));
+
+    it("is a SELL of what was delivered and a BUY of what was received, linked and valued at Kraken's figure", () => {
+      const [sell, buy] = events(
+        mapGroup([
+          spend({ amountusd: "-165", feeusd: "0" }),
+          receive({
+            fee: "0.000003",
+            amountusd: "163.50",
+            feeusd: "0.33",
+          }),
+        ]),
+      );
+      expect(sell).toMatchObject({
+        type: "SELL",
+        instrumentId: "ETH",
+        quantity: "0.05",
+        price: "3300",
+        grossAmount: "165",
+        fees: "0",
+        currency: "USD",
+        externalId: "S1:sell",
+        linkId: "S1",
+        linkKind: "swap",
+        valuationSource: "kraken-amountusd",
+      });
+      expect(buy).toMatchObject({
+        type: "BUY",
+        instrumentId: "BTC",
+        quantity: "0.001497",
+        grossAmount: "163.5",
+        fees: "0.33",
+        currency: "USD",
+        externalId: "S1:buy",
+        linkId: "S1",
+        linkKind: "swap",
+        valuationSource: "kraken-amountusd",
+      });
+      expect(buy).not.toHaveProperty("funding", "IN_KIND");
+    });
+
+    it("counts a fee charged on the delivered leg as delivered: the quantity and the value both include it", () => {
+      const [sell, buy] = events(
+        mapGroup([
+          spend({
+            amount: "-0.001",
+            fee: "0.00001",
+            amountusd: "-110",
+            feeusd: "1.10",
+          }),
+          receive({ asset: "SOL", amount: "0.5", amountusd: "109" }),
+        ]),
+      );
+      expect(sell).toMatchObject({
+        quantity: "0.00101",
+        grossAmount: "111.1",
+        fees: "0",
+      });
+      expect(buy).toMatchObject({
+        quantity: "0.5",
+        grossAmount: "109",
+        fees: "0",
+      });
+    });
+
+    it("falls back to the price history, leg by leg, and says so", () => {
+      const priceAt = priceLookupFrom([
+        {
+          instrumentId: "ETH",
+          price: "3000",
+          currency: "EUR",
+          asOf: new Date("2025-11-12T00:00:00Z"),
+          source: "YAHOO",
         },
-      },
-    ]);
+      ]);
+      const [sell, buy] = events(
+        mapGroup(
+          [
+            spend(),
+            receive({ fee: "0.000003", amountusd: "163.5", feeusd: "0.33" }),
+          ],
+          priceAt,
+        ),
+      );
+      expect(sell).toMatchObject({
+        grossAmount: "150",
+        currency: "EUR",
+        valuationSource: "yahoo",
+      });
+      expect(buy).toMatchObject({ valuationSource: "kraken-amountusd" });
+    });
+
+    it("does not trust a fee Kraken did not price: that leg falls back to the history", () => {
+      const result = mapGroup([
+        spend({ amountusd: "-165" }),
+        receive({ fee: "0.000003", amountusd: "163.5" }),
+      ]);
+      expect(result).toMatchObject([
+        {
+          kind: "discard",
+          reason: "swap-unpriced",
+          detail: { unpriced: ["BTC"] },
+        },
+      ]);
+    });
+
+    it("sets the whole swap aside when a leg has no value, naming the assets that lack one", () => {
+      const swap = mapGroup([
+        spend({ asset: "PEPE", amount: "-629732" }),
+        receive({ asset: "SOL", amount: "0.02" }),
+      ]);
+      expect(swap).toMatchObject([
+        {
+          kind: "discard",
+          reason: "swap-unpriced",
+          detail: {
+            date: "2025-11-13T18:04:48.000Z",
+            type: "receive",
+            subtype: null,
+            instrument: "PEPE → SOL",
+            unpriced: ["PEPE", "SOL"],
+          },
+          instrument: { id: "PEPE" },
+          related: [{ id: "SOL" }],
+        },
+      ]);
+      expect(swap).toHaveLength(1);
+    });
+
+    it("names only the asset that lacks a value, and writes neither leg", () => {
+      const priceAt = priceLookupFrom([
+        {
+          instrumentId: "ETH",
+          price: "3000",
+          currency: "EUR",
+          asOf: new Date("2025-11-12T00:00:00Z"),
+          source: "YAHOO",
+        },
+      ]);
+      const swap = mapGroup([spend(), receive()], priceAt);
+      expect(swap).toHaveLength(1);
+      expect(swap[0]).toMatchObject({
+        kind: "discard",
+        reason: "swap-unpriced",
+        detail: { unpriced: ["BTC"] },
+      });
+    });
+
+    it("sets aside a code that is not an asset code, as it does anywhere else", () => {
+      const swap = mapGroup([
+        spend({ amountusd: "-165" }),
+        receive({ asset: "XS00TEST0003", amountusd: "163" }),
+      ]);
+      expect(swap).toMatchObject([
+        { kind: "discard", reason: "invalid-crypto-code" },
+      ]);
+    });
   });
 
   it("discards an unrecognized row type as unsupported, keeping the row", () => {

@@ -25,7 +25,7 @@ import {
   cryptoCodeOf,
   noDailyHistoryMessage,
   noQuoteMessage,
-  rewardRetryIds,
+  unpricedAssetIds,
   suggestedQuoteSymbol,
   type IngestPreview,
   type IngestResult,
@@ -119,7 +119,7 @@ export async function commitIngest(
     broker,
     summary,
     pending: await pendingMappings(batch),
-    retryIds: rewardRetryIds(summary),
+    retryIds: unpricedAssetIds(summary),
   };
 }
 
