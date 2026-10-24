@@ -72,7 +72,7 @@ const GAIN = swap({
   linkId: "refid-gain",
   ts: "2026-03-10T10:00:00Z",
   out: { id: "ETH", quantity: "4", value: "480" },
-  in: { id: "BTC", quantity: "0.0099", value: "470", fee: "5" },
+  in: { id: "BTC", quantity: "0.0099", value: "465", fee: "5" },
 });
 
 describe("a swap through FIFO and AVCO", () => {
@@ -113,7 +113,7 @@ describe("a swap and Art. 43.i", () => {
     linkId: "refid-loss",
     ts: "2026-03-10T10:00:00Z",
     out: { id: "ETH", quantity: "4", value: "360" },
-    in: { id: "BTC", quantity: "0.0099", value: "355", fee: "5" },
+    in: { id: "BTC", quantity: "0.0099", value: "350", fee: "5" },
   });
 
   it("treats the sale at a loss like any crypto transmission: a purchase in the next two months defers it in proportion", () => {
@@ -152,7 +152,7 @@ describe("a swap and Art. 43.i", () => {
       linkId: "refid-2025",
       ts: "2025-03-10T10:00:00Z",
       out: { id: "ETH", quantity: "4", value: "480" },
-      in: { id: "BTC", quantity: "0.0099", value: "470", fee: "5" },
+      in: { id: "BTC", quantity: "0.0099", value: "465", fee: "5" },
     });
     const start = trade("BUY", "ETH", "10", "1000", "2025-01-05T10:00:00Z");
     const year = taxYearOf(

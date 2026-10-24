@@ -132,7 +132,10 @@ describe("buildTaxYearView", () => {
       trade("BUY", "ETH", "10", "1000", { ts: "2025-01-05" }),
       { ...trade("SELL", "ETH", "4", "480", { ts: "2025-03-10" }), ...link },
       {
-        ...trade("BUY", "BTC", "0.0099", "470", { ts: "2025-03-10", fees: "5" }),
+        ...trade("BUY", "BTC", "0.0099", "465", {
+          ts: "2025-03-10",
+          fees: "5",
+        }),
         ...link,
       },
     ];

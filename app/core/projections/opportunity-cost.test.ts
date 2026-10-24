@@ -301,7 +301,7 @@ describe("swap legs", () => {
       ...link,
     };
     const received = {
-      ...trade("BUY", "Y", "2025-03-17T10:00:00Z", "1", "470", "5"),
+      ...trade("BUY", "Y", "2025-03-17T10:00:00Z", "1", "465", "5"),
       ...link,
     };
     const prices_ = prices({ X: "150", Y: "500" });

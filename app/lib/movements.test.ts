@@ -230,7 +230,7 @@ describe("a swap in the net cash flow", () => {
       [
         buy({ id: "b1", fees: "0", grossAmount: "1000" }),
         buy({ id: "s1", type: "SELL", grossAmount: "480", fees: "5", ...link }),
-        buy({ id: "s2", grossAmount: "470", fees: "5", ...link }),
+        buy({ id: "s2", grossAmount: "465", fees: "5", ...link }),
       ],
       INSTRUMENTS,
     );
