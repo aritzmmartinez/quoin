@@ -955,14 +955,15 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
   because Yahoo dates it at the session open and fills it with the close, and a live row
   from its own time (`snapshotKnownAt` in `core/prices`). Keyed by the candle's date, a
   reward late on day D read D's close, which did not exist yet.
-- Every asset Kraken trades against fiat is modelled; there is no asset allow-list. Swaps
-  between two crypto assets are still set aside (`crypto-swap`) until they are modelled.
+- Every asset Kraken trades against fiat is modelled; there is no asset allow-list. A swap
+  between two crypto assets is two linked rows (`linkKind: swap`), set aside whole as
+  `swap-unpriced` if either leg has no value.
   The Kraken invariants (schema, balance check, valuation, internal moves) live in
   `app/adapters/README.md`. **A discard is classified by what it does to a modelled
-  position, not by asset.** `crypto-swap` (a `stable_coin` is crypto, not fiat),
+  position, not by asset.** `swap-unpriced` (a `stable_coin` is crypto, not fiat),
   `crypto-transfer` (on-chain in or out), `fx-unavailable` (a row in another currency
-  with no ECB rate for its day, from any adapter, see *CSV ingestion*), `reward-unpriced`
-  and `invalid-crypto-code` each leave a position wrong, and `AFFECTS_POSITION` flags
+  with no ECB rate for its day, from any adapter, see *CSV ingestion*), `reward-unpriced`,
+  `earn-return-unverified` and `invalid-crypto-code` each leave a position wrong, and `AFFECTS_POSITION` flags
   them so the wizard and `pnpm ingest` warn. Every Kraken discard
   carries a per-group detail (date, type, subtype, asset or pair — never amounts).
   `DiscardReason` is a union and its labels are `Record<DiscardReason, string>` in both
