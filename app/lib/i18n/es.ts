@@ -1183,6 +1183,10 @@ export const es = {
     },
     amountHint:
       "El importe es el flujo de caja real: comisiones incluidas y retenciones descontadas.",
+    swapType: "Permuta",
+    swapAmountLabel: "No ha entrado ni salido dinero: es una permuta",
+    swapNote:
+      "En una permuta el importe es el valor de mercado de lo entregado o de lo recibido. No ha entrado ni salido dinero, así que no cuenta en el flujo neto.",
     noRateLabel: "sin tipo",
     noRate: (currency: string): string =>
       `Esta operación está en ${currency} y no tiene tipo de cambio a euros, así que no se ha podido valorar y no cuenta en ninguna cifra.`,
@@ -1318,6 +1322,8 @@ export const es = {
         `Art. 43.${letter}: se recompraron ${repurchased} de las ${sold} uds vendidas.`,
       ownDeferredReason: (share: string, amount: string): string =>
         `El ${share} de la pérdida (${amount}) no computa este año: queda diferida en las uds recompradas y se integrará cuando se vendan.`,
+      minorDeferralReason: (share: string, cent: string): string =>
+        `Hay compras del mismo activo dentro de la ventana de recompra (${share} de las uds vendidas): la pérdida que difieren es inferior a ${cent} y no cambia ninguna cifra.`,
       carriedOverReason: (amount: string): string =>
         `Las uds vendidas traían pérdida diferida de ventas anteriores; ${amount} pasa a las nuevas uds recompradas, aunque esta venta sea con ganancia. La ganancia propia no se bloquea.`,
       windowOpenReason: (date: string): string =>
@@ -1360,12 +1366,19 @@ export const es = {
         `Pérdidas diferidas pendientes a 31 de diciembre de ${year}`,
       pendingBody:
         "Siguen ligadas a uds en cartera. No cuentan en ningún año hasta que esas uds se vendan sin nueva recompra (Art. 43).",
-      pendingColumns: {
-        t: "Uds adquiridas",
+      pendingGroupColumns: {
+        saleDate: "Venta del",
         name: "Instrumento",
-        origin: "Pérdida de la venta del",
+        acquisitions: "Adquisiciones",
         amount: "Importe",
       },
+      pendingDetailColumns: {
+        acquiredAt: "Uds adquiridas",
+        amount: "Importe",
+      },
+      belowCent: (cent: string): string => `< ${cent}`,
+      acquisitionsCount: (count: number): string =>
+        count === 1 ? "1 adquisición" : `${count} adquisiciones`,
       empty: {
         title: "Sin ventas en este año",
         body: "Elige otro año fiscal en el desplegable.",

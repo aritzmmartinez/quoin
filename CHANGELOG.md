@@ -12,13 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tax: a sale of a bond, commodity or cash instrument is named, since no repurchase rule covers it.
 - Kraken: every asset bought or sold against fiat is imported, not only Bitcoin.
 - Kraken: a swap between two crypto assets is imported as a sale and a linked purchase, each valued on its own. For tax, both take the Bizkaia rule's value: the greater of what was delivered and the gross value received, less the fee taken from what is received. A swap with a leg that has no price is set aside whole and recovered by downloading prices and importing the same file again.
-- A swap moves no money in or out, so it counts towards neither total contributed nor returns, nor the net cash flow in Movements.
+- A swap moves no money in or out, so it counts towards neither total contributed nor returns, nor the net cash flow in Movements, where its two rows read as a swap, with where it went, instead of as a purchase and a sale.
 - Kraken: rewards in any asset are valued at the figure Kraken gives in the export, and at the price history only when it gives none.
 - Kraken: moves between your own Kraken wallets create nothing, including money sent from spot to Earn, and a transfer with another account is stored as cash and flagged. Money coming back from Earn is set aside by name and flagged, since it can include yield.
 - Kraken: the mapping step suggests `<CODE>-EUR` for each crypto asset, and says what to try when Yahoo has no price for it.
 - Each ledger row records where its value came from.
 
 ### Changed
+- Tax: a repurchase that defers less than a cent is a quiet note instead of a highlighted warning, and a share too small to show says so instead of reading 0.0 %.
+- Tax: the deferred losses still pending are grouped by the sale that created them, with the total and the number of acquisitions, and the detail unfolds. An amount that rounds to 0,00 € reads "< 0,01 €" in a muted tone, in the group, in its detail and in the breakdown of a sale (non-computable loss and units that receive the deferral).
 - Kraken: an export without the wallet column, the older format, is refused. Download a new one from Kraken.
 - Kraken: a file whose balances do not follow from its rows is refused whole, naming the asset, wallet and time, before anything is written.
 - Kraken: an import no longer renames an instrument that already exists.

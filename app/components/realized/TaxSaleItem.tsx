@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import {
   DASH,
@@ -11,6 +11,7 @@ import {
 import { SignedMoney } from "../SignedMoney";
 import { ThesisChip } from "../ui/ThesisChip";
 import { TABLE_CELLS, TABLE_DIVIDER, TABLE_NUM } from "../ui/table";
+import { DeferredAmount } from "./DeferredAmount";
 import {
   TAX_BREAKDOWN_GRID,
   TAX_LOT_GRID,
@@ -34,6 +35,7 @@ export function TaxSaleItem({ sale }: { sale: TaxSaleRow }) {
   const [open, setOpen] = useState(false);
   const copy = t.realized.fiscal;
   const washSale = sale.washSale;
+  const material = washSale !== null && !sale.deferralMinor;
 
   return (
     <li className={TABLE_DIVIDER}>
@@ -43,7 +45,7 @@ export function TaxSaleItem({ sale }: { sale: TaxSaleRow }) {
         aria-expanded={open}
         aria-label={open ? copy.collapse : copy.expand}
         className={`${TABLE_CELLS} ${TAX_SALE_GRID} min-h-11 w-full text-left hover:bg-surface-2 ${
-          washSale ? "border-l-2 border-negative bg-negative/4" : ""
+          material ? "border-l-2 border-negative bg-negative/4" : ""
         }`}
       >
         <span className={`${TABLE_NUM} font-normal text-muted`}>
@@ -56,7 +58,7 @@ export function TaxSaleItem({ sale }: { sale: TaxSaleRow }) {
               {sale.name}
             </span>
             <ThesisChip thesis={sale.thesis} />
-            {washSale && (
+            {material && (
               <span
                 className={`${BADGE} border-negative/40 bg-negative/10 text-negative`}
               >
@@ -69,7 +71,15 @@ export function TaxSaleItem({ sale }: { sale: TaxSaleRow }) {
               </span>
             )}
           </div>
-          {washSale && (
+          {washSale && !material && (
+            <div className="mt-0.5 text-[11.5px] leading-snug text-muted">
+              {copy.minorDeferralReason(
+                formatPercent(washSale.fraction, 1, { floorNonZero: true }),
+                formatMoney("0.01"),
+              )}
+            </div>
+          )}
+          {washSale && material && (
             <div className="mt-0.5 text-[11.5px] leading-snug text-negative">
               {copy.washSaleReason(
                 washSale.letter,
@@ -78,7 +88,7 @@ export function TaxSaleItem({ sale }: { sale: TaxSaleRow }) {
               )}
               {sale.nonComputable !== "0" &&
                 ` ${copy.ownDeferredReason(
-                  formatPercent(washSale.fraction),
+                  formatPercent(washSale.fraction, 1, { floorNonZero: true }),
                   formatSignedMoney(sale.nonComputable).text,
                 )}`}
               {sale.carriedOver !== "0" &&
@@ -163,23 +173,25 @@ function WashSaleBreakdown({
   washSale: TaxWashSaleRow;
 }) {
   const months = washSale.windowMonths;
-  const { formatQuantity, formatDate, formatPercent, formatSignedMoney } =
-    useFormat();
+  const { formatQuantity, formatDate, formatPercent } = useFormat();
   const copy = useCopy().realized.fiscal.breakdown;
 
-  const rows: [string, string][] = [
+  const rows: [string, ReactNode][] = [
     [copy.before(months), formatQuantity(washSale.before)],
     [copy.remainingAfter, formatQuantity(washSale.remainingAfter)],
     [copy.repurchaseBefore, formatQuantity(washSale.repurchaseBefore)],
     [copy.repurchaseAfter(months), formatQuantity(washSale.repurchaseAfter)],
     [copy.repurchased, formatQuantity(washSale.repurchased)],
-    [copy.share, formatPercent(washSale.fraction, 2)],
+    [copy.share, formatPercent(washSale.fraction, 2, { floorNonZero: true })],
   ];
   if (sale.nonComputable !== "0") {
-    rows.push([copy.nonComputable, formatSignedMoney(sale.nonComputable).text]);
+    rows.push([
+      copy.nonComputable,
+      <DeferredAmount value={sale.nonComputable} />,
+    ]);
   }
   if (sale.carriedOver !== "0") {
-    rows.push([copy.carriedOver, formatSignedMoney(sale.carriedOver).text]);
+    rows.push([copy.carriedOver, <DeferredAmount value={sale.carriedOver} />]);
   }
 
   return (
@@ -221,7 +233,7 @@ function WashSaleBreakdown({
             {formatQuantity(r.quantity)}
           </span>
           <span className={`${TABLE_NUM} text-right`}>
-            <SignedMoney value={r.deferredLoss} />
+            <DeferredAmount value={r.deferredLoss} />
           </span>
         </div>
       ))}

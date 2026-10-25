@@ -12,6 +12,8 @@ import type { TradeRepublicRow } from "~/adapters/ingestion/trade-republic/row";
 
 import {
   buildTaxYearView,
+  groupPendingBySale,
+  isBelowCent,
   inKindIncomeOf,
   listTaxYears,
   parseTaxYear,
@@ -104,6 +106,203 @@ describe("parseTaxYear", () => {
   });
 });
 
+describe("groupPendingBySale", () => {
+  const row = (
+    buyEventId: string,
+    acquiredAt: string,
+    origins: [string, string][],
+    instrumentId = "ETH",
+  ) => ({
+    buyEventId,
+    acquiredAt,
+    instrumentId,
+    name: instrumentId,
+    amount: "0",
+    origins: origins.map(([originT, amount], i) => ({
+      originEventId: `sale-${originT}-${i}`,
+      originT,
+      amount,
+    })),
+  });
+
+  it("makes one row per sale, adding the pieces and counting the acquisitions", () => {
+    const groups = groupPendingBySale([
+      row("b2", "2026-08-26T05:00:00Z", [["2026-08-20T11:00:00Z", "-0.0002"]]),
+      row("b1", "2026-08-19T05:00:00Z", [["2026-08-20T11:00:00Z", "-0.0001"]]),
+      row("b3", "2026-09-02T05:00:00Z", [["2026-08-20T11:00:00Z", "-0.0003"]]),
+    ]);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({
+      instrumentId: "ETH",
+      saleT: "2026-08-20T11:00:00Z",
+      amount: "-0.0006",
+    });
+    expect(groups[0]?.acquisitions.map((a) => a.buyEventId)).toEqual([
+      "b1",
+      "b2",
+      "b3",
+    ]);
+  });
+
+  it("keeps apart two sales of one asset on different days and two assets on one day, oldest sale first", () => {
+    const groups = groupPendingBySale([
+      row("b1", "2026-09-01T05:00:00Z", [
+        ["2026-08-20T11:00:00Z", "-1"],
+        ["2026-07-01T09:00:00Z", "-2"],
+      ]),
+      row(
+        "b2",
+        "2026-09-01T05:00:00Z",
+        [["2026-08-20T11:30:00Z", "-4"]],
+        "SOL",
+      ),
+    ]);
+
+    expect(groups.map((g) => [g.instrumentId, g.saleT, g.amount])).toEqual([
+      ["ETH", "2026-07-01T09:00:00Z", "-2"],
+      ["ETH", "2026-08-20T11:00:00Z", "-1"],
+      ["SOL", "2026-08-20T11:30:00Z", "-4"],
+    ]);
+  });
+
+  it("puts two sales of one asset on one Madrid day together", () => {
+    const groups = groupPendingBySale([
+      row("b1", "2026-09-01T05:00:00Z", [
+        ["2026-08-20T08:00:00Z", "-1"],
+        ["2026-08-20T21:00:00Z", "-2"],
+      ]),
+    ]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({
+      saleT: "2026-08-20T08:00:00Z",
+      amount: "-3",
+    });
+  });
+});
+
+describe("isBelowCent", () => {
+  it("is true for a nonzero amount that rounds to 0,00 € in either direction", () => {
+    for (const v of ["-0.004", "0.004", "-0.0001", "0.00499"])
+      expect(isBelowCent(v)).toBe(true);
+  });
+
+  it("is false from half a cent up, and for an exact zero", () => {
+    for (const v of ["-0.005", "0.005", "-0.01", "-3", "0", "-0", "0.00"])
+      expect(isBelowCent(v)).toBe(false);
+  });
+
+  it("judges a group and its pieces by their own amounts", () => {
+    const [group] = groupPendingBySale([
+      {
+        buyEventId: "b1",
+        acquiredAt: "2026-08-26T05:00:00Z",
+        instrumentId: "ETH",
+        name: "ETH",
+        amount: "0",
+        origins: [
+          { originEventId: "s1", originT: "2026-08-20T11:00:00Z", amount: "-0.004" },
+        ],
+      },
+      {
+        buyEventId: "b2",
+        acquiredAt: "2026-08-27T05:00:00Z",
+        instrumentId: "ETH",
+        name: "ETH",
+        amount: "0",
+        origins: [
+          { originEventId: "s1", originT: "2026-08-20T11:00:00Z", amount: "-0.004" },
+        ],
+      },
+    ]);
+    expect(group?.acquisitions.every((p) => isBelowCent(p.amount))).toBe(true);
+    expect(isBelowCent(group?.amount ?? "0")).toBe(false);
+  });
+});
+
+describe("a repurchase that defers less than a cent", () => {
+  const crypto = [instrument("X", "Token", "CRYPTO")];
+  const sold = (loss: string, rebuys: number) => {
+    const events = [
+      trade("BUY", "X", "1000", "10", { ts: "2026-01-05" }),
+      trade("SELL", "X", "1000", String(10 - Number(loss)), {
+        ts: "2026-03-10",
+      }),
+      ...Array.from({ length: rebuys }, (_, i) =>
+        trade("BUY", "X", "0.001", "0.0001", {
+          ts: `2026-03-${String(12 + i * 2).padStart(2, "0")}`,
+        }),
+      ),
+    ];
+    return buildTaxYearView(events, crypto, 2026);
+  };
+
+  it("is flagged as minor, still shows its repurchase, and groups its pending pieces by the sale", () => {
+    const view = sold("1", 4);
+
+    expect(view.sales[0]?.washSale).not.toBeNull();
+    expect(view.sales[0]?.deferralMinor).toBe(true);
+    expect(view.pending.length).toBeGreaterThan(1);
+    expect(view.pendingBySale).toHaveLength(1);
+    expect(view.pendingBySale[0]?.acquisitions).toHaveLength(
+      view.pending.length,
+    );
+  });
+
+  it("reads its non-computable loss and every recipient as below a cent, and a real deferral as neither", () => {
+    const minor = sold("1", 4).sales[0];
+    expect(minor?.washSale?.recipients.length).toBeGreaterThan(0);
+    expect(isBelowCent(minor?.nonComputable ?? "0")).toBe(true);
+    expect(
+      minor?.washSale?.recipients.every((r) => isBelowCent(r.deferredLoss)),
+    ).toBe(true);
+
+    const material = buildTaxYearView(
+      [
+        trade("BUY", "X", "10", "1000", { ts: "2026-01-05" }),
+        trade("SELL", "X", "10", "900", { ts: "2026-03-10" }),
+        trade("BUY", "X", "5", "450", { ts: "2026-03-20" }),
+      ],
+      crypto,
+      2026,
+    ).sales[0];
+    expect(isBelowCent(material?.nonComputable ?? "0")).toBe(false);
+    expect(
+      material?.washSale?.recipients.some((r) => isBelowCent(r.deferredLoss)),
+    ).toBe(false);
+  });
+
+  it("is not flagged when it defers a real amount", () => {
+    const view = sold("1", 1);
+    const material = buildTaxYearView(
+      [
+        trade("BUY", "X", "10", "1000", { ts: "2026-01-05" }),
+        trade("SELL", "X", "10", "900", { ts: "2026-03-10" }),
+        trade("BUY", "X", "5", "450", { ts: "2026-03-20" }),
+      ],
+      crypto,
+      2026,
+    );
+
+    expect(material.sales[0]?.washSale).not.toBeNull();
+    expect(material.sales[0]?.deferralMinor).toBe(false);
+    expect(view.sales[0]?.deferralMinor).toBe(true);
+  });
+
+  it("is not flagged when nothing was repurchased", () => {
+    const view = buildTaxYearView(
+      [
+        trade("BUY", "X", "10", "1000", { ts: "2026-01-05" }),
+        trade("SELL", "X", "10", "900", { ts: "2026-03-10" }),
+      ],
+      crypto,
+      2026,
+    );
+    expect(view.sales[0]?.washSale).toBeNull();
+    expect(view.sales[0]?.deferralMinor).toBe(false);
+  });
+});
+
 describe("buildTaxYearView", () => {
   const instruments = [instrument("X", "Fondo X")];
 
@@ -180,6 +379,7 @@ describe("buildTaxYearView", () => {
       {
         buyEventId: rebuy.id,
         acquiredAt: rebuy.ts.toISOString(),
+        instrumentId: "X",
         name: "Fondo X",
         amount: "-120",
         origins: [

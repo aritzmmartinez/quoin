@@ -119,13 +119,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     value: Number(pt.value),
   }));
 
-  // Shared with the global ledger: one definition of what a movement row is, so
-  // both screens agree on fees, signs and price marks.
   const { items: movements, info: movementsPage } = paginate(
-    toMovementRows(
-      events.filter((e) => "instrumentId" in e && e.instrumentId === id),
-      [instrument],
-    ),
+    toMovementRows(events, [instrument], { instrumentId: id }),
     page,
   );
 
@@ -175,10 +170,7 @@ export default function Instrument({ loaderData }: Route.ComponentProps) {
           {t.fx.unratedCloses(unratedCloses)}
         </Explainer>
       )}
-      <InstrumentPriceChart
-        data={priceChartData}
-        unrated={unratedCloses > 0}
-      />
+      <InstrumentPriceChart data={priceChartData} unrated={unratedCloses > 0} />
       <InstrumentValueChart data={ivvData} />
       <Card className="overflow-hidden">
         <div className="px-gutter pb-3 pt-4 text-[14px] font-semibold">

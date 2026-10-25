@@ -7,7 +7,7 @@ import type {
   Thesis,
   TradeEvent,
 } from "~/core/domain";
-import { toIsoDate } from "~/core/calendar";
+import { dayOf, toIsoDate } from "~/core/calendar";
 import { Money, isInKind, type DividendEvent } from "~/core/domain";
 import { baseOf, bookable, unconvertibleInstrumentIds } from "~/core/fx";
 import {
@@ -180,6 +180,7 @@ export interface TaxSaleRow {
   nonComputable: string;
   carriedOver: string;
   washSale: TaxWashSaleRow | null;
+  deferralMinor: boolean;
   windowOpenUntil: string | null;
   unlistedRepurchaseAt: string | null;
   lots: TaxLotRow[];
@@ -197,9 +198,72 @@ export interface TaxIntegrationRow {
 export interface TaxPendingRow {
   buyEventId: string;
   acquiredAt: string;
+  instrumentId: string;
   name: string;
   amount: string;
   origins: { originEventId: string; originT: string; amount: string }[];
+}
+
+const HALF_CENT = new Decimal("0.005");
+
+function roundsToNothing(value: string): boolean {
+  return new Decimal(value).abs().lt(HALF_CENT);
+}
+
+export function isBelowCent(value: string): boolean {
+  return !new Decimal(value).isZero() && roundsToNothing(value);
+}
+
+export interface TaxPendingAcquisition {
+  buyEventId: string;
+  acquiredAt: string;
+  amount: string;
+}
+
+export interface TaxPendingGroup {
+  key: string;
+  instrumentId: string;
+  name: string;
+  saleT: string;
+  amount: string;
+  acquisitions: TaxPendingAcquisition[];
+}
+
+export function groupPendingBySale(
+  rows: readonly TaxPendingRow[],
+): TaxPendingGroup[] {
+  const groups = new Map<string, TaxPendingGroup>();
+  for (const row of rows) {
+    for (const origin of row.origins) {
+      const key = `${row.instrumentId}|${dayOf(new Date(origin.originT))}`;
+      const group = groups.get(key) ?? {
+        key,
+        instrumentId: row.instrumentId,
+        name: row.name,
+        saleT: origin.originT,
+        amount: "0",
+        acquisitions: [],
+      };
+      if (origin.originT < group.saleT) group.saleT = origin.originT;
+      group.amount = new Decimal(group.amount).plus(origin.amount).toFixed();
+      group.acquisitions.push({
+        buyEventId: row.buyEventId,
+        acquiredAt: row.acquiredAt,
+        amount: origin.amount,
+      });
+      groups.set(key, group);
+    }
+  }
+  return [...groups.values()]
+    .map((group) => ({
+      ...group,
+      acquisitions: group.acquisitions.sort((a, b) =>
+        a.acquiredAt.localeCompare(b.acquiredAt),
+      ),
+    }))
+    .sort(
+      (a, b) => a.saleT.localeCompare(b.saleT) || a.name.localeCompare(b.name),
+    );
 }
 
 export type TaxCarryforwardRow = CarryforwardStep;
@@ -246,6 +310,7 @@ export interface TaxYearView {
   computableNet: string;
   integrations: TaxIntegrationRow[];
   pending: TaxPendingRow[];
+  pendingBySale: TaxPendingGroup[];
   pendingSum: string;
   carryforward: TaxCarryforwardRow[];
   netSavingsBase: string;
@@ -285,6 +350,7 @@ export function buildTaxYearView(
   const pending: TaxPendingRow[] = result.pending.map((p) => ({
     buyEventId: p.buyEventId,
     acquiredAt: p.acquiredAt.toISOString(),
+    instrumentId: p.instrumentId,
     name: nameOf(p.instrumentId),
     amount: sum(p.pieces.map((piece) => piece.amount)),
     origins: p.pieces.map((piece) => ({
@@ -324,6 +390,7 @@ export function buildTaxYearView(
     computableNet: result.computableNet,
     integrations,
     pending,
+    pendingBySale: groupPendingBySale(pending),
     pendingSum: sum(
       pending.map((p) => p.amount),
       2,
@@ -381,6 +448,10 @@ function toSaleRow(
         deferredLoss: r.deferredLoss,
       })),
     },
+    deferralMinor:
+      gain.washSale !== null &&
+      roundsToNothing(gain.nonComputable) &&
+      roundsToNothing(gain.carriedOver),
     windowOpenUntil: windowOpenUntil(gain, today),
     unlistedRepurchaseAt: gain.unlistedNotice?.buyTs.toISOString() ?? null,
     lots: gain.lots.map((lot) => ({

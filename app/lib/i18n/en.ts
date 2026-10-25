@@ -1172,6 +1172,10 @@ export const en: Copy = {
     },
     amountHint:
       "The amount is the real cash flow: fees included and withholdings deducted.",
+    swapType: "Swap",
+    swapAmountLabel: "No money moved: it is a swap",
+    swapNote:
+      "In a swap the amount is the market value of the units delivered or received. No money came in or went out, so it is not part of the net flow.",
     noRateLabel: "no rate",
     noRate: (currency: string): string =>
       `This entry is in ${currency} and has no exchange rate to euros, so it could not be valued and counts in no figure.`,
@@ -1306,6 +1310,8 @@ export const en: Copy = {
         `Art. 43.${letter}: ${repurchased} of the ${sold} units sold were repurchased.`,
       ownDeferredReason: (share: string, amount: string): string =>
         `${share} of the loss (${amount}) does not compute this year: it stays deferred on the repurchased units and computes when they are sold.`,
+      minorDeferralReason: (share: string, cent: string): string =>
+        `Purchases of the same asset fall inside the repurchase window (${share} of the units sold): the loss they defer is under ${cent} and changes no figure.`,
       carriedOverReason: (amount: string): string =>
         `The units sold carried deferred loss from earlier sales; ${amount} moves on to the new repurchased units, even when this sale is at a gain. Its own gain is never held back.`,
       windowOpenReason: (date: string): string =>
@@ -1347,12 +1353,19 @@ export const en: Copy = {
         `Deferred losses pending at 31 December ${year}`,
       pendingBody:
         "Still attached to units held. They count in no year until those units are sold with no new repurchase (Art. 43).",
-      pendingColumns: {
-        t: "Units acquired",
+      pendingGroupColumns: {
+        saleDate: "Sale of",
         name: "Instrument",
-        origin: "Loss from the sale of",
+        acquisitions: "Acquisitions",
         amount: "Amount",
       },
+      pendingDetailColumns: {
+        acquiredAt: "Units acquired",
+        amount: "Amount",
+      },
+      belowCent: (cent: string): string => `< ${cent}`,
+      acquisitionsCount: (count: number): string =>
+        count === 1 ? "1 acquisition" : `${count} acquisitions`,
       empty: {
         title: "No sales in this year",
         body: "Pick another tax year from the dropdown.",
