@@ -81,6 +81,12 @@ export function MovementsTable({
         </div>
       </div>
 
+      {rows.some((row) => row.swap) && (
+        <p className="px-gutter pb-3 pt-3 text-[11.5px] text-muted">
+          {copy.swapNote}
+        </p>
+      )}
+
       <Pagination info={info} />
     </>
   );
@@ -100,6 +106,17 @@ function Cell({
       return <>{formatDate(row.t)}</>;
 
     case "type":
+      if (row.swap)
+        return (
+          <span className="block min-w-0">
+            <span className="block truncate">{t.movements.swapType}</span>
+            {row.swapRoute && (
+              <span className="mt-0.5 block truncate text-[11.5px] leading-snug text-muted">
+                {row.swapRoute}
+              </span>
+            )}
+          </span>
+        );
       return (
         <span className={TYPE_TONE[row.type]}>
           {row.inKind && (row.type === "BUY" || row.type === "DIVIDEND")
@@ -136,6 +153,13 @@ function Cell({
       );
 
     case "amount":
+      if (row.swap && row.amount !== null)
+        return (
+          <span className="text-muted" title={t.movements.swapAmountLabel}>
+            <span className="sr-only">{t.movements.swapAmountLabel}: </span>
+            {formatMoney(row.amount)}
+          </span>
+        );
       return row.amount === null ? (
         <span
           className="whitespace-nowrap text-muted"

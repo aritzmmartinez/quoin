@@ -14,6 +14,7 @@ import { Card } from "../ui/Card";
 import { InfoHint } from "../ui/Hint";
 import { Select } from "../ui/Select";
 import { SignedMoney } from "../SignedMoney";
+import { PendingDeferralsCard } from "./PendingDeferralsCard";
 import { TaxSaleItem } from "./TaxSaleItem";
 import {
   TAX_DEFERRED_GRID,
@@ -181,19 +182,9 @@ export function TaxYearPanel({
           )}
 
           {view.pending.length > 0 && (
-            <DeferredCard
-              title={copy.pendingTitle(view.year)}
-              body={copy.pendingBody}
-              columns={copy.pendingColumns}
-              rows={view.pending.flatMap((p) =>
-                p.origins.map((o) => ({
-                  key: `${p.buyEventId}:${o.originEventId}`,
-                  t: p.acquiredAt,
-                  name: p.name,
-                  originT: o.originT,
-                  amount: o.amount,
-                })),
-              )}
+            <PendingDeferralsCard
+              year={view.year}
+              groups={view.pendingBySale}
             />
           )}
 

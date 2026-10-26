@@ -302,7 +302,7 @@ function swapLegValue(
     const usd = new Decimal(row.amountusd).abs();
     const feeUsd = new Decimal(row.feeusd || "0");
     return {
-      gross: received ? usd : usd.plus(feeUsd),
+      gross: received ? usd.minus(feeUsd) : usd.plus(feeUsd),
       fee: received ? feeUsd : new Decimal(0),
       currency: "USD",
       valuationSource: "kraken-amountusd",
@@ -316,7 +316,7 @@ function swapLegValue(
       Money.fromString(priced.price).scaleBy(quantity.toFixed()).toString(),
     );
   return {
-    gross: received ? worth(amount) : worth(amount.plus(fee)),
+    gross: received ? worth(amount.minus(fee)) : worth(amount.plus(fee)),
     fee: received ? worth(fee) : new Decimal(0),
     currency: priced.currency,
     valuationSource: "yahoo",
@@ -375,7 +375,7 @@ function swap(
       type,
       instrumentId: instrument.id,
       quantity: quantity.toFixed(),
-      price: value.gross.minus(value.fee).dividedBy(quantity).toFixed(),
+      price: value.gross.dividedBy(quantity).toFixed(),
       grossAmount: value.gross.toFixed(),
       fees: value.fee.toFixed(),
       currency: value.currency,

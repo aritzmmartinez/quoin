@@ -151,7 +151,7 @@ describe("a Kraken swap through SQLite (integration)", () => {
       type: "BUY",
       instrumentId: "BTC",
       quantity: "0.001497",
-      grossAmount: "163.5",
+      grossAmount: "163.17",
       fees: "0.33",
       currency: "USD",
       fxSource: "ECB",

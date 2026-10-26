@@ -32,8 +32,8 @@ export interface SwapPairValue {
  *   export carries one yet, so that reading is an assumption, covered by a
  *   synthetic fixture.
  * - `receivedValue` is the market value of the received `amount` before any
- *   fee (Kraken prices `amountusd` and `feeusd` alike), on the BUY leg's
- *   `grossAmount`.
+ *   fee (Kraken prices `amountusd` and `feeusd` alike): the BUY leg's
+ *   `grossAmount`, which is the value of the units it holds, plus its `fees`.
  * - `receivedFee` is the value of the units Kraken kept from the received
  *   asset, on the BUY leg's `fees`. The BUY's quantity is already `amount −
  *   fee`, so those units never arrived.
@@ -87,10 +87,9 @@ export function swapPairValue(
 
 function loneLegValue(trade: TradeEvent): SwapLegValue {
   const gross = baseOf(trade, "grossAmount");
-  const fees = baseOf(trade, "fees");
   return trade.type === "SELL"
-    ? { gross, fees }
-    : { gross: gross.subtract(fees), fees: Money.zero() };
+    ? { gross, fees: baseOf(trade, "fees") }
+    : { gross, fees: Money.zero() };
 }
 
 export type TradeAmounts = (trade: TradeEvent) => SwapLegValue;
@@ -137,7 +136,7 @@ export function tradeAmounts(
       const pair = swapPairValue(
         {
           deliveredValue: baseOf(sell, "grossAmount"),
-          receivedValue: baseOf(buy, "grossAmount"),
+          receivedValue: baseOf(buy, "grossAmount").add(baseOf(buy, "fees")),
           receivedFee: baseOf(buy, "fees"),
         },
         swapValuationRuleFor(territory, dayOf(sell.ts), options.rules),

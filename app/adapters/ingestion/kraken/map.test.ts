@@ -1,3 +1,4 @@
+import Decimal from "decimal.js";
 import { describe, it, expect } from "vitest";
 import { isInternalMove, mapGroup, priceLookupFrom } from "./map";
 import type { KrakenRow } from "./row";
@@ -569,7 +570,7 @@ describe("Kraken mapGroup", () => {
         type: "BUY",
         instrumentId: "BTC",
         quantity: "0.001497",
-        grossAmount: "163.5",
+        grossAmount: "163.17",
         fees: "0.33",
         currency: "USD",
         externalId: "S1:buy",
@@ -578,6 +579,50 @@ describe("Kraken mapGroup", () => {
         valuationSource: "kraken-amountusd",
       });
       expect(buy).not.toHaveProperty("funding", "IN_KIND");
+    });
+
+    it("holds the units it receives at their market price, and gross plus fees is what Kraken priced", () => {
+      const [sell, buy] = events(
+        mapGroup([
+          spend({ amountusd: "-163.5", feeusd: "0" }),
+          receive({ fee: "0.000003", amountusd: "163.5", feeusd: "0.327" }),
+        ]),
+      );
+      expect(buy).toMatchObject({
+        quantity: "0.001497",
+        grossAmount: "163.173",
+        fees: "0.327",
+        price: "109000",
+      });
+      const held = buy as { grossAmount: string; fees: string };
+      expect(new Decimal(held.grossAmount).plus(held.fees).toFixed()).toBe(
+        "163.5",
+      );
+      expect(sell).toMatchObject({ grossAmount: "163.5", fees: "0" });
+    });
+
+    it("values both legs by the history the same way: the received units net of the fee, the fee apart", () => {
+      const at = (instrumentId: string, price: string) => ({
+        instrumentId,
+        price,
+        currency: "EUR",
+        asOf: new Date("2025-11-12T00:00:00Z"),
+        source: "YAHOO",
+      });
+      const [sell, buy] = events(
+        mapGroup(
+          [spend(), receive({ fee: "0.0001" })],
+          priceLookupFrom([at("ETH", "3000"), at("BTC", "90000")]),
+        ),
+      );
+      expect(sell).toMatchObject({ grossAmount: "150", fees: "0" });
+      expect(buy).toMatchObject({
+        quantity: "0.0014",
+        grossAmount: "126",
+        fees: "9",
+        price: "90000",
+        valuationSource: "yahoo",
+      });
     });
 
     it("counts a fee charged on the delivered leg as delivered: the quantity and the value both include it", () => {
@@ -712,7 +757,9 @@ describe("Kraken mapGroup", () => {
 
     it("is an internal move when it leaves a spot wallet: nothing is recorded and nothing is flagged", () => {
       const moved = mapGroup([earn()]);
-      expect(moved).toMatchObject([{ kind: "discard", reason: "internal-move" }]);
+      expect(moved).toMatchObject([
+        { kind: "discard", reason: "internal-move" },
+      ]);
       expect(isInternalMove(earn())).toBe(true);
     });
 

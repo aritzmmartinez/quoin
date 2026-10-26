@@ -15,7 +15,7 @@ import type {
   PriceSnapshot,
 } from "~/core/ports";
 
-import { rateBookFrom } from "~/core/fx";
+import { baseOf, rateBookFrom } from "~/core/fx";
 import { tradeAmounts } from "~/core/swap";
 
 import { AFFECTS_POSITION, DISCARD_REASONS } from "../discard";
@@ -968,6 +968,9 @@ describe("KrakenCsvAdapter and swaps", () => {
     expect(amountsOf(sell).fees.toString()).toBe("0.26");
     expect(amountsOf(buy).gross.toString()).toBe("131.74");
     expect(buy.quantity).toBe("0.001497");
+    expect(
+      baseOf(buy, "grossAmount").add(baseOf(buy, "fees")).toString(),
+    ).toBe("130.8");
   });
 
   it("charges nothing twice when the fee was on the delivered leg", async () => {

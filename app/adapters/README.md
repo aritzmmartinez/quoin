@@ -61,10 +61,12 @@ Contents:
   `linkId` = the refid and `linkKind` = `swap` (two nullable columns, validated by Zod at
   write and never by a CHECK, like `valuationSource`).
 - **A swap's quantities.** Delivered is `|amount| + fee`, received is `amount − fee`.
-- **Each leg is valued by itself, and the ledger keeps facts.** The delivered leg is worth
-  `|amountusd| + feeusd`; the received leg is worth `amountusd`, before its fee, and carries the
-  value of the fee Kraken kept from it (`feeusd`) in `fees`. Both are booked in euros at the ECB
-  rate of their day. Only a leg without a complete figure (no `amountusd`, or a fee with no
+- **Each leg is valued by itself, and the ledger keeps facts.** A leg's `grossAmount` is the value
+  of the units it holds, so `grossAmount / quantity` is the market price, as for a reward. The
+  delivered leg holds `|amount| + fee` units, worth `|amountusd| + feeusd`. The received leg
+  holds `amount − fee` units, worth `amountusd − feeusd`, and carries in `fees` the value of the
+  fee Kraken kept (`feeusd`), so `grossAmount + fees` is what Kraken priced. Both are booked in
+  euros at the ECB rate of their day. Only a leg without a complete figure (no `amountusd`, or a fee with no
   `feeusd`) falls back to the price history, marked `yahoo`; `valuationSource` is per leg.
 - **A swap is never written by halves.** If either leg has no value from either source the
   whole swap is set aside as `swap-unpriced`, which flags the position, names the assets that

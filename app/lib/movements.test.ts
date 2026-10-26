@@ -223,6 +223,66 @@ describe("a row with no rate to euros", () => {
   });
 });
 
+describe("a swap in the rows", () => {
+  const link = { linkId: "refid-1", linkKind: "swap" };
+  const legs = [
+    buy({
+      id: "s1",
+      type: "SELL",
+      instrumentId: "SOL",
+      quantity: "2",
+      grossAmount: "480",
+      fees: "0",
+      ...link,
+    }),
+    buy({
+      id: "s2",
+      instrumentId: "BTC",
+      quantity: "0.005",
+      grossAmount: "465",
+      fees: "5",
+      ...link,
+    }),
+    buy({ id: "other", instrumentId: "ETH" }),
+  ];
+  const instruments = [
+    ...INSTRUMENTS,
+    ...["SOL", "BTC", "ETH"].map((id) => ({
+      id,
+      name: id,
+      type: "CRYPTO" as const,
+      thesis: "CORE" as const,
+    })),
+  ];
+
+  it("names where the swap went on both legs, from the sold asset to the bought one", () => {
+    const rows = toMovementRows(legs, instruments);
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    expect(byId.get("s1")?.swapRoute).toBe("SOL → BTC");
+    expect(byId.get("s2")?.swapRoute).toBe("SOL → BTC");
+    expect(byId.get("other")?.swapRoute).toBeNull();
+  });
+
+  it("shows the value of the leg without a sign, whichever side it is", () => {
+    const rows = toMovementRows(legs, instruments);
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    expect(byId.get("s1")?.amount).toBe("480.00");
+    expect(byId.get("s2")?.amount).toBe("465.00");
+  });
+
+  it("finds the other leg when only one instrument is asked for", () => {
+    const rows = toMovementRows(legs, instruments, { instrumentId: "BTC" });
+    expect(rows.map((row) => row.id)).toEqual(["s2"]);
+    expect(rows[0]?.swapRoute).toBe("SOL → BTC");
+  });
+
+  it("has no route for a leg whose partner is not in the ledger", () => {
+    const [row] = toMovementRows([legs[1]!], instruments);
+    expect(row?.swap).toBe(true);
+    expect(row?.swapRoute).toBeNull();
+  });
+});
+
 describe("a swap in the net cash flow", () => {
   it("shows both legs and leaves them out of the net, since no money crossed the bank", () => {
     const link = { linkId: "refid-1", linkKind: "swap" };
@@ -230,7 +290,7 @@ describe("a swap in the net cash flow", () => {
       [
         buy({ id: "b1", fees: "0", grossAmount: "1000" }),
         buy({ id: "s1", type: "SELL", grossAmount: "480", fees: "5", ...link }),
-        buy({ id: "s2", grossAmount: "470", fees: "5", ...link }),
+        buy({ id: "s2", grossAmount: "465", fees: "5", ...link }),
       ],
       INSTRUMENTS,
     );
