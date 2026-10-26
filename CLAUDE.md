@@ -879,7 +879,11 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
 - **Never cite an NF 13/2013 article number without a verifiable source for it.** Two
   were fabricated during initial development (`Art. 47.2` for the wash-sale rule, `Art.
   71` for carryforward — both plausible chapter-adjacent numbers, both wrong; correct are
-  Art. 43 and Art. 66). A guessed-but-plausible citation is worse than none: it invites
+  Art. 43 and Art. 66). The wash-sale citation was the invention, not the number: since
+  NF 6/2025 (12 December, BOB 15/12/2025, effective 1 January 2025) `Art. 47.2` exists
+  with other content — FIFO for fungible crypto-assets of the same type (NF 13/2013
+  consolidated at 01/01/2026). Cite it only for that FIFO, never for the repurchase rule.
+  A guessed-but-plausible citation is worse than none: it invites
   trust nobody checked. If the article cannot be confirmed against the actual text, write
   the comment without a number ("regla de recompra a corto plazo, Bizkaia — ver nota de
   Aritz") rather than inventing one that reads as authoritative.
@@ -903,14 +907,16 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
   are taken oldest acquisition first, then purchases after the sale. Within one lot a
   deferral is spread pro rata over the units still held. Do not present any of these as
   doctrine.
-- **Crypto is outside Art. 43** (the DGT: not a security admitted to trading). Core takes
-  `unlistedInstrumentIds`, built in the app from `Instrument.type === "CRYPTO"` — a field
-  ingestion writes from the broker's asset class, unlike the hand-set `exposureKind`. It
-  is a **required** option so no caller can forget it and silently apply the rule to BTC.
-  An ETN that trades on an exchange is a listed security and stays inside. A crypto loss
-  rebought within a year gets a notice — some doctrine would apply a one-year repurchase
-  rule, and it is unsettled — and changes no figure. Do not tie that rule to securities
-  not admitted to trading: an earlier wording did, and it misattributed the doctrine.
+- **Crypto falls under Art. 43.i for transmissions from 1 January 2025, and under no
+  rule before** (NF 6/2025). The rule is chosen by the Madrid day of the transmission.
+  Core takes a repurchase class per instrument, built in the app from `Instrument.type`
+  — a field ingestion writes from the broker's asset class, unlike the hand-set
+  `exposureKind` — and throws on a sale with no class, so no caller can silently apply
+  the wrong letter. An ETN that trades on an exchange is a listed security under letter
+  g. A crypto loss before 2025 rebought within a year gets a notice — some doctrine
+  would apply a one-year repurchase rule, and it is unsettled — and changes no figure.
+  Do not tie that rule to securities not admitted to trading: an earlier wording did,
+  and it misattributed the doctrine.
 - **Core fixes the trade order: `ts`, then BUY before SELL, then `externalId`.** The same
   `compareTrades` drives `walkFifo` and the rule; the repository's `orderBy` sorts by `ts`
   alone and SQLite breaks ties however it likes. Before/after a sale is by instant, never by
@@ -930,28 +936,35 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
 
 ## Kraken rewards
 
-- **A reward is an acquisition with no counter-leg**, so its value comes from the price
-  history at the moment of receipt, injected as `PriceAt` — `mapGroup` stays pure and never
-  fetches. Zero cost hid the income *and* inflated every future realised gain by the whole
-  value of the units.
-- **No price for that day means discard (`reward-unpriced`), never zero.** A discard is
+- **A reward is an acquisition with no counter-leg**, valued first at Kraken's own figure:
+  `amountusd − feeusd` over the net quantity, in USD, converted to euros at the ECB rate of
+  its day and marked `valuationSource: "kraken-amountusd"`. Only a row with no `amountusd`
+  falls back to the price history at the moment of receipt, injected as `PriceAt` —
+  `mapGroup` stays pure and never fetches — and is marked `"yahoo"`. Zero cost hid the
+  income *and* inflated every future realised gain by the whole value of the units.
+- **No value from either source means discard (`reward-unpriced`), never zero.** A discard is
   counted and printed; a zero is a wrong number that looks like data. Fix by running
   `prices:backfill` and importing again — dedup by `refid` makes re-import safe. The
-  plan reads BTC prices **before** anything is written, so a first import into an empty
-  database sets every reward aside; the wizard re-imports the same file after its price
-  step and `pnpm ingest` offers to, both merging the two writes with `mergeRewardRetry`.
-  An unpriced reward still carries the BTC instrument, so a file of nothing but rewards
-  creates BTC and the mapping step can reach it.
-- **The lookup never reaches forward.** `priceLookupFrom` takes the last close at or before
-  the timestamp, within 7 days; a later candle is information that did not exist yet.
-- Scope is still BTC-only by choice (`isBtc` in `map.ts`). Measured on a real export:
-  most refid groups are set aside — `earn` rewards and `welcomebonus` in other assets. **A discard is classified by what it does to a modelled position, not by asset.**
-  `unmodelled-asset` is noise (rewards, transfers and trades of assets Quoin does not
-  track); `crypto-swap` (BTC ↔ another crypto, in either direction — a `stable_coin` is
-  crypto, not fiat), `crypto-transfer` (BTC on-chain in or out), `fx-unavailable` (a row
-  in another currency with no ECB rate for its day, from any adapter, see *CSV
-  ingestion*) and `reward-unpriced` each leave the BTC position wrong, and
-  `AFFECTS_POSITION` flags them so the wizard and `pnpm ingest` warn. Every Kraken discard
+  fallback reads prices **before** anything is written, so a first import into an empty
+  database sets every reward without `amountusd` aside; the wizard re-imports the same file
+  after its price step and `pnpm ingest` offers to, both merging the two writes with
+  `mergeRewardRetry`. An unpriced reward still carries its instrument, so a file of nothing
+  but rewards creates it and the mapping step can reach it.
+- **The lookup never reaches forward.** `priceLookupFrom` takes the last price *known* at or
+  before the timestamp, within 7 days: a daily candle counts from 24 h after its date,
+  because Yahoo dates it at the session open and fills it with the close, and a live row
+  from its own time (`snapshotKnownAt` in `core/prices`). Keyed by the candle's date, a
+  reward late on day D read D's close, which did not exist yet.
+- Every asset Kraken trades against fiat is modelled; there is no asset allow-list. A swap
+  between two crypto assets is two linked rows (`linkKind: swap`), set aside whole as
+  `swap-unpriced` if either leg has no value.
+  The Kraken invariants (schema, balance check, valuation, internal moves) live in
+  `app/adapters/README.md`. **A discard is classified by what it does to a modelled
+  position, not by asset.** `swap-unpriced` (a `stable_coin` is crypto, not fiat),
+  `crypto-transfer` (on-chain in or out), `fx-unavailable` (a row in another currency
+  with no ECB rate for its day, from any adapter, see *CSV ingestion*), `reward-unpriced`,
+  `earn-return-unverified` and `invalid-crypto-code` each leave a position wrong, and `AFFECTS_POSITION` flags
+  them so the wizard and `pnpm ingest` warn. Every Kraken discard
   carries a per-group detail (date, type, subtype, asset or pair — never amounts).
   `DiscardReason` is a union and its labels are `Record<DiscardReason, string>` in both
   locales, so a new reason without a label or a position decision does not compile.

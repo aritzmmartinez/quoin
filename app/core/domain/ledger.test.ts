@@ -111,6 +111,78 @@ describe("ledgerEventWriteSchema", () => {
     ).toBe(true);
   });
 
+  it.each(["kraken-amountusd", "yahoo"])(
+    "accepts the valuation source %s, and a row with none",
+    (valuationSource) => {
+      expect(
+        ledgerEventWriteSchema.safeParse({ ...baseTrade, valuationSource })
+          .success,
+      ).toBe(true);
+      expect(
+        ledgerEventWriteSchema.safeParse({
+          ...baseTrade,
+          valuationSource: null,
+        }).success,
+      ).toBe(true);
+    },
+  );
+
+  it("refuses a valuation source it does not know at write, and still reads it", () => {
+    const row = { ...baseTrade, valuationSource: "guess" };
+    expect(ledgerEventWriteSchema.safeParse(row).success).toBe(false);
+    expect(ledgerEventSchema.safeParse(row).success).toBe(true);
+  });
+
+  it("accepts a swap leg, and a row with no link", () => {
+    expect(
+      ledgerEventWriteSchema.safeParse({
+        ...baseTrade,
+        linkId: "refid-1",
+        linkKind: "swap",
+      }).success,
+    ).toBe(true);
+    expect(
+      ledgerEventWriteSchema.safeParse({
+        ...baseTrade,
+        linkId: null,
+        linkKind: null,
+      }).success,
+    ).toBe(true);
+  });
+
+  it("refuses at write a link kind it does not know, and reads it", () => {
+    const row = { ...baseTrade, linkId: "refid-1", linkKind: "merge" };
+    expect(ledgerEventWriteSchema.safeParse(row).success).toBe(false);
+    expect(ledgerEventSchema.safeParse(row).success).toBe(true);
+  });
+
+  it("refuses half a link: an id with no kind, or a kind with no id", () => {
+    expect(
+      ledgerEventWriteSchema.safeParse({ ...baseTrade, linkId: "refid-1" })
+        .success,
+    ).toBe(false);
+    expect(
+      ledgerEventWriteSchema.safeParse({ ...baseTrade, linkKind: "swap" })
+        .success,
+    ).toBe(false);
+  });
+
+  it("refuses a swap leg that is not a purchase or a sale", () => {
+    expect(
+      ledgerEventWriteSchema.safeParse({
+        id: "c1",
+        ts: new Date("2025-01-01"),
+        type: "DEPOSIT",
+        grossAmount: "10",
+        currency: "EUR",
+        account: "kraken",
+        source: "KRAKEN_CSV",
+        linkId: "refid-1",
+        linkKind: "swap",
+      }).success,
+    ).toBe(false);
+  });
+
   it("accepts an amount in another currency with its rate, direction and day", () => {
     expect(
       ledgerEventWriteSchema.safeParse({ ...baseTrade, ...converted }).success,

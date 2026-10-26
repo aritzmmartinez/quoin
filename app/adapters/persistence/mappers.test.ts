@@ -20,6 +20,9 @@ const identity = (amount: string) => ({
   fxDirection: null,
   originalAmount: amount,
   originalCurrency: "EUR",
+  valuationSource: null,
+  linkId: null,
+  linkKind: null,
 });
 
 const trade: LedgerEvent = {
@@ -122,6 +125,9 @@ describe("ledger mappers", () => {
       fxDirection: _direction,
       originalAmount: _amount,
       originalCurrency: _currency,
+      valuationSource: _valuation,
+      linkId: _linkId,
+      linkKind: _linkKind,
       ...unstated
     } = trade;
     expect(eventToCreateData(unstated as LedgerEvent)).toMatchObject(
@@ -141,6 +147,46 @@ describe("ledger mappers", () => {
       originalCurrency: "USD",
     } as LedgerEvent;
     expect(roundTripEvent(converted)).toEqual(converted);
+  });
+
+  it("round-trips where a reward's value came from", () => {
+    const reward = {
+      ...trade,
+      funding: "IN_KIND",
+      note: "kraken-reward",
+      valuationSource: "kraken-amountusd",
+    } as LedgerEvent;
+    expect(roundTripEvent(reward)).toEqual(reward);
+  });
+
+  it("round-trips a swap leg with the link it shares with the other", () => {
+    const leg = {
+      ...trade,
+      type: "SELL",
+      externalId: "refid-1:sell",
+      linkId: "refid-1",
+      linkKind: "swap",
+    } as LedgerEvent;
+    expect(roundTripEvent(leg)).toEqual(leg);
+  });
+
+  it("refuses to write a link kind the domain does not know, or half a link", () => {
+    expect(() =>
+      eventToCreateData({
+        ...trade,
+        linkId: "refid-1",
+        linkKind: "merge",
+      } as LedgerEvent),
+    ).toThrow();
+    expect(() =>
+      eventToCreateData({ ...trade, linkId: "refid-1" } as LedgerEvent),
+    ).toThrow();
+  });
+
+  it("refuses to write a valuation source the domain does not know", () => {
+    expect(() =>
+      eventToCreateData({ ...trade, valuationSource: "guess" } as LedgerEvent),
+    ).toThrow();
   });
 
   it("rejects a row with an unknown conversion source or direction", () => {

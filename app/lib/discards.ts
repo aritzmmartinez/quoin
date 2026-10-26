@@ -2,11 +2,14 @@ import type {
   DiscardCounts,
   DiscardDetail,
   DiscardDetails,
+  NoticeDetails,
 } from "~/adapters/ingestion/ingest";
 import {
   AFFECTS_POSITION,
   DISCARD_REASONS,
+  NOTICE_REASONS,
   type DiscardReason,
+  type NoticeReason,
 } from "~/adapters/ingestion/discard";
 
 import type { Copy } from "./i18n";
@@ -46,6 +49,20 @@ export function discardGroups(summary: {
           ),
       },
     ];
+  });
+}
+
+export interface NoticeGroup {
+  reason: NoticeReason;
+  details: readonly DiscardDetail[];
+}
+
+export function noticeGroups(summary: {
+  noticed: NoticeDetails;
+}): NoticeGroup[] {
+  return NOTICE_REASONS.flatMap((reason) => {
+    const details = summary.noticed[reason] ?? [];
+    return details.length === 0 ? [] : [{ reason, details }];
   });
 }
 

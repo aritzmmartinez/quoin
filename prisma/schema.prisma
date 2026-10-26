@@ -79,6 +79,16 @@ model LedgerEntry {
   /// in another one. Informational: nothing fiscal reads them.
   originalAmount   String?
   originalCurrency String?
+  /// Where the value of a row with no counter-leg came from: kraken-amountusd |
+  /// yahoo, validated by the domain at write, never by a CHECK. Null on rows
+  /// written before it existed and on rows whose value is the trade itself.
+  valuationSource String?
+  /// The other half of an operation that is two rows: both carry the same
+  /// linkId, and linkKind says what the operation is (swap). Validated by the
+  /// domain at write, never by a CHECK, like valuationSource. Null on a row that
+  /// stands alone.
+  linkId   String?
+  linkKind String?
 
   /// CASH | IN_KIND — CHECK-constrained in migration SQL, same reason as `type`.
   /// IN_KIND on a BUY: units that arrived without money leaving the bank (a

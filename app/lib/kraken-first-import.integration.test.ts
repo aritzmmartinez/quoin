@@ -3,17 +3,18 @@ import { mkdirSync, rmSync } from "node:fs";
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
+import { krakenCsv } from "~/adapters/ingestion/kraken/csv-fixture";
 import type { HistoryRange, MarketDataProvider, Quote } from "~/core/ports";
 
 import type { EnsureRates } from "./fx-sync";
 import { copyFor } from "./i18n";
 import {
-  earliestUnpricedReward,
-  mergeRewardRetry,
+  earliestUnpriced,
+  mergeRetry,
   retryAfterFill,
-  rewardRetryIds,
-  rewardsNeedMapping,
-  unpricedRewards,
+  unpricedAssetIds,
+  unpricedNeedMapping,
+  unpricedEntries,
 } from "./ingest";
 import {
   backfillInstruments,
@@ -30,29 +31,85 @@ let persistence: Persistence;
 let ingestion: Ingestion;
 let server: Server;
 
-const NO_RATES: EnsureRates = async () => ({ book: new Map(), unavailable: [] });
+const NO_RATES: EnsureRates = async () => ({
+  book: new Map(),
+  unavailable: [],
+});
 
 const tmpDir = "./.tmp-kraken-first-import";
 const dbPath = `${tmpDir}/it-${Date.now()}.sqlite`;
 
-const HEADER =
-  "txid,refid,time,type,subtype,aclass,subclass,asset,wallet,amount,fee,balance";
+const BUYS_AND_REWARDS = krakenCsv([
+  {
+    refid: "D1",
+    time: "2026-02-02 09:00:00",
+    type: "deposit",
+    subclass: "fiat",
+    asset: "EUR",
+    amount: "500.0000",
+  },
+  {
+    refid: "B1",
+    time: "2026-02-03 10:00:00",
+    type: "spend",
+    subclass: "fiat",
+    asset: "EUR",
+    amount: "-100.0000",
+  },
+  {
+    refid: "B1",
+    time: "2026-02-03 10:00:00",
+    type: "receive",
+    subclass: "crypto",
+    asset: "BTC",
+    amount: "0.0012500000",
+  },
+  {
+    refid: "R1",
+    time: "2026-03-01 05:52:00",
+    type: "reward",
+    subclass: "crypto",
+    asset: "BTC",
+    amount: "0.0000020000",
+  },
+  {
+    refid: "R2",
+    time: "2026-03-08 05:52:00",
+    type: "reward",
+    subclass: "crypto",
+    asset: "BTC",
+    amount: "0.0000030000",
+  },
+  {
+    refid: "R3",
+    time: "2026-03-15 05:52:00",
+    type: "reward",
+    subtype: "welcomebonus",
+    subclass: "crypto",
+    asset: "BTC",
+    amount: "0.0000050000",
+  },
+]);
 
-const BUYS_AND_REWARDS = [
-  HEADER,
-  `"k1","D1","2026-02-02 09:00:00","deposit","","currency","fiat","EUR","spot / main",500.0000,0,500`,
-  `"k2","B1","2026-02-03 10:00:00","spend","","currency","fiat","EUR","spot / main",-100.0000,0,400`,
-  `"k3","B1","2026-02-03 10:00:00","receive","","currency","crypto","BTC","spot / main",0.0012500000,0,0.00125`,
-  `"k4","R1","2026-03-01 05:52:00","reward","","currency","crypto","BTC","spot / main",0.0000020000,0,0.001252`,
-  `"k5","R2","2026-03-08 05:52:00","reward","","currency","crypto","BTC","spot / main",0.0000030000,0,0.001255`,
-  `"k6","R3","2026-03-15 05:52:00","reward","welcomebonus","currency","crypto","BTC","spot / main",0.0000050000,0,0.00126`,
-].join("\n");
-
-const REWARDS_ONLY = [
-  HEADER,
-  `"r1","R1","2026-03-01 05:52:00","reward","welcomebonus","currency","crypto","BTC","spot / main",0.0000020000,0,0.000002`,
-  `"r2","R2","2026-03-08 05:52:00","reward","","currency","crypto","BTC","spot / main",0.0000030000,0,0.000005`,
-].join("\n");
+const REWARDS_ONLY = krakenCsv([
+  {
+    refid: "R1",
+    time: "2026-03-01 05:52:00",
+    type: "reward",
+    subtype: "welcomebonus",
+    subclass: "crypto",
+    asset: "BTC",
+    amount: "0.0000020000",
+  },
+  {
+    refid: "R2",
+    time: "2026-03-08 05:52:00",
+    type: "reward",
+    subclass: "crypto",
+    asset: "BTC",
+    amount: "0.0000030000",
+  },
+]);
 
 const candleFor = (day: number) => String(80000 + day * 10);
 
@@ -129,7 +186,7 @@ async function firstImportFlow(csv: string) {
 
   const first = await adapter.import(csv);
 
-  const ids = rewardRetryIds(first);
+  const ids = unpricedAssetIds(first);
   for (const id of ids) {
     await assignQuoteSymbol(
       instruments,
@@ -144,12 +201,12 @@ async function firstImportFlow(csv: string) {
     provider,
     prices,
     ids.map((id) => ({ id, quoteSymbol: "BTC-EUR" })),
-    rangeCovering(earliestUnpricedReward(first)!, new Date()),
+    rangeCovering(earliestUnpriced(first)!, new Date()),
     NO_RATES,
   );
 
   const retry = await adapter.import(csv);
-  return { adapter, ledger, first, retry, merged: mergeRewardRetry(first, retry) };
+  return { adapter, ledger, first, retry, merged: mergeRetry(first, retry) };
 }
 
 describe("first Kraken import into an empty database (integration)", () => {
@@ -158,9 +215,9 @@ describe("first Kraken import into an empty database (integration)", () => {
       await firstImportFlow(BUYS_AND_REWARDS);
 
     expect(first.imported).toBe(2);
-    expect(unpricedRewards(first)).toBe(3);
+    expect(unpricedEntries(first)).toBe(3);
 
-    expect(unpricedRewards(retry)).toBe(0);
+    expect(unpricedEntries(retry)).toBe(0);
     expect(retry.imported).toBe(3);
     expect(retry.duplicates).toBe(2);
     expect(merged.recovered).toBe(3);
@@ -175,17 +232,21 @@ describe("first Kraken import into an empty database (integration)", () => {
 
     for (const event of rewards) {
       if (event.type !== "BUY") throw new Error("a reward must be a BUY");
-      const price = candleFor(dayIndex(event.ts.toISOString()));
+      const price = candleFor(dayIndex(event.ts.toISOString()) - 1);
       expect(event.price).toBe(price);
-      const twin = income.find((e) => e.externalId === `${event.externalId}:income`);
-      expect(twin?.type === "DIVIDEND" && twin.grossAmount).toBe(event.grossAmount);
+      const twin = income.find(
+        (e) => e.externalId === `${event.externalId}:income`,
+      );
+      expect(twin?.type === "DIVIDEND" && twin.grossAmount).toBe(
+        event.grossAmount,
+      );
     }
     expect(
       rewards.map((e) => e.type === "BUY" && [e.quantity, e.grossAmount]),
     ).toEqual([
-      ["0.000002", "0.16056"],
-      ["0.000003", "0.24105"],
-      ["0.000005", "0.4021"],
+      ["0.000002", "0.16054"],
+      ["0.000003", "0.24102"],
+      ["0.000005", "0.40205"],
     ]);
   });
 
@@ -196,7 +257,7 @@ describe("first Kraken import into an empty database (integration)", () => {
 
     expect(third.imported).toBe(0);
     expect(third.duplicates).toBe(5);
-    expect(unpricedRewards(third)).toBe(0);
+    expect(unpricedEntries(third)).toBe(0);
   });
 
   it("creates BTC on the first write even when the file holds nothing but rewards", async () => {
@@ -210,22 +271,27 @@ describe("first Kraken import into an empty database (integration)", () => {
 
 describe("wizard path with BTC left unmapped (integration)", () => {
   it("does not re-import, keeps the rewards unpriced with their help, and writes nothing half-way", async () => {
-    const committed = await server.commitIngest(copyFor("es"), BUYS_AND_REWARDS);
+    const committed = await server.commitIngest(
+      copyFor("es"),
+      BUYS_AND_REWARDS,
+    );
 
     expect(committed.summary.imported).toBe(2);
-    expect(unpricedRewards(committed.summary)).toBe(3);
+    expect(unpricedEntries(committed.summary)).toBe(3);
     expect(committed.retryIds).toEqual(["BTC"]);
     expect(committed.pending.map((p) => p.instrumentId)).toEqual(["BTC"]);
 
     const fill = await server.fillPrices(
       committed.retryIds,
-      rangeSince(earliestUnpricedReward(committed.summary), new Date()),
+      rangeSince(earliestUnpriced(committed.summary), new Date()),
     );
 
     expect(fill.backfilled).toEqual([]);
     expect(fill.candles).toBe(0);
     expect(retryAfterFill(committed.summary, fill)).toBe(false);
-    expect(rewardsNeedMapping(committed.summary, committed.pending, {})).toBe(true);
+    expect(unpricedNeedMapping(committed.summary, committed.pending, {})).toBe(
+      true,
+    );
 
     const events = await new persistence.PrismaLedgerRepository().list();
     expect(events).toHaveLength(2);
@@ -251,7 +317,10 @@ describe("wizard path with BTC left unmapped (integration)", () => {
   });
 });
 
-function candles(dates: readonly Date[], price: (date: Date) => string): Quote[] {
+function candles(
+  dates: readonly Date[],
+  price: (date: Date) => string,
+): Quote[] {
   return dates.map((asOf) => ({
     symbol: "BTC-EUR",
     price: price(asOf),
@@ -270,7 +339,9 @@ function providerOf(quotes: Quote[]): MarketDataProvider {
 
 async function priceAndRetry(
   csv: string,
-  first: Awaited<ReturnType<Ingestion["KrakenCsvAdapter"]["prototype"]["import"]>>,
+  first: Awaited<
+    ReturnType<Ingestion["KrakenCsvAdapter"]["prototype"]["import"]>
+  >,
   quotes: Quote[],
 ) {
   const instruments = new persistence.PrismaInstrumentRepository();
@@ -297,20 +368,44 @@ async function priceAndRetry(
     "max",
     NO_RATES,
   );
-  return mergeRewardRetry(first, await adapter.import(csv));
+  return mergeRetry(first, await adapter.import(csv));
 }
 
-const utcDay = (y: number, m: number, d: number) => new Date(Date.UTC(y, m - 1, d));
+const utcDay = (y: number, m: number, d: number) =>
+  new Date(Date.UTC(y, m - 1, d));
 const dailyFrom = (start: Date, days: number) =>
-  Array.from({ length: days }, (_, i) => new Date(start.getTime() + i * 86_400_000));
+  Array.from(
+    { length: days },
+    (_, i) => new Date(start.getTime() + i * 86_400_000),
+  );
 
 describe("candle spacing and the 7-day lookup (integration)", () => {
-  const LATE_NOVEMBER = [
-    HEADER,
-    `"n1","B1","2025-11-13 18:04:48","spend","","currency","fiat","EUR","spot / main",-150.0000,0,0`,
-    `"n2","B1","2025-11-13 18:04:48","receive","","currency","crypto","BTC","spot / main",0.0020000000,0,0.002`,
-    `"n3","R1","2025-11-26 05:52:00","reward","","currency","crypto","BTC","spot / main",0.0000040000,0,0.002004`,
-  ].join("\n");
+  const LATE_NOVEMBER = krakenCsv([
+    {
+      refid: "B1",
+      time: "2025-11-13 18:04:48",
+      type: "spend",
+      subclass: "fiat",
+      asset: "EUR",
+      amount: "-150.0000",
+    },
+    {
+      refid: "B1",
+      time: "2025-11-13 18:04:48",
+      type: "receive",
+      subclass: "crypto",
+      asset: "BTC",
+      amount: "0.0020000000",
+    },
+    {
+      refid: "R1",
+      time: "2025-11-26 05:52:00",
+      type: "reward",
+      subclass: "crypto",
+      asset: "BTC",
+      amount: "0.0000040000",
+    },
+  ]);
 
   it("leaves a reward unpriced when the nearest earlier candle is a month away, and prices it from daily candles", async () => {
     const adapter = new ingestion.KrakenCsvAdapter(
@@ -319,7 +414,7 @@ describe("candle spacing and the 7-day lookup (integration)", () => {
       new persistence.PrismaPriceRepository(),
     );
     const first = await adapter.import(LATE_NOVEMBER);
-    expect(unpricedRewards(first)).toBe(1);
+    expect(unpricedEntries(first)).toBe(1);
 
     const monthly = await priceAndRetry(
       LATE_NOVEMBER,
@@ -327,33 +422,56 @@ describe("candle spacing and the 7-day lookup (integration)", () => {
       candles([utcDay(2025, 11, 1), utcDay(2025, 12, 1)], () => "90000"),
     );
     expect(monthly.recovered).toBe(0);
-    expect(unpricedRewards(monthly.summary)).toBe(1);
+    expect(unpricedEntries(monthly.summary)).toBe(1);
 
     const daily = await priceAndRetry(
       LATE_NOVEMBER,
       monthly.summary,
-      candles(dailyFrom(utcDay(2025, 11, 1), 40), (d) => String(80000 + d.getUTCDate())),
+      candles(dailyFrom(utcDay(2025, 11, 1), 40), (d) =>
+        String(80000 + d.getUTCDate()),
+      ),
     );
     expect(daily.recovered).toBe(1);
-    expect(unpricedRewards(daily.summary)).toBe(0);
+    expect(unpricedEntries(daily.summary)).toBe(0);
 
     const reward = (await new persistence.PrismaLedgerRepository().list()).find(
       (e) => e.note === "kraken-reward",
     );
-    expect(reward?.type === "BUY" && reward.price).toBe("80026");
+    expect(reward?.type === "BUY" && reward.price).toBe("80025");
   });
 
   it("prices a reward older than the instrument's first written trade", async () => {
-    const BONUS_BEFORE_BUY = [
-      HEADER,
-      `"o1","R0","2026-02-02 05:52:00","reward","welcomebonus","currency","crypto","BTC","spot / main",0.0000020000,0,0.000002`,
-      `"o2","B1","2026-02-10 10:00:00","spend","","currency","fiat","EUR","spot / main",-100.0000,0,0`,
-      `"o3","B1","2026-02-10 10:00:00","receive","","currency","crypto","BTC","spot / main",0.0012500000,0,0.001252`,
-    ].join("\n");
+    const BONUS_BEFORE_BUY = krakenCsv([
+      {
+        refid: "R0",
+        time: "2026-02-02 05:52:00",
+        type: "reward",
+        subtype: "welcomebonus",
+        subclass: "crypto",
+        asset: "BTC",
+        amount: "0.0000020000",
+      },
+      {
+        refid: "B1",
+        time: "2026-02-10 10:00:00",
+        type: "spend",
+        subclass: "fiat",
+        asset: "EUR",
+        amount: "-100.0000",
+      },
+      {
+        refid: "B1",
+        time: "2026-02-10 10:00:00",
+        type: "receive",
+        subclass: "crypto",
+        asset: "BTC",
+        amount: "0.0012500000",
+      },
+    ]);
 
     const { first, merged } = await firstImportFlow(BONUS_BEFORE_BUY);
 
-    expect(unpricedRewards(first)).toBe(1);
+    expect(unpricedEntries(first)).toBe(1);
     expect(merged.recovered).toBe(1);
     const events = await new persistence.PrismaLedgerRepository().list();
     const bonus = events.find((e) => e.note === "kraken-reward");
@@ -374,7 +492,10 @@ describe("the summary counts operations, like the file and the discards (integra
     summary.imported +
     summary.duplicates +
     summary.errors +
-    Object.values(summary.discarded).reduce((sum: number, n) => sum + (n ?? 0), 0);
+    Object.values(summary.discarded).reduce(
+      (sum: number, n) => sum + (n ?? 0),
+      0,
+    );
 
   it("adds new, duplicate and set-aside operations up to the file, in the preview and after the recovery", async () => {
     const adapter = new ingestion.KrakenCsvAdapter(

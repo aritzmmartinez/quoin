@@ -6,7 +6,8 @@ import {
   type Revalue,
   type TradeEvent,
 } from "../domain";
-import { baseOf, bookable } from "../fx";
+import { bookable } from "../fx";
+import { tradeAmounts } from "../swap";
 
 export interface FifoLot {
   id: string;
@@ -72,6 +73,7 @@ export function walkFifo(
   revalue?: Revalue,
 ): FifoWalk {
   const trades = sortTrades(events);
+  const amountsOf = tradeAmounts(trades);
 
   const restate: Revalue = revalue ?? ((money) => money);
   const queues = new Map<string, FifoLot[]>();
@@ -86,8 +88,9 @@ export function walkFifo(
     }
 
     const quantity = new Decimal(trade.quantity);
-    const gross = restate(baseOf(trade, "grossAmount"), trade.ts);
-    const fees = restate(baseOf(trade, "fees"), trade.ts);
+    const amounts = amountsOf(trade);
+    const gross = restate(amounts.gross, trade.ts);
+    const fees = restate(amounts.fees, trade.ts);
 
     if (trade.type === "BUY") {
       const unitCost = quantity.isZero()

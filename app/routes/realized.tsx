@@ -33,6 +33,8 @@ import {
   realizedTotals,
   taxExclusions,
   toRealizedRows,
+  todayInMadrid,
+  unclassifiedSales,
   useCopy,
   useFormat,
 } from "~/lib";
@@ -89,12 +91,13 @@ export async function loader({ request }: Route.LoaderArgs) {
     },
     fiscal: {
       noRate: taxExclusions(events, instruments),
+      unclassified: unclassifiedSales(events, instruments),
       years: taxYears,
       year: taxYear,
       view:
         view !== "tax" || taxYear === null
           ? null
-          : buildTaxYearView(events, instruments, taxYear),
+          : buildTaxYearView(events, instruments, taxYear, todayInMadrid()),
     },
   };
 }
@@ -115,6 +118,11 @@ export default function Realized({ loaderData }: Route.ComponentProps) {
         {fiscal.noRate.length > 0 && (
           <Explainer tone="notice" className="mb-4">
             {t.common.noRateTax(fiscal.noRate.join(", "))}
+          </Explainer>
+        )}
+        {fiscal.unclassified.length > 0 && (
+          <Explainer tone="notice" className="mb-4">
+            {t.common.unclassifiedTax(fiscal.unclassified.join(", "))}
           </Explainer>
         )}
         <TaxYearPanel

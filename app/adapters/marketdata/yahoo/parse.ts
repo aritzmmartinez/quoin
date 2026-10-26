@@ -2,6 +2,8 @@ import Decimal from "decimal.js";
 
 import type { Quote } from "~/core/ports";
 
+export const CLOSE_SIGNIFICANT_DIGITS = 7;
+
 const MINOR_UNITS: Readonly<Record<string, string>> = {
   GBp: "GBP",
   ZAc: "ZAR",
@@ -40,8 +42,15 @@ interface YahooChartResponse {
  * Extract a {@link Quote} from a Yahoo chart payload, or null if it lacks the
  * price/currency/time we need (unknown symbol, empty result, provider error).
  *
- * Yahoo returns the price as a JSON number; we pin it to a fixed-point string at
- * the boundary so no float ever enters the domain. Pure and fully testable.
+ * Yahoo returns the price as a JSON number; we pin it to a decimal string at the
+ * boundary so no float ever enters the domain. Pure and fully testable.
+ *
+ * Measured 2026-10-22: `regularMarketPrice` arrives as the shortest decimal
+ * (`763.96`, `4.38E-6`) and is kept exactly; a daily close arrives as a float32
+ * widened to a double (`769.0499877929688`), so it is kept to the seven
+ * significant digits a float32 holds. Fixed decimal places are wrong both
+ * ways: they keep the float32 noise of a large price and erase a price below
+ * a millionth.
  */
 export function parseYahooChart(json: unknown, symbol: string): Quote | null {
   const meta = (json as YahooChartResponse)?.chart?.result?.[0]?.meta;
@@ -63,7 +72,7 @@ export function parseYahooChart(json: unknown, symbol: string): Quote | null {
 
   return {
     symbol,
-    ...inMajorUnit(regularMarketPrice.toFixed(6), currency),
+    ...inMajorUnit(new Decimal(String(regularMarketPrice)).toFixed(), currency),
     asOf: new Date(regularMarketTime * 1000),
     ...(name ? { name } : {}),
   };
@@ -93,7 +102,12 @@ export function parseYahooChartHistory(json: unknown, symbol: string): Quote[] {
     }
     quotes.push({
       symbol,
-      ...inMajorUnit(close.toFixed(6), currency),
+      ...inMajorUnit(
+        new Decimal(String(close))
+          .toSignificantDigits(CLOSE_SIGNIFICANT_DIGITS)
+          .toFixed(),
+        currency,
+      ),
       asOf: new Date(timestamp * 1000),
     });
   }

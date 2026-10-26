@@ -24,11 +24,12 @@ import {
 import {
   copyFor,
   discardGroups,
-  earliestUnpricedReward,
-  mergeRewardRetry,
+  earliestUnpriced,
+  mergeRetry,
+  noticeGroups,
   rangeSince,
-  rewardRetryIds,
-  unpricedRewards,
+  unpricedAssetIds,
+  unpricedEntries,
 } from "~/lib";
 import { ensureRatesNow } from "~/lib/fx-sync.server";
 import { planWithRates } from "~/lib/ingest-rates";
@@ -71,6 +72,10 @@ function printSummary(title: string, summary: ImportSummary): void {
   ) {
     console.log(`  ! ${copy.positionWarning}`);
   }
+  for (const { reason, details } of noticeGroups(summary)) {
+    console.log(`  ${copy.notices[reason]}: ${details.length}`);
+    console.log(`        ${copy.noticeHelp[reason]}`);
+  }
   console.log(`  errors             : ${summary.errors}`);
   console.log(`  instruments        : ${summary.instruments}`);
 }
@@ -82,7 +87,7 @@ async function ask(question: string): Promise<boolean> {
   return answer.trim().toLowerCase() === "y";
 }
 
-async function retryRewards(
+async function retryUnpriced(
   adapter: KrakenCsvAdapter | TradeRepublicCsvAdapter,
   instruments: PrismaInstrumentRepository,
   ledger: PrismaLedgerRepository,
@@ -90,25 +95,25 @@ async function retryRewards(
   first: ImportSummary,
   yes: boolean,
 ): Promise<void> {
-  const unpriced = unpricedRewards(first);
-  const earliest = earliestUnpricedReward(first);
+  const unpriced = unpricedEntries(first);
+  const earliest = earliestUnpriced(first);
   if (unpriced === 0 || earliest === null) return;
 
-  const ids = rewardRetryIds(first);
+  const ids = unpricedAssetIds(first);
   const stored = await instruments.list();
   const unmapped = ids.filter(
     (id) => !stored.find((instrument) => instrument.id === id)?.quoteSymbol,
   );
   if (unmapped.length > 0) {
     console.log(
-      `\n${unpriced} reward(s) could not be valued. Map ${unmapped.join(", ")} first ` +
+      `\n${unpriced} reward(s) or swap(s) could not be valued. Map ${unmapped.join(", ")} first ` +
         "(pnpm prices:map <ID> <SYMBOL>), then run this import again.",
     );
     return;
   }
 
   const range = rangeSince(earliest, new Date());
-  const question = `${unpriced} reward(s) have no price yet. Backfill ${ids.join(", ")} (${range}) and re-import?`;
+  const question = `${unpriced} reward(s) or swap(s) have no price yet. Backfill ${ids.join(", ")} (${range}) and re-import?`;
   if (!yes && !(await ask(question))) return;
 
   const fill = await fillPrices(ids, range);
@@ -128,8 +133,8 @@ async function retryRewards(
     ledger,
     await planWithRates(() => adapter.plan(csv), ensureRatesNow),
   );
-  const merged = mergeRewardRetry(first, retried);
-  console.log(`  rewards recovered  : ${merged.recovered}`);
+  const merged = mergeRetry(first, retried);
+  console.log(`  recovered          : ${merged.recovered}`);
   printSummary("After re-import", merged.summary);
 }
 
@@ -170,7 +175,7 @@ async function main(): Promise<void> {
   const preview = await previewBatch(ledger, batch);
   printSummary(`Preview (${broker})`, preview);
 
-  if (preview.imported === 0 && unpricedRewards(preview) === 0) {
+  if (preview.imported === 0 && unpricedEntries(preview) === 0) {
     console.log("\nNothing new to import.");
     return;
   }
@@ -182,7 +187,7 @@ async function main(): Promise<void> {
 
   const result = await persistBatch(instruments, ledger, batch);
   printSummary("Imported", result);
-  await retryRewards(adapter, instruments, ledger, csv, result, values.yes);
+  await retryUnpriced(adapter, instruments, ledger, csv, result, values.yes);
 }
 
 main()

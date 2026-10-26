@@ -8,6 +8,7 @@ import type { FifoSale } from "./fifo";
 import { fiscalYearOf } from "./fiscal-year";
 import {
   createWashSaleAssessor,
+  type RepurchaseScope,
   type UnlistedRepurchaseNotice,
   type WashSaleAssessment,
 } from "./wash-sale";
@@ -90,9 +91,9 @@ interface LotDeferral {
 export function walkDeferredLosses(
   sales: readonly FifoSale[],
   trades: readonly TradeEvent[],
-  unlistedInstrumentIds: ReadonlySet<string>,
+  scope: RepurchaseScope,
 ): DeferredLossWalk {
-  const assessor = createWashSaleAssessor(trades, unlistedInstrumentIds);
+  const assessor = createWashSaleAssessor(trades, scope);
   const lots = new Map<string, LotDeferral>();
   const bySale = new Map<string, SaleDeferral>();
   const pendingByYear = new Map<number, PendingDeferredLoss[]>();
@@ -103,10 +104,15 @@ export function walkDeferredLosses(
 
     let assessment: WashSaleAssessment | null = null;
     let notice: UnlistedRepurchaseNotice | null = null;
-    if (!assessor.isListed(sale.trade.instrumentId)) {
-      notice = isLoss ? assessor.unlistedNotice(sale) : null;
+    const rule = assessor.ruleFor(sale);
+    if (rule === null) {
+      notice =
+        isLoss &&
+        assessor.assetClassOf(sale.trade.instrumentId) === "fungible-crypto"
+          ? assessor.unlistedNotice(sale)
+          : null;
     } else if (isLoss || carriedIn.length > 0) {
-      assessment = assessor.assess(sale);
+      assessment = assessor.assess(sale, rule);
     }
     const fraction = assessment?.fraction ?? new Decimal(0);
 

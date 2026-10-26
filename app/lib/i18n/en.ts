@@ -1,10 +1,11 @@
-import type { DiscardReason } from "~/adapters/ingestion/discard";
+import type { DiscardReason, NoticeReason } from "~/adapters/ingestion/discard";
 import type {
   ExposureKind,
   InstrumentType,
   LeafKind,
   Thesis,
 } from "~/core/domain";
+import type { RepurchaseLetter } from "~/core/tax";
 
 import type { ExcludedNotice } from "./es";
 import type { Copy } from "./types";
@@ -17,27 +18,45 @@ const REFRESH_RATES = `use “${REFRESH_NOW}” on exchange rates in ${EXTERNAL_
 const REFRESH_CPI = `use “${REFRESH_NOW}” on the CPI in ${EXTERNAL_DATA} (${SETTINGS})`;
 
 const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
-  "crypto-swap": "Swaps involving BTC",
-  "crypto-transfer": "BTC transfers",
-  "reward-unpriced": "BTC rewards without a price",
+  "swap-unpriced": "Swaps between crypto assets without a price",
+  "crypto-transfer": "Crypto transfers",
+  "reward-unpriced": "Rewards without a price",
   "fx-unavailable": "Trades with no exchange rate for their day",
-  "unmodelled-asset": "Assets Quoin does not model",
+  "invalid-crypto-code": "Crypto with an invalid asset code",
+  "earn-return-unverified": "Returns from Earn not yet verified",
+  "internal-move": "Moves between your Kraken wallets",
   "card-spending": "Card payments",
   "saveback-unpaired": "Saveback with no paired purchase",
   unsupported: "Unsupported",
 };
 
 const DISCARD_REASON_HELP: Record<DiscardReason, string | null> = {
-  "crypto-swap": null,
+  "swap-unpriced": `There is no price for those dates for one of the assets in these swaps, so they were not recorded and their positions do not include them. In Instruments, open the symbol of that asset and use “${REDOWNLOAD}” with a range that reaches those dates. Then import this same file again: what is already recorded is not duplicated.`,
   "crypto-transfer": null,
-  "reward-unpriced":
-    `There is no BTC price for those dates, so these rewards were not recorded and your BTC position does not include them. In Instruments, open BTC's symbol and use “${REDOWNLOAD}” with a range that reaches those dates. Then import this same file again: what is already recorded is not duplicated.`,
+  "reward-unpriced": `There is no price for those dates for the asset of these rewards, so they were not recorded and its position does not include them. In Instruments, open that asset's symbol and use “${REDOWNLOAD}” with a range that reaches those dates. Then import this same file again: what is already recorded is not duplicated.`,
   "fx-unavailable": `The ECB had no rate for the day of these trades in another currency (one from today before 16:00, or a currency it does not publish), or could not be reached, so they were not imported and do not count towards their positions. Later, ${REFRESH_RATES} and import this same file again: what is already recorded is not duplicated.`,
-  "unmodelled-asset": null,
+  "invalid-crypto-code":
+    "Quoin identifies each crypto asset by its asset code (BTC, ETH…), the same at every broker, so that its purchases and sales form a single position. These rows carried something else in its place, so they were not imported and their position does not include them.",
+  "earn-return-unverified":
+    "Money coming back from Earn to your spot wallet. It can include the yield as well as what you put in, and Quoin has not yet checked how Kraken reports it, so it was not recorded: treating it as a move between your own wallets would lose the yield without a word. Your position of that asset may not match the broker's.",
+  "internal-move":
+    "Steps between your own Kraken wallets, such as allocating to Earn or taking back from it. They do not change what you hold, so they are not recorded.",
   "card-spending": null,
   "saveback-unpaired":
     "The purchase this saveback paid for was not found (one purchase of the same amount in the 7 days after it, and only one). If that purchase is in the file, it counts as your own contribution. If it is in another export, import one that covers both dates.",
   unsupported: null,
+};
+
+const NOTICE_LABELS: Record<NoticeReason, string> = {
+  "account-transfer": "Transfers with another account",
+  "internal-booked-as-reward": "Internal moves recorded earlier as rewards",
+};
+
+const NOTICE_HELP: Record<NoticeReason, string> = {
+  "account-transfer":
+    "Cash leaving this Kraken account for another account, or arriving from one. It is recorded as a withdrawal or a deposit.",
+  "internal-booked-as-reward":
+    "An earlier version of Quoin recorded these steps between your Kraken wallets as rewards, and they are still in the ledger as purchases in kind. They do not change what you hold, so that position includes units it should not.",
 };
 
 const THESIS_LABELS: Record<Thesis, string> = {
@@ -89,6 +108,8 @@ export const en: Copy = {
     },
     noRateTax: (names: string): string =>
       `No exchange rate: ${names}. Their trades could not be converted to euros and are not part of this calculation. Check them before using these figures in a tax return.`,
+    unclassifiedTax: (names: string): string =>
+      `No repurchase rule: ${names}. Its type (bond, commodity or cash) is neither a listed security nor a crypto asset: a bond held directly yields income from movable capital, to which Art. 43 does not apply, and a commodity held directly would have a rule of its own, which Quoin does not model. Its sales are computed with no repurchase rule. Check them before using these figures in a tax return.`,
   },
   notFound: {
     title: "Page not found",
@@ -665,9 +686,17 @@ export const en: Copy = {
     failed: "The import failed.",
     invalidEvent: (date: string, type: string, currency: string): string =>
       `The ${type} of ${date} in ${currency} breaks the ledger's rules. This is a fault in how Quoin reads this export, not in the file: nothing was imported.`,
+    krakenLegacyExport:
+      "This is an old Kraken export, without the wallet column, and Quoin reads only the current format. Download a new one from Kraken and import it. Nothing was imported.",
+    krakenBalanceMismatch: (
+      asset: string,
+      wallet: string,
+      date: string,
+    ): string =>
+      `The ${asset} balance in “${wallet}” on ${date} does not follow from the rows before it. Quoin is not reading this file the way Kraken wrote it, so nothing was imported.`,
     analysing: "Analysing the file…",
     importing: "Importing…",
-    retrying: "Valuing the rewards…",
+    retrying: "Valuing the rewards and swaps…",
     brokerLabel: (broker: string): string =>
       broker === "kraken" ? "Kraken" : "Trade Republic",
     detected: (broker: string): string => `${broker} detected`,
@@ -684,16 +713,19 @@ export const en: Copy = {
       reasonHelp: DISCARD_REASON_HELP,
       details: (count: number): string =>
         count === 1 ? "1 transaction" : `${count} transactions`,
-      pendingPrice: "BTC rewards awaiting a price",
+      pendingPrice: "Rewards and swaps awaiting a price",
       pendingPriceNote:
         "They will be valued after the price step, by importing the file again.",
       positionWarning:
-        "These change your BTC balance and Quoin does not record them, so your BTC position does not reflect them and may not match the broker's.",
+        "These change your balance of that asset and Quoin does not record them, so its position does not reflect them and may not match the broker's.",
+      noticed: "Notices",
+      notices: NOTICE_LABELS,
+      noticeHelp: NOTICE_HELP,
       noInstrument: "No instrument",
     },
     nothingNew:
       "Nothing new to import: every trade in this file was already in the ledger.",
-    confirmPending: "Continue to value the rewards",
+    confirmPending: "Continue to value the rewards and swaps",
     confirmCount: (count: number): string =>
       count === 1 ? "Import 1 trade" : `Import ${count} trades`,
     appliesNow:
@@ -722,6 +754,8 @@ export const en: Copy = {
       invalid: "Invalid symbol.",
       noQuote: (symbol: string): string =>
         `Yahoo returns no price for ${symbol}. Try another venue (.DE, .MI, .PA, .AS).`,
+      noQuoteCrypto: (symbol: string, code: string): string =>
+        `Yahoo returns no price for ${symbol}. For a crypto asset, try ${code}-USD, valued at the ECB rate, or the ticker with the number Yahoo appends when the code is shared, such as PEPE24478-USD. A shared ticker can be another coin with the same code: check the name and the implied value before saving.`,
       price: "Price",
       impliedValue: "Implied value",
       quantity: "Units",
@@ -741,6 +775,8 @@ export const en: Copy = {
         "This symbol has no closes on the dates of your trades, so they cannot be compared.",
       noDailyHistory:
         "Yahoo has no daily history for this symbol. Look for its ticker on a euro exchange (.DE, .AS…).",
+      noDailyHistoryCrypto: (code: string): string =>
+        `Yahoo has no daily history for this symbol. For a crypto asset, try ${code}-USD, valued at the ECB rate, or the ticker with the number Yahoo appends when the code is shared, such as PEPE24478-USD. A shared ticker can be another coin with the same code: check the name and the implied value before saving.`,
       hasHistory:
         "This instrument already has stored prices. Change its symbol in the Symbol column of Instruments: the new history is downloaded there before the old one is removed.",
       pending: (count: number): string =>
@@ -768,11 +804,11 @@ export const en: Copy = {
     done: {
       title: "Import summary",
       rewardsNeedMapping:
-        "The BTC rewards are still unvalued because BTC has no symbol. Go back to the mapping step, give it one and carry on: the wizard will download its prices and import the file again.",
+        "Some rewards or swaps are still unvalued because their asset has no symbol. Go back to the mapping step, give it one and carry on: the wizard will download its prices and import the file again.",
       recovered: (count: number): string =>
         count === 1
-          ? "1 reward recovered by valuing it with the downloaded prices"
-          : `${count} rewards recovered by valuing them with the downloaded prices`,
+          ? "1 reward or swap recovered by valuing it with the downloaded prices"
+          : `${count} rewards and swaps recovered by valuing them with the downloaded prices`,
       imported: (count: number): string =>
         count === 1 ? "1 trade imported" : `${count} trades imported`,
       duplicates: (count: number): string =>
@@ -873,6 +909,8 @@ export const en: Copy = {
     noSymbol: "No symbol",
     noDailyHistory:
       "This symbol has no daily history. Download it again or change the symbol to its ticker on a euro exchange.",
+    noDailyHistoryCrypto: (code: string): string =>
+      `This symbol has no daily history. For a crypto asset, try ${code}-USD, valued at the ECB rate, or the ticker with the number Yahoo appends when the code is shared, such as PEPE24478-USD. A shared ticker can be another coin with the same code: check the name and the implied value before saving.`,
     obsoleteVenues:
       "This composition was imported under obsolete country codes and does not merge with other funds. Drop its file on this row again.",
     resolves: RESOLVES_LABELS,
@@ -1003,8 +1041,7 @@ export const en: Copy = {
     fromTarget: "Simulates your current plan",
     noHistory:
       "No line of your plan has price history, so there is nothing to resample. Give them a symbol in the Symbol column of Instruments: saving it downloads its history.",
-    noWindow:
-      `The lines of your plan share not a single month of history, so there is no common window to resample. Extend the shortest history in Instruments with “${REDOWNLOAD}” and a longer range.`,
+    noWindow: `The lines of your plan share not a single month of history, so there is no common window to resample. Extend the shortest history in Instruments with “${REDOWNLOAD}” and a longer range.`,
     thinWindow: {
       title: "No figures yet: the window is too short",
       body: (months: number, minimum: number, instrument: string): string =>
@@ -1043,8 +1080,7 @@ export const en: Copy = {
       p90Hint:
         "90th percentile: only one in ten simulations ends above this figure. It is estimated from the fewest paths, so it is the one that moves most when the seed changes.",
       real: (amount: string): string => `${amount} in today's euros`,
-      noReal:
-        `Without CPI data this cannot be expressed in today's euros. To get it, ${REFRESH_CPI}.`,
+      noReal: `Without CPI data this cannot be expressed in today's euros. To get it, ${REFRESH_CPI}.`,
     },
     contributed: (amount: string): string =>
       `Of that, ${amount} comes out of your pocket: what you already hold simulated, plus every contribution over the horizon.`,
@@ -1136,6 +1172,10 @@ export const en: Copy = {
     },
     amountHint:
       "The amount is the real cash flow: fees included and withholdings deducted.",
+    swapType: "Swap",
+    swapAmountLabel: "No money moved: it is a swap",
+    swapNote:
+      "In a swap the amount is the market value of the units delivered or received. No money came in or went out, so it is not part of the net flow.",
     noRateLabel: "no rate",
     noRate: (currency: string): string =>
       `This entry is in ${currency} and has no exchange rate to euros, so it could not be valued and counts in no figure.`,
@@ -1223,7 +1263,7 @@ export const en: Copy = {
     fiscal: {
       about: "About the tax basis",
       intro:
-        "The same sales, on a FIFO basis instead of AVCO, which is what the Bizkaia foral tax return (NF 13/2013) requires and not what the Sales tab uses. A loss with a repurchase of homogeneous securities in the two months before or after is deferred under Art. 43, in the proportion repurchased, and computes when the repurchased securities are transmitted; offsetting against earlier years follows Art. 66. The repurchase arithmetic follows the DGT rulings V1403-21, V1117-21 and V3282-18 on the parallel state rule, which do not bind the Hacienda Foral.",
+        "The same sales, on a FIFO basis instead of AVCO, which is what the Bizkaia foral tax return (NF 13/2013) requires and not what the Sales tab uses. A loss with a repurchase in the two months before or after is deferred under Art. 43 (letter g for homogeneous securities and, for transmissions from 1 January 2025, letter i for crypto assets of the same type), in the proportion repurchased, and computes when the repurchased units are transmitted; offsetting against earlier years follows Art. 66. The repurchase arithmetic follows the DGT rulings V1403-21, V1117-21 and V3282-18 on the parallel state rule, which do not bind the Hacienda Foral.",
       yearLabel: "Tax year",
       noYears: "There are no sales recorded in any year yet.",
       summary: {
@@ -1262,16 +1302,27 @@ export const en: Copy = {
         quantity: "Units",
         unitCost: "Unit cost",
       },
-      washSaleReason: (repurchased: string, sold: string): string =>
-        `Art. 43: ${repurchased} of the ${sold} units sold were repurchased.`,
+      washSaleReason: (
+        letter: RepurchaseLetter,
+        repurchased: string,
+        sold: string,
+      ): string =>
+        `Art. 43.${letter}: ${repurchased} of the ${sold} units sold were repurchased.`,
       ownDeferredReason: (share: string, amount: string): string =>
         `${share} of the loss (${amount}) does not compute this year: it stays deferred on the repurchased units and computes when they are sold.`,
+      minorDeferralReason: (share: string, cent: string): string =>
+        `Purchases of the same asset fall inside the repurchase window (${share} of the units sold): the loss they defer is under ${cent} and changes no figure.`,
       carriedOverReason: (amount: string): string =>
         `The units sold carried deferred loss from earlier sales; ${amount} moves on to the new repurchased units, even when this sale is at a gain. Its own gain is never held back.`,
+      windowOpenReason: (date: string): string =>
+        `Repurchase window open until ${date}: a purchase of the same asset up to that day can still defer this loss, so the year's figure may change.`,
       unlistedReason: (date: string): string =>
-        `Crypto: the two-month rule doesn't apply and the loss counts in full. There is a new purchase on ${date}; some doctrine would apply the one-year repurchase rule. This is unsettled and changes no figures.`,
+        `Crypto sold before 2025: the repurchase rule for crypto assets (Art. 43.i) governs transmissions from 1 January 2025, so the loss counts in full. There is a new purchase on ${date}; some doctrine would apply the one-year repurchase rule. This is unsettled and changes no figures.`,
       breakdown: {
-        title: "Repurchase of homogeneous securities (Art. 43)",
+        title: {
+          g: "Repurchase of homogeneous securities (Art. 43.g)",
+          i: "Repurchase of crypto assets of the same type (Art. 43.i)",
+        },
         before: (months: number): string =>
           `Acquired in the ${months} months before`,
         remainingAfter: "Position left after the sale",
@@ -1302,12 +1353,19 @@ export const en: Copy = {
         `Deferred losses pending at 31 December ${year}`,
       pendingBody:
         "Still attached to units held. They count in no year until those units are sold with no new repurchase (Art. 43).",
-      pendingColumns: {
-        t: "Units acquired",
+      pendingGroupColumns: {
+        saleDate: "Sale of",
         name: "Instrument",
-        origin: "Loss from the sale of",
+        acquisitions: "Acquisitions",
         amount: "Amount",
       },
+      pendingDetailColumns: {
+        acquiredAt: "Units acquired",
+        amount: "Amount",
+      },
+      belowCent: (cent: string): string => `< ${cent}`,
+      acquisitionsCount: (count: number): string =>
+        count === 1 ? "1 acquisition" : `${count} acquisitions`,
       empty: {
         title: "No sales in this year",
         body: "Pick another tax year from the dropdown.",

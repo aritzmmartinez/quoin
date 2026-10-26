@@ -145,13 +145,51 @@ describe("mapRow", () => {
   });
 
   it("maps asset classes to instrument types", () => {
-    const type = (assetClass: string) => {
-      const r = mapRow(row({ asset_class: assetClass }));
+    const type = (assetClass: string, symbol = "IE00TEST0001") => {
+      const r = mapRow(row({ asset_class: assetClass, symbol }));
       return r.kind === "domain" ? r.instrument?.type : null;
     };
     expect(type("STOCK")).toBe("STOCK");
-    expect(type("CRYPTO")).toBe("CRYPTO");
+    expect(type("CRYPTO", "BTC")).toBe("CRYPTO");
     expect(type("SYNTHETIC")).toBe("ETF");
+  });
+
+  it("takes a crypto asset's code as its instrument id", () => {
+    const result = mapRow(
+      row({ asset_class: "CRYPTO", name: "Bitcoin", symbol: "BTC" }),
+    );
+    expect(result.kind).toBe("domain");
+    if (result.kind !== "domain") return;
+    expect(result.instrument?.id).toBe("BTC");
+    expect(result.event.type === "BUY" && result.event.instrumentId).toBe(
+      "BTC",
+    );
+  });
+
+  it("sets aside a crypto row whose symbol is not an asset code, naming it", () => {
+    const crypto = { asset_class: "CRYPTO", name: "Bitcoin" };
+    for (const over of [
+      { symbol: "XF000BTC0017" },
+      { category: "CASH", type: "DIVIDEND", symbol: "XF000BTC0017" },
+    ]) {
+      expect(mapRow(row({ ...crypto, ...over }))).toEqual({
+        kind: "discard",
+        reason: "invalid-crypto-code",
+        detail: {
+          date: "2025-01-01T10:00:00.000Z",
+          type: over.type ?? "BUY",
+          subtype: null,
+          instrument: "XF000BTC0017",
+        },
+      });
+    }
+  });
+
+  it("leaves a non-crypto symbol as it stands", () => {
+    const result = mapRow(row({ asset_class: "STOCK", symbol: "us0000test" }));
+    expect(result.kind === "domain" && result.instrument?.id).toBe(
+      "us0000test",
+    );
   });
 
   it("throws on an unknown asset class (surfaced, not silently mis-typed)", () => {

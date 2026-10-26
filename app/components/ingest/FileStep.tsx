@@ -65,7 +65,7 @@ export function FileStep({
         </Button>
       </div>
 
-      <SummaryList summary={preview.summary} pendingRewards />
+      <SummaryList summary={preview.summary} pendingPrice />
 
       {!canImport ? (
         <p className="mt-3 text-[12px] text-muted">{copy.nothingNew}</p>
@@ -81,7 +81,7 @@ export function FileStep({
         >
           {busy
             ? copy.importing
-            : action === "value-rewards"
+            : action === "value-unpriced"
               ? copy.confirmPending
               : copy.confirmCount(newCount)}
         </Button>

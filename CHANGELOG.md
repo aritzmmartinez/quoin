@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-10-26
+
+### Upgrading
+- This version adds database columns (where a row's value came from, and the link between the two rows of a swap). The Docker image backs up the ledger before migrating; to go back to an earlier image, restore that backup (see *Updating* in the README).
+- If you already imported Kraken, import the export again, in the current format (it has a wallet column): it brings the rest of the assets and the swaps, and what was already imported is reported as duplicated.
+
+### Added
+- Kraken: every asset bought or sold against fiat is imported, not only Bitcoin.
+- Kraken: a swap between two crypto assets is imported as a sale and a linked purchase, each valued on its own. For tax, both take the Bizkaia rule's value: the greater of what was delivered and the gross value received, less the fee taken from what is received. A swap with a leg that has no price is set aside whole and recovered by downloading prices and importing the same file again.
+- A swap is neither a contribution nor a withdrawal: it stays out of Total contributed, out of the flows behind the portfolio's returns and out of the net cash flow in Movements, where its two rows read as a swap, with where it went, instead of as a purchase and a sale. On the instrument page it counts, and its result shows like any other sale.
+- Kraken: rewards in any asset are valued at the figure Kraken gives in the export, and at the price history only when it gives none.
+- Kraken: moves between your own Kraken wallets create nothing, including money sent from spot to Earn, and a transfer with another account is stored as cash and flagged. Money coming back from Earn is set aside by name and flagged, since it can include yield.
+- Kraken: the mapping step suggests `<CODE>-EUR` for each crypto asset, and says what to try when Yahoo has no price for it.
+- Tax: a loss sale whose repurchase window is still open says until when, since a purchase before then can still defer it.
+- Each ledger row records where its value came from.
+
+### Changed
+- Tax: a repurchase that defers less than a cent is a quiet note instead of a highlighted warning, and a share too small to show says so instead of reading 0.0 %.
+- Tax: the deferred losses still pending are grouped by the sale that created them, with the total and the number of acquisitions, and the detail unfolds. An amount that rounds to 0,00 € reads "< 0,01 €" in a muted tone, in the group, in its detail and in the breakdown of a sale (non-computable loss and units that receive the deferral).
+- Kraken: an export without the wallet column, the older format, is refused. Download a new one from Kraken.
+- Kraken: a file whose balances do not follow from its rows is refused whole, naming the asset, wallet and time, before anything is written.
+- Kraken: an import no longer renames an instrument that already exists.
+- Tax: from 2025, a crypto loss with a purchase of the same asset in the two months before or after is deferred (Art. 43.i, NF 6/2025), whichever broker each trade was at. Crypto sold before 2025 is unchanged. This can change the savings base of 2025 and later years.
+- Import: a crypto row whose symbol is not an asset code is set aside and named instead of becoming an instrument of its own.
+
+### Fixed
+- Prices below a cent were stored to six decimals, so a crypto quoted in millionths lost most of its value or became zero; they are now stored as Yahoo sends them and shown with significant digits in Portfolio, the instrument chart, Instruments and Realised.
+- Quantities are shown to ten decimals without losing digits on large holdings.
+- A Kraken reward that the export gives no value for was valued at the close of its own day, published hours after it; it now takes the last close already published. Rewards already imported are not revalued.
+- The symbol check compared each trade with a close published after it; it now uses the last one before.
+- The symbol check compares against Kraken rewards only when Kraken valued them.
+
+### Security
+- body-parser updated to 2.4.0 (CVE-2026-111181, denial of service via an uncaught exception).
+
 ## [0.13.0] - 2026-10-22
 
 ### Upgrading
@@ -410,7 +445,8 @@ fund holdings must be supplied as CSV rather than the Excel most issuers publish
 Design rationale lives beside the code it explains, in `docs/ARCHITECTURE.md` and in the
 commit history — not here.
 
-[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/aritzmmartinez/quoin/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/aritzmmartinez/quoin/compare/v0.12.1...v0.13.0
 [0.12.1]: https://github.com/aritzmmartinez/quoin/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/aritzmmartinez/quoin/compare/v0.11.1...v0.12.0

@@ -172,19 +172,62 @@ describe("recentTradeMarks", () => {
     expect(mark?.price).toBe("23.91");
   });
 
+  it("takes a reward valued at Kraken's own figure, never one valued from a price history", () => {
+    const marks = recentTradeMarks(
+      [
+        trade("2026-03-02T09:00:00Z", "0.01", "1.40", {
+          currency: "USD",
+          fxSource: "ECB",
+          fxRate: "1.25",
+          fxDirection: "QUOTE_PER_BASE",
+          fxDate: "2026-03-02",
+          funding: "IN_KIND",
+          note: "kraken-reward",
+          valuationSource: "kraken-amountusd",
+        }),
+        trade("2026-03-09T05:52:00Z", "0.01", "999", {
+          funding: "IN_KIND",
+          note: "kraken-reward",
+        }),
+      ],
+      ID,
+    );
+
+    expect(marks.map((m) => m.price)).toEqual(["112"]);
+  });
+
+  it("keeps the price of a small asset, and skips a trade worth less than a cent", () => {
+    const marks = recentTradeMarks(
+      [
+        trade("2026-03-02T09:00:00Z", "120000", "0.48", { fees: "0" }),
+        trade("2026-03-03T09:00:00Z", "100", "0.004", {
+          fees: "0",
+          currency: "USD",
+          fxSource: "ECB",
+          fxRate: "1.25",
+          fxDirection: "QUOTE_PER_BASE",
+          fxDate: "2026-03-03",
+        }),
+      ],
+      ID,
+    );
+
+    expect(marks.map((m) => m.price)).toEqual(["0.000004"]);
+  });
+
   it("is empty for an instrument never traded", () => {
     expect(recentTradeMarks([], ID)).toEqual([]);
   });
 });
 
 describe("tradeSpan", () => {
-  it("covers only the trades, plus a week back for the first close", () => {
+  it("covers only the trades, plus a week and a candle back for the first close", () => {
     const span = tradeSpan([
       { ts: new Date("2025-07-31T10:00:00Z"), price: "1" },
       { ts: new Date("2025-05-10T10:00:00Z"), price: "1" },
     ]);
 
-    expect(span?.from.toISOString()).toBe("2025-05-03T10:00:00.000Z");
+    expect(span?.from.toISOString()).toBe("2025-05-02T10:00:00.000Z");
     expect(span?.to.toISOString()).toBe("2025-08-01T10:00:00.000Z");
   });
 
@@ -196,18 +239,24 @@ describe("tradeSpan", () => {
 describe("compareTrades", () => {
   const mark = { ts: new Date("2025-07-31T10:00:00Z"), price: "23.91" };
 
-  it("compares with the close of the trading day", () => {
+  it("compares with the close of the last day that has ended", () => {
     const [row] = compareTrades(
       [mark],
       [
-        close("2025-07-30T07:00:00Z", "23.50"),
-        close("2025-07-31T07:00:00Z", "23.88"),
-        close("2025-08-01T07:00:00Z", "30"),
+        close("2025-07-29T07:00:00Z", "23.50"),
+        close("2025-07-30T07:00:00Z", "23.88"),
+        close("2025-07-31T07:00:00Z", "30"),
       ],
     );
 
     expect(row).toMatchObject({ close: "23.88", traded: "23.91", off: false });
     expect(row?.deviation).toBe("-0.001255");
+  });
+
+  it("never takes the candle of the trade's own day, whose close came later", () => {
+    expect(
+      compareTrades([mark], [close("2025-07-31T07:00:00Z", "23.88")]),
+    ).toEqual([]);
   });
 
   it("never reaches forward, and skips a trade with no close in the week before", () => {
@@ -222,7 +271,7 @@ describe("compareTrades", () => {
   it("converts a close in another currency at the ECB rate of the trade's day", () => {
     const [row] = compareTrades(
       [mark],
-      [close("2025-07-31T07:00:00Z", "29.85", "USD")],
+      [close("2025-07-30T07:00:00Z", "29.85", "USD")],
       USD_BOOK,
     );
 
@@ -238,7 +287,7 @@ describe("compareTrades", () => {
   it("marks a close far from the trade, as a wrong venue or class would give", () => {
     const [row] = compareTrades(
       [mark],
-      [close("2025-07-31T07:00:00Z", "131.5")],
+      [close("2025-07-30T07:00:00Z", "131.5")],
     );
     expect(row?.off).toBe(true);
   });
@@ -295,7 +344,7 @@ describe("checkQuoteAgainstLedger", () => {
     ];
     const { provider: market, asked } = provider(live, [
       close("2025-05-09T07:00:00Z", "23.90"),
-      close("2025-07-31T07:00:00Z", "23.88"),
+      close("2025-07-30T07:00:00Z", "23.88"),
     ]);
 
     const check = await checkQuoteAgainstLedger(
@@ -311,7 +360,7 @@ describe("checkQuoteAgainstLedger", () => {
     expect(check?.tradesOff).toBe(false);
     expect(asked).toEqual([
       {
-        from: new Date("2025-05-03T10:00:00.000Z"),
+        from: new Date("2025-05-02T10:00:00.000Z"),
         to: new Date("2025-08-01T10:00:00.000Z"),
       },
     ]);
@@ -366,7 +415,7 @@ describe("checkQuoteAgainstLedger", () => {
 
   it("compares a quote in another currency against the trades in euros, asking for the rates of their span", async () => {
     const usd = provider({ ...live, currency: "USD" }, [
-      close("2025-07-31T07:00:00Z", "29.85", "USD"),
+      close("2025-07-30T07:00:00Z", "29.85", "USD"),
     ]);
     const asked: [string, string][] = [];
     const rates: EnsureRates = async (needs) => {
@@ -382,7 +431,7 @@ describe("checkQuoteAgainstLedger", () => {
       rates,
     );
 
-    expect(asked).toEqual([["USD", "2025-07-24"]]);
+    expect(asked).toEqual([["USD", "2025-07-23"]]);
     expect(check?.rateSeries).toBe("published");
     expect(check?.trades).toMatchObject([{ close: "23.88", off: false }]);
   });

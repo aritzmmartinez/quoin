@@ -3,8 +3,13 @@ import { describe, expect, it } from "vitest";
 
 import type { TradeEvent } from "../domain";
 
-import { toIsoDate } from "../calendar";
+import { calendarDate, toIsoDate } from "../calendar";
 
+import {
+  REPURCHASE_RULES,
+  repurchaseRuleFor,
+  type RepurchaseRule,
+} from "./config";
 import {
   createWashSaleAssessor,
   washSaleWindow,
@@ -37,18 +42,37 @@ function trade(
   };
 }
 
-function assess(trades: TradeEvent[], unlisted: string[] = []) {
-  const assessor = createWashSaleAssessor(trades, new Set(unlisted));
+function assess(
+  trades: TradeEvent[],
+  crypto: string[] = [],
+  rules?: readonly RepurchaseRule[],
+) {
+  const assessor = createWashSaleAssessor(trades, {
+    territory: "bizkaia",
+    assetClasses: new Map(
+      trades.map(
+        (t) =>
+          [
+            t.instrumentId,
+            crypto.includes(t.instrumentId)
+              ? "fungible-crypto"
+              : "listed-security",
+          ] as const,
+      ),
+    ),
+    rules,
+  });
   const bySale = new Map<string, WashSaleAssessment>();
   const notices = new Map<string, UnlistedRepurchaseNotice>();
   for (const sale of walkFifo(trades).sales) {
     if (!sale.realizedPnL.isNegative()) continue;
-    if (!assessor.isListed(sale.trade.instrumentId)) {
+    const rule = assessor.ruleFor(sale);
+    if (rule === null) {
       const notice = assessor.unlistedNotice(sale);
       if (notice) notices.set(sale.trade.id, notice);
       continue;
     }
-    bySale.set(sale.trade.id, assessor.assess(sale));
+    bySale.set(sale.trade.id, assessor.assess(sale, rule));
   }
   return { bySale, notices };
 }
@@ -265,26 +289,26 @@ describe("assessWashSales — scope and allocation", () => {
     expect(assessmentOf([buy, sell, other], sell.id).repurchased).toBe("0");
   });
 
-  it("crypto is outside the rule; a rebuy within a year is only pointed out", () => {
-    const buy = trade("BUY", "BTC", "1", "60000", { ts: "2025-01-10" });
-    const sell = trade("SELL", "BTC", "1", "50000", { ts: "2025-05-08" });
-    const rebuy = trade("BUY", "BTC", "1", "52000", { ts: "2025-05-20" });
+  it("crypto before 2025 is outside the rule; a rebuy within a year is only pointed out", () => {
+    const buy = trade("BUY", "BTC", "1", "60000", { ts: "2024-01-10" });
+    const sell = trade("SELL", "BTC", "1", "50000", { ts: "2024-05-08" });
+    const rebuy = trade("BUY", "BTC", "1", "52000", { ts: "2024-05-20" });
 
     const result = assess([buy, sell, rebuy], ["BTC"]);
     expect(result.bySale.has(sell.id)).toBe(false);
     expect(result.notices.get(sell.id)?.buyEventId).toBe(rebuy.id);
   });
 
-  it("crypto: no notice without an acquisition in the following year", () => {
-    const buy = trade("BUY", "BTC", "1", "60000", { ts: "2025-01-10" });
+  it("crypto before 2025: no notice without an acquisition in the following year", () => {
+    const buy = trade("BUY", "BTC", "1", "60000", { ts: "2024-01-10" });
     const sell = trade("SELL", "BTC", "1", "50000", {
-      ts: "2025-05-08T10:00:00Z",
+      ts: "2024-05-08T10:00:00Z",
     });
     const late = trade("BUY", "BTC", "1", "52000", {
-      ts: "2026-05-09T10:00:00Z",
+      ts: "2025-05-09T10:00:00Z",
     });
     const edge = trade("BUY", "BTC", "1", "52000", {
-      ts: "2026-05-08T10:00:00Z",
+      ts: "2025-05-08T10:00:00Z",
     });
 
     const outside = assess([buy, sell, late], ["BTC"]);
@@ -293,9 +317,9 @@ describe("assessWashSales — scope and allocation", () => {
     expect(assess([buy, sell, edge], ["BTC"]).notices.has(sell.id)).toBe(true);
   });
 
-  it("crypto: an acquisition only before the sale gives no notice", () => {
-    const buy = trade("BUY", "BTC", "2", "120000", { ts: "2025-01-10" });
-    const sell = trade("SELL", "BTC", "1", "50000", { ts: "2025-02-08" });
+  it("crypto before 2025: an acquisition only before the sale gives no notice", () => {
+    const buy = trade("BUY", "BTC", "2", "120000", { ts: "2024-01-10" });
+    const sell = trade("SELL", "BTC", "1", "50000", { ts: "2024-02-08" });
 
     expect(assess([buy, sell], ["BTC"]).notices.has(sell.id)).toBe(false);
   });
@@ -313,7 +337,7 @@ function tripsOn(saleTs: string, rebuyTs: string): boolean {
 }
 
 function windowOf(saleTs: string): string {
-  const { start, end } = washSaleWindow(new Date(saleTs));
+  const { start, end } = washSaleWindow(new Date(saleTs), 2);
   return `${toIsoDate(start)}..${toIsoDate(end)}`;
 }
 
@@ -407,5 +431,194 @@ describe("washSaleWindow — date to date on Madrid's calendar, bounds inside", 
     // 23:59 CET on 26 December = 22:59Z; midnight = 23:00Z.
     expect(tripsOn("2025-10-26T01:30:00Z", "2025-12-26T22:59:00Z")).toBe(true);
     expect(tripsOn("2025-10-26T01:30:00Z", "2025-12-26T23:00:00Z")).toBe(false);
+  });
+});
+
+describe("repurchase rules", () => {
+  it("covers listed securities with letter g, two months either side, on any day", () => {
+    for (const day of [calendarDate(2010, 1, 1), calendarDate(2026, 5, 8)]) {
+      expect(
+        repurchaseRuleFor("bizkaia", "listed-security", day),
+      ).toMatchObject({
+        letter: "g",
+        windowMonths: 2,
+        homogeneity: "instrument",
+        acquisitions: "all",
+      });
+    }
+  });
+
+  it("covers crypto with letter i from 1 January 2025, and not before", () => {
+    expect(
+      repurchaseRuleFor(
+        "bizkaia",
+        "fungible-crypto",
+        calendarDate(2024, 12, 31),
+      ),
+    ).toBeNull();
+    for (const day of [calendarDate(2025, 1, 1), calendarDate(2026, 5, 8)]) {
+      expect(
+        repurchaseRuleFor("bizkaia", "fungible-crypto", day),
+      ).toMatchObject({
+        letter: "i",
+        windowMonths: 2,
+        homogeneity: "instrument",
+        acquisitions: "all",
+      });
+    }
+  });
+
+  it("takes the rule into the assessment", () => {
+    const buy = trade("BUY", "X", "10", "1000", { ts: "2025-01-01" });
+    const sell = trade("SELL", "X", "10", "700", { ts: "2025-03-01" });
+
+    expect(assess([buy, sell]).bySale.get(sell.id)?.rule.letter).toBe("g");
+  });
+});
+
+describe("acquisitions received in kind", () => {
+  const cashOnly = REPURCHASE_RULES.map((rule): RepurchaseRule => ({
+    ...rule,
+    acquisitions: "cash-only",
+  }));
+  const buy = trade("BUY", "X", "10", "1000", { ts: "2025-01-01" });
+  const sell = trade("SELL", "X", "10", "700", { ts: "2025-03-01" });
+  const reward: TradeEvent = {
+    ...trade("BUY", "X", "4", "280", { ts: "2025-03-20" }),
+    funding: "IN_KIND",
+  };
+
+  it("count as a repurchase when the rule takes every acquisition", () => {
+    const assessment = assess([buy, sell, reward]).bySale.get(sell.id);
+    expect(assessment?.repurchased.toFixed()).toBe("4");
+    expect(assessment?.recipients.map((r) => r.buyEventId)).toEqual([
+      reward.id,
+    ]);
+  });
+
+  it("count for nothing when the rule takes only acquisitions paid in cash", () => {
+    const assessment = assess([buy, sell, reward], [], cashOnly).bySale.get(
+      sell.id,
+    );
+    expect(assessment?.repurchased.toFixed()).toBe("0");
+    expect(assessment?.recipients).toEqual([]);
+  });
+});
+
+describe("Art. 43.i — fungible crypto from 1 January 2025", () => {
+  const assessed = (trades: TradeEvent[], asset = "BTC") => {
+    const sale = trades.find((t) => t.type === "SELL");
+    return sale ? assess(trades, [asset]).bySale.get(sale.id) : undefined;
+  };
+
+  const repurchased = (trades: TradeEvent[], asset = "BTC") =>
+    assessed(trades, asset)?.repurchased.toFixed() ?? null;
+
+  const lot = trade("BUY", "BTC", "1", "60000", { ts: "2025-01-10" });
+  const sell = trade("SELL", "BTC", "1", "50000", { ts: "2025-06-10" });
+
+  it("a purchase a month before the sale, still held, is a repurchase", () => {
+    const before = trade("BUY", "BTC", "0.5", "26000", { ts: "2025-05-10" });
+    const sellOne = trade("SELL", "BTC", "1", "50000", { ts: "2025-06-10" });
+
+    expect(repurchased([lot, before, sellOne])).toBe("0.5");
+  });
+
+  it("a purchase a month after the sale is a repurchase", () => {
+    const after = trade("BUY", "BTC", "1", "52000", { ts: "2025-07-10" });
+
+    const assessment = assessed([lot, sell, after]);
+    expect(assessment?.rule.letter).toBe("i");
+    expect(assessment?.repurchased.toFixed()).toBe("1");
+  });
+
+  it("a purchase outside the two months is not", () => {
+    const late = trade("BUY", "BTC", "1", "52000", { ts: "2025-08-11" });
+
+    expect(repurchased([lot, sell, late])).toBe("0");
+  });
+
+  it("units received in kind inside the window count, as any acquisition does", () => {
+    const reward: TradeEvent = {
+      ...trade("BUY", "BTC", "0.001", "52", { ts: "2025-06-20" }),
+      funding: "IN_KIND",
+    };
+
+    expect(repurchased([lot, sell, reward])).toBe("0.001");
+  });
+
+  it("a window across the new year: sale in November, purchase in January", () => {
+    const novSell = trade("SELL", "BTC", "1", "50000", { ts: "2025-11-20" });
+    const january = trade("BUY", "BTC", "1", "52000", { ts: "2026-01-15" });
+
+    expect(repurchased([lot, novSell, january])).toBe("1");
+  });
+
+  it("the transmission decides: a January 2025 sale counts a December 2024 purchase", () => {
+    const old = trade("BUY", "BTC", "2", "120000", { ts: "2024-06-01" });
+    const december = trade("BUY", "BTC", "1", "55000", { ts: "2024-12-20" });
+    const january = trade("SELL", "BTC", "1", "50000", { ts: "2025-01-10" });
+
+    expect(repurchased([old, december, january])).toBe("1");
+  });
+
+  it("a 2024 sale has no rule, whatever is bought after it", () => {
+    const old = trade("BUY", "BTC", "1", "60000", { ts: "2024-01-10" });
+    const sell2024 = trade("SELL", "BTC", "1", "50000", { ts: "2024-12-20" });
+    const january = trade("BUY", "BTC", "1", "52000", { ts: "2025-01-10" });
+
+    const result = assess([old, sell2024, january], ["BTC"]);
+    expect(result.bySale.has(sell2024.id)).toBe(false);
+    expect(result.notices.get(sell2024.id)?.buyEventId).toBe(january.id);
+  });
+
+  it("covers a stablecoin like any other crypto", () => {
+    const usd = trade("BUY", "USDG", "1000", "950", { ts: "2025-01-10" });
+    const out = trade("SELL", "USDG", "1000", "900", { ts: "2025-06-10" });
+    const back = trade("BUY", "USDG", "400", "360", { ts: "2025-06-20" });
+
+    expect(repurchased([usd, out, back], "USDG")).toBe("400");
+  });
+
+  describe("one asset across brokers", () => {
+    const at = (
+      t: TradeEvent,
+      source: string,
+      account: string,
+    ): TradeEvent => ({
+      ...t,
+      source,
+      account,
+    });
+    const trBuy = at(
+      trade("BUY", "BTC", "1", "60000", { ts: "2026-01-10T10:00:00Z" }),
+      "TR_CSV",
+      "trade-republic",
+    );
+    const trSell = at(
+      trade("SELL", "BTC", "1", "50000", { ts: "2026-05-08T16:39:00Z" }),
+      "TR_CSV",
+      "trade-republic",
+    );
+
+    it("a sale at one broker is repurchased by a purchase at another inside the window", () => {
+      const kraken = at(
+        trade("BUY", "BTC", "1", "52000", { ts: "2026-07-05T10:00:00Z" }),
+        "KRAKEN_CSV",
+        "kraken",
+      );
+
+      expect(repurchased([trBuy, trSell, kraken])).toBe("1");
+    });
+
+    it("and not by one outside it", () => {
+      const kraken = at(
+        trade("BUY", "BTC", "1", "52000", { ts: "2026-07-09T10:00:00Z" }),
+        "KRAKEN_CSV",
+        "kraken",
+      );
+
+      expect(repurchased([trBuy, trSell, kraken])).toBe("0");
+    });
   });
 });

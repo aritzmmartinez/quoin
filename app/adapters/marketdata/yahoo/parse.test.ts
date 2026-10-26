@@ -24,7 +24,7 @@ describe("parseYahooChart", () => {
     expect(quote).not.toBeNull();
     expect(quote?.symbol).toBe("VWCE.DE");
     expect(quote?.currency).toBe("EUR");
-    expect(quote?.price).toBe("118.420000");
+    expect(quote?.price).toBe("118.42");
     expect(quote?.asOf).toEqual(new Date(1_751_363_100 * 1000));
   });
 
@@ -103,11 +103,11 @@ describe("parseYahooChartHistory", () => {
     expect(quotes).toHaveLength(2);
     expect(quotes[0]).toEqual({
       symbol: "VWCE.DE",
-      price: "10.500000",
+      price: "10.5",
       currency: "EUR",
       asOf: new Date(1_700_000_000 * 1000),
     });
-    expect(quotes[1]?.price).toBe("11.000000");
+    expect(quotes[1]?.price).toBe("11");
   });
 
   it("drops sessions with no close instead of interpolating", () => {
@@ -116,7 +116,7 @@ describe("parseYahooChartHistory", () => {
       "VWCE.DE",
     );
 
-    expect(quotes.map((q) => q.price)).toEqual(["10.000000", "12.000000"]);
+    expect(quotes.map((q) => q.price)).toEqual(["10", "12"]);
   });
 
   it("sorts an out-of-order payload", () => {
@@ -187,8 +187,44 @@ describe("minor currency units", () => {
 
   it("keeps a price already in a major unit exactly as it was", () => {
     expect(parseYahooChart(quoted("GBP", 12.345), "X")).toMatchObject({
-      price: "12.345000",
+      price: "12.345",
       currency: "GBP",
     });
+  });
+});
+
+describe("precision, as Yahoo sends it", () => {
+  const payload = (regularMarketPrice: number, close: number) => ({
+    chart: {
+      result: [
+        {
+          meta: {
+            currency: "USD",
+            regularMarketPrice,
+            regularMarketTime: 1_751_363_100,
+          },
+          timestamp: [1_751_363_100],
+          indicators: { quote: [{ close: [close] }] },
+        },
+      ],
+    },
+  });
+
+  const live = (price: number) =>
+    parseYahooChart(payload(price, price), "X")?.price;
+  const close = (price: number) =>
+    parseYahooChartHistory(payload(price, price), "X")[0]?.price;
+
+  it("keeps a live price exactly, however small", () => {
+    expect(live(763.96)).toBe("763.96");
+    expect(live(4.38e-6)).toBe("0.00000438");
+    expect(live(3.01e-7)).toBe("0.000000301");
+  });
+
+  it("keeps a close to the seven significant digits of a float32", () => {
+    expect(close(769.0499877929688)).toBe("769.05");
+    expect(close(73881.9375)).toBe("73881.94");
+    expect(close(4.380000063974876e-6)).toBe("0.00000438");
+    expect(close(4.999999873689376e-6)).toBe("0.000005");
   });
 });

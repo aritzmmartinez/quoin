@@ -6,7 +6,8 @@ import {
   type Revalue,
   type TradeEvent,
 } from "../domain";
-import { baseOf, bookable } from "../fx";
+import { bookable } from "../fx";
+import { tradeAmounts } from "../swap";
 
 export interface CostBasisPoint {
   ts: string;
@@ -36,8 +37,9 @@ export function computeCostBasisTimeline(
 ): CostBasisPoint[] {
   const restate: Revalue = revalue ?? ((money) => money);
 
-  const trades = bookable(events)
-    .filter(isTrade)
+  const allTrades = bookable(events).filter(isTrade);
+  const amountsOf = tradeAmounts(allTrades);
+  const trades = allTrades
     .filter((t) => t.instrumentId === instrumentId)
     .slice()
     .sort((a, b) => a.ts.getTime() - b.ts.getTime());
@@ -48,8 +50,9 @@ export function computeCostBasisTimeline(
 
   for (const trade of trades) {
     const tradeQty = new Decimal(trade.quantity);
-    const gross = restate(baseOf(trade, "grossAmount"), trade.ts);
-    const fees = restate(baseOf(trade, "fees"), trade.ts);
+    const amounts = amountsOf(trade);
+    const gross = restate(amounts.gross, trade.ts);
+    const fees = restate(amounts.fees, trade.ts);
     const tradePrice = tradeQty.isZero()
       ? Money.zero()
       : gross.divideBy(tradeQty);

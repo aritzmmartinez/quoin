@@ -1,15 +1,22 @@
 import { describe, expect, it } from "vitest";
 
 import type { ImportSummary } from "~/adapters/ingestion";
+import type { Instrument } from "~/core/domain";
+
+import { copyFor } from "./i18n";
 
 import {
-  earliestUnpricedReward,
+  earliestUnpriced,
   importAction,
-  mergeRewardRetry,
-  rewardRetryIds,
+  mergeRetry,
+  unpricedAssetIds,
   retryAfterFill,
-  rewardsNeedMapping,
-  unpricedRewards,
+  unpricedNeedMapping,
+  suggestedQuoteSymbol,
+  cryptoCodeOf,
+  noDailyHistoryMessage,
+  noQuoteMessage,
+  unpricedEntries,
 } from "./ingest";
 
 const reward = (date: string) => ({
@@ -25,20 +32,21 @@ const summary = (over: Partial<ImportSummary> = {}): ImportSummary => ({
   duplicates: 0,
   discarded: {},
   discardedDetails: {},
+  noticed: {},
   errors: 0,
   instruments: 1,
   ...over,
 });
 
 const first = summary({
-  discarded: { "reward-unpriced": 3, "unmodelled-asset": 1 },
+  discarded: { "reward-unpriced": 3, "internal-move": 1 },
   discardedDetails: {
     "reward-unpriced": [
       reward("2026-03-08T05:52:00.000Z"),
       reward("2026-03-01T05:52:00.000Z"),
       reward("2026-03-15T05:52:00.000Z"),
     ],
-    "unmodelled-asset": [
+    "internal-move": [
       {
         date: "2026-01-11T05:52:10.000Z",
         type: "earn",
@@ -51,40 +59,40 @@ const first = summary({
 
 describe("reward retry helpers", () => {
   it("reads how many rewards were set aside for want of a price", () => {
-    expect(unpricedRewards(first)).toBe(3);
-    expect(unpricedRewards(summary())).toBe(0);
+    expect(unpricedEntries(first)).toBe(3);
+    expect(unpricedEntries(summary())).toBe(0);
   });
 
   it("names the instruments to price, once each", () => {
-    expect(rewardRetryIds(first)).toEqual(["BTC"]);
-    expect(rewardRetryIds(summary())).toEqual([]);
+    expect(unpricedAssetIds(first)).toEqual(["BTC"]);
+    expect(unpricedAssetIds(summary())).toEqual([]);
   });
 
   it("finds the oldest unpriced reward, which decides the range to fetch", () => {
-    expect(earliestUnpricedReward(first)).toEqual(
+    expect(earliestUnpriced(first)).toEqual(
       new Date("2026-03-01T05:52:00.000Z"),
     );
-    expect(earliestUnpricedReward(summary())).toBeNull();
+    expect(earliestUnpriced(summary())).toBeNull();
   });
 });
 
-describe("mergeRewardRetry", () => {
+describe("mergeRetry", () => {
   it("counts every reward the retry valued and drops the reason when none is left", () => {
     const retry = summary({
       imported: 6,
       duplicates: 2,
-      discarded: { "unmodelled-asset": 1 },
+      discarded: { "internal-move": 1 },
       discardedDetails: {
-        "unmodelled-asset": first.discardedDetails["unmodelled-asset"],
+        "internal-move": first.discardedDetails["internal-move"],
       },
     });
 
-    const merged = mergeRewardRetry(first, retry);
+    const merged = mergeRetry(first, retry);
 
     expect(merged.recovered).toBe(3);
     expect(merged.summary.imported).toBe(8);
     expect(merged.summary.duplicates).toBe(0);
-    expect(merged.summary.discarded).toEqual({ "unmodelled-asset": 1 });
+    expect(merged.summary.discarded).toEqual({ "internal-move": 1 });
     expect(merged.summary.discardedDetails["reward-unpriced"]).toBeUndefined();
   });
 
@@ -92,16 +100,67 @@ describe("mergeRewardRetry", () => {
     const left = [reward("2026-03-01T05:52:00.000Z")];
     const retry = summary({
       imported: 4,
-      discarded: { "reward-unpriced": 1, "unmodelled-asset": 1 },
+      discarded: { "reward-unpriced": 1, "internal-move": 1 },
       discardedDetails: { "reward-unpriced": left },
     });
 
-    const merged = mergeRewardRetry(first, retry);
+    const merged = mergeRetry(first, retry);
 
     expect(merged.recovered).toBe(2);
     expect(merged.summary.discarded["reward-unpriced"]).toBe(1);
     expect(merged.summary.discardedDetails["reward-unpriced"]).toEqual(left);
-    expect(merged.summary.discarded["unmodelled-asset"]).toBe(1);
+    expect(merged.summary.discarded["internal-move"]).toBe(1);
+  });
+});
+
+describe("a swap set aside for want of a price", () => {
+  const swapDetail = (date: string, unpriced: string[]) => ({
+    date,
+    type: "receive",
+    subtype: null,
+    instrument: "ETH → BTC",
+    unpriced,
+  });
+  const withSwaps = summary({
+    discarded: { "reward-unpriced": 1, "swap-unpriced": 2 },
+    discardedDetails: {
+      "reward-unpriced": [reward("2026-03-08T05:52:00.000Z")],
+      "swap-unpriced": [
+        swapDetail("2026-03-02T10:00:00.000Z", ["ETH", "BTC"]),
+        swapDetail("2026-03-09T10:00:00.000Z", ["SOL"]),
+      ],
+    },
+  });
+
+  it("counts with the rewards, since both are recovered by downloading prices and importing again", () => {
+    expect(unpricedEntries(withSwaps)).toBe(3);
+    expect(
+      importAction(summary({ imported: 0, discarded: withSwaps.discarded })),
+    ).toBe("value-unpriced");
+  });
+
+  it("names the assets that lack a value, not the pair, and the oldest date decides the range", () => {
+    expect(unpricedAssetIds(withSwaps)).toEqual(["BTC", "ETH", "SOL"]);
+    expect(earliestUnpriced(withSwaps)).toEqual(
+      new Date("2026-03-02T10:00:00.000Z"),
+    );
+  });
+
+  it("is merged like a reward: recovered when the retry values it, kept with its rows when not", () => {
+    const left = [swapDetail("2026-03-09T10:00:00.000Z", ["SOL"])];
+    const merged = mergeRetry(
+      withSwaps,
+      summary({
+        imported: 3,
+        discarded: { "swap-unpriced": 1 },
+        discardedDetails: { "swap-unpriced": left },
+      }),
+    );
+
+    expect(merged.recovered).toBe(2);
+    expect(merged.summary.discarded).toEqual({ "swap-unpriced": 1 });
+    expect(merged.summary.discardedDetails["swap-unpriced"]).toEqual(left);
+    expect(merged.summary.discardedDetails["reward-unpriced"]).toBeUndefined();
   });
 });
 
@@ -147,21 +206,27 @@ describe("retryAfterFill", () => {
   });
 });
 
-describe("rewardsNeedMapping", () => {
-  const btc = { instrumentId: "BTC", name: "Bitcoin", quantity: "0" };
+describe("unpricedNeedMapping", () => {
+  const btc = {
+    instrumentId: "BTC",
+    name: "Bitcoin",
+    quantity: "0",
+    suggested: "BTC-EUR",
+    cryptoCode: "BTC",
+  };
 
   it("points at the mapping step while BTC is pending and unmapped", () => {
-    expect(rewardsNeedMapping(first, [btc], {})).toBe(true);
+    expect(unpricedNeedMapping(first, [btc], {})).toBe(true);
   });
 
   it("stops once BTC is mapped, or was never pending", () => {
-    expect(rewardsNeedMapping(first, [btc], { BTC: "BTC-EUR" })).toBe(false);
-    expect(rewardsNeedMapping(first, [], {})).toBe(false);
-    expect(rewardsNeedMapping(summary(), [btc], {})).toBe(false);
+    expect(unpricedNeedMapping(first, [btc], { BTC: "BTC-EUR" })).toBe(false);
+    expect(unpricedNeedMapping(first, [], {})).toBe(false);
+    expect(unpricedNeedMapping(summary(), [btc], {})).toBe(false);
   });
 });
 
-describe("mergeRewardRetry keeps every other reason's rows", () => {
+describe("mergeRetry keeps every other reason's rows", () => {
   it("still lists an unsupported row in the final summary", () => {
     const transfer = {
       date: "2025-11-20T10:00:00.000Z",
@@ -182,7 +247,7 @@ describe("mergeRewardRetry keeps every other reason's rows", () => {
       discardedDetails: { unsupported: [transfer] },
     });
 
-    const merged = mergeRewardRetry(withUnsupported, retry).summary;
+    const merged = mergeRetry(withUnsupported, retry).summary;
 
     expect(merged.discarded).toEqual({ unsupported: 1 });
     expect(merged.discardedDetails).toEqual({ unsupported: [transfer] });
@@ -197,7 +262,7 @@ describe("importAction", () => {
 
   it("offers to value the rewards when nothing is new but some still lack a price", () => {
     expect(importAction({ ...first, imported: 0, duplicates: 8 })).toBe(
-      "value-rewards",
+      "value-unpriced",
     );
   });
 
@@ -207,5 +272,61 @@ describe("importAction", () => {
         summary({ imported: 0, duplicates: 13, discarded: { unsupported: 1 } }),
       ),
     ).toBe("nothing");
+  });
+});
+
+describe("suggestedQuoteSymbol", () => {
+  const instrument = (id: string, type: Instrument["type"]): Instrument => ({
+    id,
+    name: id,
+    type,
+    thesis: "CORE",
+  });
+
+  it("proposes the euro line of a crypto asset", () => {
+    expect(suggestedQuoteSymbol(instrument("ETH", "CRYPTO"))).toBe("ETH-EUR");
+    expect(suggestedQuoteSymbol(instrument("USDG", "CRYPTO"))).toBe("USDG-EUR");
+  });
+
+  it("takes a verified exception instead, where Yahoo has no euro line", () => {
+    expect(suggestedQuoteSymbol(instrument("PEPE", "CRYPTO"))).toBe(
+      "PEPE24478-USD",
+    );
+  });
+
+  it("proposes nothing for anything that is not crypto", () => {
+    expect(suggestedQuoteSymbol(instrument("IE00TEST0001", "ETF"))).toBeNull();
+  });
+});
+
+describe("the hint when Yahoo has no price", () => {
+  const t = copyFor("es");
+
+  it("points a fund at another venue", () => {
+    expect(noQuoteMessage(t, null, "XS00TEST0001.SG")).toBe(
+      t.ingest.map.noQuote("XS00TEST0001.SG"),
+    );
+    expect(noDailyHistoryMessage(t, null)).toBe(t.ingest.map.noDailyHistory);
+  });
+
+  it("points a crypto asset at its dollar line and warns about shared tickers", () => {
+    const message = noQuoteMessage(t, "DOGE", "DOGE-EUR");
+    expect(message).toContain("DOGE-USD");
+    expect(message).toContain("PEPE24478-USD");
+    expect(message).not.toContain(".MI");
+    expect(noDailyHistoryMessage(copyFor("en"), "DOGE")).toContain(
+      "another coin",
+    );
+  });
+
+  it("knows a crypto asset by its type, by its code", () => {
+    const instrument = (type: Instrument["type"]): Instrument => ({
+      id: "DOGE",
+      name: "DOGE",
+      type,
+      thesis: "CORE",
+    });
+    expect(cryptoCodeOf(instrument("CRYPTO"))).toBe("DOGE");
+    expect(cryptoCodeOf(instrument("ETF"))).toBeNull();
   });
 });

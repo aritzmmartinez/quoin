@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import type { TradeEvent } from "../domain";
+import type { LedgerEvent, TradeEvent } from "../domain";
 
 import { fiscalYearOf } from "./fiscal-year";
-import { computeTaxHistory, computeTaxLots, taxYearOf } from "./tax-lots";
+import {
+  computeTaxHistory,
+  computeTaxLots,
+  taxYearOf,
+  type TaxOptions,
+} from "./tax-lots";
 
 let seq = 0;
 
@@ -29,12 +34,31 @@ function trade(
   };
 }
 
-const LISTED = { unlistedInstrumentIds: new Set<string>() };
+function options(
+  events: readonly LedgerEvent[],
+  crypto: string[] = [],
+): TaxOptions {
+  return {
+    territory: "bizkaia",
+    assetClasses: new Map(
+      events.flatMap((e) =>
+        "instrumentId" in e
+          ? [
+              [
+                e.instrumentId,
+                crypto.includes(e.instrumentId)
+                  ? "fungible-crypto"
+                  : "listed-security",
+              ] as const,
+            ]
+          : [],
+      ),
+    ),
+  };
+}
 
-function year(events: TradeEvent[], y: number, unlisted: string[] = []) {
-  return computeTaxLots(events, y, {
-    unlistedInstrumentIds: new Set(unlisted),
-  });
+function year(events: TradeEvent[], y: number, crypto: string[] = []) {
+  return computeTaxLots(events, y, options(events, crypto));
 }
 
 describe("fiscalYearOf", () => {
@@ -370,16 +394,16 @@ describe("computeTaxLots", () => {
     expect(y2025.pending.map((p) => p.buyEventId)).toEqual([rebuy.id]);
   });
 
-  it("a crypto loss computes whole and carries a notice when rebought within a year", () => {
-    const sell = trade("SELL", "BTC", "1", "50000", { ts: "2025-05-08" });
-    const rebuy = trade("BUY", "BTC", "1", "52000", { ts: "2025-05-20" });
+  it("a crypto loss before 2025 computes whole and carries a notice when rebought within a year", () => {
+    const sell = trade("SELL", "BTC", "1", "50000", { ts: "2024-05-08" });
+    const rebuy = trade("BUY", "BTC", "1", "52000", { ts: "2024-05-20" });
     const events = [
-      trade("BUY", "BTC", "1", "60000", { ts: "2025-01-10" }),
+      trade("BUY", "BTC", "1", "60000", { ts: "2024-01-10" }),
       sell,
       rebuy,
     ];
 
-    const result = year(events, 2025, ["BTC"]);
+    const result = year(events, 2024, ["BTC"]);
     const gain = result.gains[0]!;
     expect(gain.computablePnL).toBe("-10000");
     expect(gain.washSale).toBeNull();
@@ -388,6 +412,63 @@ describe("computeTaxLots", () => {
       buyTs: rebuy.ts,
     });
     expect(result.computableNet).toBe("-10000");
+  });
+
+  it("Art. 43.i: a crypto loss rebought whole at another broker is deferred whole", () => {
+    const sell = {
+      ...trade("SELL", "BTC", "1", "50000", { ts: "2026-05-08T16:39:00Z" }),
+      source: "TR_CSV",
+    };
+    const rebuy = {
+      ...trade("BUY", "BTC", "1", "52000", { ts: "2026-07-05T10:00:00Z" }),
+      source: "KRAKEN_CSV",
+    };
+    const events = [
+      {
+        ...trade("BUY", "BTC", "1", "60000", { ts: "2026-01-10" }),
+        source: "TR_CSV",
+      },
+      sell,
+      rebuy,
+    ];
+
+    const result = year(events, 2026, ["BTC"]);
+    const gain = result.gains[0]!;
+    expect(gain.washSale?.letter).toBe("i");
+    expect(gain.nonComputable).toBe("-10000");
+    expect(gain.computablePnL).toBe("0");
+    expect(gain.unlistedNotice).toBeNull();
+    expect(result.computableNet).toBe("0");
+    expect(result.pending).toEqual([
+      {
+        buyEventId: rebuy.id,
+        acquiredAt: rebuy.ts,
+        instrumentId: "BTC",
+        pieces: [{ originEventId: sell.id, amount: "-10000" }],
+      },
+    ]);
+  });
+
+  it("Art. 43.i: a partial repurchase defers only its share, which computes when those units are sold", () => {
+    const sell = trade("SELL", "BTC", "1", "50000", { ts: "2025-06-10" });
+    const rebuy = trade("BUY", "BTC", "0.4", "20800", { ts: "2025-06-20" });
+    const events = [
+      trade("BUY", "BTC", "1", "60000", { ts: "2025-01-10" }),
+      sell,
+      rebuy,
+      trade("SELL", "BTC", "0.4", "22000", { ts: "2026-03-01" }),
+    ];
+
+    const sale2025 = year(events, 2025, ["BTC"]);
+    expect(sale2025.gains[0]!.nonComputable).toBe("-4000");
+    expect(sale2025.gains[0]!.computablePnL).toBe("-6000");
+    expect(sale2025.computableNet).toBe("-6000");
+
+    const sale2026 = year(events, 2026, ["BTC"]);
+    expect(sale2026.gains[0]!.computablePnL).toBe("1200");
+    expect(sale2026.integrations.map((i) => i.amount)).toEqual(["-4000"]);
+    expect(sale2026.computableNet).toBe("-2800");
+    expect(sale2026.pending).toEqual([]);
   });
 
   it("nets several sales in a year, mixing gains and deferred losses", () => {
@@ -412,9 +493,11 @@ describe("computeTaxLots", () => {
       trade("SELL", "X", "10", "800", { ts: "2026-06-01" }),
     ];
 
-    const history = computeTaxHistory(events, LISTED);
+    const history = computeTaxHistory(events, options(events));
     for (const y of [2024, 2025, 2026, 2027]) {
-      expect(taxYearOf(history, y)).toEqual(computeTaxLots(events, y, LISTED));
+      expect(taxYearOf(history, y)).toEqual(
+        computeTaxLots(events, y, options(events)),
+      );
     }
   });
 });
@@ -431,7 +514,7 @@ describe("an instrument with a trade it cannot convert to euros", () => {
       },
     ];
 
-    const result = taxYearOf(computeTaxHistory(events, LISTED), 2025);
+    const result = taxYearOf(computeTaxHistory(events, options(events)), 2025);
     expect(result.gains.map((g) => g.instrumentId)).toEqual(["IE00TEST0001"]);
   });
 });

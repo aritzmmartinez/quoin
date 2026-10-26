@@ -16,20 +16,20 @@ describe("discardGroups", () => {
     const groups = discardGroups({
       discarded: {
         unsupported: 1,
-        "unmodelled-asset": 3,
+        "internal-move": 3,
         "crypto-transfer": 1,
         "card-spending": 4,
       },
       discardedDetails: {
         unsupported: [at("Test ETF")],
-        "unmodelled-asset": [at("SOL"), at("ETH"), at("SOL")],
+        "internal-move": [at("SOL"), at("ETH"), at("SOL")],
         "crypto-transfer": [at("BTC")],
       },
     });
 
     expect(groups.map((g) => [g.reason, g.count, g.affectsPosition])).toEqual([
       ["crypto-transfer", 1, true],
-      ["unmodelled-asset", 3, false],
+      ["internal-move", 3, false],
       ["card-spending", 4, false],
       ["unsupported", 1, false],
     ]);
@@ -37,9 +37,9 @@ describe("discardGroups", () => {
 
   it("counts each reason's groups by asset, most frequent first", () => {
     const [group] = discardGroups({
-      discarded: { "unmodelled-asset": 4 },
+      discarded: { "internal-move": 4 },
       discardedDetails: {
-        "unmodelled-asset": [at("SOL"), at("ETH"), at("SOL"), at(null)],
+        "internal-move": [at("SOL"), at("ETH"), at("SOL"), at(null)],
       },
     });
 

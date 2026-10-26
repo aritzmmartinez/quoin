@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import {
   DASH,
@@ -11,6 +11,7 @@ import {
 import { SignedMoney } from "../SignedMoney";
 import { ThesisChip } from "../ui/ThesisChip";
 import { TABLE_CELLS, TABLE_DIVIDER, TABLE_NUM } from "../ui/table";
+import { DeferredAmount } from "./DeferredAmount";
 import {
   TAX_BREAKDOWN_GRID,
   TAX_LOT_GRID,
@@ -21,24 +22,20 @@ import {
 const BADGE =
   "shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide";
 
-export function TaxSaleItem({
-  sale,
-  windowMonths,
-}: {
-  sale: TaxSaleRow;
-  windowMonths: number;
-}) {
+export function TaxSaleItem({ sale }: { sale: TaxSaleRow }) {
   const {
     formatMoney,
     formatQuantity,
     formatDate,
     formatPercent,
+    formatPrice,
     formatSignedMoney,
   } = useFormat();
   const t = useCopy();
   const [open, setOpen] = useState(false);
   const copy = t.realized.fiscal;
   const washSale = sale.washSale;
+  const material = washSale !== null && !sale.deferralMinor;
 
   return (
     <li className={TABLE_DIVIDER}>
@@ -48,7 +45,7 @@ export function TaxSaleItem({
         aria-expanded={open}
         aria-label={open ? copy.collapse : copy.expand}
         className={`${TABLE_CELLS} ${TAX_SALE_GRID} min-h-11 w-full text-left hover:bg-surface-2 ${
-          washSale ? "border-l-2 border-negative bg-negative/4" : ""
+          material ? "border-l-2 border-negative bg-negative/4" : ""
         }`}
       >
         <span className={`${TABLE_NUM} font-normal text-muted`}>
@@ -61,7 +58,7 @@ export function TaxSaleItem({
               {sale.name}
             </span>
             <ThesisChip thesis={sale.thesis} />
-            {washSale && (
+            {material && (
               <span
                 className={`${BADGE} border-negative/40 bg-negative/10 text-negative`}
               >
@@ -74,19 +71,33 @@ export function TaxSaleItem({
               </span>
             )}
           </div>
-          {washSale && (
+          {washSale && !material && (
+            <div className="mt-0.5 text-[11.5px] leading-snug text-muted">
+              {copy.minorDeferralReason(
+                formatPercent(washSale.fraction, 1, { floorNonZero: true }),
+                formatMoney("0.01"),
+              )}
+            </div>
+          )}
+          {washSale && material && (
             <div className="mt-0.5 text-[11.5px] leading-snug text-negative">
               {copy.washSaleReason(
+                washSale.letter,
                 formatQuantity(washSale.repurchased),
                 formatQuantity(sale.quantity),
               )}
               {sale.nonComputable !== "0" &&
                 ` ${copy.ownDeferredReason(
-                  formatPercent(washSale.fraction),
+                  formatPercent(washSale.fraction, 1, { floorNonZero: true }),
                   formatSignedMoney(sale.nonComputable).text,
                 )}`}
               {sale.carriedOver !== "0" &&
                 ` ${copy.carriedOverReason(formatSignedMoney(sale.carriedOver).text)}`}
+            </div>
+          )}
+          {sale.windowOpenUntil && (
+            <div className="mt-0.5 text-[11.5px] leading-snug text-muted">
+              {copy.windowOpenReason(formatDate(sale.windowOpenUntil))}
             </div>
           )}
           {sale.unlistedRepurchaseAt && (
@@ -118,13 +129,7 @@ export function TaxSaleItem({
 
       {open && (
         <div className="border-t border-border-subtle bg-surface-2 px-gutter py-3">
-          {washSale && (
-            <WashSaleBreakdown
-              sale={sale}
-              washSale={washSale}
-              months={windowMonths}
-            />
-          )}
+          {washSale && <WashSaleBreakdown sale={sale} washSale={washSale} />}
 
           <div className="mb-2 text-[11px] uppercase tracking-[0.08em] text-muted">
             {copy.lotsTitle}
@@ -150,7 +155,7 @@ export function TaxSaleItem({
                 {formatQuantity(lot.quantity)}
               </span>
               <span className={`${TABLE_NUM} text-right`}>
-                {formatMoney(lot.unitCost, 4)}
+                {formatPrice(lot.unitCost)}
               </span>
             </div>
           ))}
@@ -163,35 +168,36 @@ export function TaxSaleItem({
 function WashSaleBreakdown({
   sale,
   washSale,
-  months,
 }: {
   sale: TaxSaleRow;
   washSale: TaxWashSaleRow;
-  months: number;
 }) {
-  const { formatQuantity, formatDate, formatPercent, formatSignedMoney } =
-    useFormat();
+  const months = washSale.windowMonths;
+  const { formatQuantity, formatDate, formatPercent } = useFormat();
   const copy = useCopy().realized.fiscal.breakdown;
 
-  const rows: [string, string][] = [
+  const rows: [string, ReactNode][] = [
     [copy.before(months), formatQuantity(washSale.before)],
     [copy.remainingAfter, formatQuantity(washSale.remainingAfter)],
     [copy.repurchaseBefore, formatQuantity(washSale.repurchaseBefore)],
     [copy.repurchaseAfter(months), formatQuantity(washSale.repurchaseAfter)],
     [copy.repurchased, formatQuantity(washSale.repurchased)],
-    [copy.share, formatPercent(washSale.fraction, 2)],
+    [copy.share, formatPercent(washSale.fraction, 2, { floorNonZero: true })],
   ];
   if (sale.nonComputable !== "0") {
-    rows.push([copy.nonComputable, formatSignedMoney(sale.nonComputable).text]);
+    rows.push([
+      copy.nonComputable,
+      <DeferredAmount value={sale.nonComputable} />,
+    ]);
   }
   if (sale.carriedOver !== "0") {
-    rows.push([copy.carriedOver, formatSignedMoney(sale.carriedOver).text]);
+    rows.push([copy.carriedOver, <DeferredAmount value={sale.carriedOver} />]);
   }
 
   return (
     <div className="mb-4">
       <div className="mb-2 text-[11px] uppercase tracking-[0.08em] text-muted">
-        {copy.title}
+        {copy.title[washSale.letter]}
       </div>
       {rows.map(([label, value]) => (
         <div
@@ -227,7 +233,7 @@ function WashSaleBreakdown({
             {formatQuantity(r.quantity)}
           </span>
           <span className={`${TABLE_NUM} text-right`}>
-            <SignedMoney value={r.deferredLoss} />
+            <DeferredAmount value={r.deferredLoss} />
           </span>
         </div>
       ))}

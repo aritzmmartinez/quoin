@@ -277,7 +277,9 @@ and a superseded scale is a wrong number that looks right.
 Never cite an NF 13/2013 article number that has not been checked against the actual text.
 Two were fabricated during development (`Art. 47.2`, `Art. 71` — both plausible, both
 wrong; the real ones are Art. 43 and Art. 66). A guessed-but-plausible citation invites a
-trust nobody earned.
+trust nobody earned. `Art. 47.2` was wrong as the repurchase rule; since NF 6/2025 it exists
+with other content (FIFO for fungible crypto-assets of the same type, NF 13/2013 consolidated
+at 01/01/2026) and is cited only for that.
 
 ## Persistence (Prisma 7 + SQLite)
 

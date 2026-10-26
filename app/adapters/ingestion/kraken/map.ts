@@ -7,28 +7,45 @@ import {
   instrumentSchema,
   tradeEventSchema,
   type Instrument,
+  type ValuationSource,
 } from "~/core/domain";
 import type { PriceSnapshot } from "~/core/ports";
+import { snapshotKnownAt } from "~/core/prices";
 import { atOrBefore } from "~/core/series";
 
-import type { DiscardReason, MappedItem } from "../ingest";
-import type { KrakenRow } from "./row";
+import { cryptoInstrumentId } from "../crypto-id";
+import type { DiscardReason, MappedItem, NoticeReason } from "../ingest";
+import { parseTime, type KrakenRow } from "./row";
+
+export const REWARD_NOTE = "kraken-reward";
+export const ACCOUNT_TRANSFER_NOTE = "kraken-account-transfer";
+
+const INTERNAL_EARN = new Set([
+  "allocation",
+  "deallocation",
+  "migration",
+  "autoallocation",
+]);
+
+function detailOf(row: KrakenRow, instrument: string | null) {
+  return {
+    date: parseTime(row.time).toISOString(),
+    type: row.type,
+    subtype: row.subtype || null,
+    instrument,
+  };
+}
 
 function discard(
   reason: DiscardReason,
   row: KrakenRow,
   instrument: string | null = row.asset || null,
-): MappedItem {
-  return {
-    kind: "discard",
-    reason,
-    detail: {
-      date: parseTime(row.time).toISOString(),
-      type: row.type,
-      subtype: row.subtype || null,
-      instrument,
-    },
-  };
+): Extract<MappedItem, { kind: "discard" }> {
+  return { kind: "discard", reason, detail: detailOf(row, instrument) };
+}
+
+function notice(reason: NoticeReason, row: KrakenRow): MappedItem {
+  return { kind: "notice", reason, detail: detailOf(row, row.asset || null) };
 }
 
 function unsupported(row: KrakenRow): MappedItem {
@@ -44,8 +61,6 @@ export type PriceAt = (instrumentId: string, ts: Date) => PricedAt | null;
 
 const MAX_PRICE_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
-const asOfTime = (snapshot: PriceSnapshot) => snapshot.asOf.getTime();
-
 export function priceLookupFrom(snapshots: readonly PriceSnapshot[]): PriceAt {
   const byInstrument = new Map<string, PriceSnapshot[]>();
   for (const snapshot of snapshots) {
@@ -54,7 +69,7 @@ export function priceLookupFrom(snapshots: readonly PriceSnapshot[]): PriceAt {
     byInstrument.set(snapshot.instrumentId, list);
   }
   for (const list of byInstrument.values()) {
-    list.sort((a, b) => asOfTime(a) - asOfTime(b));
+    list.sort((a, b) => snapshotKnownAt(a) - snapshotKnownAt(b));
   }
 
   return (instrumentId, ts) => {
@@ -62,7 +77,7 @@ export function priceLookupFrom(snapshots: readonly PriceSnapshot[]): PriceAt {
     if (!history) return null;
     const close = atOrBefore(
       history,
-      asOfTime,
+      snapshotKnownAt,
       ts.getTime(),
       MAX_PRICE_AGE_MS,
     );
@@ -70,27 +85,39 @@ export function priceLookupFrom(snapshots: readonly PriceSnapshot[]): PriceAt {
   };
 }
 
-const BTC: Instrument = instrumentSchema.parse({
-  id: "BTC",
-  name: "Bitcoin",
-  type: "CRYPTO",
-  assetClass: "crypto",
-});
+const NAMES: Readonly<Record<string, string>> = { BTC: "Bitcoin" };
 
-function parseTime(time: string): Date {
-  return new Date(`${time.replace(" ", "T")}Z`);
+function cryptoInstrument(code: string): Instrument | null {
+  const id = cryptoInstrumentId(code);
+  if (id === null) return null;
+  return instrumentSchema.parse({
+    id,
+    name: NAMES[id] ?? id,
+    type: "CRYPTO",
+    assetClass: "crypto",
+  });
+}
+
+export function krakenCryptoIds(rows: readonly KrakenRow[]): string[] {
+  const ids = new Set<string>();
+  for (const row of rows) {
+    if (isFiat(row)) continue;
+    const id = cryptoInstrumentId(row.asset);
+    if (id !== null) ids.add(id);
+  }
+  return [...ids].sort();
 }
 
 function isFiat(row: KrakenRow): boolean {
   return row.subclass === "fiat";
 }
 
-function isBtc(row: KrakenRow): boolean {
-  return row.asset === "BTC";
-}
-
 function abs(value: string): string {
   return new Decimal(value || "0").abs().toFixed();
+}
+
+function net(row: KrakenRow): Decimal {
+  return new Decimal(row.amount || "0").minus(row.fee || "0");
 }
 
 export function groupByRefid(rows: KrakenRow[]): Map<string, KrakenRow[]> {
@@ -103,80 +130,311 @@ export function groupByRefid(rows: KrakenRow[]): Map<string, KrakenRow[]> {
   return groups;
 }
 
+function isSpotWallet(row: KrakenRow): boolean {
+  return row.wallet.split(" / ")[0] === "spot";
+}
+
+/**
+ * Units that leave spot for Earn are still the user's, so no event. This is
+ * checked against a real export for the one shape seen, a negative
+ * `hybridearnwithdrawal` in a spot wallet, and not widened by the name: the
+ * opposite direction can carry yield as well as the principal, and counting it
+ * as internal would lose the yield without a word (`earn-return-unverified`).
+ */
+function isSpotToEarn(row: KrakenRow): boolean {
+  return (
+    row.type === "hybridearnwithdrawal" &&
+    isSpotWallet(row) &&
+    new Decimal(row.amount || "0").isNegative()
+  );
+}
+
+export function isInternalMove(row: KrakenRow): boolean {
+  if (row.type === "transfer") return row.subtype !== "useraccounttransfer";
+  if (isSpotToEarn(row)) return true;
+  return row.type === "earn" && INTERNAL_EARN.has(row.subtype ?? "");
+}
+
 export function mapGroup(
   rows: KrakenRow[],
   priceAt: PriceAt = () => null,
 ): MappedItem[] {
-  const refid = rows[0]!.refid;
+  const first = rows[0]!;
+  const refid = first.refid;
+
+  if (rows.every(isInternalMove)) return [discard("internal-move", first)];
+
   const spend = rows.find((r) => r.type === "spend");
   const receive = rows.find((r) => r.type === "receive");
-
-  if (spend && receive) {
+  if (spend && receive && rows.length === 2) {
     const pair = `${spend.asset} → ${receive.asset}`;
-    if (isBtc(receive) && isFiat(spend))
-      return [trade(refid, "BUY", spend, receive)];
-    if (isBtc(spend) && isFiat(receive))
-      return [trade(refid, "SELL", receive, spend)];
+    if (isFiat(spend) && isFiat(receive)) return [unsupported(receive)];
+    if (!isFiat(spend) && !isFiat(receive))
+      return swap(refid, spend, receive, pair, priceAt);
+    const crypto = isFiat(spend) ? receive : spend;
+    const instrument = cryptoInstrument(crypto.asset);
+    if (instrument === null) return [discard("invalid-crypto-code", crypto)];
+    return isFiat(spend)
+      ? [buy(refid, instrument, spend, receive)]
+      : [sell(refid, instrument, receive, spend)];
+  }
+
+  if (rows.length !== 1) return [unsupported(first)];
+
+  switch (first.type) {
+    case "deposit":
+    case "withdrawal":
+      if (isFiat(first))
+        return [
+          cash(
+            refid,
+            first,
+            first.type === "deposit" ? "DEPOSIT" : "WITHDRAWAL",
+          ),
+        ];
+      return [discard("crypto-transfer", first)];
+    case "transfer":
+      if (!isFiat(first)) return [discard("crypto-transfer", first)];
+      return [
+        cash(
+          refid,
+          first,
+          new Decimal(first.amount).isNegative() ? "WITHDRAWAL" : "DEPOSIT",
+          ACCOUNT_TRANSFER_NOTE,
+        ),
+        notice("account-transfer", first),
+      ];
+    case "reward":
+      return reward(refid, first, priceAt);
+    case "earn":
+      return first.subtype === "reward"
+        ? reward(refid, first, priceAt)
+        : [unsupported(first)];
+    case "hybridearnwithdrawal":
+      return [discard("earn-return-unverified", first)];
+    default:
+      return [unsupported(first)];
+  }
+}
+
+function tradeEvent(
+  refid: string,
+  instrument: Instrument,
+  type: "BUY" | "SELL",
+  fiat: KrakenRow,
+  quantity: Decimal,
+  fiatAmount: Decimal,
+) {
+  return tradeEventSchema.parse({
+    id: crypto.randomUUID(),
+    ts: parseTime(fiat.time),
+    type,
+    instrumentId: instrument.id,
+    quantity: quantity.toFixed(),
+    price: quantity.isZero() ? "0" : fiatAmount.dividedBy(quantity).toFixed(),
+    grossAmount: fiatAmount.toFixed(),
+    fees: abs(fiat.fee),
+    currency: fiat.asset,
+    account: "kraken",
+    source: "KRAKEN_CSV",
+    externalId: refid,
+    note: null,
+  });
+}
+
+function buy(
+  refid: string,
+  instrument: Instrument,
+  fiat: KrakenRow,
+  received: KrakenRow,
+): MappedItem {
+  return {
+    kind: "domain",
+    instrument,
+    event: tradeEvent(
+      refid,
+      instrument,
+      "BUY",
+      fiat,
+      net(received),
+      new Decimal(abs(fiat.amount)),
+    ),
+  };
+}
+
+function sell(
+  refid: string,
+  instrument: Instrument,
+  fiat: KrakenRow,
+  delivered: KrakenRow,
+): MappedItem {
+  return {
+    kind: "domain",
+    instrument,
+    event: tradeEvent(
+      refid,
+      instrument,
+      "SELL",
+      fiat,
+      net(delivered).abs(),
+      new Decimal(abs(fiat.amount)),
+    ),
+  };
+}
+
+interface SwapLegValue {
+  gross: Decimal;
+  fee: Decimal;
+  currency: string;
+  valuationSource: ValuationSource;
+}
+
+function swapLegValue(
+  row: KrakenRow,
+  instrument: Instrument,
+  priceAt: PriceAt,
+  received: boolean,
+): SwapLegValue | null {
+  const fee = new Decimal(row.fee || "0");
+  const amount = new Decimal(row.amount || "0").abs();
+
+  if (row.amountusd && (fee.isZero() || row.feeusd)) {
+    const usd = new Decimal(row.amountusd).abs();
+    const feeUsd = new Decimal(row.feeusd || "0");
+    return {
+      gross: received ? usd.minus(feeUsd) : usd.plus(feeUsd),
+      fee: received ? feeUsd : new Decimal(0),
+      currency: "USD",
+      valuationSource: "kraken-amountusd",
+    };
+  }
+
+  const priced = priceAt(instrument.id, parseTime(row.time));
+  if (priced === null) return null;
+  const worth = (quantity: Decimal) =>
+    new Decimal(
+      Money.fromString(priced.price).scaleBy(quantity.toFixed()).toString(),
+    );
+  return {
+    gross: received ? worth(amount.minus(fee)) : worth(amount.plus(fee)),
+    fee: received ? worth(fee) : new Decimal(0),
+    currency: priced.currency,
+    valuationSource: "yahoo",
+  };
+}
+
+function swap(
+  refid: string,
+  spend: KrakenRow,
+  receive: KrakenRow,
+  pair: string,
+  priceAt: PriceAt,
+): MappedItem[] {
+  const delivered = cryptoInstrument(spend.asset);
+  const arrived = cryptoInstrument(receive.asset);
+  if (delivered === null) return [discard("invalid-crypto-code", spend)];
+  if (arrived === null) return [discard("invalid-crypto-code", receive)];
+
+  const deliveredQuantity = net(spend).abs();
+  const receivedQuantity = net(receive);
+  if (deliveredQuantity.isZero() || !receivedQuantity.isPositive())
+    return [unsupported(receive)];
+
+  const out = swapLegValue(spend, delivered, priceAt, false);
+  const into = swapLegValue(receive, arrived, priceAt, true);
+  if (out === null || into === null) {
+    const unpriced = [
+      ...(out === null ? [delivered.id] : []),
+      ...(into === null ? [arrived.id] : []),
+    ];
     return [
-      discard(
-        isBtc(spend) || isBtc(receive) ? "crypto-swap" : "unmodelled-asset",
-        receive,
-        pair,
-      ),
+      {
+        kind: "discard",
+        reason: "swap-unpriced",
+        detail: {
+          ...detailOf(receive, pair),
+          unpriced,
+        },
+        instrument: delivered,
+        related: [arrived],
+      },
     ];
   }
 
-  if (rows.length === 1) {
-    const row = rows[0]!;
-    switch (row.type) {
-      case "deposit":
-      case "withdrawal":
-        if (isFiat(row))
-          return [
-            cash(refid, row, row.type === "deposit" ? "DEPOSIT" : "WITHDRAWAL"),
-          ];
-        return [
-          discard(isBtc(row) ? "crypto-transfer" : "unmodelled-asset", row),
-        ];
-      case "reward":
-      case "earn":
-        return isBtc(row)
-          ? reward(refid, row, priceAt)
-          : [discard("unmodelled-asset", row)];
-      default:
-        return [unsupported(row)];
-    }
-  }
-
-  return [unsupported(rows[0]!)];
-}
-
-function trade(
-  refid: string,
-  type: "BUY" | "SELL",
-  fiat: KrakenRow,
-  cryptoLeg: KrakenRow,
-): MappedItem {
-  const paid = new Decimal(abs(fiat.amount));
-  const btc = new Decimal(abs(cryptoLeg.amount));
-  return {
-    kind: "domain",
-    instrument: BTC,
-    event: tradeEventSchema.parse({
+  const leg = (
+    type: "BUY" | "SELL",
+    row: KrakenRow,
+    instrument: Instrument,
+    quantity: Decimal,
+    value: SwapLegValue,
+    suffix: "buy" | "sell",
+  ) =>
+    tradeEventSchema.parse({
       id: crypto.randomUUID(),
-      ts: parseTime(fiat.time),
+      ts: parseTime(row.time),
       type,
-      instrumentId: "BTC",
-      quantity: btc.toFixed(),
-      price: btc.isZero() ? "0" : paid.dividedBy(btc).toFixed(),
-      grossAmount: paid.toFixed(),
-      fees: abs(fiat.fee),
-      currency: fiat.asset,
+      instrumentId: instrument.id,
+      quantity: quantity.toFixed(),
+      price: value.gross.dividedBy(quantity).toFixed(),
+      grossAmount: value.gross.toFixed(),
+      fees: value.fee.toFixed(),
+      currency: value.currency,
       account: "kraken",
       source: "KRAKEN_CSV",
-      externalId: refid,
+      externalId: `${refid}:${suffix}`,
       note: null,
-    }),
+      linkId: refid,
+      linkKind: "swap",
+      valuationSource: value.valuationSource,
+    });
+
+  return [
+    {
+      kind: "domain",
+      instrument: delivered,
+      event: leg("SELL", spend, delivered, deliveredQuantity, out, "sell"),
+    },
+    {
+      kind: "domain",
+      instrument: arrived,
+      event: leg("BUY", receive, arrived, receivedQuantity, into, "buy"),
+    },
+  ];
+}
+
+interface RewardValue {
+  price: string;
+  grossAmount: string;
+  currency: string;
+  valuationSource: ValuationSource;
+}
+
+function valueAtKraken(row: KrakenRow, quantity: Decimal): RewardValue | null {
+  if (!row.amountusd) return null;
+  const usd = new Decimal(row.amountusd).minus(row.feeusd || "0");
+  return {
+    price: usd.dividedBy(quantity).toFixed(),
+    grossAmount: usd.toFixed(),
+    currency: "USD",
+    valuationSource: "kraken-amountusd",
+  };
+}
+
+function valueFromHistory(
+  instrument: Instrument,
+  ts: Date,
+  quantity: Decimal,
+  priceAt: PriceAt,
+): RewardValue | null {
+  const priced = priceAt(instrument.id, ts);
+  if (priced === null) return null;
+  return {
+    price: priced.price,
+    grossAmount: Money.fromString(priced.price)
+      .scaleBy(quantity.toFixed())
+      .toString(),
+    currency: priced.currency,
+    valuationSource: "yahoo",
   };
 }
 
@@ -191,33 +449,38 @@ function trade(
  * dedup key.
  */
 function reward(refid: string, row: KrakenRow, priceAt: PriceAt): MappedItem[] {
-  const ts = parseTime(row.time);
-  const priced = priceAt("BTC", ts);
-  if (priced === null)
-    return [{ ...discard("reward-unpriced", row), instrument: BTC }];
+  const instrument = cryptoInstrument(row.asset);
+  if (instrument === null) return [discard("invalid-crypto-code", row)];
 
-  const { price, currency } = priced;
-  const quantity = abs(row.amount);
-  const grossAmount = Money.fromString(price).scaleBy(quantity).toString();
+  const ts = parseTime(row.time);
+  const quantity = net(row);
+  if (!quantity.isPositive()) return [unsupported(row)];
+
+  const value =
+    valueAtKraken(row, quantity) ??
+    valueFromHistory(instrument, ts, quantity, priceAt);
+  if (value === null)
+    return [{ ...discard("reward-unpriced", row), instrument }];
 
   const acquisition: MappedItem = {
     kind: "domain",
-    instrument: BTC,
+    instrument,
     event: tradeEventSchema.parse({
       id: crypto.randomUUID(),
       ts,
       type: "BUY",
-      instrumentId: "BTC",
-      quantity,
-      price,
-      grossAmount,
+      instrumentId: instrument.id,
+      quantity: quantity.toFixed(),
+      price: value.price,
+      grossAmount: value.grossAmount,
       fees: "0",
       funding: "IN_KIND",
-      currency,
+      currency: value.currency,
       account: "kraken",
       source: "KRAKEN_CSV",
       externalId: refid,
-      note: "kraken-reward",
+      note: REWARD_NOTE,
+      valuationSource: value.valuationSource,
     }),
   };
 
@@ -228,15 +491,16 @@ function reward(refid: string, row: KrakenRow, priceAt: PriceAt): MappedItem[] {
       id: crypto.randomUUID(),
       ts,
       type: "DIVIDEND",
-      instrumentId: "BTC",
-      grossAmount,
+      instrumentId: instrument.id,
+      grossAmount: value.grossAmount,
       taxWithheld: "0",
       funding: "IN_KIND",
-      currency,
+      currency: value.currency,
       account: "kraken",
       source: "KRAKEN_CSV",
       externalId: `${refid}:income`,
       note: "kraken-reward-income",
+      valuationSource: value.valuationSource,
     }),
   };
 
@@ -255,6 +519,7 @@ function cash(
   refid: string,
   row: KrakenRow,
   type: "DEPOSIT" | "WITHDRAWAL",
+  note: string | null = null,
 ): MappedItem {
   return {
     kind: "domain",
@@ -268,7 +533,7 @@ function cash(
       account: "kraken",
       source: "KRAKEN_CSV",
       externalId: refid,
-      note: null,
+      note,
     }),
   };
 }

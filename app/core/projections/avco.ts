@@ -6,7 +6,8 @@ import {
   type Revalue,
   type TradeEvent,
 } from "../domain";
-import { baseOf, bookable } from "../fx";
+import { bookable } from "../fx";
+import { tradeAmounts } from "../swap";
 
 export interface AvcoLot {
   instrumentId: string;
@@ -43,6 +44,7 @@ export function walkAvco(
     .filter(isTrade)
     .slice()
     .sort((a, b) => a.ts.getTime() - b.ts.getTime());
+  const amountsOf = tradeAmounts(trades);
 
   const restate: Revalue = revalue ?? ((money) => money);
   const lots = new Map<string, AvcoLot>();
@@ -63,8 +65,9 @@ export function walkAvco(
     }
 
     const quantity = new Decimal(trade.quantity);
-    const gross = restate(baseOf(trade, "grossAmount"), trade.ts);
-    const fees = restate(baseOf(trade, "fees"), trade.ts);
+    const amounts = amountsOf(trade);
+    const gross = restate(amounts.gross, trade.ts);
+    const fees = restate(amounts.fees, trade.ts);
 
     if (trade.type === "BUY") {
       lot.acquiredAt = blendAcquisition(lot, quantity, trade.ts);

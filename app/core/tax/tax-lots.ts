@@ -2,7 +2,7 @@ import Decimal from "decimal.js";
 
 import { Money, type LedgerEvent, type Revalue } from "../domain";
 
-import type { Territory } from "./config";
+import type { RepurchaseLetter, Territory } from "./config";
 import {
   walkDeferredLosses,
   type DeferredLossPiece,
@@ -10,10 +10,13 @@ import {
 } from "./deferred-loss";
 import { sortTrades, walkFifo, type FifoSale } from "./fifo";
 import { fiscalYearOf } from "./fiscal-year";
-import type { WashSaleAssessment, WashSaleWindow } from "./wash-sale";
+import type {
+  RepurchaseScope,
+  WashSaleAssessment,
+  WashSaleWindow,
+} from "./wash-sale";
 
-export interface TaxOptions {
-  unlistedInstrumentIds: ReadonlySet<string>;
+export interface TaxOptions extends RepurchaseScope {
   revalue?: Revalue;
 }
 
@@ -37,6 +40,8 @@ export interface WashSaleRecipientDetail {
 }
 
 export interface WashSaleDetail {
+  letter: RepurchaseLetter;
+  windowMonths: number;
   window: WashSaleWindow;
   before: string;
   remainingAfter: string;
@@ -66,7 +71,13 @@ export interface RealizedGainDetail {
   nonComputable: string;
   carriedOver: string;
   washSale: WashSaleDetail | null;
+  repurchaseWindow: RepurchaseWindowDetail | null;
   unlistedNotice: UnlistedNoticeDetail | null;
+}
+
+export interface RepurchaseWindowDetail {
+  letter: RepurchaseLetter;
+  window: WashSaleWindow;
 }
 
 export interface DeferredLossIntegration {
@@ -95,6 +106,7 @@ export interface TaxYearResult {
 }
 
 export interface TaxHistory {
+  territory: Territory;
   gains: RealizedGainDetail[];
   integrations: DeferredLossIntegration[];
   pendingByYear: Map<number, PendingDeferredLossDetail[]>;
@@ -107,11 +119,7 @@ export function computeTaxHistory(
   const walk = walkFifo(events, options.revalue);
   const trades = sortTrades(events);
   const tradesById = new Map(trades.map((t) => [t.id, t]));
-  const deferrals = walkDeferredLosses(
-    walk.sales,
-    trades,
-    options.unlistedInstrumentIds,
-  );
+  const deferrals = walkDeferredLosses(walk.sales, trades, options);
 
   const gains: RealizedGainDetail[] = [];
   const integrations: DeferredLossIntegration[] = [];
@@ -129,6 +137,9 @@ export function computeTaxHistory(
         assessment && assessment.repurchased.gt(0)
           ? washSaleDetail(assessment, deferral.shares)
           : null,
+      repurchaseWindow: assessment
+        ? { letter: assessment.rule.letter, window: assessment.window }
+        : null,
       unlistedNotice: notice
         ? { buyEventId: notice.buyEventId, buyTs: notice.buyTs }
         : null,
@@ -153,7 +164,7 @@ export function computeTaxHistory(
     ]),
   );
 
-  return { gains, integrations, pendingByYear };
+  return { territory: options.territory, gains, integrations, pendingByYear };
 }
 
 export function taxYearOf(history: TaxHistory, year: number): TaxYearResult {
@@ -175,7 +186,7 @@ export function taxYearOf(history: TaxHistory, year: number): TaxYearResult {
 
   return {
     year,
-    territory: "bizkaia",
+    territory: history.territory,
     gains,
     integrations,
     pending,
@@ -199,6 +210,7 @@ function saleFigures(
   | "nonComputable"
   | "carriedOver"
   | "washSale"
+  | "repurchaseWindow"
   | "unlistedNotice"
 > {
   return {
@@ -227,6 +239,8 @@ function washSaleDetail(
     shares.map((s) => [s.buyEventId, total(s.pieces)]),
   );
   return {
+    letter: assessment.rule.letter,
+    windowMonths: assessment.rule.windowMonths,
     window: assessment.window,
     before: assessment.before.toFixed(),
     remainingAfter: assessment.remainingAfter.toFixed(),

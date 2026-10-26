@@ -12,13 +12,14 @@ import {
   type LedgerRepository,
 } from "~/core/ports";
 
-import type { DiscardDetail, DiscardReason } from "./discard";
+import type { DiscardDetail, DiscardReason, NoticeReason } from "./discard";
 import { noRates, type RateAt } from "./fx";
 
-export type { DiscardDetail, DiscardReason } from "./discard";
+export type { DiscardDetail, DiscardReason, NoticeReason } from "./discard";
 
 export type DiscardCounts = Partial<Record<DiscardReason, number>>;
 export type DiscardDetails = Partial<Record<DiscardReason, DiscardDetail[]>>;
+export type NoticeDetails = Partial<Record<NoticeReason, DiscardDetail[]>>;
 
 export type MappedItem =
   | { kind: "domain"; instrument: Instrument | null; event: LedgerEvent }
@@ -27,7 +28,9 @@ export type MappedItem =
       reason: DiscardReason;
       detail?: DiscardDetail;
       instrument?: Instrument;
-    };
+      related?: readonly Instrument[];
+    }
+  | { kind: "notice"; reason: NoticeReason; detail: DiscardDetail };
 
 export interface MappedBatch {
   total: number;
@@ -36,6 +39,7 @@ export interface MappedBatch {
   operationOf: number[];
   discarded: DiscardCounts;
   discardedDetails: DiscardDetails;
+  noticed: NoticeDetails;
   errors: number;
   ratesNeeded: Map<string, string>;
 }
@@ -46,6 +50,7 @@ export interface ImportSummary {
   duplicates: number;
   discarded: DiscardCounts;
   discardedDetails: DiscardDetails;
+  noticed: NoticeDetails;
   errors: number;
   instruments: number;
 }
@@ -73,6 +78,7 @@ export class BatchBuilder {
   private readonly instruments = new Map<string, Instrument>();
   private readonly discarded: DiscardCounts = {};
   private readonly discardedDetails: DiscardDetails = {};
+  private readonly noticed: NoticeDetails = {};
   private errors = 0;
   private readonly ratesNeeded = new Map<string, string>();
 
@@ -124,7 +130,17 @@ export class BatchBuilder {
     }
   }
 
+  addNotice(reason: NoticeReason, detail: DiscardDetail): void {
+    const list = this.noticed[reason] ?? [];
+    list.push(detail);
+    this.noticed[reason] = list;
+  }
+
   private addItem(item: MappedItem, operation: number): void {
+    if (item.kind === "notice") {
+      this.addNotice(item.reason, item.detail);
+      return;
+    }
     if (item.kind === "discard") {
       this.discarded[item.reason] = (this.discarded[item.reason] ?? 0) + 1;
       if (item.detail) {
@@ -132,8 +148,8 @@ export class BatchBuilder {
         list.push(item.detail);
         this.discardedDetails[item.reason] = list;
       }
-      if (item.instrument) {
-        this.instruments.set(item.instrument.id, item.instrument);
+      for (const instrument of [item.instrument, ...(item.related ?? [])]) {
+        if (instrument) this.instruments.set(instrument.id, instrument);
       }
       return;
     }
@@ -162,6 +178,7 @@ export class BatchBuilder {
       operationOf: this.operationOf,
       discarded: this.discarded,
       discardedDetails: this.discardedDetails,
+      noticed: this.noticed,
       errors: this.errors,
       ratesNeeded: this.ratesNeeded,
     };
@@ -214,6 +231,7 @@ function summarize(
     duplicates: counts.duplicates,
     discarded: batch.discarded,
     discardedDetails: batch.discardedDetails,
+    noticed: batch.noticed,
     errors: batch.errors,
     instruments: batch.instruments.length,
   };

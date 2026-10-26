@@ -69,7 +69,7 @@ describe("counting by operation", () => {
       { kind: "domain", instrument: null, event: event("R2") },
       { kind: "domain", instrument: null, event: event("R2:income") },
     ]);
-    builder.addOperation([{ kind: "discard", reason: "unmodelled-asset" }]);
+    builder.addOperation([{ kind: "discard", reason: "internal-move" }]);
     builder.addOperation([
       { kind: "domain", instrument: null, event: event("D1") },
     ]);

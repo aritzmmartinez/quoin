@@ -279,4 +279,53 @@ describe("PrismaLedgerRepository (integration)", () => {
     );
     expect(stored && "funding" in stored && stored.funding).toBe("IN_KIND");
   });
+
+  it("stores the link between two rows as plain columns", async () => {
+    await ledgerRepo.append([
+      {
+        ...event("swap-1:sell"),
+        type: "SELL",
+        linkId: "swap-1",
+        linkKind: "swap",
+      } as LedgerEvent,
+      {
+        ...event("swap-1:buy"),
+        linkId: "swap-1",
+        linkKind: "swap",
+      } as LedgerEvent,
+    ]);
+    const stored = (await ledgerRepo.list()).filter(
+      (e) => e.linkId === "swap-1",
+    );
+    expect(stored.map((e) => e.linkKind)).toEqual(["swap", "swap"]);
+    expect(stored.map((e) => e.type).sort()).toEqual(["BUY", "SELL"]);
+  });
+
+  it("stores where a value came from, as a plain column next to the CHECKs", async () => {
+    await ledgerRepo.append([
+      {
+        ...event("v-1"),
+        funding: "IN_KIND",
+        valuationSource: "kraken-amountusd",
+      } as LedgerEvent,
+    ]);
+    const stored = (await ledgerRepo.list()).find(
+      (e) => e.externalId === "v-1",
+    );
+    expect(stored?.valuationSource).toBe("kraken-amountusd");
+
+    const { prisma } = await import("./index");
+    const [table] = await prisma.$queryRaw<{ sql: string }[]>`
+      SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'LedgerEntry'`;
+    expect(table?.sql).not.toContain("valuationSource_check");
+    expect(table?.sql).not.toContain("linkKind_check");
+    for (const name of [
+      "LedgerEntry_type_check",
+      "LedgerEntry_funding_check",
+      "LedgerEntry_fxDirection_check",
+      "LedgerEntry_fxSource_check",
+    ]) {
+      expect(table?.sql).toContain(name);
+    }
+  });
 });

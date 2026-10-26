@@ -54,6 +54,15 @@ describe("planDailyWrite — one row per Madrid day once its candle exists", () 
     expect(plan.write.map((s) => s.price)).toEqual(["101.000000"]);
   });
 
+  it("a candle equal in value to the stored one, written differently, is no correction", () => {
+    const plan = planDailyWrite(
+      [row("same", "2026-10-09T07:00:00Z", "YAHOO", "100.000000")],
+      [snap("2026-10-09T07:00:00Z", "YAHOO", "100")],
+      null,
+    );
+    expect(plan).toMatchObject({ write: [], inserted: 0, corrected: 0 });
+  });
+
   it("a candle already stored as it is writes nothing", () => {
     const plan = planDailyWrite(
       [row("same", "2026-10-09T07:00:00Z")],

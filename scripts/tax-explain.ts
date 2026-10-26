@@ -11,7 +11,6 @@ import { toCalendarDate, toIsoDate } from "~/core/calendar";
 import { Money } from "~/core/domain";
 import {
   FISCAL_TIME_ZONE,
-  WASH_SALE_WINDOW_MONTHS,
   carryforwardFrom,
   computeSavingsQuota,
   computeTaxHistory,
@@ -19,7 +18,13 @@ import {
   taxYearOf,
   type RealizedGainDetail,
 } from "~/core/tax";
-import { taxExclusions, unlistedInstrumentIds } from "~/lib/tax";
+import { todayInMadrid } from "~/lib/format";
+import {
+  taxExclusions,
+  taxOptionsFor,
+  unclassifiedSales,
+  windowOpenUntil,
+} from "~/lib/tax";
 import { announceDatabase } from "./lib/db-target";
 
 const YEAR = Number(
@@ -40,6 +45,8 @@ function day(t: Date): string {
   return toIsoDate(toCalendarDate(t, FISCAL_TIME_ZONE));
 }
 
+const TODAY = todayInMadrid();
+
 function printSale(gain: RealizedGainDetail, names: Map<string, string>): void {
   const name = names.get(gain.instrumentId) ?? gain.instrumentId;
   const flag = gain.washSale
@@ -53,10 +60,17 @@ function printSale(gain: RealizedGainDetail, names: Map<string, string>): void {
       `  pnl ${eur(gain.realizedPnL)}  ${name}${flag}`,
   );
 
+  const openUntil = windowOpenUntil(gain, TODAY);
+  if (openUntil) {
+    console.log(
+      `      window open until ${openUntil}: a purchase before then can still defer this loss`,
+    );
+  }
+
   const ws = gain.washSale;
   if (ws) {
     console.log(
-      `      window: [${toIsoDate(ws.window.start)} .. ${toIsoDate(ws.window.end)}]  (sale ± ${WASH_SALE_WINDOW_MONTHS}m, Madrid)`,
+      `      window: [${toIsoDate(ws.window.start)} .. ${toIsoDate(ws.window.end)}]  (Art. 43.${ws.letter}, sale ± ${ws.windowMonths}m, Madrid)`,
     );
     console.log(
       `      before ${ws.before}  R ${ws.remainingAfter}  repurchase_before ${ws.repurchaseBefore}` +
@@ -109,9 +123,17 @@ async function main(): Promise<void> {
     );
   }
 
-  const history = computeTaxHistory(events, {
-    unlistedInstrumentIds: unlistedInstrumentIds(instruments),
-  });
+  const unclassified = unclassifiedSales(events, instruments);
+  if (unclassified.length > 0) {
+    console.log(
+      `! No repurchase rule: ${unclassified.join(", ")}.\n` +
+        "  A bond, commodity or cash instrument is neither a listed security\n" +
+        "  nor a crypto asset, so its sales are computed with no repurchase\n" +
+        "  rule. Check them before using these figures in a tax return.\n",
+    );
+  }
+
+  const history = computeTaxHistory(events, taxOptionsFor(instruments));
   const saleDays = new Map(history.gains.map((g) => [g.eventId, day(g.ts)]));
   const result = taxYearOf(history, YEAR);
 

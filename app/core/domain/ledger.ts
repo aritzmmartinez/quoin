@@ -53,6 +53,12 @@ export type FxSource = z.infer<typeof fxSourceSchema>;
 export const fxDirectionSchema = z.enum(["QUOTE_PER_BASE", "BASE_PER_QUOTE"]);
 export type FxDirection = z.infer<typeof fxDirectionSchema>;
 
+export const valuationSourceSchema = z.enum(["kraken-amountusd", "yahoo"]);
+export type ValuationSource = z.infer<typeof valuationSourceSchema>;
+
+export const linkKindSchema = z.enum(["swap"]);
+export type LinkKind = z.infer<typeof linkKindSchema>;
+
 const baseEventSchema = z.object({
   id: z.string(),
   ts: z.date(),
@@ -63,6 +69,9 @@ const baseEventSchema = z.object({
   fxDirection: fxDirectionSchema.nullish(),
   originalAmount: decimalString.nullish(),
   originalCurrency: z.string().nullish(),
+  valuationSource: z.string().nullish(),
+  linkId: z.string().nullish(),
+  linkKind: z.string().nullish(),
   account: z.string(),
   source: z.string(),
   externalId: z.string().nullish(),
@@ -133,6 +142,30 @@ export const ledgerEventWriteSchema = ledgerEventSchema.superRefine(
     const issue = (message: string) =>
       ctx.addIssue({ code: "custom", message });
 
+    if (
+      event.valuationSource != null &&
+      !valuationSourceSchema.safeParse(event.valuationSource).success
+    ) {
+      issue(`Unknown valuation source "${event.valuationSource}"`);
+    }
+
+    if (
+      event.linkKind != null &&
+      !linkKindSchema.safeParse(event.linkKind).success
+    ) {
+      issue(`Unknown link kind "${event.linkKind}"`);
+    }
+    if ((event.linkId == null) !== (event.linkKind == null)) {
+      issue("A link needs both its id and its kind, or neither");
+    }
+    if (
+      event.linkKind === "swap" &&
+      event.type !== "BUY" &&
+      event.type !== "SELL"
+    ) {
+      issue("A swap leg is a purchase or a sale");
+    }
+
     if (source === "IDENTITY") {
       if (event.currency !== BASE_CURRENCY) {
         issue(
@@ -164,6 +197,10 @@ export const ledgerEventWriteSchema = ledgerEventSchema.superRefine(
 
 export function isInKind(event: LedgerEvent): boolean {
   return "funding" in event && event.funding === "IN_KIND";
+}
+
+export function isSwapLeg(event: LedgerEvent): boolean {
+  return event.linkKind === "swap";
 }
 
 export const MAX_TER_PERCENT = 5;

@@ -291,3 +291,27 @@ describe("in-kind acquisitions", () => {
     expect(withReward.realValue).toBe("1650");
   });
 });
+
+describe("swap legs", () => {
+  it("move units between positions without adding to what was contributed or to the benchmark", () => {
+    const buy = trade("BUY", "X", "2025-01-15T10:00:00Z", "10", "1000", "0");
+    const link = { linkId: "refid-1", linkKind: "swap" };
+    const out = {
+      ...trade("SELL", "X", "2025-03-17T10:00:00Z", "4", "480", "0"),
+      ...link,
+    };
+    const received = {
+      ...trade("BUY", "Y", "2025-03-17T10:00:00Z", "1", "465", "5"),
+      ...link,
+    };
+    const prices_ = prices({ X: "150", Y: "500" });
+    const swapped = run([buy, out, received], prices_);
+    const without = run([buy], prices({ X: "150" }));
+
+    expect(lineFor(swapped, "X")?.contributed).toBe("1000");
+    expect(lineFor(swapped, "Y")?.contributed).toBe("0");
+    expect(swapped.benchmarkValue).toBe(without.benchmarkValue);
+    expect(swapped.benchmarkMwr).toBe(without.benchmarkMwr);
+    expect(swapped.realValue).toBe("1400");
+  });
+});

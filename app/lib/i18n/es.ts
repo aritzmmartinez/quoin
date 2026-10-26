@@ -1,10 +1,11 @@
-import type { DiscardReason } from "~/adapters/ingestion/discard";
+import type { DiscardReason, NoticeReason } from "~/adapters/ingestion/discard";
 import type {
   ExposureKind,
   InstrumentType,
   LeafKind,
   Thesis,
 } from "~/core/domain";
+import type { RepurchaseLetter } from "~/core/tax";
 
 export interface ExcludedNotice {
   symbol: string;
@@ -25,27 +26,46 @@ const REFRESH_RATES = `pulsa «${REFRESH_NOW}» en los tipos de cambio de ${EXTE
 const REFRESH_CPI = `pulsa «${REFRESH_NOW}» en el IPC de ${EXTERNAL_DATA} (${SETTINGS})`;
 
 const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
-  "crypto-swap": "Intercambios con BTC",
-  "crypto-transfer": "Transferencias de BTC",
-  "reward-unpriced": "Recompensas de BTC sin precio",
+  "swap-unpriced": "Intercambios entre criptos sin precio",
+  "crypto-transfer": "Transferencias de cripto",
+  "reward-unpriced": "Recompensas sin precio",
   "fx-unavailable": "Operaciones sin tipo de cambio del día",
-  "unmodelled-asset": "Activos que Quoin no modela",
+  "invalid-crypto-code": "Cripto con un código de activo no válido",
+  "earn-return-unverified": "Vueltas de Earn sin verificar",
+  "internal-move": "Movimientos entre tus monederos de Kraken",
   "card-spending": "Pagos con tarjeta",
   "saveback-unpaired": "Saveback sin compra emparejada",
   unsupported: "Sin soporte",
 };
 
 const DISCARD_REASON_HELP: Record<DiscardReason, string | null> = {
-  "crypto-swap": null,
+  "swap-unpriced": `No hay precio de esas fechas para uno de los activos de estos intercambios, así que no se han registrado y sus posiciones no los incluyen. En Instrumentos, abre el símbolo de ese activo y pulsa «${REDOWNLOAD}» con un rango que llegue a esas fechas. Después vuelve a importar este mismo fichero: lo ya registrado no se duplica.`,
   "crypto-transfer": null,
-  "reward-unpriced":
-    `No hay precio de BTC de esas fechas, así que estas recompensas no se han registrado y tu posición de BTC no las incluye. En Instrumentos, abre el símbolo de BTC y pulsa «${REDOWNLOAD}» con un rango que llegue a esas fechas. Después vuelve a importar este mismo fichero: lo ya registrado no se duplica.`,
+  "reward-unpriced": `No hay precio de esas fechas para el activo de estas recompensas, así que no se han registrado y su posición no las incluye. En Instrumentos, abre el símbolo de ese activo y pulsa «${REDOWNLOAD}» con un rango que llegue a esas fechas. Después vuelve a importar este mismo fichero: lo ya registrado no se duplica.`,
   "fx-unavailable": `El BCE no tenía tipo para el día de estas operaciones en otra divisa (una de hoy antes de las 16:00, o una divisa que no publica), o no se ha podido consultar, así que no se han importado y no cuentan en sus posiciones. Más tarde, ${REFRESH_RATES} y vuelve a importar este mismo fichero: lo ya registrado no se duplica.`,
-  "unmodelled-asset": null,
+  "invalid-crypto-code":
+    "Quoin identifica cada cripto por su código de activo (BTC, ETH…), el mismo en todos los brókers, para que sus compras y ventas formen una sola posición. Estas filas traían otra cosa en ese lugar, así que no se han importado y su posición no las incluye.",
+  "earn-return-unverified":
+    "Dinero que vuelve de Earn a tu monedero de spot. Puede incluir el rendimiento además de lo que pusiste, y Quoin aún no ha comprobado cómo lo informa Kraken, así que no se ha registrado: tratarlo como un paso entre tus propios monederos perdería el rendimiento sin avisar. Tu posición de ese activo puede no cuadrar con la del bróker.",
+  "internal-move":
+    "Pasos entre tus propios monederos de Kraken, como asignar a Earn o retirar de ahí. No cambian lo que tienes, así que no se registran.",
   "card-spending": null,
   "saveback-unpaired":
     "No se ha encontrado la compra que pagó este saveback (una compra del mismo importe en los 7 días siguientes, y solo una). Si esa compra está en el fichero, cuenta como aportación tuya. Si está en otro export, importa uno que cubra las dos fechas.",
   unsupported: null,
+};
+
+const NOTICE_LABELS: Record<NoticeReason, string> = {
+  "account-transfer": "Transferencias con otra cuenta",
+  "internal-booked-as-reward":
+    "Movimientos internos registrados antes como recompensa",
+};
+
+const NOTICE_HELP: Record<NoticeReason, string> = {
+  "account-transfer":
+    "Efectivo que sale de esta cuenta de Kraken hacia otra cuenta, o que llega de ella. Se registra como retirada o como ingreso.",
+  "internal-booked-as-reward":
+    "Una versión anterior de Quoin registró estos pasos entre tus monederos de Kraken como recompensas, y siguen en el registro como compras en especie. No cambian lo que tienes, así que esa posición incluye unidades de más.",
 };
 
 const THESIS_LABELS: Record<Thesis, string> = {
@@ -96,6 +116,8 @@ export const es = {
     },
     noRateTax: (names: string): string =>
       `Sin tipo de cambio: ${names}. Sus operaciones no se han podido convertir a euros y no entran en este cálculo. Revísalo antes de usar estas cifras en la declaración.`,
+    unclassifiedTax: (names: string): string =>
+      `Sin regla de recompra: ${names}. Su tipo (bono, materia prima o efectivo) no es un valor cotizado ni un criptoactivo: un bono directo da rendimiento del capital mobiliario, al que el Art. 43 no se aplica, y una materia prima directa tendría su propia regla, que Quoin no modela. Sus ventas se calculan sin regla de recompra. Revísalas antes de usar estas cifras en la declaración.`,
   },
   notFound: {
     title: "Página no encontrada",
@@ -675,9 +697,17 @@ export const es = {
     failed: "La importación ha fallado.",
     invalidEvent: (date: string, type: string, currency: string): string =>
       `La operación ${type} del ${date} en ${currency} no cumple las reglas del registro. Es un fallo de Quoin al leer este export, no del fichero: no se ha importado nada.`,
+    krakenLegacyExport:
+      "Es un export antiguo de Kraken, sin la columna wallet, y Quoin solo lee el formato actual. Descarga uno nuevo desde Kraken e impórtalo. No se ha importado nada.",
+    krakenBalanceMismatch: (
+      asset: string,
+      wallet: string,
+      date: string,
+    ): string =>
+      `El saldo de ${asset} en «${wallet}» del ${date} no sale de las filas anteriores. Quoin no está leyendo este fichero como Kraken lo escribió, así que no se ha importado nada.`,
     analysing: "Analizando el fichero…",
     importing: "Importando…",
-    retrying: "Valorando las recompensas…",
+    retrying: "Valorando las recompensas y los intercambios…",
     brokerLabel: (broker: string): string =>
       broker === "kraken" ? "Kraken" : "Trade Republic",
     detected: (broker: string): string => `${broker} detectado`,
@@ -694,16 +724,19 @@ export const es = {
       reasonHelp: DISCARD_REASON_HELP,
       details: (count: number): string =>
         count === 1 ? "1 operación" : `${count} operaciones`,
-      pendingPrice: "Recompensas de BTC pendientes de precio",
+      pendingPrice: "Recompensas e intercambios pendientes de precio",
       pendingPriceNote:
         "Se valorarán después del paso de precios, volviendo a importar el fichero.",
       positionWarning:
-        "Estas operaciones cambian tu saldo de BTC y Quoin no las registra, así que la posición de BTC no las refleja y puede no cuadrar con la del bróker.",
+        "Estas operaciones cambian tu saldo de ese activo y Quoin no las registra, así que su posición no las refleja y puede no cuadrar con la del bróker.",
+      noticed: "Avisos",
+      notices: NOTICE_LABELS,
+      noticeHelp: NOTICE_HELP,
       noInstrument: "Sin instrumento",
     },
     nothingNew:
       "Nada nuevo que importar: todas las operaciones de este fichero ya estaban en el registro.",
-    confirmPending: "Continuar para valorar las recompensas",
+    confirmPending: "Continuar para valorar las recompensas y los intercambios",
     confirmCount: (count: number): string =>
       count === 1 ? "Importar 1 operación" : `Importar ${count} operaciones`,
     appliesNow:
@@ -732,6 +765,8 @@ export const es = {
       invalid: "Símbolo no válido.",
       noQuote: (symbol: string): string =>
         `Yahoo no devuelve precio para ${symbol}. Prueba otra plaza (.DE, .MI, .PA, .AS).`,
+      noQuoteCrypto: (symbol: string, code: string): string =>
+        `Yahoo no devuelve precio para ${symbol}. Para una cripto, prueba ${code}-USD, que se valora con el tipo del BCE, o el ticker con el número que Yahoo añade cuando el código está repetido, como PEPE24478-USD. Un ticker repetido puede ser otra moneda con el mismo código: comprueba el nombre y el valor implícito antes de guardar.`,
       price: "Precio",
       impliedValue: "Valor implícito",
       quantity: "Unidades",
@@ -751,6 +786,8 @@ export const es = {
         "No hay cierres de este símbolo en las fechas de tus operaciones, así que no se pueden comparar.",
       noDailyHistory:
         "Yahoo no tiene histórico diario de este símbolo. Busca su ticker en una bolsa en euros (.DE, .AS…).",
+      noDailyHistoryCrypto: (code: string): string =>
+        `Yahoo no tiene histórico diario de este símbolo. Para una cripto, prueba ${code}-USD, que se valora con el tipo del BCE, o el ticker con el número que Yahoo añade cuando el código está repetido, como PEPE24478-USD. Un ticker repetido puede ser otra moneda con el mismo código: comprueba el nombre y el valor implícito antes de guardar.`,
       hasHistory:
         "Este instrumento ya tiene precios guardados. Cambia su símbolo en la columna Símbolo de Instrumentos: allí se descarga el histórico nuevo antes de borrar el anterior.",
       pending: (count: number): string =>
@@ -778,11 +815,11 @@ export const es = {
     done: {
       title: "Resumen de la importación",
       rewardsNeedMapping:
-        "Las recompensas de BTC siguen sin valorar porque BTC no tiene símbolo. Vuelve al paso de mapeo, asígnale uno y continúa: el asistente descargará sus precios y volverá a importar el fichero.",
+        "Algunas recompensas o intercambios siguen sin valorar porque su activo no tiene símbolo. Vuelve al paso de mapeo, asígnale uno y continúa: el asistente descargará sus precios y volverá a importar el fichero.",
       recovered: (count: number): string =>
         count === 1
-          ? "1 recompensa recuperada al valorarla con los precios descargados"
-          : `${count} recompensas recuperadas al valorarlas con los precios descargados`,
+          ? "1 recompensa o intercambio recuperado al valorarlo con los precios descargados"
+          : `${count} recompensas e intercambios recuperados al valorarlos con los precios descargados`,
       imported: (count: number): string =>
         count === 1
           ? "1 operación importada"
@@ -887,6 +924,8 @@ export const es = {
     noSymbol: "Sin símbolo",
     noDailyHistory:
       "Este símbolo no tiene histórico diario. Vuelve a descargarlo o cambia el símbolo por su ticker en una bolsa en euros.",
+    noDailyHistoryCrypto: (code: string): string =>
+      `Este símbolo no tiene histórico diario. Para una cripto, prueba ${code}-USD, que se valora con el tipo del BCE, o el ticker con el número que Yahoo añade cuando el código está repetido, como PEPE24478-USD. Un ticker repetido puede ser otra moneda con el mismo código: comprueba el nombre y el valor implícito antes de guardar.`,
     obsoleteVenues:
       "Esta composición se importó con códigos de país antiguos y no se fusiona con otros fondos. Vuelve a soltar su archivo en esta fila.",
     resolves: RESOLVES_LABELS,
@@ -1014,8 +1053,7 @@ export const es = {
     fromTarget: "Simula tu plan actual",
     noHistory:
       "Ninguna línea de tu plan tiene histórico de precios, así que no hay nada que remuestrear. Asígnales un símbolo en la columna Símbolo de Instrumentos: al guardarlo se descarga su histórico.",
-    noWindow:
-      `Las líneas de tu plan no comparten ni un solo mes de histórico, así que no hay ventana común que remuestrear. Amplía el histórico más corto en Instrumentos con «${REDOWNLOAD}» y un rango más largo.`,
+    noWindow: `Las líneas de tu plan no comparten ni un solo mes de histórico, así que no hay ventana común que remuestrear. Amplía el histórico más corto en Instrumentos con «${REDOWNLOAD}» y un rango más largo.`,
     thinWindow: {
       title: "Sin cifras todavía: la ventana es demasiado corta",
       body: (months: number, minimum: number, instrument: string): string =>
@@ -1145,6 +1183,10 @@ export const es = {
     },
     amountHint:
       "El importe es el flujo de caja real: comisiones incluidas y retenciones descontadas.",
+    swapType: "Permuta",
+    swapAmountLabel: "No ha entrado ni salido dinero: es una permuta",
+    swapNote:
+      "En una permuta el importe es el valor de mercado de lo entregado o de lo recibido. No ha entrado ni salido dinero, así que no cuenta en el flujo neto.",
     noRateLabel: "sin tipo",
     noRate: (currency: string): string =>
       `Esta operación está en ${currency} y no tiene tipo de cambio a euros, así que no se ha podido valorar y no cuenta en ninguna cifra.`,
@@ -1233,7 +1275,7 @@ export const es = {
     fiscal: {
       about: "Sobre el criterio fiscal",
       intro:
-        "Mismas ventas, con criterio FIFO en vez de AVCO, que es el que exige la declaración foral de Bizkaia (NF 13/2013) y no el de la pestaña de Ventas. Las pérdidas con recompra de valores homogéneos en los dos meses anteriores o posteriores se difieren según el Art. 43, en la proporción recomprada, y se integran cuando se transmiten los títulos recomprados; la compensación con años anteriores sigue el Art. 66. La aritmética de la recompra sigue las consultas de la DGT V1403-21, V1117-21 y V3282-18 sobre la norma estatal paralela, que no vinculan a la Hacienda Foral.",
+        "Mismas ventas, con criterio FIFO en vez de AVCO, que es el que exige la declaración foral de Bizkaia (NF 13/2013) y no el de la pestaña de Ventas. Las pérdidas con recompra en los dos meses anteriores o posteriores se difieren según el Art. 43 (letra g para valores homogéneos y, en las transmisiones desde el 1 de enero de 2025, letra i para criptoactivos del mismo tipo), en la proporción recomprada, y se integran cuando se transmiten los recomprados; la compensación con años anteriores sigue el Art. 66. La aritmética de la recompra sigue las consultas de la DGT V1403-21, V1117-21 y V3282-18 sobre la norma estatal paralela, que no vinculan a la Hacienda Foral.",
       yearLabel: "Año fiscal",
       noYears: "No hay ventas registradas todavía en ningún año.",
       summary: {
@@ -1272,16 +1314,27 @@ export const es = {
         quantity: "Uds",
         unitCost: "Coste unitario",
       },
-      washSaleReason: (repurchased: string, sold: string): string =>
-        `Art. 43: se recompraron ${repurchased} de las ${sold} uds vendidas.`,
+      washSaleReason: (
+        letter: RepurchaseLetter,
+        repurchased: string,
+        sold: string,
+      ): string =>
+        `Art. 43.${letter}: se recompraron ${repurchased} de las ${sold} uds vendidas.`,
       ownDeferredReason: (share: string, amount: string): string =>
         `El ${share} de la pérdida (${amount}) no computa este año: queda diferida en las uds recompradas y se integrará cuando se vendan.`,
+      minorDeferralReason: (share: string, cent: string): string =>
+        `Hay compras del mismo activo dentro de la ventana de recompra (${share} de las uds vendidas): la pérdida que difieren es inferior a ${cent} y no cambia ninguna cifra.`,
       carriedOverReason: (amount: string): string =>
         `Las uds vendidas traían pérdida diferida de ventas anteriores; ${amount} pasa a las nuevas uds recompradas, aunque esta venta sea con ganancia. La ganancia propia no se bloquea.`,
+      windowOpenReason: (date: string): string =>
+        `Ventana de recompra abierta hasta el ${date}: una compra del mismo activo hasta ese día todavía puede diferir esta pérdida, así que la cifra del año puede cambiar.`,
       unlistedReason: (date: string): string =>
-        `Criptomoneda: la regla de los dos meses no se aplica y la pérdida computa entera. Hay una nueva compra el ${date}; parte de la doctrina aplicaría la regla de recompra en el año siguiente. No está resuelto y no cambia ninguna cifra.`,
+        `Criptomoneda vendida antes de 2025: la regla de recompra de criptoactivos (Art. 43.i) rige para las transmisiones desde el 1 de enero de 2025, así que la pérdida computa entera. Hay una nueva compra el ${date}; parte de la doctrina aplicaría la regla de recompra en el año siguiente. No está resuelto y no cambia ninguna cifra.`,
       breakdown: {
-        title: "Recompra de valores homogéneos (Art. 43)",
+        title: {
+          g: "Recompra de valores homogéneos (Art. 43.g)",
+          i: "Recompra de criptoactivos del mismo tipo (Art. 43.i)",
+        } satisfies Record<RepurchaseLetter, string>,
         before: (months: number): string =>
           `Adquiridas en los ${months} meses anteriores`,
         remainingAfter: "Posición que queda tras la venta",
@@ -1313,12 +1366,19 @@ export const es = {
         `Pérdidas diferidas pendientes a 31 de diciembre de ${year}`,
       pendingBody:
         "Siguen ligadas a uds en cartera. No cuentan en ningún año hasta que esas uds se vendan sin nueva recompra (Art. 43).",
-      pendingColumns: {
-        t: "Uds adquiridas",
+      pendingGroupColumns: {
+        saleDate: "Venta del",
         name: "Instrumento",
-        origin: "Pérdida de la venta del",
+        acquisitions: "Adquisiciones",
         amount: "Importe",
       },
+      pendingDetailColumns: {
+        acquiredAt: "Uds adquiridas",
+        amount: "Importe",
+      },
+      belowCent: (cent: string): string => `< ${cent}`,
+      acquisitionsCount: (count: number): string =>
+        count === 1 ? "1 adquisición" : `${count} adquisiciones`,
       empty: {
         title: "Sin ventas en este año",
         body: "Elige otro año fiscal en el desplegable.",

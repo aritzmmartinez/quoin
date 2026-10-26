@@ -1,16 +1,156 @@
 import Decimal from "decimal.js";
 
+import { toIsoDate, type CalendarDate } from "../calendar";
 import { Money } from "../domain";
 
 /** Spanish IRPF territories only (foral and común) — not a multi-country abstraction. */
 export type Territory = "bizkaia";
 
-/** Art. 43 NF 13/2013 de Bizkaia — pérdidas patrimoniales no computables (recompra de valores homogéneos). */
-export const WASH_SALE_WINDOW_MONTHS = 2;
+/** The one territory Quoin files in; core entry points that need one default to it. */
+export const DEFAULT_TERRITORY: Territory = "bizkaia";
+
+export type RepurchaseAssetClass =
+  "listed-security" | "fungible-crypto" | "unclassified";
+
+export type RepurchaseLetter = "g" | "i";
+
+/**
+ * Art. 43 NF 13/2013 de Bizkaia — pérdidas patrimoniales no computables por
+ * recompra. Each letter is one entry over one engine (wash-sale.ts,
+ * deferred-loss.ts); the letters differ in the assets they cover, the window
+ * either side of the transmission, what counts as the same asset and the
+ * transmissions they govern, never in how a deferred loss is carried or
+ * integrated.
+ *
+ * - `homogeneity: "instrument"` is the same instrument id. For crypto that is
+ *   the same asset at any broker, because every adapter takes a crypto
+ *   instrument's id from its asset code (`cryptoInstrumentId`).
+ * - `acquisitions` says which purchases in the window count: "all" reads
+ *   "hubiera adquirido" literally, so units received in kind (a reward, a
+ *   saveback) are an acquisition; "cash-only" leaves them out of the window
+ *   and out of the recipients of the deferral.
+ * - `from` / `to` are Madrid calendar days of the transmission, inclusive. The
+ *   transmission decides: a purchase before `from` still counts as the
+ *   repurchase of a sale on or after it.
+ *
+ * A sale no entry covers is assessed by nothing, and its loss computes whole.
+ * No entry covers "unclassified": a bond held directly yields income from
+ * movable capital, outside Art. 43, and a commodity held directly would fall
+ * under a letter that is not modelled, so the app names such a sale instead.
+ *
+ * Letter i is letter g's mechanics with another homogeneity and another
+ * start: fungible crypto of the same type, transmitted from 1 January 2025.
+ * A crypto sale before that day has no rule and only its notice.
+ */
+export interface RepurchaseRule {
+  territory: Territory;
+  letter: RepurchaseLetter;
+  assetClass: RepurchaseAssetClass;
+  windowMonths: number;
+  homogeneity: "instrument";
+  acquisitions: "all" | "cash-only";
+  from: string | null;
+  to: string | null;
+  source: string;
+}
+
+export const REPURCHASE_RULES: readonly RepurchaseRule[] = [
+  {
+    territory: "bizkaia",
+    letter: "g",
+    assetClass: "listed-security",
+    windowMonths: 2,
+    homogeneity: "instrument",
+    acquisitions: "all",
+    from: null,
+    to: null,
+    source: "Art. 43.g NF 13/2013 de Bizkaia",
+  },
+  {
+    territory: "bizkaia",
+    letter: "i",
+    assetClass: "fungible-crypto",
+    windowMonths: 2,
+    homogeneity: "instrument",
+    acquisitions: "all",
+    from: "2025-01-01",
+    to: null,
+    source:
+      "Art. 43.i NF 13/2013, redacción de la NF 6/2025, de 12 de diciembre (BOB 15/12/2025)",
+  },
+];
+
+export function repurchaseRuleFor(
+  territory: Territory,
+  assetClass: RepurchaseAssetClass,
+  saleDay: CalendarDate,
+  rules: readonly RepurchaseRule[] = REPURCHASE_RULES,
+): RepurchaseRule | null {
+  const day = toIsoDate(saleDay);
+  return (
+    rules.find(
+      (rule) =>
+        rule.territory === territory &&
+        rule.assetClass === assetClass &&
+        (rule.from === null || rule.from <= day) &&
+        (rule.to === null || day <= rule.to),
+    ) ?? null
+  );
+}
+
+/**
+ * How the two legs of a swap are valued for tax, as data like a repurchase rule.
+ * Bizkaia (NF 13/2013, consolidated at 01/01/2026, as given by Aritz): the value
+ * of what is delivered is the greater of its market value and the gross value of
+ * what is received (Art. 47.1.i, which NF 6/2025 does not modify and which
+ * predates 2025), and that same value is the acquisition value of what is
+ * received (Art. 45.1.a, real amount). Art. 47.1.p, introduced by NF 6/2025 with
+ * effect from 1 January 2025 (Disposición Final Segunda, Primero.Dos), values
+ * crypto-assets at market value, or the agreed price if higher. The norm does
+ * not say "the greater" of the two legs in so many words; it is a reasoned
+ * criterion, chosen so that one gain is not taxed twice, and `swapPairValue`
+ * carries the reasoning.
+ *
+ * `from` / `to` are Madrid calendar days of the swap, inclusive; null is open,
+ * which is what applies while no start date is settled. No entry in force
+ * leaves each leg at its own market value.
+ */
+export interface SwapValuationRule {
+  territory: Territory;
+  from: string | null;
+  to: string | null;
+  source: string;
+}
+
+export const SWAP_VALUATION_RULES: readonly SwapValuationRule[] = [
+  {
+    territory: "bizkaia",
+    from: null,
+    to: null,
+    source:
+      "Arts. 47.1.i, 45.1 y 45.3 NF 13/2013 de Bizkaia; Art. 47.1.p, redacción de la NF 6/2025",
+  },
+];
+
+export function swapValuationRuleFor(
+  territory: Territory,
+  swapDay: string,
+  rules: readonly SwapValuationRule[] = SWAP_VALUATION_RULES,
+): SwapValuationRule | null {
+  return (
+    rules.find(
+      (rule) =>
+        rule.territory === territory &&
+        (rule.from === null || rule.from <= swapDay) &&
+        (rule.to === null || swapDay <= rule.to),
+    ) ?? null
+  );
+}
+
 /**
  * How far after a crypto loss sale a new acquisition of the same asset is
- * pointed out. Informative only: crypto is outside the two-month rule, and
- * whether a one-year repurchase rule reaches it is unsettled.
+ * pointed out, for a sale before letter i governs crypto. Informative only:
+ * whether a one-year repurchase rule reached those sales is unsettled.
  */
 export const UNLISTED_NOTICE_WINDOW_MONTHS = 12;
 /**

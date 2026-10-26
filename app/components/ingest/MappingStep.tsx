@@ -80,6 +80,8 @@ function MappingRow({
       <SymbolMapper
         instrumentId={item.instrumentId}
         stored={saved}
+        suggested={item.suggested}
+        cryptoCode={item.cryptoCode}
         saveLabel={copy.save}
         onSave={save}
       />

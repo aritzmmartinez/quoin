@@ -1,5 +1,6 @@
 import Decimal from "decimal.js";
 
+import { REWARD_NOTE } from "~/adapters/ingestion/kraken/map";
 import { isFreshQuote } from "~/adapters/marketdata";
 import { dayOf, shiftDay } from "~/core/calendar";
 import {
@@ -15,6 +16,7 @@ import type {
   MarketDataProvider,
   Quote,
 } from "~/core/ports";
+import { DAILY_CANDLE_MS, candleKnownAt } from "~/core/prices";
 import { computePositions } from "~/core/projections";
 import { atOrBefore } from "~/core/series";
 
@@ -22,8 +24,8 @@ import { rateSeriesOf, type EnsureRates, type RateSeries } from "./fx-sync";
 
 export const TRADE_CHECKS = 3;
 export const TRADE_DEVIATION_LIMIT = "0.1";
+const MARK_SIGNIFICANT_DIGITS = 12;
 const LOOKBACK_MS = 7 * 86_400_000;
-const REWARD_NOTE = "kraken-reward";
 export const DAILY_HISTORY_PROBE: HistoryRange = "1y";
 export const RATE_PROBE_DAYS = 30;
 
@@ -95,9 +97,12 @@ function isComparableTrade(
   return (
     (event.type === "BUY" || event.type === "SELL") &&
     event.instrumentId === instrumentId &&
-    event.note !== REWARD_NOTE &&
+    !(
+      event.note === REWARD_NOTE && event.valuationSource !== "kraken-amountusd"
+    ) &&
     hasRate(event) &&
-    new Decimal(event.quantity).gt(0)
+    new Decimal(event.quantity).gt(0) &&
+    !baseOf(event, "grossAmount").isZero()
   );
 }
 
@@ -114,8 +119,8 @@ export function recentTradeMarks(
       ts: trade.ts,
       price: new Decimal(baseOf(trade, "grossAmount").toString())
         .div(trade.quantity)
-        .toDecimalPlaces(6)
-        .toString(),
+        .toSignificantDigits(MARK_SIGNIFICANT_DIGITS)
+        .toFixed(),
     }));
 }
 
@@ -123,7 +128,7 @@ export function tradeSpan(marks: readonly TradeMark[]): HistorySpan | null {
   if (marks.length === 0) return null;
   const times = marks.map((mark) => mark.ts.getTime());
   return {
-    from: new Date(Math.min(...times) - LOOKBACK_MS),
+    from: new Date(Math.min(...times) - LOOKBACK_MS - DAILY_CANDLE_MS),
     to: new Date(Math.max(...times) + 86_400_000),
   };
 }
@@ -146,17 +151,12 @@ export function compareTrades(
   candles: readonly Quote[],
   book: RateBook = new Map(),
 ): TradeComparison[] {
-  const asOfTime = (quote: Quote) => quote.asOf.getTime();
-  const sorted = [...candles].sort((a, b) => asOfTime(a) - asOfTime(b));
+  const knownAt = (quote: Quote) => candleKnownAt(quote.asOf);
+  const sorted = [...candles].sort((a, b) => knownAt(a) - knownAt(b));
   const limit = new Decimal(TRADE_DEVIATION_LIMIT);
 
   return marks.flatMap((mark) => {
-    const candle = atOrBefore(
-      sorted,
-      asOfTime,
-      mark.ts.getTime(),
-      LOOKBACK_MS,
-    );
+    const candle = atOrBefore(sorted, knownAt, mark.ts.getTime(), LOOKBACK_MS);
     if (!candle) return [];
     const close = closeInBase(candle, book, mark.ts);
     if (close === null) return [];
