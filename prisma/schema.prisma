@@ -249,13 +249,15 @@ model EtfHolding {
 model PortfolioTarget {
   id         String   @id // uuid
   name       String
-  activeFrom DateTime // the date this version takes over
+  /// The calendar day this version takes over, `YYYY-MM-DD` in the residence's
+  /// zone. One version per day. Nullable only because SQLite cannot ADD a NOT NULL
+  /// column without a default; a CHECK on the format lives in the migration and
+  /// the domain requires it on read and write.
+  activeFrom String?  @unique
   note       String?
-  createdAt  DateTime @default(now()) // tie-break only: two versions from the same day
+  createdAt  DateTime @default(now()) // audit only
 
   lines PortfolioTargetLine[]
-
-  @@index([activeFrom])
 }
 
 /// One instrument's slice of the monthly contribution.

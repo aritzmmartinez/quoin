@@ -12,6 +12,7 @@ import {
   PrismaTargetRepository,
   prisma,
 } from "~/adapters/persistence";
+import { parseIsoDate, today } from "~/core/calendar";
 import {
   deriveTargetWeights,
   findIdMismatches,
@@ -19,8 +20,10 @@ import {
   monthlyTotal,
   parseTargetLines,
   TargetParseError,
+  targetOnDay,
   type PortfolioTarget,
 } from "~/core/domain";
+import { loadResidence } from "~/lib/residence.server";
 
 import { announceDatabase } from "./lib/db-target";
 
@@ -41,6 +44,15 @@ The file is one line per instrument, "<instrumentId> <monthlyAmount>":
 Amounts are the fact; weights are derived from them. A version is never edited:
 changing the plan means recording another one with a later --from.`;
 
+function isCalendarDay(value: string): boolean {
+  try {
+    parseIsoDate(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function flag(name: string): string | undefined {
   const prefix = `--${name}=`;
   return argv
@@ -54,9 +66,7 @@ function describe(
   names: ReadonlyMap<string, string>,
 ): void {
   const total = monthlyTotal(target);
-  console.log(
-    `${target.name}  (from ${target.activeFrom.toISOString().slice(0, 10)})`,
-  );
+  console.log(`${target.name}  (from ${target.activeFrom})`);
   if (target.note) console.log(`  note: ${target.note}`);
 
   for (const line of deriveTargetWeights(target)) {
@@ -76,9 +86,11 @@ async function main(): Promise<void> {
   const instruments = await new PrismaInstrumentRepository().list();
   const names = new Map(instruments.map((i) => [i.id, i.name]));
   const repo = new PrismaTargetRepository();
+  const { calendarZone } = await loadResidence();
+  const now = today(calendarZone, new Date());
 
   if (!file || file === "--help") {
-    const active = getActiveTarget(await repo.list(), new Date());
+    const active = getActiveTarget(await repo.list(), now);
     if (!active) {
       console.log("No target recorded yet.\n");
       console.log(USAGE);
@@ -105,9 +117,17 @@ async function main(): Promise<void> {
   }
 
   const fromArg = flag("from");
-  const activeFrom = fromArg ? new Date(fromArg) : new Date();
-  if (Number.isNaN(activeFrom.getTime())) {
+  const activeFrom = fromArg ?? now;
+  if (!isCalendarDay(activeFrom)) {
     console.error(`"--from=${fromArg}" is not a date (use YYYY-MM-DD).`);
+    exit(1);
+  }
+  const taken = targetOnDay(await repo.list(), activeFrom);
+  if (taken) {
+    console.error(
+      `Nothing was recorded. "${taken.name}" already takes over on ${activeFrom}, ` +
+        "and a day takes one version only. Delete it first if this one replaces it.",
+    );
     exit(1);
   }
 

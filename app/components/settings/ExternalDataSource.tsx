@@ -25,7 +25,7 @@ export function ExternalDataSource({
   busy: boolean;
 }) {
   const t = useCopy();
-  const { formatDate, formatPeriod, formatRelativeTime } = useFormat();
+  const { formatCalendarDate, formatPeriod, formatRelativeTime } = useFormat();
   const copy = t.settings.externalData;
 
   const until = status.until;
@@ -34,7 +34,7 @@ export function ExternalDataSource({
       ? null
       : until.kind === "period"
         ? formatPeriod(until.value)
-        : formatDate(`${until.value}T12:00:00Z`);
+        : formatCalendarDate(until.value);
 
   return (
     <SettingRow

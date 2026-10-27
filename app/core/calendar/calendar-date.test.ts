@@ -190,9 +190,15 @@ describe("toCalendarDate's cache", () => {
   });
 
   it("leaves instants before 1980 out, whose offsets were not round", () => {
+    const zone = "Pacific/Kiritimati";
     const size = calendarCacheSize();
-    toCalendarDate(new Date("1979-04-01T10:00:00Z"), "Pacific/Kiritimati");
+    toCalendarDate(new Date("1975-06-01T10:00:00Z"), zone);
+    toCalendarDate(new Date("1979-04-01T10:00:00Z"), zone);
+    toCalendarDate(new Date("1979-12-31T23:59:59.999Z"), zone);
     expect(calendarCacheSize()).toBe(size);
+
+    toCalendarDate(new Date("1980-01-01T00:00:00.000Z"), zone);
+    expect(calendarCacheSize()).toBe(size + 1);
   });
 
   it("is bounded", () => {

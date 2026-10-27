@@ -22,7 +22,7 @@ type Result =
 export function SymbolPanel({ item }: { item: InstrumentListItem }) {
   const t = useCopy();
   const copy = t.instruments.history;
-  const { formatDate } = useFormat();
+  const { formatInstant } = useFormat();
   const revalidator = useRevalidator();
 
   const earliest = item.historyStart ? new Date(item.historyStart) : null;
@@ -54,7 +54,7 @@ export function SymbolPanel({ item }: { item: InstrumentListItem }) {
     if (response.step === "replace") {
       setResult({
         ok: true,
-        text: copy.done(response.written, formatDate(response.first)),
+        text: copy.done(response.written, formatInstant(response.first)),
         note: response.live ? null : copy.noLive,
       });
       void revalidator.revalidate();
@@ -104,8 +104,8 @@ export function SymbolPanel({ item }: { item: InstrumentListItem }) {
           {lost && earliest && (
             <p className="mt-1 text-negative">
               {copy.lost(
-                formatDate(lost.toISOString()),
-                formatDate(earliest.toISOString()),
+                formatInstant(lost.toISOString()),
+                formatInstant(earliest.toISOString()),
               )}
             </p>
           )}

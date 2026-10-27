@@ -26,7 +26,8 @@ export function TaxSaleItem({ sale }: { sale: TaxSaleRow }) {
   const {
     formatMoney,
     formatQuantity,
-    formatDate,
+    formatCalendarDate,
+    formatInstant,
     formatPercent,
     formatPrice,
     formatSignedMoney,
@@ -49,7 +50,7 @@ export function TaxSaleItem({ sale }: { sale: TaxSaleRow }) {
         }`}
       >
         <span className={`${TABLE_NUM} font-normal text-muted`}>
-          {formatDate(sale.t)}
+          {formatInstant(sale.t)}
         </span>
 
         <div className="min-w-0">
@@ -97,12 +98,12 @@ export function TaxSaleItem({ sale }: { sale: TaxSaleRow }) {
           )}
           {sale.windowOpenUntil && (
             <div className="mt-0.5 text-[11.5px] leading-snug text-muted">
-              {copy.windowOpenReason(formatDate(sale.windowOpenUntil))}
+              {copy.windowOpenReason(formatCalendarDate(sale.windowOpenUntil))}
             </div>
           )}
           {sale.unlistedRepurchaseAt && (
             <div className="mt-0.5 text-[11.5px] leading-snug text-muted">
-              {copy.unlistedReason(formatDate(sale.unlistedRepurchaseAt))}
+              {copy.unlistedReason(formatInstant(sale.unlistedRepurchaseAt))}
             </div>
           )}
         </div>
@@ -150,7 +151,7 @@ export function TaxSaleItem({ sale }: { sale: TaxSaleRow }) {
               key={lot.buyEventId}
               className={`grid ${TAX_LOT_GRID} gap-2 py-1 font-mono text-[12px]`}
             >
-              <span>{formatDate(lot.acquiredAt)}</span>
+              <span>{formatInstant(lot.acquiredAt)}</span>
               <span className={`${TABLE_NUM} text-right`}>
                 {formatQuantity(lot.quantity)}
               </span>
@@ -173,7 +174,7 @@ function WashSaleBreakdown({
   washSale: TaxWashSaleRow;
 }) {
   const months = washSale.windowMonths;
-  const { formatQuantity, formatDate, formatPercent } = useFormat();
+  const { formatQuantity, formatInstant, formatPercent } = useFormat();
   const copy = useCopy().realized.fiscal.breakdown;
 
   const rows: [string, ReactNode][] = [
@@ -228,7 +229,7 @@ function WashSaleBreakdown({
           key={r.buyEventId}
           className={`grid ${TAX_RECIPIENT_GRID} gap-2 py-1 font-mono text-[12px]`}
         >
-          <span>{formatDate(r.acquiredAt)}</span>
+          <span>{formatInstant(r.acquiredAt)}</span>
           <span className={`${TABLE_NUM} text-right`}>
             {formatQuantity(r.quantity)}
           </span>

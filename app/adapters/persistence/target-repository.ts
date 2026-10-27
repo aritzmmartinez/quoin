@@ -25,7 +25,8 @@ export class PrismaTargetRepository implements TargetRepository {
     );
   }
 
-  async create(target: PortfolioTarget): Promise<void> {
+  async create(input: PortfolioTarget): Promise<void> {
+    const target = portfolioTargetSchema.parse(input);
     await prisma.portfolioTarget.create({
       data: {
         id: target.id,

@@ -13,35 +13,35 @@ export type PortfolioTargetLine = z.infer<typeof portfolioTargetLineSchema>;
 export const portfolioTargetSchema = z.object({
   id: z.string().min(1),
   name: z.string(),
-  activeFrom: z.date(),
+  /** The calendar day this version takes over, `YYYY-MM-DD`. One version per day. */
+  activeFrom: z.iso.date(),
   note: z.string().nullish(),
   createdAt: z.date(),
   lines: z.array(portfolioTargetLineSchema),
 });
 export type PortfolioTarget = z.infer<typeof portfolioTargetSchema>;
 
+/** The version in force on `day` (`YYYY-MM-DD`): the latest `activeFrom` on or before it. */
 export function getActiveTarget(
   targets: readonly PortfolioTarget[],
-  asOf: Date,
+  day: string,
 ): PortfolioTarget | null {
   let active: PortfolioTarget | null = null;
-
   for (const target of targets) {
-    if (target.activeFrom.getTime() > asOf.getTime()) continue;
-    if (active === null) {
+    if (target.activeFrom > day) continue;
+    if (active === null || target.activeFrom > active.activeFrom) {
       active = target;
-      continue;
     }
-    const byActiveFrom =
-      target.activeFrom.getTime() - active.activeFrom.getTime();
-    const wins =
-      byActiveFrom > 0 ||
-      (byActiveFrom === 0 &&
-        target.createdAt.getTime() > active.createdAt.getTime());
-    if (wins) active = target;
   }
-
   return active;
+}
+
+/** The version already taking over on `day`, which a new one for that day would collide with. */
+export function targetOnDay(
+  targets: readonly PortfolioTarget[],
+  day: string,
+): PortfolioTarget | null {
+  return targets.find((target) => target.activeFrom === day) ?? null;
 }
 
 export function monthlyTotal(target: PortfolioTarget): string {

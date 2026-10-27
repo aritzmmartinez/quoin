@@ -32,7 +32,7 @@ export function DatePicker({
   required?: boolean;
   className?: string;
 }) {
-  const { formatDate, formatPeriod } = useFormat();
+  const { formatCalendarDate, formatPeriod } = useFormat();
   const { calendarZone } = useZones();
   const t = useCopy();
   const copy = t.datePicker;
@@ -143,7 +143,7 @@ export function DatePicker({
         className={`${TRIGGER} ${open ? "border-accent" : "border-border hover:border-faint"} ${className}`}
       >
         <span className={value === "" ? "text-muted" : ""}>
-          {value === "" ? copy.placeholder : formatDate(value)}
+          {value === "" ? copy.placeholder : formatCalendarDate(value)}
         </span>
         <CalendarDays
           size={13}
@@ -216,7 +216,7 @@ export function DatePicker({
                           type="button"
                           data-iso={iso}
                           tabIndex={iso === focusDay ? 0 : -1}
-                          aria-label={formatDate(iso)}
+                          aria-label={formatCalendarDate(iso)}
                           aria-current={iso === today ? "date" : undefined}
                           onFocus={() => setFocusDay(iso)}
                           onClick={() => commit(iso)}

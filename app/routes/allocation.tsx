@@ -27,6 +27,7 @@ import {
   resolveWithHoldings,
   type WeightedLeaf,
 } from "~/core/domain";
+import { today } from "~/core/calendar";
 import {
   computeAllFundOverlaps,
   computeCurrencyExposure,
@@ -171,7 +172,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     readingFor(rows, summary.resolvedLeafCount, threshold),
   );
 
-  const target = getActiveTarget(targets, new Date());
+  const target = getActiveTarget(targets, today(calendarZone, new Date()));
 
   const hedged = new Set(
     instruments.filter((i) => i.hedgedToBase).map((i) => i.id),

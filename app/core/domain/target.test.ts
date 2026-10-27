@@ -7,6 +7,7 @@ import {
   monthlyTotal,
   parseTargetLines,
   TargetParseError,
+  targetOnDay,
   type PortfolioTarget,
   type PortfolioTargetLine,
 } from "./target";
@@ -20,7 +21,7 @@ function target(
   return {
     id,
     name: id,
-    activeFrom: new Date(activeFrom),
+    activeFrom,
     note: null,
     createdAt: new Date(createdAt),
     lines,
@@ -34,33 +35,25 @@ const line = (
 
 describe("getActiveTarget", () => {
   const versions = [
-    target("v1", "2026-01-01T00:00:00.000Z", [line("FTSE", "250")]),
-    target("v2", "2026-03-01T00:00:00.000Z", [line("FTSE", "300")]),
-    target("v3", "2026-06-01T00:00:00.000Z", [line("FTSE", "300")]),
+    target("v1", "2026-01-01", [line("FTSE", "250")]),
+    target("v2", "2026-03-01", [line("FTSE", "300")]),
+    target("v3", "2026-06-01", [line("FTSE", "300")]),
   ];
 
-  it("picks the latest version whose validity has begun", () => {
-    expect(
-      getActiveTarget(versions, new Date("2026-04-15T00:00:00.000Z"))?.id,
-    ).toBe("v2");
+  it("picks the latest version whose first day has come", () => {
+    expect(getActiveTarget(versions, "2026-04-15")?.id).toBe("v2");
   });
 
-  it("includes the version that starts exactly on the asked date", () => {
-    expect(
-      getActiveTarget(versions, new Date("2026-06-01T00:00:00.000Z"))?.id,
-    ).toBe("v3");
+  it("includes the version that starts on the day asked", () => {
+    expect(getActiveTarget(versions, "2026-06-01")?.id).toBe("v3");
   });
 
   it("ignores versions that have not taken over yet", () => {
-    expect(
-      getActiveTarget(versions, new Date("2026-05-31T23:59:59.000Z"))?.id,
-    ).toBe("v2");
+    expect(getActiveTarget(versions, "2026-05-31")?.id).toBe("v2");
   });
 
   it("returns null before the first version begins", () => {
-    expect(
-      getActiveTarget(versions, new Date("2025-12-31T00:00:00.000Z")),
-    ).toBeNull();
+    expect(getActiveTarget(versions, "2025-12-31")).toBeNull();
   });
 
   it("does not depend on the order the versions come in", () => {
@@ -69,59 +62,44 @@ describe("getActiveTarget", () => {
       versions[0],
       versions[1],
     ] as PortfolioTarget[];
-    expect(
-      getActiveTarget(shuffled, new Date("2026-04-15T00:00:00.000Z"))?.id,
-    ).toBe("v2");
-  });
-
-  it("breaks an exact activeFrom tie by createdAt", () => {
-    const first = target(
-      "first",
-      "2026-03-01T00:00:00.000Z",
-      [],
-      "2026-02-20T10:00:00.000Z",
-    );
-    const correction = target(
-      "correction",
-      "2026-03-01T00:00:00.000Z",
-      [],
-      "2026-02-28T10:00:00.000Z",
-    );
-
-    expect(
-      getActiveTarget([first, correction], new Date("2026-04-01T00:00:00.000Z"))
-        ?.id,
-    ).toBe("correction");
-    expect(
-      getActiveTarget([correction, first], new Date("2026-04-01T00:00:00.000Z"))
-        ?.id,
-    ).toBe("correction");
+    expect(getActiveTarget(shuffled, "2026-04-15")?.id).toBe("v2");
   });
 
   it("does not let a late-recorded version outrank a later activeFrom", () => {
     const backdated = target(
       "backdated",
-      "2026-02-01T00:00:00.000Z",
+      "2026-02-01",
       [],
       "2026-07-01T00:00:00.000Z",
     );
-    const all = [...versions, backdated];
-
-    expect(getActiveTarget(all, new Date("2026-07-01T00:00:00.000Z"))?.id).toBe(
+    expect(getActiveTarget([...versions, backdated], "2026-07-01")?.id).toBe(
       "v3",
     );
   });
 
   it("returns null when there is no target at all", () => {
-    expect(
-      getActiveTarget([], new Date("2026-04-15T00:00:00.000Z")),
-    ).toBeNull();
+    expect(getActiveTarget([], "2026-04-15")).toBeNull();
+  });
+});
+
+describe("targetOnDay", () => {
+  const versions = [
+    target("v1", "2026-01-01", []),
+    target("v2", "2026-03-01", []),
+  ];
+
+  it("finds the version that already takes over on that day", () => {
+    expect(targetOnDay(versions, "2026-03-01")?.id).toBe("v2");
+  });
+
+  it("finds none on a free day", () => {
+    expect(targetOnDay(versions, "2026-03-02")).toBeNull();
   });
 });
 
 describe("monthlyTotal", () => {
   it("sums the lines into the total monthly contribution", () => {
-    const plan = target("plan", "2026-01-01T00:00:00.000Z", [
+    const plan = target("plan", "2026-01-01", [
       line("FTSE", "300"),
       line("EM", "75"),
       line("GOLD", "40"),
@@ -134,7 +112,7 @@ describe("monthlyTotal", () => {
   });
 
   it("adds fractional amounts without float drift", () => {
-    const plan = target("plan", "2026-01-01T00:00:00.000Z", [
+    const plan = target("plan", "2026-01-01", [
       line("A", "0.1"),
       line("B", "0.2"),
     ]);
@@ -143,15 +121,13 @@ describe("monthlyTotal", () => {
   });
 
   it("is zero for an empty target", () => {
-    expect(monthlyTotal(target("empty", "2026-01-01T00:00:00.000Z", []))).toBe(
-      "0",
-    );
+    expect(monthlyTotal(target("empty", "2026-01-01", []))).toBe("0");
   });
 });
 
 describe("deriveTargetWeights", () => {
   it("derives each weight from its amount", () => {
-    const plan = target("plan", "2026-01-01T00:00:00.000Z", [
+    const plan = target("plan", "2026-01-01", [
       line("FTSE", "300"),
       line("EM", "75"),
       line("GOLD", "40"),
@@ -171,13 +147,11 @@ describe("deriveTargetWeights", () => {
   });
 
   it("yields no weights for an empty target", () => {
-    expect(
-      deriveTargetWeights(target("empty", "2026-01-01T00:00:00.000Z", [])),
-    ).toEqual([]);
+    expect(deriveTargetWeights(target("empty", "2026-01-01", []))).toEqual([]);
   });
 
   it("reports zero weights when nothing is contributed", () => {
-    const plan = target("plan", "2026-01-01T00:00:00.000Z", [line("A", "0")]);
+    const plan = target("plan", "2026-01-01", [line("A", "0")]);
 
     expect(deriveTargetWeights(plan)).toEqual([
       { instrumentId: "A", monthlyAmount: "0", weight: "0" },

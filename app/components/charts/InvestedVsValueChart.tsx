@@ -60,7 +60,7 @@ export function InvestedVsValueChart({
   labels: { value: string; invested: string };
   height?: number;
 }) {
-  const { formatMoney, formatDate, formatTimeTick } = useFormat();
+  const { formatMoney, formatInstant, formatTimeTick } = useFormat();
   const { displayZone } = useZones();
   const axisEur = (v: number) => formatMoney(String(v), 0);
   const hydrated = useHydrated();
@@ -135,7 +135,7 @@ export function InvestedVsValueChart({
           labelStyle={TOOLTIP_LABEL_STYLE}
           itemStyle={TOOLTIP_ITEM_STYLE}
           labelFormatter={(t) =>
-            typeof t === "number" ? formatDate(new Date(t).toISOString()) : ""
+            typeof t === "number" ? formatInstant(t) : ""
           }
           formatter={(value, name) => [formatMoney(String(value)), name]}
         />

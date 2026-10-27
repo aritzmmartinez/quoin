@@ -9,10 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Upgrading
 - This version adds a settings table holding where you are tax resident (Bizkaia), from which the tax territory and the calendar zone are derived. It is created on start, after the usual backup; there is nothing to set.
+- If two versions of the savings plan were recorded for the same day, the migration keeps the one that was in force (the later one) and deletes the others with their lines. Back up first if you want to keep them; the Docker image backs the ledger up before migrating.
 
 ### Changed
 - Every date is assigned and shown in the residence's zone (Madrid), on the server and in the browser alike: chart axes and tooltips no longer follow the browser's clock, and a date-only value can no longer show as the day before.
 - Trade Republic: a file whose `datetime` carries no offset is refused, since each machine would read it in its own zone. Every export seen so far carries one.
+- Savings plan: a version takes over on a calendar day, from its first minute in Madrid, rather than at midnight UTC (01:00 or 02:00 in Madrid). A day holds one version only: recording a second one for the same day is refused, naming the version already there.
 
 ## [0.14.0] - 2026-10-26
 

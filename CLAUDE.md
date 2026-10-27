@@ -29,13 +29,17 @@ License: AGPL-3.0-only.
   takes a `Copy` argument. Route `meta` uses `copyFromMatches(matches)`.
 - Formatting goes through `useFormat()` in a component, `createFormat(locale, zone)` anywhere
   else (`formatMoney`, `formatQuantity`, `formatSignedMoney`, `formatPercent`,
-  `formatDate`, `formatPeriod`, `formatTimeTick`, `formatRelativeTime`, `formatClock`).
+  `formatCalendarDate`, `formatInstant`, `formatPeriod`, `formatTimeTick`, `formatRelativeTime`, `formatClock`).
   **Never call `Intl` or `toLocaleString` from a component**, and never reintroduce a
   free `formatMoney`: the whole point of the factory is that no code path can format
   without saying which locale it means.
 - The zone a formatter shows instants in is the **display zone**; it arrives from the root
-  loader (`useZones()`), never from inside the formatter. A bare `YYYY-MM-DD` is a day
-  already and `formatDate` reads it in UTC, like `formatPeriod`.
+  loader (`useZones()`), never from inside the formatter. **A day and an instant are two
+  functions, chosen by what the value is, never by the shape of the string:**
+  `formatCalendarDate` takes a `YYYY-MM-DD` (it has no zone, is never shifted into one,
+  and throws on anything else); `formatInstant` takes an ISO instant or epoch ms and shows
+  its day in the display zone. `activeFrom`, a rate day, a closing day and the repurchase
+  window's end are days; a trade's `ts`, a price's `asOf` and a check time are instants.
 - Note on es-ES: CLDR `min2` means 4-digit numbers carry **no** thousands separator
   (`1234,56 €`). This is correct output, not a bug. English is **en-GB**, not en-US:
   the app is euro-denominated and day-first, so `€1,234.56` and `14/09/2026` are the
@@ -885,9 +889,17 @@ manual aliasing was abandoned — 726 confirmations is not a system.
 ## Portfolio target (the savings plan)
 
 - **Versions are resolved by `activeFrom`, never by `createdAt`.** `getActiveTarget(targets,
-  asOf)` picks the latest `activeFrom <= asOf` — the same rule that makes `latest()` order
-  prices by `asOf`. A plan recorded late belongs to the past it was written for. `createdAt`
-  breaks an exact `activeFrom` tie and nothing else.
+  day)` picks the latest `activeFrom <= day` — the same rule that makes `latest()` order
+  prices by `asOf`. A plan recorded late belongs to the past it was written for.
+- **`activeFrom` is a calendar day (`YYYY-MM-DD`), one version per day.** It was an instant,
+  and a version recorded at 00:00Z took over at 01:00 Madrid. Callers pass
+  `today(zone, now)`. The column is `TEXT` with a format CHECK and a UNIQUE index, nullable
+  only because SQLite cannot ADD a NOT NULL column without a default; `portfolioTargetSchema`
+  requires the day on read and on write. The form and `target:set` refuse a taken day by
+  naming the version there (`targetOnDay`); the index is the backstop. `createdAt` is
+  audit only. The migration that converted it kept, per Madrid day, the version that was
+  in force and deleted the rest, because the container migrates on start and must not
+  fail on a duplicate.
 - **A target is never edited in place.** The repository exposes `create` / `list` / `remove`
   and no update: changing the plan records the next version, so "what was I aiming at in
   March" stays answerable. Reusing an id fails, deliberately.

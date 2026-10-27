@@ -7,6 +7,7 @@ import {
   PrismaPriceRepository,
   PrismaTargetRepository,
 } from "~/adapters/persistence";
+import { today } from "~/core/calendar";
 import {
   averageMonthlyInflation,
   BASE_CURRENCY,
@@ -82,7 +83,7 @@ export async function loadProjectionContext(
       ? null
       : new Decimal(monthlyInflation).plus(1).pow(12).minus(1).toFixed(6);
 
-  const target = getActiveTarget(targets, asOf);
+  const target = getActiveTarget(targets, today(calendarZone, asOf));
   const hasTrades = events.length > 0;
   if (target === null) return { hasTrades, annualInflation, plan: null };
 

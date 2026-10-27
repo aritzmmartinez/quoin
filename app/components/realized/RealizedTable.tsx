@@ -137,7 +137,7 @@ function RealizedRowItem({ row }: { row: RealizedRow }) {
     formatMoney,
     formatPrice,
     formatQuantity,
-    formatDate,
+    formatInstant,
     formatPercent,
   } = useFormat();
   const t = useCopy();
@@ -148,7 +148,7 @@ function RealizedRowItem({ row }: { row: RealizedRow }) {
         className={`${TABLE_CELLS} ${REALIZED_GRID} min-h-11 hover:bg-surface-2`}
       >
         <span className={`${TABLE_NUM} font-normal text-muted`}>
-          {formatDate(row.t)}
+          {formatInstant(row.t)}
         </span>
 
         <div className="min-w-0">

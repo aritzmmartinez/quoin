@@ -7,7 +7,7 @@ const MADRID = "Europe/Madrid";
 const {
   formatAmount,
   formatClock,
-  formatDate,
+  formatInstant,
   formatMoney,
   formatPercent,
   formatPrice,
@@ -100,11 +100,47 @@ describe("formatSignedMoney", () => {
   });
 });
 
-describe("formatDate", () => {
+describe("formatInstant", () => {
   it("renders a short es-ES date", () => {
-    const out = norm(formatDate("2026-07-01T10:00:00.000Z")).toLowerCase();
+    const out = norm(formatInstant("2026-07-01T10:00:00.000Z")).toLowerCase();
     expect(out).toContain("2026");
     expect(out).toContain("jul");
+  });
+
+  it("shows the instant on its day in the display zone", () => {
+    const newYear = "2026-12-31T23:30:00.000Z";
+    expect(norm(createFormat("en", MADRID).formatInstant(newYear))).toBe(
+      "1 Jan 2027",
+    );
+    expect(norm(createFormat("en", "UTC").formatInstant(newYear))).toBe(
+      "31 Dec 2026",
+    );
+    expect(
+      norm(createFormat("en", MADRID).formatInstant(Date.parse(newYear))),
+    ).toBe("1 Jan 2027");
+  });
+});
+
+describe("formatCalendarDate", () => {
+  it("is the same day in every display zone, west of UTC included", () => {
+    for (const zone of [
+      MADRID,
+      "UTC",
+      "Pacific/Pago_Pago",
+      "Pacific/Kiritimati",
+    ]) {
+      expect(
+        norm(createFormat("en", zone).formatCalendarDate("2026-07-01")),
+      ).toBe("1 Jul 2026");
+    }
+  });
+
+  it("refuses anything that is not a calendar day", () => {
+    const { formatCalendarDate } = createFormat("en", MADRID);
+    expect(() => formatCalendarDate("2026-07-01T10:00:00.000Z")).toThrow(
+      RangeError,
+    );
+    expect(() => formatCalendarDate("2026-02-30")).toThrow(RangeError);
   });
 });
 

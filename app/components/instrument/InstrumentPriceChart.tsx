@@ -38,7 +38,8 @@ export function InstrumentPriceChart({
   data: PriceChartPoint[];
   unrated?: boolean;
 }) {
-  const { formatMoney, formatPrice, formatDate, formatTimeTick } = useFormat();
+  const { formatMoney, formatPrice, formatInstant, formatTimeTick } =
+    useFormat();
   const { displayZone } = useZones();
   const axisEur = (v: number) =>
     Math.abs(v) >= 1 ? formatMoney(String(v), 0) : formatPrice(String(v));
@@ -121,9 +122,7 @@ export function InstrumentPriceChart({
             <Tooltip
               contentStyle={TOOLTIP_STYLE}
               labelFormatter={(t) =>
-                typeof t === "number"
-                  ? formatDate(new Date(t).toISOString())
-                  : ""
+                typeof t === "number" ? formatInstant(t) : ""
               }
               formatter={(value, name, item) =>
                 item.dataKey === "t" || value == null

@@ -113,7 +113,7 @@ function ExcludedNotice<T extends ExcludedPurchases>({
 }
 
 export default function OpportunityCost({ loaderData }: Route.ComponentProps) {
-  const { formatMoney, formatSignedMoney, formatDate, formatPercent } =
+  const { formatMoney, formatSignedMoney, formatCalendarDate, formatPercent } =
     useFormat();
   const t = useCopy();
   const o = t.opportunity;
@@ -249,7 +249,7 @@ export default function OpportunityCost({ loaderData }: Route.ComponentProps) {
             text={(e, amount) =>
               o.truncated({
                 ...notice,
-                day: formatDate(e.firstDay),
+                day: formatCalendarDate(e.firstDay),
                 count: e.count,
                 amount,
               })
@@ -260,7 +260,7 @@ export default function OpportunityCost({ loaderData }: Route.ComponentProps) {
             text={(e, amount) =>
               o.stale({
                 ...notice,
-                day: formatDate(e.lastDay),
+                day: formatCalendarDate(e.lastDay),
                 count: e.count,
                 amount,
               })

@@ -20,7 +20,7 @@ export function signedPercent(
 export function periodReturnTile(
   period: PeriodReturns,
   kind: "twr" | "mwr",
-  format: Pick<Format, "formatPercent" | "formatDate">,
+  format: Pick<Format, "formatPercent" | "formatInstant">,
   t: Copy,
 ): { value: string; sub: string; sign: string | null } {
   const figure = period[kind];
@@ -28,7 +28,7 @@ export function periodReturnTile(
   if (shown === null || period.since === null) {
     return { value: DASH, sub: t.periodReturn.unavailable, sign: null };
   }
-  const since = format.formatDate(new Date(period.since).toISOString());
+  const since = format.formatInstant(period.since);
   const cumulative = signedPercent(format.formatPercent, figure.cumulative);
   const annual =
     kind === "twr"

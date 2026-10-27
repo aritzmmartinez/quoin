@@ -57,7 +57,7 @@ export function PendingDeferralsCard({
 }
 
 function PendingGroupItem({ group }: { group: TaxPendingGroup }) {
-  const { formatDate } = useFormat();
+  const { formatInstant } = useFormat();
   const copy = useCopy().realized.fiscal;
   const [open, setOpen] = useState(false);
 
@@ -70,7 +70,7 @@ function PendingGroupItem({ group }: { group: TaxPendingGroup }) {
         aria-label={open ? copy.collapse : copy.expand}
         className={`${TABLE_CELLS} ${TAX_PENDING_GROUP_GRID} min-h-11 w-full text-left text-[12.5px] hover:bg-surface-2`}
       >
-        <span className="font-mono">{formatDate(group.saleT)}</span>
+        <span className="font-mono">{formatInstant(group.saleT)}</span>
         <span className="truncate">{group.name}</span>
         <span className="text-right text-muted">
           {copy.acquisitionsCount(group.acquisitions.length)}
@@ -99,7 +99,7 @@ function PendingGroupItem({ group }: { group: TaxPendingGroup }) {
               className={`grid ${TAX_PENDING_DETAIL_GRID} gap-2 py-1 text-[12px]`}
             >
               <span className="font-mono">
-                {formatDate(acquisition.acquiredAt)}
+                {formatInstant(acquisition.acquiredAt)}
               </span>
               <span className={`${TABLE_NUM} text-right`}>
                 <DeferredAmount value={acquisition.amount} />

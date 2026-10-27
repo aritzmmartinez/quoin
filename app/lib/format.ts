@@ -1,5 +1,6 @@
 import Decimal from "decimal.js";
 
+import { parseIsoDate } from "~/core/calendar";
 import { BASE_CURRENCY, Money } from "~/core/domain";
 
 import { intlTag, type Locale } from "./locale";
@@ -20,7 +21,10 @@ export interface Format {
     value: string,
     maximumFractionDigits?: number,
   ) => SignedMoney;
-  formatDate: (iso: string) => string;
+  /** A calendar day, `YYYY-MM-DD`: it has no zone and is never shifted into one. */
+  formatCalendarDate: (day: string) => string;
+  /** An instant (ISO string or epoch ms), shown on its day in the display zone. */
+  formatInstant: (instant: string | number) => string;
   formatTimeTick: (
     timestamp: number,
     unit: "day" | "month",
@@ -36,8 +40,6 @@ export interface Format {
   formatClock: (now?: Date) => string;
   tag: string;
 }
-
-const CALENDAR_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 function exact(value: string): `${number}` {
   return new Decimal(value).toFixed() as `${number}`;
@@ -99,14 +101,25 @@ export function createFormat(locale: Locale, zone: string): Format {
     return { text: `+${magnitude}`, sign: "positive" };
   }
 
-  /** An instant is shown in `zone`; a bare `YYYY-MM-DD` is a day already, read in UTC like a period. */
-  function formatDate(iso: string): string {
+  const DATE_PARTS = {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  } as const satisfies Intl.DateTimeFormatOptions;
+
+  function formatCalendarDate(day: string): string {
+    const { year, month, day: d } = parseIsoDate(day);
     return new Intl.DateTimeFormat(tag, {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-      timeZone: CALENDAR_DATE.test(iso) ? "UTC" : zone,
-    }).format(new Date(iso));
+      ...DATE_PARTS,
+      timeZone: "UTC",
+    }).format(Date.UTC(year, month - 1, d));
+  }
+
+  function formatInstant(instant: string | number): string {
+    return new Intl.DateTimeFormat(tag, {
+      ...DATE_PARTS,
+      timeZone: zone,
+    }).format(new Date(instant));
   }
 
   function formatTimeTick(
@@ -199,7 +212,8 @@ export function createFormat(locale: Locale, zone: string): Format {
     formatPrice,
     formatQuantity,
     formatSignedMoney,
-    formatDate,
+    formatCalendarDate,
+    formatInstant,
     formatTimeTick,
     formatPeriod,
     formatPercent,
