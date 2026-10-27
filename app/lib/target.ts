@@ -50,7 +50,7 @@ export function toTargetVersionRows(
     .map((target) => ({
       id: target.id,
       name: target.name,
-      activeFrom: target.activeFrom.toISOString(),
+      activeFrom: target.activeFrom,
       note: target.note ?? null,
       monthlyTotal: monthlyTotal(target),
       lineCount: target.lines.length,

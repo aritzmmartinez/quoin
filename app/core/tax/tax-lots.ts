@@ -1,5 +1,6 @@
 import Decimal from "decimal.js";
 
+import { fiscalYearOf } from "../calendar";
 import { Money, type LedgerEvent, type Revalue } from "../domain";
 
 import type { RepurchaseLetter, Territory } from "./config";
@@ -9,7 +10,6 @@ import {
   type PendingDeferredLoss,
 } from "./deferred-loss";
 import { sortTrades, walkFifo, type FifoSale } from "./fifo";
-import { fiscalYearOf } from "./fiscal-year";
 import type {
   RepurchaseScope,
   WashSaleAssessment,
@@ -107,6 +107,7 @@ export interface TaxYearResult {
 
 export interface TaxHistory {
   territory: Territory;
+  zone: string;
   gains: RealizedGainDetail[];
   integrations: DeferredLossIntegration[];
   pendingByYear: Map<number, PendingDeferredLossDetail[]>;
@@ -116,7 +117,7 @@ export function computeTaxHistory(
   events: readonly LedgerEvent[],
   options: TaxOptions,
 ): TaxHistory {
-  const walk = walkFifo(events, options.revalue);
+  const walk = walkFifo(events, options, options.revalue);
   const trades = sortTrades(events);
   const tradesById = new Map(trades.map((t) => [t.id, t]));
   const deferrals = walkDeferredLosses(walk.sales, trades, options);
@@ -164,13 +165,21 @@ export function computeTaxHistory(
     ]),
   );
 
-  return { territory: options.territory, gains, integrations, pendingByYear };
+  return {
+    territory: options.territory,
+    zone: options.zone,
+    gains,
+    integrations,
+    pendingByYear,
+  };
 }
 
 export function taxYearOf(history: TaxHistory, year: number): TaxYearResult {
-  const gains = history.gains.filter((g) => fiscalYearOf(g.ts) === year);
+  const gains = history.gains.filter(
+    (g) => fiscalYearOf(g.ts, history.zone) === year,
+  );
   const integrations = history.integrations.filter(
-    (i) => fiscalYearOf(i.ts) === year,
+    (i) => fiscalYearOf(i.ts, history.zone) === year,
   );
 
   let computableNet = new Decimal(0);

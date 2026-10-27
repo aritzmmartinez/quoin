@@ -15,6 +15,8 @@ import { rateBookFrom } from "~/core/fx";
 import type { EnsureRates } from "./fx-sync";
 import { assignQuoteSymbol, clearQuoteSymbol } from "./quote-symbol";
 
+const MADRID = "Europe/Madrid";
+
 const NOW = new Date("2026-10-08T15:00:00Z");
 const NO_RATES: EnsureRates = async () => ({ book: new Map(), unavailable: [] });
 
@@ -101,6 +103,7 @@ describe("assignQuoteSymbol", () => {
       INSTRUMENT.id,
       "XS00TEST0001.SG",
       NO_RATES,
+      MADRID,
     );
 
     expect(result).toEqual({ ok: false, reason: "no-history" });
@@ -125,6 +128,7 @@ describe("assignQuoteSymbol", () => {
         INSTRUMENT.id,
         "NEW.DE",
         NO_RATES,
+        MADRID,
       ),
     ).rejects.toBeInstanceOf(MarketDataUnavailableError);
     expect(calls).toEqual([]);
@@ -140,6 +144,7 @@ describe("assignQuoteSymbol", () => {
       INSTRUMENT.id,
       "NEW.DE",
       NO_RATES,
+      MADRID,
     );
 
     expect(result).toEqual({ ok: true });
@@ -159,6 +164,7 @@ describe("assignQuoteSymbol", () => {
       INSTRUMENT.id,
       "NEW.DE",
       NO_RATES,
+      MADRID,
     );
 
     expect(calls).toEqual(["set:NEW.DE"]);
@@ -177,6 +183,7 @@ describe("assignQuoteSymbol", () => {
       INSTRUMENT.id,
       "NEW.DE",
       NO_RATES,
+      MADRID,
     );
 
     expect(result).toEqual({ ok: false, reason: "has-history" });
@@ -196,6 +203,7 @@ describe("assignQuoteSymbol", () => {
       INSTRUMENT.id,
       "OLD.DE",
       NO_RATES,
+      MADRID,
     );
 
     expect(result).toEqual({ ok: true });
@@ -222,6 +230,7 @@ describe("assignQuoteSymbol", () => {
       INSTRUMENT.id,
       "AAA",
       rates,
+      MADRID,
       NOW,
     );
 
@@ -240,6 +249,7 @@ describe("assignQuoteSymbol", () => {
       INSTRUMENT.id,
       "AAA",
       NO_RATES,
+      MADRID,
     );
 
     expect(result).toEqual({
@@ -260,6 +270,7 @@ describe("assignQuoteSymbol", () => {
       INSTRUMENT.id,
       "AAA",
       async () => ({ book: new Map(), unavailable: ["USD"] }),
+      MADRID,
     );
 
     expect(result).toEqual({
@@ -280,6 +291,7 @@ describe("assignQuoteSymbol", () => {
       INSTRUMENT.id,
       "NOPE.DE",
       NO_RATES,
+      MADRID,
     );
 
     expect(result).toEqual({ ok: false, reason: "no-quote" });
@@ -290,7 +302,15 @@ describe("assignQuoteSymbol", () => {
     const { calls, instruments, prices } = fakes(null);
 
     await expect(
-      assignQuoteSymbol(instruments, prices, EUR, "NOPE", "NEW.DE", NO_RATES),
+      assignQuoteSymbol(
+        instruments,
+        prices,
+        EUR,
+        "NOPE",
+        "NEW.DE",
+        NO_RATES,
+        MADRID,
+      ),
     ).rejects.toThrow(/NOPE/);
     expect(calls).toEqual([]);
   });

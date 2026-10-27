@@ -24,6 +24,11 @@ import {
   taxOptionsFor,
   unclassifiedSales,
 } from "./tax";
+import { jurisdictionOf } from "~/core/tax";
+import { today } from "~/core/calendar";
+
+const MADRID = "Europe/Madrid";
+const BIZKAIA = jurisdictionOf("bizkaia");
 
 let seq = 0;
 
@@ -60,7 +65,10 @@ function instrument(
 describe("listTaxYears", () => {
   it("is empty with no sales", () => {
     expect(
-      listTaxYears([trade("BUY", "X", "10", "1000", { ts: "2025-01-01" })]),
+      listTaxYears(
+        [trade("BUY", "X", "10", "1000", { ts: "2025-01-01" })],
+        MADRID,
+      ),
     ).toEqual([]);
   });
 
@@ -71,7 +79,7 @@ describe("listTaxYears", () => {
       trade("SELL", "X", "3", "300", { ts: "2026-06-01" }),
       trade("SELL", "X", "3", "300", { ts: "2024-09-01" }),
     ];
-    expect(listTaxYears(events)).toEqual([2026, 2024]);
+    expect(listTaxYears(events, MADRID)).toEqual([2026, 2024]);
   });
 });
 
@@ -80,29 +88,31 @@ describe("parseTaxYear", () => {
 
   it("uses the requested year when it has data", () => {
     const params = new URLSearchParams({ [TAX_YEAR_PARAM]: "2025" });
-    expect(parseTaxYear(params, years)).toBe(2025);
+    expect(parseTaxYear(params, years, MADRID, new Date())).toBe(2025);
   });
 
   it("falls back to the current fiscal year when it has data and none was requested", () => {
     const params = new URLSearchParams();
     const now = new Date("2025-05-01");
-    expect(parseTaxYear(params, years, now)).toBe(2025);
+    expect(parseTaxYear(params, years, MADRID, now)).toBe(2025);
   });
 
   it("falls back to the most recent year when the current one has no data", () => {
     const params = new URLSearchParams();
     const now = new Date("2024-05-01");
-    expect(parseTaxYear(params, years, now)).toBe(2026);
+    expect(parseTaxYear(params, years, MADRID, now)).toBe(2026);
   });
 
   it("ignores a requested year with no data", () => {
     const params = new URLSearchParams({ [TAX_YEAR_PARAM]: "1999" });
     const now = new Date("2024-05-01");
-    expect(parseTaxYear(params, years, now)).toBe(2026);
+    expect(parseTaxYear(params, years, MADRID, now)).toBe(2026);
   });
 
   it("returns null when nothing has ever been sold", () => {
-    expect(parseTaxYear(new URLSearchParams(), [])).toBeNull();
+    expect(
+      parseTaxYear(new URLSearchParams(), [], MADRID, new Date()),
+    ).toBeNull();
   });
 });
 
@@ -126,11 +136,20 @@ describe("groupPendingBySale", () => {
   });
 
   it("makes one row per sale, adding the pieces and counting the acquisitions", () => {
-    const groups = groupPendingBySale([
-      row("b2", "2026-08-26T05:00:00Z", [["2026-08-20T11:00:00Z", "-0.0002"]]),
-      row("b1", "2026-08-19T05:00:00Z", [["2026-08-20T11:00:00Z", "-0.0001"]]),
-      row("b3", "2026-09-02T05:00:00Z", [["2026-08-20T11:00:00Z", "-0.0003"]]),
-    ]);
+    const groups = groupPendingBySale(
+      [
+        row("b2", "2026-08-26T05:00:00Z", [
+          ["2026-08-20T11:00:00Z", "-0.0002"],
+        ]),
+        row("b1", "2026-08-19T05:00:00Z", [
+          ["2026-08-20T11:00:00Z", "-0.0001"],
+        ]),
+        row("b3", "2026-09-02T05:00:00Z", [
+          ["2026-08-20T11:00:00Z", "-0.0003"],
+        ]),
+      ],
+      MADRID,
+    );
 
     expect(groups).toHaveLength(1);
     expect(groups[0]).toMatchObject({
@@ -146,18 +165,21 @@ describe("groupPendingBySale", () => {
   });
 
   it("keeps apart two sales of one asset on different days and two assets on one day, oldest sale first", () => {
-    const groups = groupPendingBySale([
-      row("b1", "2026-09-01T05:00:00Z", [
-        ["2026-08-20T11:00:00Z", "-1"],
-        ["2026-07-01T09:00:00Z", "-2"],
-      ]),
-      row(
-        "b2",
-        "2026-09-01T05:00:00Z",
-        [["2026-08-20T11:30:00Z", "-4"]],
-        "SOL",
-      ),
-    ]);
+    const groups = groupPendingBySale(
+      [
+        row("b1", "2026-09-01T05:00:00Z", [
+          ["2026-08-20T11:00:00Z", "-1"],
+          ["2026-07-01T09:00:00Z", "-2"],
+        ]),
+        row(
+          "b2",
+          "2026-09-01T05:00:00Z",
+          [["2026-08-20T11:30:00Z", "-4"]],
+          "SOL",
+        ),
+      ],
+      MADRID,
+    );
 
     expect(groups.map((g) => [g.instrumentId, g.saleT, g.amount])).toEqual([
       ["ETH", "2026-07-01T09:00:00Z", "-2"],
@@ -167,12 +189,15 @@ describe("groupPendingBySale", () => {
   });
 
   it("puts two sales of one asset on one Madrid day together", () => {
-    const groups = groupPendingBySale([
-      row("b1", "2026-09-01T05:00:00Z", [
-        ["2026-08-20T08:00:00Z", "-1"],
-        ["2026-08-20T21:00:00Z", "-2"],
-      ]),
-    ]);
+    const groups = groupPendingBySale(
+      [
+        row("b1", "2026-09-01T05:00:00Z", [
+          ["2026-08-20T08:00:00Z", "-1"],
+          ["2026-08-20T21:00:00Z", "-2"],
+        ]),
+      ],
+      MADRID,
+    );
     expect(groups).toHaveLength(1);
     expect(groups[0]).toMatchObject({
       saleT: "2026-08-20T08:00:00Z",
@@ -193,28 +218,39 @@ describe("isBelowCent", () => {
   });
 
   it("judges a group and its pieces by their own amounts", () => {
-    const [group] = groupPendingBySale([
-      {
-        buyEventId: "b1",
-        acquiredAt: "2026-08-26T05:00:00Z",
-        instrumentId: "ETH",
-        name: "ETH",
-        amount: "0",
-        origins: [
-          { originEventId: "s1", originT: "2026-08-20T11:00:00Z", amount: "-0.004" },
-        ],
-      },
-      {
-        buyEventId: "b2",
-        acquiredAt: "2026-08-27T05:00:00Z",
-        instrumentId: "ETH",
-        name: "ETH",
-        amount: "0",
-        origins: [
-          { originEventId: "s1", originT: "2026-08-20T11:00:00Z", amount: "-0.004" },
-        ],
-      },
-    ]);
+    const [group] = groupPendingBySale(
+      [
+        {
+          buyEventId: "b1",
+          acquiredAt: "2026-08-26T05:00:00Z",
+          instrumentId: "ETH",
+          name: "ETH",
+          amount: "0",
+          origins: [
+            {
+              originEventId: "s1",
+              originT: "2026-08-20T11:00:00Z",
+              amount: "-0.004",
+            },
+          ],
+        },
+        {
+          buyEventId: "b2",
+          acquiredAt: "2026-08-27T05:00:00Z",
+          instrumentId: "ETH",
+          name: "ETH",
+          amount: "0",
+          origins: [
+            {
+              originEventId: "s1",
+              originT: "2026-08-20T11:00:00Z",
+              amount: "-0.004",
+            },
+          ],
+        },
+      ],
+      MADRID,
+    );
     expect(group?.acquisitions.every((p) => isBelowCent(p.amount))).toBe(true);
     expect(isBelowCent(group?.amount ?? "0")).toBe(false);
   });
@@ -234,7 +270,13 @@ describe("a repurchase that defers less than a cent", () => {
         }),
       ),
     ];
-    return buildTaxYearView(events, crypto, 2026);
+    return buildTaxYearView(
+      events,
+      crypto,
+      2026,
+      BIZKAIA,
+      today(MADRID, new Date()),
+    );
   };
 
   it("is flagged as minor, still shows its repurchase, and groups its pending pieces by the sale", () => {
@@ -265,6 +307,8 @@ describe("a repurchase that defers less than a cent", () => {
       ],
       crypto,
       2026,
+      BIZKAIA,
+      today(MADRID, new Date()),
     ).sales[0];
     expect(isBelowCent(material?.nonComputable ?? "0")).toBe(false);
     expect(
@@ -282,6 +326,8 @@ describe("a repurchase that defers less than a cent", () => {
       ],
       crypto,
       2026,
+      BIZKAIA,
+      today(MADRID, new Date()),
     );
 
     expect(material.sales[0]?.washSale).not.toBeNull();
@@ -297,6 +343,8 @@ describe("a repurchase that defers less than a cent", () => {
       ],
       crypto,
       2026,
+      BIZKAIA,
+      today(MADRID, new Date()),
     );
     expect(view.sales[0]?.washSale).toBeNull();
     expect(view.sales[0]?.deferralMinor).toBe(false);
@@ -312,7 +360,13 @@ describe("buildTaxYearView", () => {
       trade("SELL", "X", "10", "1200", { ts: "2026-06-01" }),
     ];
 
-    const view = buildTaxYearView(events, instruments, 2026);
+    const view = buildTaxYearView(
+      events,
+      instruments,
+      2026,
+      BIZKAIA,
+      today(MADRID, new Date()),
+    );
 
     expect(view.sales).toHaveLength(1);
     const sale = view.sales[0]!;
@@ -345,6 +399,8 @@ describe("buildTaxYearView", () => {
         instrument("BTC", "Bitcoin", "CRYPTO"),
       ],
       2025,
+      BIZKAIA,
+      today(MADRID, new Date()),
     );
 
     expect(view.sales).toHaveLength(1);
@@ -358,7 +414,13 @@ describe("buildTaxYearView", () => {
     const sell = trade("SELL", "X", "10", "700", { ts: "2025-06-01" });
     const rebuy = trade("BUY", "X", "4", "300", { ts: "2025-07-01" });
 
-    const view = buildTaxYearView([buy1, sell, rebuy], instruments, 2025);
+    const view = buildTaxYearView(
+      [buy1, sell, rebuy],
+      instruments,
+      2025,
+      BIZKAIA,
+      today(MADRID, new Date()),
+    );
 
     const sale = view.sales[0]!;
     expect(sale.nonComputable).toBe("-120");
@@ -404,7 +466,13 @@ describe("buildTaxYearView", () => {
       final,
     ];
 
-    const view = buildTaxYearView(events, instruments, 2026);
+    const view = buildTaxYearView(
+      events,
+      instruments,
+      2026,
+      BIZKAIA,
+      today(MADRID, new Date()),
+    );
 
     expect(view.integrations).toEqual([
       {
@@ -431,7 +499,13 @@ describe("buildTaxYearView", () => {
       rebuy,
     ];
 
-    const view = buildTaxYearView(events, btc, 2024);
+    const view = buildTaxYearView(
+      events,
+      btc,
+      2024,
+      BIZKAIA,
+      today(MADRID, new Date()),
+    );
 
     expect(view.sales[0]!.washSale).toBeNull();
     expect(view.sales[0]!.unlistedRepurchaseAt).toBe(rebuy.ts.toISOString());
@@ -448,7 +522,13 @@ describe("buildTaxYearView", () => {
       rebuy,
     ];
 
-    const view = buildTaxYearView(events, btc, 2026);
+    const view = buildTaxYearView(
+      events,
+      btc,
+      2026,
+      BIZKAIA,
+      today(MADRID, new Date()),
+    );
 
     expect(view.sales[0]!.washSale).toMatchObject({
       letter: "i",
@@ -466,7 +546,13 @@ describe("buildTaxYearView", () => {
       trade("SELL", "X", "5", "550", { ts: "2025-03-01" }),
     ];
 
-    const view = buildTaxYearView(events, instruments, 2025);
+    const view = buildTaxYearView(
+      events,
+      instruments,
+      2025,
+      BIZKAIA,
+      today(MADRID, new Date()),
+    );
 
     expect(view.sales.map((s) => s.t)).toEqual([
       new Date("2025-03-01").toISOString(),
@@ -482,7 +568,13 @@ describe("buildTaxYearView", () => {
       trade("SELL", "X", "10", "1500", { ts: "2025-06-01" }), // +500
     ];
 
-    const view = buildTaxYearView(events, instruments, 2025);
+    const view = buildTaxYearView(
+      events,
+      instruments,
+      2025,
+      BIZKAIA,
+      today(MADRID, new Date()),
+    );
 
     expect(view.computableNet).toBe("500");
     expect(view.netSavingsBase).toBe("200");
@@ -495,9 +587,15 @@ describe("buildTaxYearView", () => {
       trade("SELL", "Y", "10", "1200", { ts: "2025-06-01" }),
     ];
 
-    expect(() => buildTaxYearView(events, instruments, 2025)).toThrow(
-      "No repurchase asset class for instrument Y",
-    );
+    expect(() =>
+      buildTaxYearView(
+        events,
+        instruments,
+        2025,
+        BIZKAIA,
+        today(MADRID, new Date()),
+      ),
+    ).toThrow("No repurchase asset class for instrument Y");
   });
 });
 
@@ -563,7 +661,13 @@ describe("unclassifiedSales", () => {
       trade("BUY", "B", "10", "905", { ts: "2026-05-20" }),
     ];
 
-    const view = buildTaxYearView(events, instruments, 2026);
+    const view = buildTaxYearView(
+      events,
+      instruments,
+      2026,
+      BIZKAIA,
+      today(MADRID, new Date()),
+    );
 
     expect(view.sales[0]!.washSale).toBeNull();
     expect(view.sales[0]!.unlistedRepurchaseAt).toBeNull();
@@ -602,29 +706,36 @@ describe("income received in kind", () => {
 
   it("is read by no tax calculation", () => {
     expect(
-      computeTaxHistory([...ledger, ...incomes], taxOptionsFor(instruments)),
-    ).toEqual(computeTaxHistory(ledger, taxOptionsFor(instruments)));
+      computeTaxHistory(
+        [...ledger, ...incomes],
+        taxOptionsFor(instruments, BIZKAIA),
+      ),
+    ).toEqual(computeTaxHistory(ledger, taxOptionsFor(instruments, BIZKAIA)));
 
     const { inKindIncome: _with, ...withIncome } = buildTaxYearView(
       [...ledger, ...incomes],
       instruments,
       2025,
+      BIZKAIA,
+      today(MADRID, new Date()),
     );
     const { inKindIncome: _without, ...withoutIncome } = buildTaxYearView(
       ledger,
       instruments,
       2025,
+      BIZKAIA,
+      today(MADRID, new Date()),
     );
     expect(withIncome).toEqual(withoutIncome);
   });
 
   it("is listed for its Madrid fiscal year, with what was withheld", () => {
-    expect(inKindIncomeOf(incomes, 2025)).toEqual({
+    expect(inKindIncomeOf(incomes, 2025, MADRID)).toEqual({
       count: 1,
       gross: "1.00",
       withheld: "0.19",
     });
-    expect(inKindIncomeOf(incomes, 2026)).toEqual({
+    expect(inKindIncomeOf(incomes, 2026, MADRID)).toEqual({
       count: 1,
       gross: "2.00",
       withheld: "0.38",
@@ -632,7 +743,7 @@ describe("income received in kind", () => {
   });
 
   it("opens a tax year even when nothing was sold in it", () => {
-    expect(listTaxYears([...ledger, ...incomes])).toEqual([2026, 2025]);
+    expect(listTaxYears([...ledger, ...incomes], MADRID)).toEqual([2026, 2025]);
   });
 
   it("leaves a cash dividend out of the block", () => {
@@ -640,7 +751,7 @@ describe("income received in kind", () => {
       ...reward("2025-05-01T10:00:00Z", "5"),
       funding: "CASH" as const,
     };
-    expect(inKindIncomeOf([cash], 2025).count).toBe(0);
+    expect(inKindIncomeOf([cash], 2025, MADRID).count).toBe(0);
   });
 });
 
@@ -700,7 +811,13 @@ describe("crypto from Trade Republic in the tax view", () => {
       item.instrument ? [item.instrument] : [],
     );
 
-    const view = buildTaxYearView(events, crypto, 2026);
+    const view = buildTaxYearView(
+      events,
+      crypto,
+      2026,
+      BIZKAIA,
+      today(MADRID, new Date()),
+    );
 
     expect(repurchaseAssetClasses(crypto).get("BTC")).toBe("fungible-crypto");
     expect(view.sales).toHaveLength(1);
@@ -727,7 +844,7 @@ describe("a repurchase window still open", () => {
     const { events } = lossSale("X", "2026-05-08T10:00:00Z");
 
     const open = (today: string) =>
-      buildTaxYearView(events, instruments, 2026, today).sales[0]!
+      buildTaxYearView(events, instruments, 2026, BIZKAIA, today).sales[0]!
         .windowOpenUntil;
 
     expect(open("2026-05-08")).toBe("2026-07-08");
@@ -738,7 +855,13 @@ describe("a repurchase window still open", () => {
   it("is named under letter i too, across the new year", () => {
     const { events } = lossSale("BTC", "2025-11-20T10:00:00Z");
 
-    const view = buildTaxYearView(events, instruments, 2025, "2026-01-05");
+    const view = buildTaxYearView(
+      events,
+      instruments,
+      2025,
+      BIZKAIA,
+      "2026-01-05",
+    );
 
     expect(view.sales[0]!.windowOpenUntil).toBe("2026-01-20");
   });
@@ -750,8 +873,13 @@ describe("a repurchase window still open", () => {
       trade("BUY", "X", "1", "52", { ts: "2026-05-20T10:00:00Z" }),
     ];
 
-    const sale = buildTaxYearView(rebought, instruments, 2026, "2026-06-01")
-      .sales[0]!;
+    const sale = buildTaxYearView(
+      rebought,
+      instruments,
+      2026,
+      BIZKAIA,
+      "2026-06-01",
+    ).sales[0]!;
 
     expect(sale.washSale).not.toBeNull();
     expect(sale.windowOpenUntil).toBe("2026-07-08");
@@ -763,7 +891,13 @@ describe("a repurchase window still open", () => {
       trade("SELL", "X", "1", "50", { ts: "2026-05-08T10:00:00Z" }),
     ];
 
-    const view = buildTaxYearView(events, instruments, 2026, "2026-05-09");
+    const view = buildTaxYearView(
+      events,
+      instruments,
+      2026,
+      BIZKAIA,
+      "2026-05-09",
+    );
 
     expect(view.sales[0]!.windowOpenUntil).toBeNull();
   });
@@ -771,7 +905,13 @@ describe("a repurchase window still open", () => {
   it("is not named for a sale no rule covers", () => {
     const { events } = lossSale("BTC", "2024-12-20T10:00:00Z");
 
-    const view = buildTaxYearView(events, instruments, 2024, "2025-01-05");
+    const view = buildTaxYearView(
+      events,
+      instruments,
+      2024,
+      BIZKAIA,
+      "2025-01-05",
+    );
 
     expect(view.sales[0]!.windowOpenUntil).toBeNull();
   });

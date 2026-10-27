@@ -17,6 +17,8 @@ import { rateBookFrom } from "~/core/fx";
 import { BatchBuilder, InvalidLedgerEventError, previewBatch } from "../ingest";
 import { TradeRepublicCsvAdapter } from "./adapter";
 
+const MADRID = "Europe/Madrid";
+
 class FakeInstrumentRepository implements InstrumentRepository {
   upserted: Instrument[] = [];
   async upsert(instruments: readonly Instrument[]): Promise<void> {
@@ -128,7 +130,7 @@ describe("TradeRepublicCsvAdapter", () => {
   beforeEach(() => {
     instruments = new FakeInstrumentRepository();
     ledger = new FakeLedgerRepository();
-    adapter = new TradeRepublicCsvAdapter(instruments, ledger);
+    adapter = new TradeRepublicCsvAdapter(instruments, ledger, MADRID);
   });
 
   it("imports a mixed CSV, discarding card spending and unsupported rows", async () => {
@@ -217,6 +219,7 @@ describe("TradeRepublicCsvAdapter with the original amount columns", () => {
     const adapter = new TradeRepublicCsvAdapter(
       new FakeInstrumentRepository(),
       ledger,
+      MADRID,
     );
 
     await adapter.import(
@@ -243,6 +246,7 @@ describe("TradeRepublicCsvAdapter with the original amount columns", () => {
     const adapter = new TradeRepublicCsvAdapter(
       new FakeInstrumentRepository(),
       new FakeLedgerRepository(),
+      MADRID,
     );
 
     const summary = await adapter.import(
@@ -272,7 +276,7 @@ describe("TradeRepublicCsvAdapter with a row in another currency", () => {
   beforeEach(() => {
     instruments = new FakeInstrumentRepository();
     ledger = new FakeLedgerRepository();
-    adapter = new TradeRepublicCsvAdapter(instruments, ledger);
+    adapter = new TradeRepublicCsvAdapter(instruments, ledger, MADRID);
   });
 
   afterEach(() => {
@@ -284,6 +288,7 @@ describe("TradeRepublicCsvAdapter with a row in another currency", () => {
     const converting = new TradeRepublicCsvAdapter(
       instruments,
       ledger,
+      MADRID,
       async (currencies) => {
         asked.push([...currencies]);
         return rateBookFrom([
@@ -364,6 +369,7 @@ describe("TradeRepublicCsvAdapter with crypto", () => {
     await new TradeRepublicCsvAdapter(
       new FakeInstrumentRepository(),
       ledger,
+      MADRID,
     ).import(CRYPTO_CSV);
 
     for (const id of ["s-btc", "b-btc", "t-btc"]) {
@@ -380,6 +386,7 @@ describe("TradeRepublicCsvAdapter with crypto", () => {
     const summary = await new TradeRepublicCsvAdapter(
       instruments,
       ledger,
+      MADRID,
     ).import(CRYPTO_CSV);
 
     expect(summary.imported).toBe(2);

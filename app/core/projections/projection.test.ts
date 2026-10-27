@@ -13,6 +13,8 @@ import {
   type ProjectionSourceLine,
 } from "./projection";
 
+const MADRID = "Europe/Madrid";
+
 function returns(from: string, months: number, seed = 1): MonthlyReturn[] {
   const random = mulberry32(seed);
   const [startYear, startMonth] = from.split("-").map(Number);
@@ -42,6 +44,7 @@ describe("toMonthlyReturns", () => {
         { asOf: new Date("2024-03-05T17:00:00Z"), price: "500" },
       ],
       new Date("2024-03-10T12:00:00Z"),
+      MADRID,
     );
 
     expect(result).toHaveLength(1);
@@ -57,6 +60,7 @@ describe("toMonthlyReturns", () => {
         { asOf: new Date("2024-05-31T17:00:00Z"), price: "143" },
       ],
       new Date("2024-07-01T12:00:00Z"),
+      MADRID,
     );
 
     expect(result.map((r) => r.period)).toEqual(["2024-05"]);
@@ -70,6 +74,7 @@ describe("toMonthlyReturns", () => {
         { asOf: new Date("2024-03-31T23:30:00Z"), price: "110" },
       ],
       new Date("2024-06-01T12:00:00Z"),
+      MADRID,
     );
 
     expect(result.map((r) => r.period)).toEqual(["2024-03", "2024-04"]);

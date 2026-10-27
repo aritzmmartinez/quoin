@@ -7,15 +7,13 @@ import type {
   Thesis,
   TradeEvent,
 } from "~/core/domain";
-import { dayOf, toIsoDate } from "~/core/calendar";
+import { dayOf, fiscalYearOf, toIsoDate } from "~/core/calendar";
 import { Money, isInKind, type DividendEvent } from "~/core/domain";
 import { baseOf, bookable, unconvertibleInstrumentIds } from "~/core/fx";
 import {
-  DEFAULT_TERRITORY,
   carryforwardFrom,
   computeSavingsQuota,
   computeTaxHistory,
-  fiscalYearOf,
   getTaxScale,
   taxYearOf,
   type CarryforwardStep,
@@ -23,11 +21,11 @@ import {
   type RepurchaseAssetClass,
   type RepurchaseLetter,
   type TaxBracket,
+  type Jurisdiction,
   type TaxOptions,
   type Territory,
 } from "~/core/tax";
 
-import { todayInMadrid } from "./format";
 import { namesOf } from "./opportunity-cost";
 import { REALIZED_VIEW_PARAM } from "./realized";
 
@@ -64,11 +62,14 @@ export function unclassifiedSales(
   return namesOf([...sold].sort(), instruments);
 }
 
-export function listTaxYears(events: readonly LedgerEvent[]): number[] {
+export function listTaxYears(
+  events: readonly LedgerEvent[],
+  zone: string,
+): number[] {
   const years = new Set(
     events
       .filter((e) => isSellTrade(e) || isInKindIncome(e))
-      .map((e) => fiscalYearOf(e.ts)),
+      .map((e) => fiscalYearOf(e.ts, zone)),
   );
   return [...years].sort((a, b) => b - a);
 }
@@ -78,7 +79,8 @@ export const TAX_YEAR_PARAM = "year";
 export function parseTaxYear(
   params: URLSearchParams,
   years: readonly number[],
-  now: Date = new Date(),
+  zone: string,
+  now: Date,
 ): number | null {
   const raw = params.get(TAX_YEAR_PARAM);
   const requested = raw !== null ? Number(raw) : null;
@@ -90,7 +92,7 @@ export function parseTaxYear(
     return requested;
   }
 
-  const current = fiscalYearOf(now);
+  const current = fiscalYearOf(now, zone);
   if (years.includes(current)) return current;
   return years[0] ?? null;
 }
@@ -101,8 +103,6 @@ export function taxYearHref(params: URLSearchParams, year: number): string {
   next.set(TAX_YEAR_PARAM, String(year));
   return `?${next.toString()}`;
 }
-
-export const TAX_TERRITORY: Territory = DEFAULT_TERRITORY;
 
 export function repurchaseAssetClassOf(
   type: InstrumentType,
@@ -132,9 +132,12 @@ export function repurchaseAssetClasses(
   );
 }
 
-export function taxOptionsFor(instruments: readonly Instrument[]): TaxOptions {
+export function taxOptionsFor(
+  instruments: readonly Instrument[],
+  jurisdiction: Jurisdiction,
+): TaxOptions {
   return {
-    territory: TAX_TERRITORY,
+    ...jurisdiction,
     assetClasses: repurchaseAssetClasses(instruments),
   };
 }
@@ -231,11 +234,12 @@ export interface TaxPendingGroup {
 
 export function groupPendingBySale(
   rows: readonly TaxPendingRow[],
+  zone: string,
 ): TaxPendingGroup[] {
   const groups = new Map<string, TaxPendingGroup>();
   for (const row of rows) {
     for (const origin of row.origins) {
-      const key = `${row.instrumentId}|${dayOf(new Date(origin.originT))}`;
+      const key = `${row.instrumentId}|${dayOf(new Date(origin.originT), zone)}`;
       const group = groups.get(key) ?? {
         key,
         instrumentId: row.instrumentId,
@@ -277,9 +281,11 @@ export interface TaxInKindIncome {
 export function inKindIncomeOf(
   events: readonly LedgerEvent[],
   year: number,
+  zone: string,
 ): TaxInKindIncome {
   const received = bookable(events).filter(
-    (e): e is DividendEvent => isInKindIncome(e) && fiscalYearOf(e.ts) === year,
+    (e): e is DividendEvent =>
+      isInKindIncome(e) && fiscalYearOf(e.ts, zone) === year,
   );
   return {
     count: received.length,
@@ -323,12 +329,16 @@ export function buildTaxYearView(
   events: readonly LedgerEvent[],
   instruments: readonly Instrument[],
   year: number,
-  today: string = todayInMadrid(),
+  jurisdiction: Jurisdiction,
+  today: string,
 ): TaxYearView {
   const byId = new Map(instruments.map((i) => [i.id, i]));
   const nameOf = (id: string): string => byId.get(id)?.name ?? id;
 
-  const history = computeTaxHistory(events, taxOptionsFor(instruments));
+  const history = computeTaxHistory(
+    events,
+    taxOptionsFor(instruments, jurisdiction),
+  );
   const result = taxYearOf(history, year);
   const saleTs = new Map(history.gains.map((g) => [g.eventId, g.ts]));
   const originT = (id: string): string =>
@@ -390,7 +400,7 @@ export function buildTaxYearView(
     computableNet: result.computableNet,
     integrations,
     pending,
-    pendingBySale: groupPendingBySale(pending),
+    pendingBySale: groupPendingBySale(pending, jurisdiction.zone),
     pendingSum: sum(
       pending.map((p) => p.amount),
       2,
@@ -399,7 +409,7 @@ export function buildTaxYearView(
     netSavingsBase: carry.netSavingsBase,
     scale: scale ? { source: scale.source, brackets: scale.brackets } : null,
     quota,
-    inKindIncome: inKindIncomeOf(events, year),
+    inKindIncome: inKindIncomeOf(events, year, jurisdiction.zone),
   };
 }
 

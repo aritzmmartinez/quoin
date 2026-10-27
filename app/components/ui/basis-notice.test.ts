@@ -4,6 +4,8 @@ import { createFormat, es } from "~/lib";
 
 import { basisNotice, type BasisNoticeProps } from "./basis-notice";
 
+const MADRID = "Europe/Madrid";
+
 const base: BasisNoticeProps = {
   basis: "real",
   active: true,
@@ -15,7 +17,7 @@ const base: BasisNoticeProps = {
 describe("basisNotice", () => {
   it("says nothing on the nominal basis", () => {
     expect(
-      basisNotice(es, createFormat("es").formatPeriod, {
+      basisNotice(es, createFormat("es", MADRID).formatPeriod, {
         ...base,
         basis: "nominal",
       }),
@@ -24,7 +26,7 @@ describe("basisNotice", () => {
 
   it("reports that no index is stored", () => {
     expect(
-      basisNotice(es, createFormat("es").formatPeriod, {
+      basisNotice(es, createFormat("es", MADRID).formatPeriod, {
         ...base,
         hasIndex: false,
       }),
@@ -32,7 +34,7 @@ describe("basisNotice", () => {
   });
 
   it("names the missing months inside the range", () => {
-    const notice = basisNotice(es, createFormat("es").formatPeriod, {
+    const notice = basisNotice(es, createFormat("es", MADRID).formatPeriod, {
       ...base,
       active: false,
       missing: ["2026-03"],
@@ -43,7 +45,7 @@ describe("basisNotice", () => {
 
   it("reports a stale series when real mode works", () => {
     expect(
-      basisNotice(es, createFormat("es").formatPeriod, {
+      basisNotice(es, createFormat("es", MADRID).formatPeriod, {
         ...base,
         checkStale: true,
       }),
@@ -51,6 +53,8 @@ describe("basisNotice", () => {
   });
 
   it("says nothing when real mode works and the series is fresh", () => {
-    expect(basisNotice(es, createFormat("es").formatPeriod, base)).toBeNull();
+    expect(
+      basisNotice(es, createFormat("es", MADRID).formatPeriod, base),
+    ).toBeNull();
   });
 });

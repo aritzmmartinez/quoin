@@ -9,12 +9,11 @@ import {
 import { isInKind, type TradeEvent } from "../domain";
 
 import {
-  FISCAL_TIME_ZONE,
   UNLISTED_NOTICE_WINDOW_MONTHS,
   repurchaseRuleFor,
   type RepurchaseAssetClass,
   type RepurchaseRule,
-  type Territory,
+  type Jurisdiction,
 } from "./config";
 import { compareTrades, type FifoSale } from "./fifo";
 
@@ -23,8 +22,12 @@ export interface WashSaleWindow {
   end: CalendarDate;
 }
 
-export function washSaleWindow(saleTs: Date, months: number): WashSaleWindow {
-  const sale = toCalendarDate(saleTs, FISCAL_TIME_ZONE);
+export function washSaleWindow(
+  saleTs: Date,
+  months: number,
+  zone: string,
+): WashSaleWindow {
+  const sale = toCalendarDate(saleTs, zone);
   return {
     start: addCalendarMonths(sale, -months),
     end: addCalendarMonths(sale, months),
@@ -32,13 +35,12 @@ export function washSaleWindow(saleTs: Date, months: number): WashSaleWindow {
 }
 
 /**
- * What the rules are read against: the territory, and which class each
- * instrument belongs to. A sale of an instrument missing from `assetClasses`
+ * What the rules are read against: the territory, the zone its calendar is
+ * read in, and which class each instrument belongs to. A sale of an instrument missing from `assetClasses`
  * throws: no class is never read as one. `rules` defaults to the table in
  * config.ts and is open only so a test can state a variant.
  */
-export interface RepurchaseScope {
-  territory: Territory;
+export interface RepurchaseScope extends Jurisdiction {
   assetClasses: ReadonlyMap<string, RepurchaseAssetClass>;
   rules?: readonly RepurchaseRule[];
 }
@@ -115,7 +117,7 @@ export function createWashSaleAssessor(
     return repurchaseRuleFor(
       scope.territory,
       assetClassOf(sale.trade.instrumentId),
-      toCalendarDate(sale.trade.ts, FISCAL_TIME_ZONE),
+      toCalendarDate(sale.trade.ts, scope.zone),
       scope.rules,
     );
   }
@@ -125,13 +127,9 @@ export function createWashSaleAssessor(
     const buys = (buysByInstrument.get(sale.trade.instrumentId) ?? []).filter(
       (buy) => counts(rule, buy),
     );
-    const window = washSaleWindow(sale.trade.ts, rule.windowMonths);
+    const window = washSaleWindow(sale.trade.ts, rule.windowMonths, scope.zone);
     const inWindow = buys.filter((b) =>
-      isWithin(
-        toCalendarDate(b.ts, FISCAL_TIME_ZONE),
-        window.start,
-        window.end,
-      ),
+      isWithin(toCalendarDate(b.ts, scope.zone), window.start, window.end),
     );
     const earlier = inWindow.filter((b) => (position.get(b.id) ?? 0) < saleAt);
     const later = inWindow.filter((b) => (position.get(b.id) ?? 0) > saleAt);
@@ -208,6 +206,7 @@ export function createWashSaleAssessor(
         buysByInstrument.get(sale.trade.instrumentId) ?? [],
         position,
         position.get(sale.trade.id) ?? -1,
+        scope.zone,
       ),
   };
 }
@@ -217,13 +216,14 @@ function findUnlistedRepurchase(
   buys: readonly TradeEvent[],
   position: ReadonlyMap<string, number>,
   saleAt: number,
+  zone: string,
 ): UnlistedRepurchaseNotice | null {
-  const start = toCalendarDate(sale.trade.ts, FISCAL_TIME_ZONE);
+  const start = toCalendarDate(sale.trade.ts, zone);
   const end = addCalendarMonths(start, UNLISTED_NOTICE_WINDOW_MONTHS);
   const buy = buys.find(
     (b) =>
       (position.get(b.id) ?? 0) > saleAt &&
-      isWithin(toCalendarDate(b.ts, FISCAL_TIME_ZONE), start, end),
+      isWithin(toCalendarDate(b.ts, zone), start, end),
   );
   return buy
     ? { saleEventId: sale.trade.id, buyEventId: buy.id, buyTs: buy.ts }

@@ -2,17 +2,19 @@ import { describe, expect, it } from "vitest";
 
 import { createFormat } from "./format";
 
+const MADRID = "Europe/Madrid";
+
 const {
   formatAmount,
   formatClock,
-  formatDate,
+  formatInstant,
   formatMoney,
   formatPercent,
   formatPrice,
   formatQuantity,
   formatRelativeTime,
   formatSignedMoney,
-} = createFormat("es");
+} = createFormat("es", MADRID);
 
 const norm = (s: string) => s.replace(/[\s\u00a0\u202f]/g, " ");
 
@@ -29,9 +31,9 @@ describe("formatMoney", () => {
 describe("formatAmount", () => {
   it("formats an amount in another currency with two decimals and its code", () => {
     expect(norm(formatAmount("343.990000", "USD"))).toBe("343,99 USD");
-    expect(norm(createFormat("en").formatAmount("343.990000", "USD"))).toBe(
-      "343.99 USD",
-    );
+    expect(
+      norm(createFormat("en", MADRID).formatAmount("343.990000", "USD")),
+    ).toBe("343.99 USD");
   });
 
   it("formats an amount in euros exactly as formatMoney does", () => {
@@ -71,9 +73,9 @@ describe("formatPrice", () => {
   it("names another currency after the figure, by the same rule", () => {
     expect(norm(formatPrice("0.00000438", "USD"))).toBe("0,00000438 USD");
     expect(norm(formatPrice("343.99", "USD"))).toBe("343,99 USD");
-    expect(norm(createFormat("en").formatPrice("0.00000438", "USD"))).toBe(
-      "0.00000438 USD",
-    );
+    expect(
+      norm(createFormat("en", MADRID).formatPrice("0.00000438", "USD")),
+    ).toBe("0.00000438 USD");
   });
 });
 
@@ -98,11 +100,47 @@ describe("formatSignedMoney", () => {
   });
 });
 
-describe("formatDate", () => {
+describe("formatInstant", () => {
   it("renders a short es-ES date", () => {
-    const out = norm(formatDate("2026-07-01T10:00:00.000Z")).toLowerCase();
+    const out = norm(formatInstant("2026-07-01T10:00:00.000Z")).toLowerCase();
     expect(out).toContain("2026");
     expect(out).toContain("jul");
+  });
+
+  it("shows the instant on its day in the display zone", () => {
+    const newYear = "2026-12-31T23:30:00.000Z";
+    expect(norm(createFormat("en", MADRID).formatInstant(newYear))).toBe(
+      "1 Jan 2027",
+    );
+    expect(norm(createFormat("en", "UTC").formatInstant(newYear))).toBe(
+      "31 Dec 2026",
+    );
+    expect(
+      norm(createFormat("en", MADRID).formatInstant(Date.parse(newYear))),
+    ).toBe("1 Jan 2027");
+  });
+});
+
+describe("formatCalendarDate", () => {
+  it("is the same day in every display zone, west of UTC included", () => {
+    for (const zone of [
+      MADRID,
+      "UTC",
+      "Pacific/Pago_Pago",
+      "Pacific/Kiritimati",
+    ]) {
+      expect(
+        norm(createFormat("en", zone).formatCalendarDate("2026-07-01")),
+      ).toBe("1 Jul 2026");
+    }
+  });
+
+  it("refuses anything that is not a calendar day", () => {
+    const { formatCalendarDate } = createFormat("en", MADRID);
+    expect(() => formatCalendarDate("2026-07-01T10:00:00.000Z")).toThrow(
+      RangeError,
+    );
+    expect(() => formatCalendarDate("2026-02-30")).toThrow(RangeError);
   });
 });
 

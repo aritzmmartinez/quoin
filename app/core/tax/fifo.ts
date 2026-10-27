@@ -9,6 +9,8 @@ import {
 import { bookable } from "../fx";
 import { tradeAmounts } from "../swap";
 
+import type { Jurisdiction } from "./config";
+
 export interface FifoLot {
   id: string;
   instrumentId: string;
@@ -70,10 +72,11 @@ export function sortTrades(events: readonly LedgerEvent[]): TradeEvent[] {
 
 export function walkFifo(
   events: readonly LedgerEvent[],
+  jurisdiction: Jurisdiction,
   revalue?: Revalue,
 ): FifoWalk {
   const trades = sortTrades(events);
-  const amountsOf = tradeAmounts(trades);
+  const amountsOf = tradeAmounts(trades, jurisdiction);
 
   const restate: Revalue = revalue ?? ((money) => money);
   const queues = new Map<string, FifoLot[]>();

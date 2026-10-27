@@ -51,6 +51,7 @@ export function benchmarkCandidates(
 export function convertibleStarts(
   startsByCurrency: ReadonlyMap<string, ReadonlyMap<string, Date>>,
   book: RateBook,
+  zone: string,
 ): Map<string, Date> {
   const starts = new Map<string, Date>();
   const keep = (id: string, at: Date) => {
@@ -67,7 +68,7 @@ export function convertibleStarts(
     for (const [id, at] of byInstrument) {
       keep(
         id,
-        valuationRate(book, currency, dayOf(at)) !== null
+        valuationRate(book, currency, dayOf(at, zone)) !== null
           ? at
           : new Date(`${firstRate.day}T12:00:00Z`),
       );

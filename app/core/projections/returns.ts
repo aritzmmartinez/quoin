@@ -92,7 +92,7 @@ export function computeReturns(
   events: readonly LedgerEvent[],
   instrumentId: string,
   currentPrice: string | null,
-  now: Date = new Date(),
+  now: Date,
 ): ReturnsSummary {
   const trades = bookable(events)
     .filter(isTrade)

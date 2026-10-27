@@ -32,6 +32,7 @@ import {
 import { loadValuation } from "~/lib/rate-book.server";
 
 import { announceDatabase } from "./lib/db-target";
+import { loadResidence } from "~/lib/residence.server";
 
 const TOP = Number(
   process.argv.find((a) => a.startsWith("--top="))?.slice("--top=".length) ??
@@ -268,15 +269,17 @@ async function main(): Promise<void> {
 
   const priceRepository = new PrismaPriceRepository();
   const now = new Date();
+  const { jurisdiction } = await loadResidence();
+  const { zone } = jurisdiction;
   const [allEvents, instruments, valuation] = await Promise.all([
     new PrismaLedgerRepository().list(),
     new PrismaInstrumentRepository().list(),
-    loadValuation(now),
+    loadValuation(zone, now),
   ]);
   const { prices } = valuation;
 
   const names = new Map(instruments.map((i) => [i.id, i.name]));
-  const allPositions = computePositions(allEvents);
+  const allPositions = computePositions(allEvents, jurisdiction);
   const unpriced = unpricedOpenIds(
     allPositions,
     computeMarketValues(allPositions, prices, BASE_CURRENCY),
@@ -289,12 +292,16 @@ async function main(): Promise<void> {
   );
 
   const holdings: Holding[] = heldIds.map((id, index) => {
-    const { history } = historyInBase(histories[index] ?? [], valuation.book);
+    const { history } = historyInBase(
+      histories[index] ?? [],
+      valuation.book,
+      zone,
+    );
     return {
       id,
       name: names.get(id) ?? id,
       history,
-      timeline: computeCostBasisTimeline(events, id),
+      timeline: computeCostBasisTimeline(events, id, jurisdiction),
       series: computeInvestedVsValueSeries(
         events,
         id,
@@ -304,6 +311,7 @@ async function main(): Promise<void> {
         })),
         prices.get(id)?.price ?? null,
         now,
+        jurisdiction,
       ),
     };
   });

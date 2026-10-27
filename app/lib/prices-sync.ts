@@ -58,6 +58,7 @@ export interface SyncDeps {
   provider: MarketDataProvider;
   checks?: PriceSyncRepository;
   now?: Date;
+  zone: string;
 }
 
 function toSnapshot(
@@ -81,15 +82,15 @@ async function gapCandles(
 ): Promise<Quote[]> {
   const last = await deps.prices.lastAsOf(target.id);
   if (!last) return [];
-  const from = shiftDay(dayOf(last), -SYNC_OVERLAP_DAYS);
-  const yesterday = shiftDay(dayOf(now), -1);
+  const from = shiftDay(dayOf(last, deps.zone), -SYNC_OVERLAP_DAYS);
+  const yesterday = shiftDay(dayOf(now, deps.zone), -1);
   if (from > yesterday) return [];
   const history = await deps.provider.getHistory(target.quoteSymbol, {
     from: new Date(last.getTime() - (SYNC_OVERLAP_DAYS + 1) * DAY_MS),
     to: now,
   });
   return history.filter((quote) => {
-    const day = dayOf(quote.asOf);
+    const day = dayOf(quote.asOf, deps.zone);
     return day >= from && day <= yesterday;
   });
 }
@@ -124,6 +125,7 @@ export async function syncInstrumentPrices(
     target.id,
     candles.map((c) => toSnapshot(target.id, c, provider.source)),
     live,
+    deps.zone,
   );
   return result(written, problem);
 }

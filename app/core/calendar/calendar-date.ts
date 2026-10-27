@@ -27,36 +27,127 @@ export function calendarDate(
   return { year, month, day };
 }
 
-const formatters = new Map<string, Intl.DateTimeFormat>();
+const dateFormatters = new Map<string, Intl.DateTimeFormat>();
+const timeFormatters = new Map<string, Intl.DateTimeFormat>();
 
-function formatterFor(timeZone: string): Intl.DateTimeFormat {
-  let formatter = formatters.get(timeZone);
+function formatterFor(
+  cache: Map<string, Intl.DateTimeFormat>,
+  timeZone: string,
+  options: Intl.DateTimeFormatOptions,
+): Intl.DateTimeFormat {
+  let formatter = cache.get(timeZone);
   if (!formatter) {
-    formatter = new Intl.DateTimeFormat("en-CA", {
-      timeZone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
-    formatters.set(timeZone, formatter);
+    formatter = new Intl.DateTimeFormat("en-CA", { timeZone, ...options });
+    cache.set(timeZone, formatter);
   }
   return formatter;
 }
 
+function partsIn(
+  instant: Date | number,
+  timeZone: string,
+  withTime: boolean,
+): Record<string, number> {
+  const formatter = withTime
+    ? formatterFor(timeFormatters, timeZone, {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hourCycle: "h23",
+      })
+    : formatterFor(dateFormatters, timeZone, {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      });
+  const parts: Record<string, number> = {};
+  for (const part of formatter.formatToParts(instant)) {
+    if (part.type !== "literal") parts[part.type] = Number(part.value);
+  }
+  return parts;
+}
+
+/*
+ * Keyed by UTC minute, not quarter-hour. Every offset in force since 1980 is a
+ * multiple of 15 minutes, but not every transition falls on a quarter-hour:
+ * St John's switched at 00:01 local until 2011, Casey in 2020–2022. All of them,
+ * over every IANA zone, fall on a whole UTC minute, so every instant in one UTC
+ * minute shares a calendar day in any zone. Before 1980 not even offsets are
+ * round (Kiritimati ran at −10:40 until 1979), so older instants skip the cache.
+ */
+const BUCKET_MS = 60_000;
+const CACHE_FROM_MS = Date.UTC(1980, 0, 1);
+const CACHE_LIMIT = 4096;
+const dayCache = new Map<string, CalendarDate>();
+
+function readCalendarDate(ms: number, timeZone: string): CalendarDate {
+  const { year = 0, month = 0, day = 0 } = partsIn(ms, timeZone, false);
+  return calendarDate(year, month, day);
+}
+
 /** The calendar day `instant` falls on, read in `timeZone` (an IANA name). */
 export function toCalendarDate(instant: Date, timeZone: string): CalendarDate {
-  if (Number.isNaN(instant.getTime())) {
-    throw new RangeError("Invalid instant");
+  const ms = instant.getTime();
+  if (Number.isNaN(ms)) throw new RangeError("Invalid instant");
+  if (ms < CACHE_FROM_MS) return readCalendarDate(ms, timeZone);
+
+  const key = `${timeZone}|${Math.floor(ms / BUCKET_MS)}`;
+  const cached = dayCache.get(key);
+  if (cached) {
+    dayCache.delete(key);
+    dayCache.set(key, cached);
+    return cached;
   }
-  let year = 0;
-  let month = 0;
-  let day = 0;
-  for (const part of formatterFor(timeZone).formatToParts(instant)) {
-    if (part.type === "year") year = Number(part.value);
-    else if (part.type === "month") month = Number(part.value);
-    else if (part.type === "day") day = Number(part.value);
+  const date = readCalendarDate(ms, timeZone);
+  dayCache.set(key, date);
+  if (dayCache.size > CACHE_LIMIT) {
+    const oldest = dayCache.keys().next().value;
+    if (oldest !== undefined) dayCache.delete(oldest);
   }
-  return calendarDate(year, month, day);
+  return date;
+}
+
+export function calendarCacheSize(): number {
+  return dayCache.size;
+}
+
+export const CALENDAR_CACHE_LIMIT = CACHE_LIMIT;
+
+function offsetMs(ms: number, timeZone: string): number {
+  const p = partsIn(ms, timeZone, true);
+  const wall = Date.UTC(
+    p.year ?? 0,
+    (p.month ?? 1) - 1,
+    p.day ?? 1,
+    p.hour ?? 0,
+    p.minute ?? 0,
+    p.second ?? 0,
+  );
+  return wall - (ms - (((ms % 1000) + 1000) % 1000));
+}
+
+/**
+ * The instant `date` begins in `timeZone`. Throws for a zone whose clocks skip
+ * midnight itself (none of the zones Quoin resolves to do).
+ */
+export function startOfDay(date: CalendarDate, timeZone: string): Date {
+  const wall = Date.UTC(date.year, date.month - 1, date.day);
+  const first = wall - offsetMs(wall, timeZone);
+  const instant = wall - offsetMs(first, timeZone);
+  const p = partsIn(instant, timeZone, true);
+  if (
+    compareCalendarDates(toCalendarDate(new Date(instant), timeZone), date) !==
+      0 ||
+    p.hour !== 0 ||
+    p.minute !== 0 ||
+    p.second !== 0
+  ) {
+    throw new RangeError(`${toIsoDate(date)} has no midnight in ${timeZone}`);
+  }
+  return new Date(instant);
 }
 
 export function addCalendarMonths(date: CalendarDate, n: number): CalendarDate {

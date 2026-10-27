@@ -19,11 +19,14 @@ export function loadRateBook(currencies: Iterable<string>): Promise<RateBook> {
   return new PrismaFxRepository().book(ECB_SOURCE, foreign.sort());
 }
 
-export async function loadValuation(now: Date = new Date()): Promise<Valuation> {
+export async function loadValuation(
+  zone: string,
+  now: Date = new Date(),
+): Promise<Valuation> {
   const latest = await new PrismaPriceRepository().latest();
   const book = await loadRateBook(
     [...latest.values()].map((snapshot) => snapshot.currency),
   );
-  const { prices, unrated } = pricesInBase(latest, book, now);
+  const { prices, unrated } = pricesInBase(latest, book, now, zone);
   return { latest, prices, unrated, book };
 }

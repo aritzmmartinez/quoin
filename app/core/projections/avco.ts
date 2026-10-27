@@ -8,6 +8,7 @@ import {
 } from "../domain";
 import { bookable } from "../fx";
 import { tradeAmounts } from "../swap";
+import type { Jurisdiction } from "../tax/config";
 
 export interface AvcoLot {
   instrumentId: string;
@@ -38,13 +39,14 @@ function isTrade(event: LedgerEvent): event is TradeEvent {
 
 export function walkAvco(
   events: readonly LedgerEvent[],
+  jurisdiction: Jurisdiction,
   revalue?: Revalue,
 ): AvcoWalk {
   const trades = bookable(events)
     .filter(isTrade)
     .slice()
     .sort((a, b) => a.ts.getTime() - b.ts.getTime());
-  const amountsOf = tradeAmounts(trades);
+  const amountsOf = tradeAmounts(trades, jurisdiction);
 
   const restate: Revalue = revalue ?? ((money) => money);
   const lots = new Map<string, AvcoLot>();

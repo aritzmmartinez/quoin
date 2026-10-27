@@ -24,6 +24,8 @@ import {
   type FxSyncDeps,
 } from "./fx-sync";
 
+const MADRID = "Europe/Madrid";
+
 const rate = (quote: string, day: string, value: string): FxRate => ({
   source: "ECB",
   base: "EUR",
@@ -84,6 +86,7 @@ describe("syncFxRates", () => {
     ]);
 
     const result = await syncFxRates({
+      zone: MADRID,
       repository,
       provider,
       currencies: ["USD"],
@@ -117,6 +120,7 @@ describe("syncFxRates", () => {
     ]);
 
     await syncFxRates({
+      zone: MADRID,
       repository,
       provider,
       currencies: ["USD"],
@@ -132,6 +136,7 @@ describe("syncFxRates", () => {
     const { provider, calls } = fakeProvider(() => []);
 
     await syncFxRates({
+      zone: MADRID,
       repository,
       provider,
       currencies: ["CHF"],
@@ -152,6 +157,7 @@ describe("syncFxRates", () => {
     const firstUse = new Map([["USD", "2026-04-02"]]);
 
     await syncFxRates({
+      zone: MADRID,
       repository,
       provider,
       currencies: ["USD"],
@@ -164,6 +170,7 @@ describe("syncFxRates", () => {
 
     published = [...published, rate("USD", "2026-04-07", "1.2007")];
     const later = await syncFxRates({
+      zone: MADRID,
       repository,
       provider,
       currencies: ["USD"],
@@ -191,6 +198,7 @@ describe("syncFxRates", () => {
     ]);
 
     await syncFxRates({
+      zone: MADRID,
       repository,
       provider,
       currencies: ["USD"],
@@ -207,6 +215,7 @@ describe("syncFxRates", () => {
     const { provider, calls } = fakeProvider(() => []);
 
     await syncFxRates({
+      zone: MADRID,
       repository,
       provider,
       currencies: ["USD"],
@@ -227,6 +236,7 @@ describe("syncFxRates", () => {
     ]);
 
     const result = await syncFxRates({
+      zone: MADRID,
       repository,
       provider,
       currencies: ["USD"],
@@ -257,6 +267,7 @@ describe("syncFxRates", () => {
     };
 
     const result = await syncFxRates({
+      zone: MADRID,
       repository,
       provider,
       currencies: ["GBP", "USD"],
@@ -274,6 +285,7 @@ describe("syncFxRates", () => {
     const { provider } = fakeProvider(() => []);
 
     const result = await syncFxRates({
+      zone: MADRID,
       repository,
       provider,
       currencies: ["USDG"],
@@ -319,12 +331,15 @@ describe("syncStart", () => {
 describe("firstUseByCurrency", () => {
   it("keeps the earliest Madrid day of each currency but the base", () => {
     expect(
-      firstUseByCurrency([
-        { currency: "USD", at: new Date("2026-04-07T10:00:00Z") },
-        { currency: "EUR", at: new Date("2025-01-01T10:00:00Z") },
-        { currency: "GBP", at: new Date("2026-03-31T22:30:00Z") },
-        { currency: "USD", at: new Date("2026-02-27T10:00:00Z") },
-      ]),
+      firstUseByCurrency(
+        [
+          { currency: "USD", at: new Date("2026-04-07T10:00:00Z") },
+          { currency: "EUR", at: new Date("2025-01-01T10:00:00Z") },
+          { currency: "GBP", at: new Date("2026-03-31T22:30:00Z") },
+          { currency: "USD", at: new Date("2026-02-27T10:00:00Z") },
+        ],
+        MADRID,
+      ),
     ).toEqual(
       new Map([
         ["GBP", "2026-04-01"],
@@ -335,9 +350,10 @@ describe("firstUseByCurrency", () => {
 
   it("is empty for a portfolio held only in the base currency", () => {
     expect(
-      firstUseByCurrency([
-        { currency: "EUR", at: new Date("2026-04-07T10:00:00Z") },
-      ]),
+      firstUseByCurrency(
+        [{ currency: "EUR", at: new Date("2026-04-07T10:00:00Z") }],
+        MADRID,
+      ),
     ).toEqual(new Map());
   });
 });
@@ -362,7 +378,12 @@ describe("ensureRates", () => {
     ]);
 
     const ensured = await ensureRates(
-      { repository, provider, now: new Date("2026-04-07T18:00:00Z") },
+      {
+        zone: MADRID,
+        repository,
+        provider,
+        now: new Date("2026-04-07T18:00:00Z"),
+      },
       new Map([
         ["USD", "2026-04-06"],
         ["EUR", "2026-04-01"],
@@ -381,7 +402,7 @@ describe("ensureRates", () => {
     const { provider, calls } = fakeProvider(() => []);
 
     const ensured = await ensureRates(
-      { repository, provider },
+      { zone: MADRID, repository, provider },
       new Map([["EUR", "2026-04-01"]]),
     );
 
@@ -400,7 +421,12 @@ describe("ensureRates", () => {
     };
 
     const ensured = await ensureRates(
-      { repository, provider, now: new Date("2026-04-07T18:00:00Z") },
+      {
+        zone: MADRID,
+        repository,
+        provider,
+        now: new Date("2026-04-07T18:00:00Z"),
+      },
       new Map([["USD", "2026-04-06"]]),
     );
 

@@ -11,3 +11,4 @@ export * from "./security-identity-repository";
 export * from "./target-repository";
 export * from "./fx-repository";
 export * from "./fx-rate-provider";
+export * from "./settings-repository";

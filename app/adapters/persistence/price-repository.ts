@@ -37,6 +37,7 @@ export class PrismaPriceRepository implements PriceRepository {
     instrumentId: string,
     candles: readonly PriceSnapshot[],
     live: PriceSnapshot | null,
+    zone: string,
   ): Promise<DailyWriteCount> {
     const incoming = live ? [...candles, live] : candles;
     if (incoming.length === 0)
@@ -54,7 +55,7 @@ export class PrismaPriceRepository implements PriceRepository {
           currency: true,
         },
       });
-      const plan = planDailyWrite(stored, candles, live);
+      const plan = planDailyWrite(stored, candles, live, zone);
       if (plan.remove.length > 0) {
         await tx.priceSnapshot.deleteMany({
           where: { id: { in: plan.remove } },

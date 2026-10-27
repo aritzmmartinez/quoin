@@ -134,7 +134,7 @@ function CheckDetail({
 }) {
   const {
     formatAmount,
-    formatDate,
+    formatInstant,
     formatPercent,
     formatPrice,
     formatRelativeTime,
@@ -187,7 +187,7 @@ function CheckDetail({
                 className={trade.off ? "text-negative" : "text-text"}
               >
                 {copy.tradeLine(
-                  formatDate(trade.ts),
+                  formatInstant(trade.ts),
                   formatPrice(trade.traded),
                   formatPrice(trade.close),
                   formatPercent(trade.deviation, 1, { signed: true }),

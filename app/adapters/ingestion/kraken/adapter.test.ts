@@ -22,6 +22,10 @@ import { AFFECTS_POSITION, DISCARD_REASONS } from "../discard";
 import { KrakenCsvAdapter } from "./adapter";
 import { KrakenBalanceMismatchError } from "./balance";
 import { krakenCsv, type KrakenFixtureRow } from "./csv-fixture";
+import { jurisdictionOf } from "~/core/tax";
+
+const MADRID = "Europe/Madrid";
+const BIZKAIA = jurisdictionOf("bizkaia");
 
 class FakeInstrumentRepository implements InstrumentRepository {
   upserted: Instrument[] = [];
@@ -183,6 +187,7 @@ describe("KrakenCsvAdapter", () => {
     adapter = new KrakenCsvAdapter(
       instruments,
       ledger,
+      MADRID,
       new FakePriceRepository([btcAt("2025-11-24T00:00:00Z", "80000")]),
     );
   });
@@ -231,7 +236,7 @@ describe("KrakenCsvAdapter", () => {
   });
 
   it("discards the reward when no price is available for it", async () => {
-    const blind = new KrakenCsvAdapter(instruments, ledger);
+    const blind = new KrakenCsvAdapter(instruments, ledger, MADRID);
 
     const summary = await blind.import(CSV);
 
@@ -304,6 +309,7 @@ describe("KrakenCsvAdapter in another fiat currency", () => {
     const adapter = new KrakenCsvAdapter(
       new FakeInstrumentRepository(),
       ledger,
+      MADRID,
       new FakePriceRepository([usdBtc("2026-01-06", "99000")]),
       async (currencies) => {
         asked.push([...currencies]);
@@ -329,6 +335,7 @@ describe("KrakenCsvAdapter in another fiat currency", () => {
     const adapter = new KrakenCsvAdapter(
       new FakeInstrumentRepository(),
       new FakeLedgerRepository(),
+      MADRID,
       new FakePriceRepository([]),
       async () => rateBookFrom([]),
     );
@@ -476,6 +483,7 @@ describe("KrakenCsvAdapter discards", () => {
     const adapter = new KrakenCsvAdapter(
       new FakeInstrumentRepository(),
       new FakeLedgerRepository(),
+      MADRID,
       new FakePriceRepository([]),
     );
 
@@ -558,7 +566,7 @@ describe("KrakenCsvAdapter and the balance column", () => {
       },
     ]);
 
-    const plan = new KrakenCsvAdapter(instruments, ledger).import(csv);
+    const plan = new KrakenCsvAdapter(instruments, ledger, MADRID).import(csv);
 
     await expect(plan).rejects.toBeInstanceOf(KrakenBalanceMismatchError);
     await expect(plan).rejects.toMatchObject({
@@ -677,6 +685,7 @@ describe("KrakenCsvAdapter over the shapes of a real export", () => {
     const summary = await new KrakenCsvAdapter(
       instruments,
       ledger,
+      MADRID,
       new FakePriceRepository([]),
       async () => usd,
     ).import(EXPORT);
@@ -808,6 +817,7 @@ describe("KrakenCsvAdapter and instruments already known", () => {
     const batch = await new KrakenCsvAdapter(
       instruments,
       new FakeLedgerRepository(),
+      MADRID,
     ).plan(csv);
 
     expect(batch.instruments.map((i) => [i.id, i.name]).sort()).toEqual([
@@ -902,6 +912,7 @@ describe("KrakenCsvAdapter and swaps", () => {
     const summary = await new KrakenCsvAdapter(
       instruments,
       ledger,
+      MADRID,
       new FakePriceRepository([closeOf("SOL", "150"), closeOf("DOGE", "0.2")]),
       async () => usd,
     ).import(EXPORT);
@@ -960,7 +971,7 @@ describe("KrakenCsvAdapter and swaps", () => {
       (e): e is Extract<LedgerEvent, { type: "BUY" | "SELL" }> =>
         e.type === "BUY" || e.type === "SELL",
     );
-    const amountsOf = tradeAmounts(trades);
+    const amountsOf = tradeAmounts(trades, BIZKAIA);
     const sell = trades.find((e) => e.type === "SELL")!;
     const buy = trades.find((e) => e.type === "BUY")!;
 
@@ -979,7 +990,7 @@ describe("KrakenCsvAdapter and swaps", () => {
       (e): e is Extract<LedgerEvent, { type: "BUY" | "SELL" }> =>
         e.linkId === "S2" && (e.type === "BUY" || e.type === "SELL"),
     );
-    const amountsOf = tradeAmounts(trades);
+    const amountsOf = tradeAmounts(trades, BIZKAIA);
     const sell = trades.find((e) => e.type === "SELL")!;
     const buy = trades.find((e) => e.type === "BUY")!;
 
@@ -1009,6 +1020,7 @@ describe("KrakenCsvAdapter and swaps", () => {
     const plan = new KrakenCsvAdapter(
       new FakeInstrumentRepository(),
       new FakeLedgerRepository(),
+      MADRID,
     ).import(wrong);
     await expect(plan).rejects.toBeInstanceOf(KrakenBalanceMismatchError);
   });
@@ -1063,6 +1075,7 @@ describe("KrakenCsvAdapter and money moved to Earn", () => {
     const summary = await new KrakenCsvAdapter(
       new FakeInstrumentRepository(),
       ledger,
+      MADRID,
     ).import(krakenCsv(rows));
     return { summary, ledger };
   }

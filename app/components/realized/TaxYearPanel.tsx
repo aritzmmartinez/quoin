@@ -321,7 +321,7 @@ function DeferredCard({
     amount: string;
   }[];
 }) {
-  const { formatDate } = useFormat();
+  const { formatInstant } = useFormat();
 
   return (
     <Card className="p-6">
@@ -344,9 +344,9 @@ function DeferredCard({
               role="row"
               className={`grid ${TAX_DEFERRED_GRID} gap-2 border-b border-border py-2 text-[12.5px] last:border-b-0`}
             >
-              <span className="font-mono">{formatDate(row.t)}</span>
+              <span className="font-mono">{formatInstant(row.t)}</span>
               <span className="truncate">{row.name}</span>
-              <span className="font-mono">{formatDate(row.originT)}</span>
+              <span className="font-mono">{formatInstant(row.originT)}</span>
               <span className="text-right font-mono tabular-nums">
                 <SignedMoney value={row.amount} />
               </span>

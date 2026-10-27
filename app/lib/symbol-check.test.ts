@@ -21,6 +21,10 @@ import {
   type TradeComparison,
 } from "./symbol-check";
 import type { EnsureRates } from "./fx-sync";
+import { jurisdictionOf } from "~/core/tax";
+
+const MADRID = "Europe/Madrid";
+const BIZKAIA = jurisdictionOf("bizkaia");
 
 const NOW = new Date("2026-07-13T12:00:00.000Z");
 
@@ -247,6 +251,7 @@ describe("compareTrades", () => {
         close("2025-07-30T07:00:00Z", "23.88"),
         close("2025-07-31T07:00:00Z", "30"),
       ],
+      MADRID,
     );
 
     expect(row).toMatchObject({ close: "23.88", traded: "23.91", off: false });
@@ -255,16 +260,16 @@ describe("compareTrades", () => {
 
   it("never takes the candle of the trade's own day, whose close came later", () => {
     expect(
-      compareTrades([mark], [close("2025-07-31T07:00:00Z", "23.88")]),
+      compareTrades([mark], [close("2025-07-31T07:00:00Z", "23.88")], MADRID),
     ).toEqual([]);
   });
 
   it("never reaches forward, and skips a trade with no close in the week before", () => {
     expect(
-      compareTrades([mark], [close("2025-08-01T07:00:00Z", "23.88")]),
+      compareTrades([mark], [close("2025-08-01T07:00:00Z", "23.88")], MADRID),
     ).toEqual([]);
     expect(
-      compareTrades([mark], [close("2025-07-20T07:00:00Z", "23.88")]),
+      compareTrades([mark], [close("2025-07-20T07:00:00Z", "23.88")], MADRID),
     ).toEqual([]);
   });
 
@@ -272,6 +277,7 @@ describe("compareTrades", () => {
     const [row] = compareTrades(
       [mark],
       [close("2025-07-30T07:00:00Z", "29.85", "USD")],
+      MADRID,
       USD_BOOK,
     );
 
@@ -280,7 +286,11 @@ describe("compareTrades", () => {
 
   it("skips a trade whose day has no rate rather than compare across currencies", () => {
     expect(
-      compareTrades([mark], [close("2025-07-31T07:00:00Z", "29.85", "USD")]),
+      compareTrades(
+        [mark],
+        [close("2025-07-31T07:00:00Z", "29.85", "USD")],
+        MADRID,
+      ),
     ).toEqual([]);
   });
 
@@ -288,6 +298,7 @@ describe("compareTrades", () => {
     const [row] = compareTrades(
       [mark],
       [close("2025-07-30T07:00:00Z", "131.5")],
+      MADRID,
     );
     expect(row?.off).toBe(true);
   });
@@ -353,6 +364,7 @@ describe("checkQuoteAgainstLedger", () => {
       ID,
       "TEST.DE",
       NO_RATES,
+      BIZKAIA,
     );
 
     expect(check?.closed).toBe(true);
@@ -374,6 +386,7 @@ describe("checkQuoteAgainstLedger", () => {
       ID,
       "TEST.DE",
       NO_RATES,
+      BIZKAIA,
     );
     expect(none.asked).toEqual([DAILY_HISTORY_PROBE]);
     expect(check?.dailyHistory).toBe(true);
@@ -387,6 +400,7 @@ describe("checkQuoteAgainstLedger", () => {
       ID,
       "XS00TEST0001.SG",
       NO_RATES,
+      BIZKAIA,
     );
 
     expect(check?.dailyHistory).toBe(false);
@@ -406,6 +420,7 @@ describe("checkQuoteAgainstLedger", () => {
       ID,
       "TEST.DE",
       NO_RATES,
+      BIZKAIA,
     );
 
     expect(check?.dailyHistory).toBe(true);
@@ -429,6 +444,7 @@ describe("checkQuoteAgainstLedger", () => {
       ID,
       "TEST",
       rates,
+      BIZKAIA,
     );
 
     expect(asked).toEqual([["USD", "2025-07-23"]]);
@@ -446,6 +462,7 @@ describe("checkQuoteAgainstLedger", () => {
       ID,
       "TEST",
       NO_RATES,
+      BIZKAIA,
     );
 
     expect(xyz.asked).toEqual([DAILY_HISTORY_PROBE]);
@@ -456,7 +473,7 @@ describe("checkQuoteAgainstLedger", () => {
   it("is null when the provider has no quote", async () => {
     const { provider: market } = provider(null, []);
     expect(
-      await checkQuoteAgainstLedger(market, [], ID, "NOPE", NO_RATES),
+      await checkQuoteAgainstLedger(market, [], ID, "NOPE", NO_RATES, BIZKAIA),
     ).toBeNull();
   });
 });

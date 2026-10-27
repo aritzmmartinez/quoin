@@ -24,13 +24,14 @@ export function pricesStatus(input: {
   relevant: readonly { id: string; name: string }[];
   latest: ReadonlyMap<string, { asOf: Date }>;
   checked: ReadonlyMap<string, Date>;
+  zone: string;
 }): SourceStatus {
   let lagging: { name: string; day: string } | null = null;
   let ahead = false;
   for (const { id, name } of input.relevant) {
     const asOf = input.latest.get(id)?.asOf;
     if (!asOf) continue;
-    const day = dayOf(asOf);
+    const day = dayOf(asOf, input.zone);
     if (lagging === null) lagging = { name, day };
     else if (day < lagging.day) {
       ahead = true;

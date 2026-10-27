@@ -2,26 +2,28 @@ import { describe, expect, it } from "vitest";
 
 import { dayOf, shiftDay } from "./day";
 
+const MADRID = "Europe/Madrid";
+
 describe("dayOf — the Madrid calendar day", () => {
   it("winter: Madrid is UTC+1", () => {
-    expect(dayOf(new Date("2026-03-28T22:59:59Z"))).toBe("2026-03-28");
-    expect(dayOf(new Date("2026-03-28T23:00:00Z"))).toBe("2026-03-29");
+    expect(dayOf(new Date("2026-03-28T22:59:59Z"), MADRID)).toBe("2026-03-28");
+    expect(dayOf(new Date("2026-03-28T23:00:00Z"), MADRID)).toBe("2026-03-29");
   });
 
   it("summer: Madrid is UTC+2, across the March switch", () => {
-    expect(dayOf(new Date("2026-03-29T21:59:59Z"))).toBe("2026-03-29");
-    expect(dayOf(new Date("2026-03-29T22:00:00Z"))).toBe("2026-03-30");
+    expect(dayOf(new Date("2026-03-29T21:59:59Z"), MADRID)).toBe("2026-03-29");
+    expect(dayOf(new Date("2026-03-29T22:00:00Z"), MADRID)).toBe("2026-03-30");
   });
 
   it("across the October switch back to UTC+1", () => {
-    expect(dayOf(new Date("2026-10-24T21:59:59Z"))).toBe("2026-10-24");
-    expect(dayOf(new Date("2026-10-24T22:00:00Z"))).toBe("2026-10-25");
-    expect(dayOf(new Date("2026-10-25T22:59:59Z"))).toBe("2026-10-25");
-    expect(dayOf(new Date("2026-10-25T23:00:00Z"))).toBe("2026-10-26");
+    expect(dayOf(new Date("2026-10-24T21:59:59Z"), MADRID)).toBe("2026-10-24");
+    expect(dayOf(new Date("2026-10-24T22:00:00Z"), MADRID)).toBe("2026-10-25");
+    expect(dayOf(new Date("2026-10-25T22:59:59Z"), MADRID)).toBe("2026-10-25");
+    expect(dayOf(new Date("2026-10-25T23:00:00Z"), MADRID)).toBe("2026-10-26");
   });
 
   it("New Year's Eve after 23:00 UTC is already next year", () => {
-    expect(dayOf(new Date("2026-12-31T23:30:00Z"))).toBe("2027-01-01");
+    expect(dayOf(new Date("2026-12-31T23:30:00Z"), MADRID)).toBe("2027-01-01");
   });
 });
 
@@ -36,5 +38,13 @@ describe("shiftDay", () => {
   it("is unaffected by the DST switch, being calendar arithmetic", () => {
     expect(shiftDay("2026-03-30", -1)).toBe("2026-03-29");
     expect(shiftDay("2026-10-26", -1)).toBe("2026-10-25");
+  });
+});
+
+describe("the test process", () => {
+  it("runs in UTC+14, where a read of the process's own zone lands on another day", () => {
+    expect(Intl.DateTimeFormat().resolvedOptions().timeZone).toBe(
+      "Pacific/Kiritimati",
+    );
   });
 });

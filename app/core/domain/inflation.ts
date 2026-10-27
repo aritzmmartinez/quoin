@@ -4,22 +4,6 @@ import { Money } from "./money";
 
 export type Period = string;
 
-const MONTH_IN_MADRID = new Intl.DateTimeFormat("en-CA", {
-  timeZone: "Europe/Madrid",
-  year: "numeric",
-  month: "2-digit",
-});
-
-export function periodOf(date: Date): Period {
-  const parts = MONTH_IN_MADRID.formatToParts(date);
-  const year = parts.find((p) => p.type === "year")?.value;
-  const month = parts.find((p) => p.type === "month")?.value;
-  if (!year || !month) {
-    throw new Error(`Cannot derive a period from ${date.toISOString()}`);
-  }
-  return `${year}-${month}`;
-}
-
 export type Revalue = (money: Money, ts: Date) => Money;
 
 export interface IndexPoint {

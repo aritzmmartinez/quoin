@@ -41,6 +41,7 @@ import {
   useCopy,
 } from "~/lib";
 import { loadRateBook } from "~/lib/rate-book.server";
+import { loadResidence } from "~/lib/residence.server";
 import { unratedNames } from "~/lib/unrated";
 
 export function meta({ matches }: Route.MetaArgs) {
@@ -60,14 +61,16 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const now = new Date();
   const page = parsePage(new URL(request.url).searchParams);
 
-  const [instrument, events, history] = await Promise.all([
+  const [instrument, events, history, { jurisdiction }] = await Promise.all([
     new PrismaInstrumentRepository().get(id),
     new PrismaLedgerRepository().list(),
     new PrismaPriceRepository().historyFor(id),
+    loadResidence(),
   ]);
+  const { zone } = jurisdiction;
   if (!instrument) throw new Response("Not found", { status: 404 });
 
-  const positions = computePositions(events).filter(
+  const positions = computePositions(events, jurisdiction).filter(
     (p) => p.instrumentId === id,
   );
   let quantity = new Decimal(0);
@@ -81,9 +84,15 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const { history: baseHistory, unrated: unratedCloses } = historyInBase(
     history,
     book,
+    zone,
   );
   const last = history.at(-1);
-  const current = pricesInBase(new Map(last ? [[id, last]] : []), book, now);
+  const current = pricesInBase(
+    new Map(last ? [[id, last]] : []),
+    book,
+    now,
+    zone,
+  );
   const latest = current.prices.get(id) ?? null;
   const currentPrice = latest ? latest.price : null;
   const priced = currentPrice !== null && quantity.gt(0);
@@ -95,7 +104,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const returns = computeReturns(events, id, currentPrice, now);
 
   const priceChartData = buildPriceChartData(
-    computeCostBasisTimeline(events, id),
+    computeCostBasisTimeline(events, id, jurisdiction),
     [
       ...baseHistory.map((s) => ({
         t: s.asOf.getTime(),
@@ -113,6 +122,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     baseHistory.map((s) => ({ asOf: s.asOf, price: s.price })),
     currentPrice,
     now,
+    jurisdiction,
   ).map((pt) => ({
     t: pt.t,
     invested: Number(pt.invested),

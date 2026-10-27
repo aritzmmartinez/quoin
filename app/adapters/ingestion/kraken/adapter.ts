@@ -28,6 +28,7 @@ export class KrakenCsvAdapter {
   constructor(
     private readonly instruments: InstrumentRepository,
     private readonly ledger: LedgerRepository,
+    private readonly zone: string,
     private readonly prices: PriceRepository | null = null,
     private readonly rates: RateBookLoader | null = null,
   ) {}
@@ -47,11 +48,16 @@ export class KrakenCsvAdapter {
     const priceAt = priceLookupFrom(histories);
 
     const builder = new BatchBuilder(
-      await rateLookupFor(this.rates, [
-        ...rows.filter((row) => row.subclass === "fiat").map((r) => r.asset),
-        ...histories.map((snapshot) => snapshot.currency),
-        ...(rows.some((row) => row.amountusd) ? ["USD"] : []),
-      ]),
+      this.zone,
+      await rateLookupFor(
+        this.rates,
+        [
+          ...rows.filter((row) => row.subclass === "fiat").map((r) => r.asset),
+          ...histories.map((snapshot) => snapshot.currency),
+          ...(rows.some((row) => row.amountusd) ? ["USD"] : []),
+        ],
+        this.zone,
+      ),
     );
     const internal: KrakenRow[] = [];
     for (const group of groups.values()) {

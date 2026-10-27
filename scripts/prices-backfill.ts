@@ -19,6 +19,7 @@ import {
 import { ensureRatesNow } from "~/lib/fx-sync.server";
 
 import { announceDatabase } from "./lib/db-target";
+import { loadResidence } from "~/lib/residence.server";
 
 function usage(): string {
   return [
@@ -66,6 +67,7 @@ async function main(): Promise<void> {
 
   const provider = new YahooMarketDataProvider();
   const repository = new PrismaPriceRepository();
+  const { calendarZone } = await loadResidence();
   let total = 0;
 
   for (const instrument of targets) {
@@ -75,6 +77,7 @@ async function main(): Promise<void> {
       { id: instrument.id, quoteSymbol: instrument.quoteSymbol },
       range,
       ensureRatesNow,
+      calendarZone,
     );
     total += report.written;
 

@@ -18,7 +18,7 @@ const instrument = (id: string, name: string): Instrument => ({
 const plan: PortfolioTarget = {
   id: "v1",
   name: "Savings plan",
-  activeFrom: new Date("2026-01-01T00:00:00.000Z"),
+  activeFrom: "2026-01-01",
   note: null,
   createdAt: new Date("2026-01-01T00:00:00.000Z"),
   lines: [
@@ -81,7 +81,7 @@ describe("toTargetVersionRows", () => {
     const older: PortfolioTarget = {
       ...plan,
       id: "v0",
-      activeFrom: new Date("2025-06-01T00:00:00.000Z"),
+      activeFrom: "2025-06-01",
       lines: [{ instrumentId: "HELD", monthlyAmount: "250" }],
     };
 
@@ -89,7 +89,7 @@ describe("toTargetVersionRows", () => {
       {
         id: "v1",
         name: "Savings plan",
-        activeFrom: "2026-01-01T00:00:00.000Z",
+        activeFrom: "2026-01-01",
         note: null,
         monthlyTotal: "500",
         lineCount: 3,
@@ -98,7 +98,7 @@ describe("toTargetVersionRows", () => {
       {
         id: "v0",
         name: "Savings plan",
-        activeFrom: "2025-06-01T00:00:00.000Z",
+        activeFrom: "2025-06-01",
         note: null,
         monthlyTotal: "250",
         lineCount: 1,

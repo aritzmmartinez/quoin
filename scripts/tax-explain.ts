@@ -7,18 +7,18 @@ import {
   PrismaLedgerRepository,
   prisma,
 } from "~/adapters/persistence";
-import { toCalendarDate, toIsoDate } from "~/core/calendar";
+import { dayOf, toIsoDate, today } from "~/core/calendar";
 import { Money } from "~/core/domain";
 import {
-  FISCAL_TIME_ZONE,
   carryforwardFrom,
   computeSavingsQuota,
   computeTaxHistory,
   getTaxScale,
   taxYearOf,
+  type Jurisdiction,
   type RealizedGainDetail,
 } from "~/core/tax";
-import { todayInMadrid } from "~/lib/format";
+import { loadResidence } from "~/lib/residence.server";
 import {
   taxExclusions,
   taxOptionsFor,
@@ -41,11 +41,12 @@ function eur(value: string): string {
   return new Decimal(value).toFixed(2).padStart(12);
 }
 
-function day(t: Date): string {
-  return toIsoDate(toCalendarDate(t, FISCAL_TIME_ZONE));
-}
+let JURISDICTION: Jurisdiction;
+let TODAY = "";
 
-const TODAY = todayInMadrid();
+function day(t: Date): string {
+  return dayOf(t, JURISDICTION.zone);
+}
 
 function printSale(gain: RealizedGainDetail, names: Map<string, string>): void {
   const name = names.get(gain.instrumentId) ?? gain.instrumentId;
@@ -107,6 +108,9 @@ function printSale(gain: RealizedGainDetail, names: Map<string, string>): void {
 async function main(): Promise<void> {
   announceDatabase();
 
+  JURISDICTION = (await loadResidence()).jurisdiction;
+  TODAY = today(JURISDICTION.zone, new Date());
+
   const [events, instruments] = await Promise.all([
     new PrismaLedgerRepository().list(),
     new PrismaInstrumentRepository().list(),
@@ -133,7 +137,10 @@ async function main(): Promise<void> {
     );
   }
 
-  const history = computeTaxHistory(events, taxOptionsFor(instruments));
+  const history = computeTaxHistory(
+    events,
+    taxOptionsFor(instruments, JURISDICTION),
+  );
   const saleDays = new Map(history.gains.map((g) => [g.eventId, day(g.ts)]));
   const result = taxYearOf(history, YEAR);
 

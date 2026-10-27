@@ -36,6 +36,7 @@ const NOMINAL = (basis: Basis): RealView => ({
 export async function resolveRealView(
   request: Request,
   events: readonly LedgerEvent[],
+  zone: string,
 ): Promise<RealView> {
   const basis = parseBasis(request.headers.get("Cookie"));
   if (basis === "nominal") return NOMINAL(basis);
@@ -52,7 +53,7 @@ export async function resolveRealView(
   }
 
   const checkStale = ipcSyncStale(syncedAt, new Date());
-  const resolved = realBasis(index, events);
+  const resolved = realBasis(index, events, zone);
   if (!resolved.ok) {
     return {
       basis,

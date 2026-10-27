@@ -1042,6 +1042,8 @@ export const es = {
       idMismatch: (pairs: string): string =>
         `No se ha guardado nada. Estos identificadores no coinciden con los importados: ${pairs}. Una línea se une a su instrumento por identificador exacto, así que nunca resolverían.`,
       saveFailed: "No se ha podido guardar la versión.",
+      dayTaken: (name: string, day: string): string =>
+        `No se ha guardado nada. «${name}» ya entra en vigor el ${day}, y cada día admite una sola versión. Bórrala primero si esta la sustituye.`,
     },
   },
   projection: {

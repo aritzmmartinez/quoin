@@ -51,6 +51,7 @@ import {
   heldQuantity,
   type SymbolCheck,
 } from "./symbol-check";
+import { loadResidence } from "./residence.server";
 
 export type * from "./ingest";
 
@@ -65,15 +66,22 @@ async function plan(
 
   const instruments = new PrismaInstrumentRepository();
   const ledger = new PrismaLedgerRepository();
+  const { calendarZone } = await loadResidence();
   const adapter =
     broker === "kraken"
       ? new KrakenCsvAdapter(
           instruments,
           ledger,
+          calendarZone,
           new PrismaPriceRepository(),
           loadRateBook,
         )
-      : new TradeRepublicCsvAdapter(instruments, ledger, loadRateBook);
+      : new TradeRepublicCsvAdapter(
+          instruments,
+          ledger,
+          calendarZone,
+          loadRateBook,
+        );
 
   try {
     const batch = await planWithRates(() => adapter.plan(csv), ensureRatesNow);
@@ -127,11 +135,12 @@ async function pendingMappings(batch: MappedBatch): Promise<PendingMapping[]> {
   if (batch.instruments.length === 0) return [];
 
   const touched = new Set(batch.instruments.map((i) => i.id));
-  const [stored, events] = await Promise.all([
+  const [stored, events, { jurisdiction }] = await Promise.all([
     new PrismaInstrumentRepository().list(),
     new PrismaLedgerRepository().list(),
+    loadResidence(),
   ]);
-  const positions = computePositions(events);
+  const positions = computePositions(events, jurisdiction);
 
   return stored
     .filter((i) => touched.has(i.id) && !i.quoteSymbol)
@@ -155,6 +164,7 @@ export async function checkQuoteSymbol(
     instrumentId,
     symbol,
     ensureRatesNow,
+    (await loadResidence()).jurisdiction,
   );
   if (!check) {
     throw new IngestError(
@@ -176,6 +186,7 @@ export async function mapQuoteSymbol(
     instrumentId,
     symbol,
     ensureRatesNow,
+    (await loadResidence()).calendarZone,
   );
   if (result.ok) return;
   switch (result.reason) {
@@ -212,6 +223,7 @@ export async function replaceHistory(
       prices: new PrismaPriceRepository(),
       provider: new YahooMarketDataProvider(),
       rates: ensureRatesNow,
+      zone: (await loadResidence()).calendarZone,
     },
     { instrumentId, symbol, range },
   );
@@ -225,6 +237,7 @@ export async function fillPrices(
   const prices = new PrismaPriceRepository();
   const provider = new YahooMarketDataProvider();
   const checks = new PrismaPriceSyncRepository();
+  const { calendarZone } = await loadResidence();
 
   const wanted = new Set(instrumentIds);
   const targets = (await instruments.list()).flatMap((i) =>
@@ -239,6 +252,7 @@ export async function fillPrices(
     targets,
     range,
     ensureRatesNow,
+    calendarZone,
   );
 
   for (const report of backfilled) {
@@ -263,7 +277,11 @@ export async function fillPrices(
     targets.filter(
       (t) => !refused.has(t.id) && !unreachable.has(t.id) && !unrated.has(t.id),
     ),
-    (target) => syncInstrumentPrices({ prices, provider, checks }, target),
+    (target) =>
+      syncInstrumentPrices(
+        { prices, provider, checks, zone: calendarZone },
+        target,
+      ),
     {
       onError: (error, target) => {
         if (haltsSync(error)) throw error;
