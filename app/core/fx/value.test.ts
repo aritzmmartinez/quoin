@@ -4,6 +4,8 @@ import type { FxRate, PriceSnapshot } from "../ports";
 import { rateBookFrom } from "./rates";
 import { historyInBase, pricesInBase } from "./value";
 
+const MADRID = "Europe/Madrid";
+
 const usd = (day: string, rate: string): FxRate => ({
   source: "ECB",
   base: "EUR",
@@ -32,6 +34,7 @@ describe("pricesInBase", () => {
       new Map([["US00TEST0001", snapshot("2026-04-07T20:00:00Z", "160")]]),
       BOOK,
       new Date("2026-04-08T09:00:00Z"),
+      MADRID,
     );
     expect(prices.get("US00TEST0001")).toMatchObject({
       price: "100",
@@ -45,6 +48,7 @@ describe("pricesInBase", () => {
       new Map([["US00TEST0001", snapshot("2026-04-02T20:00:00Z", "160")]]),
       BOOK,
       new Date("2026-04-08T09:00:00Z"),
+      MADRID,
     );
     expect(prices.get("US00TEST0001")?.price).toBe("100");
   });
@@ -55,6 +59,7 @@ describe("pricesInBase", () => {
       new Map([["IE00TEST0001", eur]]),
       BOOK,
       new Date("2026-04-08T09:00:00Z"),
+      MADRID,
     );
     expect(prices.get("IE00TEST0001")).toBe(eur);
   });
@@ -67,6 +72,7 @@ describe("pricesInBase", () => {
       ]),
       BOOK,
       new Date("2026-04-20T09:00:00Z"),
+      MADRID,
     );
     expect(prices.size).toBe(0);
     expect(unrated).toEqual(
@@ -87,6 +93,7 @@ describe("historyInBase", () => {
         snapshot("2026-04-07T20:00:00Z", "160"),
       ],
       BOOK,
+      MADRID,
     );
     expect(history.map((s) => s.price)).toEqual(["100", "200", "100"]);
     expect(history.every((s) => s.currency === "EUR")).toBe(true);
@@ -100,6 +107,7 @@ describe("historyInBase", () => {
         snapshot("2026-04-02T20:00:00Z", "125"),
       ],
       BOOK,
+      MADRID,
     );
     expect(history.map((s) => s.price)).toEqual(["100"]);
     expect(unrated).toBe(1);
@@ -109,6 +117,7 @@ describe("historyInBase", () => {
     const { history } = historyInBase(
       [snapshot("2026-04-06T22:30:00Z", "160")],
       BOOK,
+      MADRID,
     );
     expect(history[0]?.price).toBe("100");
   });

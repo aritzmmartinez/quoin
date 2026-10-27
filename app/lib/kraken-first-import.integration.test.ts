@@ -23,6 +23,8 @@ import {
 } from "./prices-backfill";
 import { assignQuoteSymbol } from "./quote-symbol";
 
+const MADRID = "Europe/Madrid";
+
 type Persistence = typeof import("~/adapters/persistence");
 type Ingestion = typeof import("~/adapters/ingestion");
 type Server = typeof import("./ingest.server");
@@ -182,7 +184,12 @@ async function firstImportFlow(csv: string) {
   const instruments = new persistence.PrismaInstrumentRepository();
   const ledger = new persistence.PrismaLedgerRepository();
   const prices = new persistence.PrismaPriceRepository();
-  const adapter = new ingestion.KrakenCsvAdapter(instruments, ledger, prices);
+  const adapter = new ingestion.KrakenCsvAdapter(
+    instruments,
+    ledger,
+    MADRID,
+    prices,
+  );
 
   const first = await adapter.import(csv);
 
@@ -195,6 +202,7 @@ async function firstImportFlow(csv: string) {
       id,
       "BTC-EUR",
       NO_RATES,
+      MADRID,
     );
   }
   await backfillInstruments(
@@ -203,6 +211,7 @@ async function firstImportFlow(csv: string) {
     ids.map((id) => ({ id, quoteSymbol: "BTC-EUR" })),
     rangeCovering(earliestUnpriced(first)!, new Date()),
     NO_RATES,
+    MADRID,
   );
 
   const retry = await adapter.import(csv);
@@ -349,6 +358,7 @@ async function priceAndRetry(
   const adapter = new ingestion.KrakenCsvAdapter(
     instruments,
     new persistence.PrismaLedgerRepository(),
+    MADRID,
     prices,
   );
   if (!(await instruments.get("BTC"))?.quoteSymbol) {
@@ -359,6 +369,7 @@ async function priceAndRetry(
       "BTC",
       "BTC-EUR",
       NO_RATES,
+      MADRID,
     );
   }
   await backfillInstruments(
@@ -367,6 +378,7 @@ async function priceAndRetry(
     [{ id: "BTC", quoteSymbol: "BTC-EUR" }],
     "max",
     NO_RATES,
+    MADRID,
   );
   return mergeRetry(first, await adapter.import(csv));
 }
@@ -411,6 +423,7 @@ describe("candle spacing and the 7-day lookup (integration)", () => {
     const adapter = new ingestion.KrakenCsvAdapter(
       new persistence.PrismaInstrumentRepository(),
       new persistence.PrismaLedgerRepository(),
+      MADRID,
       new persistence.PrismaPriceRepository(),
     );
     const first = await adapter.import(LATE_NOVEMBER);
@@ -501,6 +514,7 @@ describe("the summary counts operations, like the file and the discards (integra
     const adapter = new ingestion.KrakenCsvAdapter(
       new persistence.PrismaInstrumentRepository(),
       new persistence.PrismaLedgerRepository(),
+      MADRID,
       new persistence.PrismaPriceRepository(),
     );
     const preview = await ingestion.previewBatch(

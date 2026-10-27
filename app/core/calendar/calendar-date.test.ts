@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  CALENDAR_CACHE_LIMIT,
   addCalendarMonths,
+  calendarCacheSize,
   calendarDate,
   compareCalendarDates,
   isAfter,
   isBefore,
   isWithin,
   parseIsoDate,
+  startOfDay,
   toCalendarDate,
   toIsoDate,
 } from "./calendar-date";
@@ -137,6 +140,108 @@ describe("toCalendarDate", () => {
     expect(() => toCalendarDate(new Date(), "Europe/Atlantis")).toThrow(
       RangeError,
     );
+  });
+});
+
+describe("toCalendarDate's cache", () => {
+  const fresh = (ms: number, zone: string) =>
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: zone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(ms);
+
+  it("a quarter-hour key would be wrong: Goose Bay fell back at 00:01 local", () => {
+    const zone = "America/Goose_Bay";
+    const before = Date.parse("1995-10-29T03:00:30Z");
+    const after = Date.parse("1995-10-29T03:01:30Z");
+    expect(Math.floor(before / 900_000)).toBe(Math.floor(after / 900_000));
+    expect(fresh(before, zone)).toBe("1995-10-29");
+    expect(fresh(after, zone)).toBe("1995-10-28");
+    expect(toIsoDate(toCalendarDate(new Date(before), zone))).toBe(
+      "1995-10-29",
+    );
+    expect(toIsoDate(toCalendarDate(new Date(after), zone))).toBe("1995-10-28");
+  });
+
+  it("agrees with Intl at the last millisecond of every minute around a switch, once the minute is cached", () => {
+    const windows: [string, string][] = [
+      ["Europe/Madrid", "2026-03-29T00:00:00Z"],
+      ["Europe/Madrid", "2026-03-29T21:00:00Z"],
+      ["Europe/Madrid", "2026-10-25T00:00:00Z"],
+      ["Europe/Madrid", "2026-10-25T22:00:00Z"],
+      ["Atlantic/Canary", "2026-12-31T23:00:00Z"],
+      ["America/Goose_Bay", "1995-10-29T02:00:00Z"],
+      ["Antarctica/Casey", "2021-10-02T15:00:00Z"],
+      ["Asia/Kathmandu", "2026-06-30T17:30:00Z"],
+      ["Pacific/Chatham", "2026-04-04T10:00:00Z"],
+    ];
+    for (const [zone, from] of windows) {
+      const start = Date.parse(from);
+      for (let ms = start; ms < start + 3 * 3_600_000; ms += 60_000) {
+        toCalendarDate(new Date(ms), zone);
+        const last = ms + 59_999;
+        expect(toIsoDate(toCalendarDate(new Date(last), zone))).toBe(
+          fresh(last, zone),
+        );
+      }
+    }
+  });
+
+  it("leaves instants before 1980 out, whose offsets were not round", () => {
+    const size = calendarCacheSize();
+    toCalendarDate(new Date("1979-04-01T10:00:00Z"), "Pacific/Kiritimati");
+    expect(calendarCacheSize()).toBe(size);
+  });
+
+  it("is bounded", () => {
+    const start = Date.parse("2030-01-01T00:00:00Z");
+    for (let i = 0; i < CALENDAR_CACHE_LIMIT + 500; i++) {
+      toCalendarDate(new Date(start + i * 60_000), "UTC");
+    }
+    expect(calendarCacheSize()).toBe(CALENDAR_CACHE_LIMIT);
+  });
+});
+
+describe("startOfDay", () => {
+  it("is the instant the zone's clocks read 00:00 on that day", () => {
+    expect(startOfDay(calendarDate(2026, 1, 15), MADRID).toISOString()).toBe(
+      "2026-01-14T23:00:00.000Z",
+    );
+    expect(startOfDay(calendarDate(2026, 7, 15), MADRID).toISOString()).toBe(
+      "2026-07-14T22:00:00.000Z",
+    );
+    expect(
+      startOfDay(calendarDate(2026, 7, 15), "Asia/Kathmandu").toISOString(),
+    ).toBe("2026-07-14T18:15:00.000Z");
+  });
+
+  it("round-trips through toCalendarDate on every day of a year", () => {
+    for (const zone of [MADRID, "Atlantic/Canary", "America/New_York"]) {
+      let date = calendarDate(2026, 1, 1);
+      while (date.year === 2026) {
+        const start = startOfDay(date, zone);
+        expect(toCalendarDate(start, zone)).toEqual(date);
+        expect(toCalendarDate(new Date(start.getTime() - 1), zone)).not.toEqual(
+          date,
+        );
+        const next = new Date(
+          Date.UTC(date.year, date.month - 1, date.day + 1),
+        );
+        date = calendarDate(
+          next.getUTCFullYear(),
+          next.getUTCMonth() + 1,
+          next.getUTCDate(),
+        );
+      }
+    }
+  });
+
+  it("refuses a day whose midnight the zone skips", () => {
+    expect(() =>
+      startOfDay(calendarDate(2026, 9, 6), "America/Santiago"),
+    ).toThrow(RangeError);
   });
 });
 

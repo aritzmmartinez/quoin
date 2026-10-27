@@ -28,7 +28,13 @@ import {
   type SyncTarget,
 } from "./prices-sync";
 
-const ETF: SyncTarget = { id: "XS00TEST0001", name: "Fund A", quoteSymbol: "AAA.DE" };
+const MADRID = "Europe/Madrid";
+
+const ETF: SyncTarget = {
+  id: "XS00TEST0001",
+  name: "Fund A",
+  quoteSymbol: "AAA.DE",
+};
 const BTC: SyncTarget = { id: "BTC", name: "Bitcoin", quoteSymbol: "BTC-EUR" };
 
 const at = (iso: string) => new Date(iso);
@@ -63,7 +69,7 @@ function memory(seed: Record<string, [string, string][]> = {}) {
       candles: readonly PriceSnapshot[],
       live: PriceSnapshot | null,
     ) => {
-      const plan = planDailyWrite(of(id), candles, live);
+      const plan = planDailyWrite(of(id), candles, live, MADRID);
       for (const removed of plan.remove) {
         rows.splice(rows.findIndex((r) => r.id === removed), 1);
       }
@@ -120,7 +126,7 @@ describe("syncInstrumentPrices — filling the gaps", () => {
     );
 
     const sync = await syncInstrumentPrices(
-      { prices, provider, now: at("2026-10-12T10:00Z") },
+      { zone: MADRID, prices, provider, now: at("2026-10-12T10:00Z") },
       ETF,
     );
 
@@ -145,7 +151,10 @@ describe("syncInstrumentPrices — filling the gaps", () => {
     );
     const provider = yahoo({ "BTC-EUR": days }, [q("BTC-EUR", "2026-10-13T08:00Z")]);
 
-    await syncInstrumentPrices({ prices, provider, now: at("2026-10-13T08:05Z") }, BTC);
+    await syncInstrumentPrices(
+      { zone: MADRID, prices, provider, now: at("2026-10-13T08:05Z") },
+      BTC,
+    );
 
     expect(view(BTC.id)).toEqual([
       "2026-10-09T00:00 YAHOO",
@@ -161,7 +170,7 @@ describe("syncInstrumentPrices — filling the gaps", () => {
     const provider = yahoo({}, [q("AAA.DE", "2026-10-09T15:35Z")]);
 
     const sync = await syncInstrumentPrices(
-      { prices, provider, now: at("2026-10-11T10:00Z") },
+      { zone: MADRID, prices, provider, now: at("2026-10-11T10:00Z") },
       ETF,
     );
 
@@ -179,7 +188,7 @@ describe("syncInstrumentPrices — filling the gaps", () => {
     );
 
     const sync = await syncInstrumentPrices(
-      { prices, provider, now: at("2026-10-10T10:00Z") },
+      { zone: MADRID, prices, provider, now: at("2026-10-10T10:00Z") },
       ETF,
     );
 
@@ -209,7 +218,10 @@ describe("syncInstrumentPrices — filling the gaps", () => {
     );
     const provider = yahoo({ "AAA.DE": candles }, [q("AAA.DE", "2026-10-15T08:00Z")], spans);
 
-    await syncInstrumentPrices({ prices, provider, now: at("2026-10-15T08:05Z") }, ETF);
+    await syncInstrumentPrices(
+      { zone: MADRID, prices, provider, now: at("2026-10-15T08:05Z") },
+      ETF,
+    );
 
     expect(spans[0]?.from.getTime()).toBeLessThanOrEqual(at("2026-10-06T22:00Z").getTime());
     expect(view(ETF.id)).toEqual([
@@ -233,7 +245,10 @@ describe("syncInstrumentPrices — filling the gaps", () => {
       ],
     });
 
-    await syncInstrumentPrices({ prices, provider, now: at("2026-10-15T08:00Z") }, ETF);
+    await syncInstrumentPrices(
+      { zone: MADRID, prices, provider, now: at("2026-10-15T08:00Z") },
+      ETF,
+    );
 
     expect(view(ETF.id)).toEqual([
       "2026-10-06T22:00 YAHOO",
@@ -247,7 +262,7 @@ describe("syncInstrumentPrices — filling the gaps", () => {
     const provider = yahoo({}, [q("AAA.DE", "2026-10-15T08:00Z")], spans);
 
     const sync = await syncInstrumentPrices(
-      { prices, provider, now: at("2026-10-15T08:05Z") },
+      { zone: MADRID, prices, provider, now: at("2026-10-15T08:05Z") },
       ETF,
     );
 
@@ -263,8 +278,15 @@ describe("syncInstrumentPrices — syncing again", () => {
     const candles = ["09", "12", "13", "14"].map((d) =>
       q("AAA.DE", `2026-10-${d}T07:00Z`),
     );
-    const provider = yahoo({ "AAA.DE": candles }, [q("AAA.DE", "2026-10-15T08:00Z")]);
-    const deps = { prices, provider, now: at("2026-10-15T08:05Z") };
+    const provider = yahoo({ "AAA.DE": candles }, [
+      q("AAA.DE", "2026-10-15T08:00Z"),
+    ]);
+    const deps = {
+      prices,
+      provider,
+      zone: MADRID,
+      now: at("2026-10-15T08:05Z"),
+    };
 
     const first = await syncInstrumentPrices(deps, ETF);
     const before = view(ETF.id);
@@ -281,7 +303,10 @@ describe("syncInstrumentPrices — the live quote", () => {
     const { prices, view } = memory({ [ETF.id]: [["2026-10-15T07:30Z", "YAHOO_LIVE"]] });
     const provider = yahoo({}, [q("AAA.DE", "2026-10-15T15:35Z")]);
 
-    await syncInstrumentPrices({ prices, provider, now: at("2026-10-15T16:00Z") }, ETF);
+    await syncInstrumentPrices(
+      { zone: MADRID, prices, provider, now: at("2026-10-15T16:00Z") },
+      ETF,
+    );
 
     expect(view(ETF.id)).toEqual(["2026-10-15T15:35 YAHOO_LIVE"]);
   });
@@ -298,7 +323,10 @@ describe("syncInstrumentPrices — the live quote", () => {
       [q("AAA.DE", "2026-10-15T08:00Z")],
     );
 
-    await syncInstrumentPrices({ prices, provider, now: at("2026-10-15T08:05Z") }, ETF);
+    await syncInstrumentPrices(
+      { zone: MADRID, prices, provider, now: at("2026-10-15T08:05Z") },
+      ETF,
+    );
 
     expect(view(ETF.id)).toEqual([
       "2026-10-13T07:00 YAHOO",
@@ -316,7 +344,9 @@ describe("syncInstrumentPrices — the live quote", () => {
       [q("AAA.DE", old)],
     );
 
-    expect(await syncInstrumentPrices({ prices, provider, now }, ETF)).toMatchObject({
+    expect(
+      await syncInstrumentPrices({ zone: MADRID, prices, provider, now }, ETF),
+    ).toMatchObject({
       inserted: 1,
       live: false,
       problem: "stale",
@@ -327,8 +357,12 @@ describe("syncInstrumentPrices — the live quote", () => {
     const { prices } = memory();
     const provider = yahoo({});
     expect(
-      (await syncInstrumentPrices({ prices, provider, now: at("2026-10-15T08:00Z") }, ETF))
-        .problem,
+      (
+        await syncInstrumentPrices(
+          { zone: MADRID, prices, provider, now: at("2026-10-15T08:00Z") },
+          ETF,
+        )
+      ).problem,
     ).toBe("no-quote");
   });
 });
@@ -342,7 +376,7 @@ describe("syncInstrumentPrices — other currencies", () => {
     );
 
     const sync = await syncInstrumentPrices(
-      { prices, provider, now: at("2026-10-15T14:00Z") },
+      { zone: MADRID, prices, provider, now: at("2026-10-15T14:00Z") },
       ETF,
     );
 
@@ -371,6 +405,7 @@ describe("syncInstrumentPrices — the check record", () => {
 
     const sync = await syncInstrumentPrices(
       {
+        zone: MADRID,
         prices,
         provider: yahoo({}),
         checks: record.repository,
@@ -396,6 +431,7 @@ describe("syncInstrumentPrices — the check record", () => {
     await expect(
       syncInstrumentPrices(
         {
+          zone: MADRID,
           prices,
           provider: busy,
           checks: record.repository,
@@ -415,8 +451,17 @@ describe("syncing instruments in turn", () => {
       q("AAA.DE", "2026-10-15T08:00Z"),
       q("BTC-EUR", "2026-10-15T08:00Z"),
     ]);
-    const broken: SyncTarget = { id: "XS00TEST0002", name: "Broken", quoteSymbol: "BAD" };
-    const deps = { prices, provider, now: at("2026-10-15T08:05Z") };
+    const broken: SyncTarget = {
+      id: "XS00TEST0002",
+      name: "Broken",
+      quoteSymbol: "BAD",
+    };
+    const deps = {
+      prices,
+      provider,
+      zone: MADRID,
+      now: at("2026-10-15T08:05Z"),
+    };
 
     const steps = await inTurn(
       [ETF, broken, BTC],
@@ -448,7 +493,12 @@ describe("syncing instruments in turn", () => {
       },
       getHistory: async () => [],
     };
-    const deps = { prices, provider: busy, now: at("2026-10-15T08:05Z") };
+    const deps = {
+      prices,
+      provider: busy,
+      zone: MADRID,
+      now: at("2026-10-15T08:05Z"),
+    };
 
     await expect(syncInstrumentPrices(deps, ETF)).rejects.toBeInstanceOf(
       MarketDataUnavailableError,

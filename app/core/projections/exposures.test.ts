@@ -15,6 +15,9 @@ import {
 } from "./exposures";
 import { computeMarketValues, type MarketValue } from "./market-value";
 import { computePositions, type Position } from "./positions";
+import { jurisdictionOf } from "~/core/tax";
+
+const BIZKAIA = jurisdictionOf("bizkaia");
 
 const instrument = (over: Partial<Instrument> = {}): Instrument => ({
   id: "IE00BK5BQT80",
@@ -461,7 +464,7 @@ describe("one contribution per instrument", () => {
 
   it("lists an instrument once however many times it was traded", () => {
     const events = [buy("NVDA", 1, "500"), buy("NVDA", 2, "700")];
-    const positions = computePositions(events);
+    const positions = computePositions(events, BIZKAIA);
     const marketValues = computeMarketValues(
       positions,
       new Map([["NVDA", { price: "800", currency: "EUR" }]]),

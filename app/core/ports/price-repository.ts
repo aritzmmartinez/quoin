@@ -23,6 +23,7 @@ export interface PriceRepository {
     instrumentId: string,
     candles: readonly PriceSnapshot[],
     live: PriceSnapshot | null,
+    zone: string,
   ): Promise<DailyWriteCount>;
   lastAsOf(instrumentId: string): Promise<Date | null>;
   latest(): Promise<Map<string, PriceSnapshot>>;

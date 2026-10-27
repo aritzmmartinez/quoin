@@ -22,6 +22,7 @@ import { firstUses } from "./fx-sync.server";
 import { findBenchmark } from "./opportunity-cost";
 import { splitUnmapped, toSyncTargets } from "./prices-sync";
 import { DEFAULT_INFLATION_SERIES } from "./real.server";
+import { loadResidence } from "./residence.server";
 import { openInstrumentIds } from "./unrated";
 
 export interface ExternalData {
@@ -38,7 +39,10 @@ export async function loadExternalData(
   latest: ReadonlyMap<string, PriceSnapshot>,
   benchmarkSymbol: string,
 ): Promise<ExternalData> {
-  const open = new Set(openInstrumentIds(computePositions(events)));
+  const { jurisdiction } = await loadResidence();
+  const open = new Set(
+    openInstrumentIds(computePositions(events, jurisdiction)),
+  );
   const benchmark = findBenchmark(instruments, benchmarkSymbol);
   const relevant = instruments
     .filter((i) => i.quoteSymbol && (open.has(i.id) || i.id === benchmark?.id))
@@ -66,7 +70,12 @@ export async function loadExternalData(
 
   const { targets, unmapped } = toSyncTargets(instruments);
   return {
-    prices: pricesStatus({ relevant, latest, checked }),
+    prices: pricesStatus({
+      relevant,
+      latest,
+      checked,
+      zone: jurisdiction.zone,
+    }),
     inflation: inflationStatus(
       InflationIndex.from(DEFAULT_INFLATION_SERIES, points).latestPeriod(),
       inflationChecked,

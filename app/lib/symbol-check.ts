@@ -19,6 +19,7 @@ import type {
 import { DAILY_CANDLE_MS, candleKnownAt } from "~/core/prices";
 import { computePositions } from "~/core/projections";
 import { atOrBefore } from "~/core/series";
+import type { Jurisdiction } from "~/core/tax";
 
 import { rateSeriesOf, type EnsureRates, type RateSeries } from "./fx-sync";
 
@@ -137,9 +138,10 @@ function closeInBase(
   candle: Quote,
   book: RateBook,
   tradedAt: Date,
+  zone: string,
 ): string | null {
   if (candle.currency === BASE_CURRENCY) return candle.price;
-  const rate = bookingRate(book, candle.currency, dayOf(tradedAt));
+  const rate = bookingRate(book, candle.currency, dayOf(tradedAt, zone));
   if (rate === null) return null;
   return Amount.of(candle.price, candle.currency)
     .inBase(rate.rate, "QUOTE_PER_BASE")
@@ -149,6 +151,7 @@ function closeInBase(
 export function compareTrades(
   marks: readonly TradeMark[],
   candles: readonly Quote[],
+  zone: string,
   book: RateBook = new Map(),
 ): TradeComparison[] {
   const knownAt = (quote: Quote) => candleKnownAt(quote.asOf);
@@ -158,7 +161,7 @@ export function compareTrades(
   return marks.flatMap((mark) => {
     const candle = atOrBefore(sorted, knownAt, mark.ts.getTime(), LOOKBACK_MS);
     if (!candle) return [];
-    const close = closeInBase(candle, book, mark.ts);
+    const close = closeInBase(candle, book, mark.ts, zone);
     if (close === null) return [];
 
     const deviation = new Decimal(close).div(mark.price).minus(1);
@@ -195,6 +198,7 @@ export async function checkQuoteAgainstLedger(
   instrumentId: string,
   symbol: string,
   rates: EnsureRates,
+  jurisdiction: Jurisdiction,
   now?: Date,
 ): Promise<SymbolCheck | null> {
   const quote = await provider.getQuote(symbol);
@@ -207,8 +211,11 @@ export async function checkQuoteAgainstLedger(
       [
         quote.currency,
         span
-          ? dayOf(span.from)
-          : shiftDay(dayOf(now ?? new Date()), -RATE_PROBE_DAYS),
+          ? dayOf(span.from, jurisdiction.zone)
+          : shiftDay(
+              dayOf(now ?? new Date(), jurisdiction.zone),
+              -RATE_PROBE_DAYS,
+            ),
       ],
     ]),
   );
@@ -221,9 +228,9 @@ export async function checkQuoteAgainstLedger(
 
   return checkSymbol(
     quote,
-    heldQuantity(computePositions([...events]), instrumentId),
+    heldQuantity(computePositions([...events], jurisdiction), instrumentId),
     now,
-    compareTrades(marks, candles, ensured.book),
+    compareTrades(marks, candles, jurisdiction.zone, ensured.book),
     marks.length,
     dailyHistory,
     rateSeries,

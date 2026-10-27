@@ -11,11 +11,11 @@ import {
   YAxis,
 } from "recharts";
 
-import { useFormat } from "~/lib";
+import { useFormat, useZones } from "~/lib";
 
 import { ChartSkeleton } from "../ui/ChartSkeleton";
 import { legendOrder } from "./legend-order";
-import { timeTicks } from "./time-ticks";
+import { startsYear, timeTicks } from "./time-ticks";
 import { useHydrated } from "./use-hydrated";
 
 export interface InvestedVsValueDatum {
@@ -61,14 +61,16 @@ export function InvestedVsValueChart({
   height?: number;
 }) {
   const { formatMoney, formatDate, formatTimeTick } = useFormat();
+  const { displayZone } = useZones();
   const axisEur = (v: number) => formatMoney(String(v), 0);
   const hydrated = useHydrated();
 
   const [gradientId] = useState(() => `ivvValueFill-${(gradientSeq += 1)}`);
 
   const { unit, ticks } = useMemo(
-    () => timeTicks(data[0]?.t ?? 0, data[data.length - 1]?.t ?? 0),
-    [data],
+    () =>
+      timeTicks(data[0]?.t ?? 0, data[data.length - 1]?.t ?? 0, displayZone),
+    [data, displayZone],
   );
 
   if (!hydrated) return <ChartSkeleton height={height} />;
@@ -105,7 +107,7 @@ export function InvestedVsValueChart({
           domain={["dataMin", "dataMax"]}
           ticks={ticks}
           tickFormatter={(t: number, index: number) =>
-            formatTimeTick(t, unit, index === 0 || new Date(t).getMonth() === 0)
+            formatTimeTick(t, unit, index === 0 || startsYear(t, displayZone))
           }
           stroke="var(--color-faint)"
           fontSize={11}

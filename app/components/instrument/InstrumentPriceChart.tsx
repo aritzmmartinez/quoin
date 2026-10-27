@@ -11,10 +11,10 @@ import {
   YAxis,
 } from "recharts";
 
-import { type Range, rangedSeries, useCopy, useFormat } from "~/lib";
+import { type Range, rangedSeries, useCopy, useFormat, useZones } from "~/lib";
 
 import { legendOrder } from "../charts/legend-order";
-import { timeTicks } from "../charts/time-ticks";
+import { startsYear, timeTicks } from "../charts/time-ticks";
 import { useHydrated } from "../charts/use-hydrated";
 import { Card } from "../ui/Card";
 import { ChartSkeleton } from "../ui/ChartSkeleton";
@@ -39,6 +39,7 @@ export function InstrumentPriceChart({
   unrated?: boolean;
 }) {
   const { formatMoney, formatPrice, formatDate, formatTimeTick } = useFormat();
+  const { displayZone } = useZones();
   const axisEur = (v: number) =>
     Math.abs(v) >= 1 ? formatMoney(String(v), 0) : formatPrice(String(v));
   const hydrated = useHydrated();
@@ -56,6 +57,7 @@ export function InstrumentPriceChart({
   const { unit, ticks } = timeTicks(
     points[0]?.t ?? 0,
     points[points.length - 1]?.t ?? 0,
+    displayZone,
   );
 
   return (
@@ -98,7 +100,7 @@ export function InstrumentPriceChart({
                 formatTimeTick(
                   t,
                   unit,
-                  index === 0 || new Date(t).getMonth() === 0,
+                  index === 0 || startsYear(t, displayZone),
                 )
               }
               minTickGap={24}

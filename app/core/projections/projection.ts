@@ -1,6 +1,7 @@
 import Decimal from "decimal.js";
 
-import { Money, periodOf, type Period } from "../domain";
+import { periodOf } from "../calendar";
+import { Money, type Period } from "../domain";
 
 export interface ProjectionPricePoint {
   asOf: Date;
@@ -97,10 +98,11 @@ function previousPeriod(period: Period): Period {
 export function toMonthlyReturns(
   points: readonly ProjectionPricePoint[],
   asOf: Date,
+  zone: string,
 ): MonthlyReturn[] {
   const closes = new Map<Period, { ts: number; price: Decimal }>();
   for (const point of points) {
-    const period = periodOf(point.asOf);
+    const period = periodOf(point.asOf, zone);
     const ts = point.asOf.getTime();
     const held = closes.get(period);
     if (held === undefined || ts >= held.ts) {
@@ -108,7 +110,7 @@ export function toMonthlyReturns(
     }
   }
 
-  const current = periodOf(asOf);
+  const current = periodOf(asOf, zone);
   const returns: MonthlyReturn[] = [];
   for (const period of [...closes.keys()].sort()) {
     if (period >= current) continue;

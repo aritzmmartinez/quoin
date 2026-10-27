@@ -27,15 +27,15 @@ License: AGPL-3.0-only.
 - **Copy lives in `app/lib/i18n/`** — `es.ts`, `en.ts`, `index.ts`. Components read it
   with `useCopy()`; everything else (pure helpers, loaders, actions, `*.server.ts`)
   takes a `Copy` argument. Route `meta` uses `copyFromMatches(matches)`.
-- Formatting goes through `useFormat()` in a component, `createFormat(locale)` anywhere
+- Formatting goes through `useFormat()` in a component, `createFormat(locale, zone)` anywhere
   else (`formatMoney`, `formatQuantity`, `formatSignedMoney`, `formatPercent`,
   `formatDate`, `formatPeriod`, `formatTimeTick`, `formatRelativeTime`, `formatClock`).
   **Never call `Intl` or `toLocaleString` from a component**, and never reintroduce a
   free `formatMoney`: the whole point of the factory is that no code path can format
   without saying which locale it means.
-- `todayInMadrid` stays a free function: it returns an ISO calendar date, not a display
-  string. It and `formatClock` are the only two that read the clock, and both resolve
-  through `Europe/Madrid`, the same rule as `periodOf` and `fiscalYearOf`.
+- The zone a formatter shows instants in is the **display zone**; it arrives from the root
+  loader (`useZones()`), never from inside the formatter. A bare `YYYY-MM-DD` is a day
+  already and `formatDate` reads it in UTC, like `formatPeriod`.
 - Note on es-ES: CLDR `min2` means 4-digit numbers carry **no** thousands separator
   (`1234,56 €`). This is correct output, not a bug. English is **en-GB**, not en-US:
   the app is euro-denominated and day-first, so `€1,234.56` and `14/09/2026` are the
@@ -95,7 +95,8 @@ app  →  adapters  →  core
 per-folder overrides. (`eslint-plugin-boundaries` v6 was tried and abandoned — heavier
 and it did not enforce this correctly.)
 
-- **core** — domain and pure projections. No Prisma, no `fetch`, no I/O, no clock.
+- **core** — domain and pure projections. No Prisma, no `fetch`, no I/O, no clock: `now`
+  is a parameter with no default, like the zone.
   Anything from the outside is **injected**: e.g. `computeAllocation` receives a
   `Map<instrumentId, category>` because core cannot read `Instrument.type` from Prisma.
 - **adapters** — persistence (Prisma repositories), market data (Yahoo), ingestion (broker
@@ -109,6 +110,40 @@ and it did not enforce this correctly.)
 
 No monolithic files. Extract reusable primitives (`ui/`, `charts/`) rather than
 duplicating logic across screens.
+
+## Calendar and zones
+
+Which day, month or fiscal year an instant belongs to is decided in **`core/calendar`
+and nowhere else**: `dayOf`, `periodOf`, `fiscalYearOf`, `today(zone, now)`,
+`startOfDay`. Every one takes the zone as a parameter with no default. It is the first
+piece of the contract with the mobile client, which must assign the same days.
+
+- **The zone comes from the residence setting, resolved in one place.** `Settings` has
+  one row (`CHECK id = 1`); `residence` (today only `bizkaia`) has no CHECK — the
+  vocabulary grows, `residenceSchema` validates at write and at read. Core maps it two
+  ways, `territoryOfResidence` and `zoneOfResidence`, and they are separate because the
+  régimen común will be one territory in two zones (Canarias). `loadResidence()` is the
+  server's only reader: it yields the `Jurisdiction` (territory + zone, what AVCO, FIFO
+  and the swap rule take), the **calendar zone** and the **display zone** — the same zone
+  today, two decisions. The root loader hands both to the client.
+- **`toCalendarDate` caches by `(zone, UTC minute)`, bounded LRU, from 1980.** Not by
+  quarter-hour: offsets since 1980 are multiples of 15 minutes, but Goose Bay and St
+  John's switched at 00:01 local until 2011 and Casey did in 2020–2022, so one UTC
+  quarter-hour can hold two local days. Measured over every IANA zone; a test pins the
+  Goose Bay case.
+- **Nothing reads the process's zone.** ESLint (`LOCAL_TIME` in `eslint.config.js`)
+  refuses local getters and setters, `new Date(y, m, d…)` and an `Intl.DateTimeFormat`
+  without `timeZone`, outside `core/calendar`. The one exception is `backup-names.ts`: a
+  file name is read by a person on their own clock. Both vitest configs set
+  `TZ=Pacific/Kiritimati` (UTC+14) through `test.env`, which works on Windows, where a
+  `TZ=` set from Git Bash never reaches Node; a test pins it.
+- **An instant from outside carries its offset.** Trade Republic's `datetime` must have
+  `Z` or an offset (`z.iso.datetime({ offset: true })`); without one `new Date` reads
+  the process's zone and the same row is two instants in Docker and in Madrid. Kraken's
+  `time` has none and is UTC by definition (`parseTime` appends `Z`).
+- **Golden cases live in `test/contract/*.json`**, read through `loadContract(name,
+  schema)`. They are shared with the mobile client: change a case only together with the
+  implementation that reproduces it on both sides.
 
 ## A command's logic never lives in its script
 
@@ -241,7 +276,7 @@ This has caused misdirected generation more than once:
   A live quote is not written on a day that has a candle, and replaces the day's earlier
   live row. `latest()` never returns to an **earlier day**; within one day it may move from
   the live row's time back to the session open, because the close it carries is newer
-  information. "Day" is `dayOf` in `core/calendar`, the same Madrid rule as `periodOf`.
+  information. "Day" is `dayOf` in `core/calendar`, in the calendar zone, like `periodOf`.
 - **Deleting an instrument's snapshots happens in two places, both atomic:** `saveDaily`
   above, and `PriceRepository.replaceHistory`. One transaction deletes the
   instrument's rows (all of them, or only those at or before `keepAfter`), writes the new
@@ -767,8 +802,8 @@ manual aliasing was abandoned — 726 confirmations is not a system.
   inflates real P&L. `computeInvestedVsValueSeries` restates **both** lines — invested at
   each contribution's date, value at each price mark's — because restating one turns plain
   inflation into a gap between them.
-- **The month of a trade is Madrid's, never UTC's.** `periodOf` formats through `Intl` with
-  an explicit `timeZone`. Spain is +1 in winter and +2 in summer, so the last hour(s) of
+- **The month of a trade is Madrid's, never UTC's.** `periodOf` reads it in the calendar
+  zone (*Calendar and zones*). Spain is +1 in winter and +2 in summer, so the last hour(s) of
   every month are already the next month locally, by a different amount either side of the
   DST switch — a fixed offset does not fix it. Any test touching periods must include a
   month boundary in both March/October, or the bug is invisible.
@@ -930,9 +965,9 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
 - **`TAX_SCALES` is keyed by `(territory, year)`.** A year not on file returns `null` from
   `getTaxScale` and the screen states the absence — never fall back to the nearest year's
   brackets. A rate is data; a superseded scale is a wrong number that looks right.
-- **The fiscal year is Madrid's calendar** (`fiscalYearOf` via `Intl`, `timeZone:
-  "Europe/Madrid"`), same trap as `periodOf` — the last hours of 31 December are already
-  the next year locally.
+- **The fiscal year is the calendar year in the residence's zone** (`fiscalYearOf`, Madrid
+  for Bizkaia), same trap as `periodOf` — the last hours of 31 December are already the
+  next year locally. The zone travels in `RepurchaseScope` beside the territory.
 
 ## Kraken rewards
 
@@ -1211,7 +1246,7 @@ the two controls sitting side by side behave differently on purpose.
   `string`, `en: Copy` makes a missing or misspelled key a **compile error** — that type
   is the only thing standing between a 1,100-key object and a string that silently stays
   Spanish forever. Do not "tighten" it back.
-- **A formatter has no default locale; a collator does.** `createFormat(locale)` exports
+- **A formatter has no default locale; a collator does.** `createFormat(locale, zone)` exports
   no free `formatMoney`, because a Spanish figure under an English label is unfalsifiable
   on screen — `1.234,56` is a valid English number too. The collator tag defaults to
   `es-ES` (`toInstrumentListItems`, `sortRealizedRows`, `groupRealizedByYear`,

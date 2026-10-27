@@ -1,7 +1,8 @@
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { todayInMadrid, useCopy, useFormat } from "~/lib";
+import { today as todayIn } from "~/core/calendar";
+import { useCopy, useFormat, useZones } from "~/lib";
 
 import { addDays, addMonths, monthGrid, monthOf } from "./calendar";
 import { placePopover } from "./popover-place";
@@ -32,6 +33,7 @@ export function DatePicker({
   className?: string;
 }) {
   const { formatDate, formatPeriod } = useFormat();
+  const { calendarZone } = useZones();
   const t = useCopy();
   const copy = t.datePicker;
   const [value, setValue] = useState(defaultValue);
@@ -77,8 +79,9 @@ export function DatePicker({
       return;
     }
 
-    const start = value === "" ? todayInMadrid() : value;
-    setMonth(monthOf(start) ?? todayInMadrid().slice(0, 7));
+    const now = todayIn(calendarZone, new Date());
+    const start = value === "" ? now : value;
+    setMonth(monthOf(start) ?? now.slice(0, 7));
     setFocusDay(start);
     requestAnimationFrame(place);
   }
@@ -120,7 +123,7 @@ export function DatePicker({
     setMonth(monthOf(next) ?? month);
   }
 
-  const today = open ? todayInMadrid() : "";
+  const today = open ? todayIn(calendarZone, new Date()) : "";
   const days = open && month !== "" ? monthGrid(month) : [];
   const weeks = Array.from({ length: days.length / 7 }, (_, i) =>
     days.slice(i * 7, i * 7 + 7),

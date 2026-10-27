@@ -35,7 +35,7 @@ async function main(): Promise<void> {
   }
 
   console.log("");
-  const deps = defaultDeps();
+  const deps = await defaultDeps();
   const steps = await inTurn(
     targets,
     (target) => syncInstrumentPrices(deps, target),

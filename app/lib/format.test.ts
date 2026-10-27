@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { createFormat } from "./format";
 
+const MADRID = "Europe/Madrid";
+
 const {
   formatAmount,
   formatClock,
@@ -12,7 +14,7 @@ const {
   formatQuantity,
   formatRelativeTime,
   formatSignedMoney,
-} = createFormat("es");
+} = createFormat("es", MADRID);
 
 const norm = (s: string) => s.replace(/[\s\u00a0\u202f]/g, " ");
 
@@ -29,9 +31,9 @@ describe("formatMoney", () => {
 describe("formatAmount", () => {
   it("formats an amount in another currency with two decimals and its code", () => {
     expect(norm(formatAmount("343.990000", "USD"))).toBe("343,99 USD");
-    expect(norm(createFormat("en").formatAmount("343.990000", "USD"))).toBe(
-      "343.99 USD",
-    );
+    expect(
+      norm(createFormat("en", MADRID).formatAmount("343.990000", "USD")),
+    ).toBe("343.99 USD");
   });
 
   it("formats an amount in euros exactly as formatMoney does", () => {
@@ -71,9 +73,9 @@ describe("formatPrice", () => {
   it("names another currency after the figure, by the same rule", () => {
     expect(norm(formatPrice("0.00000438", "USD"))).toBe("0,00000438 USD");
     expect(norm(formatPrice("343.99", "USD"))).toBe("343,99 USD");
-    expect(norm(createFormat("en").formatPrice("0.00000438", "USD"))).toBe(
-      "0.00000438 USD",
-    );
+    expect(
+      norm(createFormat("en", MADRID).formatPrice("0.00000438", "USD")),
+    ).toBe("0.00000438 USD");
   });
 });
 

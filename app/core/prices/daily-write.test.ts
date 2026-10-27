@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import type { PriceSnapshot } from "../ports";
 import { planDailyWrite, type StoredPrice } from "./daily-write";
 
+const MADRID = "Europe/Madrid";
+
 const LIVE = "YAHOO_LIVE";
 
 const snap = (
@@ -30,6 +32,7 @@ describe("planDailyWrite — one row per Madrid day once its candle exists", () 
       [row("live", "2026-10-09T15:35:00Z", LIVE)],
       [snap("2026-10-09T07:00:00Z")],
       null,
+      MADRID,
     );
     expect(plan.remove).toEqual(["live"]);
     expect(plan).toMatchObject({ inserted: 1, corrected: 0 });
@@ -40,6 +43,7 @@ describe("planDailyWrite — one row per Madrid day once its candle exists", () 
       [row("legacy", "2026-10-09T15:35:16Z")],
       [snap("2026-10-09T07:00:00Z")],
       null,
+      MADRID,
     );
     expect(plan.remove).toEqual(["legacy"]);
   });
@@ -49,6 +53,7 @@ describe("planDailyWrite — one row per Madrid day once its candle exists", () 
       [row("same", "2026-10-09T07:00:00Z")],
       [snap("2026-10-09T07:00:00Z", "YAHOO", "101.000000")],
       null,
+      MADRID,
     );
     expect(plan).toMatchObject({ remove: [], inserted: 0, corrected: 1 });
     expect(plan.write.map((s) => s.price)).toEqual(["101.000000"]);
@@ -59,6 +64,7 @@ describe("planDailyWrite — one row per Madrid day once its candle exists", () 
       [row("same", "2026-10-09T07:00:00Z", "YAHOO", "100.000000")],
       [snap("2026-10-09T07:00:00Z", "YAHOO", "100")],
       null,
+      MADRID,
     );
     expect(plan).toMatchObject({ write: [], inserted: 0, corrected: 0 });
   });
@@ -68,6 +74,7 @@ describe("planDailyWrite — one row per Madrid day once its candle exists", () 
       [row("same", "2026-10-09T07:00:00Z")],
       [snap("2026-10-09T07:00:00Z")],
       null,
+      MADRID,
     );
     expect(plan).toMatchObject({
       remove: [],
@@ -82,6 +89,7 @@ describe("planDailyWrite — one row per Madrid day once its candle exists", () 
       [row("legacy", "2026-10-14T15:35:00Z")],
       [snap("2026-10-14T07:00:00Z")],
       null,
+      MADRID,
     );
     expect(plan).toMatchObject({ remove: ["legacy"], inserted: 1, corrected: 0 });
   });
@@ -94,6 +102,7 @@ describe("planDailyWrite — one row per Madrid day once its candle exists", () 
       ],
       [snap("2026-10-09T07:00:00Z")],
       null,
+      MADRID,
     );
     expect(plan.remove).toEqual(["same-day-early"]);
   });
@@ -105,6 +114,7 @@ describe("planDailyWrite — the live quote", () => {
       [row("morning", "2026-10-14T08:10:00Z", LIVE)],
       [],
       snap("2026-10-14T15:35:00Z", LIVE),
+      MADRID,
     );
     expect(plan.remove).toEqual(["morning"]);
     expect(plan.live).toBe(true);
@@ -115,6 +125,7 @@ describe("planDailyWrite — the live quote", () => {
       [row("candle", "2026-10-09T07:00:00Z")],
       [],
       snap("2026-10-09T15:35:00Z", LIVE),
+      MADRID,
     );
     expect(plan).toMatchObject({ remove: [], write: [], live: false });
   });
@@ -124,6 +135,7 @@ describe("planDailyWrite — the live quote", () => {
       [],
       [snap("2026-10-09T07:00:00Z")],
       snap("2026-10-09T15:35:00Z", LIVE),
+      MADRID,
     );
     expect(plan.live).toBe(false);
     expect(plan.write).toHaveLength(1);
@@ -134,6 +146,7 @@ describe("planDailyWrite — the live quote", () => {
       [],
       [snap("2026-10-14T07:00:00Z")],
       snap("2026-10-15T09:00:00Z", LIVE),
+      MADRID,
     );
     expect(plan.live).toBe(true);
     expect(plan.write).toHaveLength(2);

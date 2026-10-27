@@ -1,11 +1,11 @@
 import Decimal from "decimal.js";
 
+import { fiscalYearOf } from "../calendar";
 import { Money } from "../domain";
 
 import type { TradeEvent } from "../domain";
 
 import type { FifoSale } from "./fifo";
-import { fiscalYearOf } from "./fiscal-year";
 import {
   createWashSaleAssessor,
   type RepurchaseScope,
@@ -151,9 +151,9 @@ export function walkDeferredLosses(
       shares,
     });
 
-    const year = fiscalYearOf(sale.trade.ts);
+    const year = fiscalYearOf(sale.trade.ts, scope.zone);
     const next = sales[index + 1];
-    if (!next || fiscalYearOf(next.trade.ts) !== year) {
+    if (!next || fiscalYearOf(next.trade.ts, scope.zone) !== year) {
       pendingByYear.set(year, snapshot(lots));
     }
   });

@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import type { LedgerEvent, TradeEvent } from "../domain";
 import { computeCostBasisTimeline } from "./cost-basis-timeline";
+import { jurisdictionOf } from "~/core/tax";
+
+const BIZKAIA = jurisdictionOf("bizkaia");
 
 function trade(
   overrides: Partial<TradeEvent> &
@@ -30,7 +33,7 @@ describe("computeCostBasisTimeline", () => {
         grossAmount: "1000",
       }),
     ];
-    const points = computeCostBasisTimeline(events, "VWCE");
+    const points = computeCostBasisTimeline(events, "VWCE", BIZKAIA);
 
     expect(points).toHaveLength(2);
     expect(points[0]?.ts).toBe(new Date("2026-01-01").toISOString());
@@ -55,7 +58,7 @@ describe("computeCostBasisTimeline", () => {
         grossAmount: "600",
       }),
     ];
-    const points = computeCostBasisTimeline(events, "VWCE");
+    const points = computeCostBasisTimeline(events, "VWCE", BIZKAIA);
 
     expect(points[1]?.side).toBe("SELL");
     expect(points[1]?.quantityAfter).toBe("6");
@@ -81,6 +84,6 @@ describe("computeCostBasisTimeline", () => {
         grossAmount: "500",
       },
     ];
-    expect(computeCostBasisTimeline(events, "VWCE")).toHaveLength(0);
+    expect(computeCostBasisTimeline(events, "VWCE", BIZKAIA)).toHaveLength(0);
   });
 });

@@ -2,7 +2,9 @@ import Papa from "papaparse";
 import { z } from "zod";
 
 export const tradeRepublicRowSchema = z.object({
-  datetime: z.string(),
+  // An offset or Z is required: without one, `new Date` reads the process's zone,
+  // and the same row would be two instants in Docker (UTC) and in Madrid.
+  datetime: z.iso.datetime({ offset: true }),
   category: z.string(),
   type: z.string(),
   asset_class: z.string(),

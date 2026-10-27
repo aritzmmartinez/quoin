@@ -21,6 +21,8 @@ import {
   widerRange,
 } from "./prices-backfill";
 
+const MADRID = "Europe/Madrid";
+
 const day = (iso: string) => new Date(`${iso}T07:00:00.000Z`);
 
 const NO_RATES: EnsureRates = async () => ({ book: new Map(), unavailable: [] });
@@ -88,6 +90,7 @@ describe("backfillInstruments", () => {
       [{ id: "XS00TEST0001", quoteSymbol: "AAA.DE" }],
       "5y",
       NO_RATES,
+      MADRID,
     );
 
     expect(report?.written).toBe(2);
@@ -125,6 +128,7 @@ describe("backfillInstruments", () => {
       [{ id: "XS00TEST0001", quoteSymbol: "AAA" }],
       "5y",
       rates,
+      MADRID,
     );
 
     expect(asked).toEqual([["USD", "2026-01-05"]]);
@@ -144,6 +148,7 @@ describe("backfillInstruments", () => {
       [{ id: "XS00TEST0001", quoteSymbol: "AAA" }],
       "5y",
       async () => ({ book: new Map(), unavailable: ["USD"] }),
+      MADRID,
     );
 
     expect(report).toMatchObject({
@@ -170,6 +175,7 @@ describe("backfillInstruments", () => {
       [{ id: "XS00TEST0001", quoteSymbol: "AAA" }],
       "5y",
       NO_RATES,
+      MADRID,
     );
 
     expect(report).toMatchObject({ written: 0, noRateSeries: "XYZ" });
@@ -192,6 +198,7 @@ describe("backfillInstruments", () => {
       [{ id: "XS00TEST0001", quoteSymbol: "AAA.DE" }],
       "max",
       NO_RATES,
+      MADRID,
     );
 
     expect(report?.weekly).toBe(true);
@@ -207,6 +214,7 @@ describe("backfillInstruments", () => {
       [{ id: "XS00TEST0001", quoteSymbol: "XS00TEST0001.SG" }],
       "5y",
       NO_RATES,
+      MADRID,
     );
 
     expect(report).toMatchObject({ written: 0, first: null, last: null });
@@ -229,6 +237,7 @@ describe("backfillInstruments", () => {
       ],
       "1y",
       NO_RATES,
+      MADRID,
     );
 
     expect(asked).toEqual(["AAA.DE", "BBB.DE"]);
@@ -259,6 +268,7 @@ describe("backfillInstruments", () => {
       ],
       "1y",
       NO_RATES,
+      MADRID,
     );
 
     expect(first).toMatchObject({ written: 0, unavailable: expect.stringContaining("429") });
@@ -275,6 +285,7 @@ describe("backfillInstruments", () => {
       [{ id: "XS00TEST0001", quoteSymbol: "NONE.DE" }],
       "1y",
       NO_RATES,
+      MADRID,
     );
 
     expect(report).toMatchObject({ written: 0, first: null, unavailable: null });

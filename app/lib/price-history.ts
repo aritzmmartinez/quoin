@@ -21,6 +21,7 @@ export interface ReplaceHistoryDeps {
   provider: MarketDataProvider;
   rates: EnsureRates;
   now?: Date;
+  zone: string;
 }
 
 export interface ReplaceHistoryRequest {
@@ -107,7 +108,7 @@ export async function replaceQuoteHistory(
   if (currencies.length > 1) return failure("failed", currencies.join(", "));
   const currency = first.currency;
   const series = rateSeriesOf(
-    await deps.rates(new Map([[currency, dayOf(first.asOf)]])),
+    await deps.rates(new Map([[currency, dayOf(first.asOf, deps.zone)]])),
     currency,
   );
   if (series === "none") return failure("no-rate-series", currency);

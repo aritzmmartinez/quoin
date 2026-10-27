@@ -10,6 +10,9 @@ import {
   computePortfolioSummary,
   computeTopPositions,
 } from "./portfolio";
+import { jurisdictionOf } from "~/core/tax";
+
+const BIZKAIA = jurisdictionOf("bizkaia");
 
 function position(
   overrides: Partial<Position> & { instrumentId: string },
@@ -359,7 +362,7 @@ describe("one instrument, one line", () => {
   const prices = new Map([["A", { price: "800", currency: "EUR" }]]);
 
   it("gives a repeatedly traded instrument a single Top-5 row", () => {
-    const positions = computePositions(ledger);
+    const positions = computePositions(ledger, BIZKAIA);
     const top = computeTopPositions(
       positions,
       computeMarketValues(positions, prices, "EUR"),
@@ -372,7 +375,7 @@ describe("one instrument, one line", () => {
   });
 
   it("counts instruments, not positions, when reporting price coverage", () => {
-    const positions = computePositions(ledger);
+    const positions = computePositions(ledger, BIZKAIA);
     const summary = computePortfolioSummary(
       positions,
       computeMarketValues(positions, prices, "EUR"),

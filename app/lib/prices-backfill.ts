@@ -119,6 +119,7 @@ export async function backfillInstrument(
   target: BackfillTarget,
   range: HistoryRange,
   rates: EnsureRates,
+  zone: string,
 ): Promise<BackfillReport> {
   const quotes = await provider.getHistory(target.quoteSymbol, range);
   const first = quotes[0];
@@ -126,7 +127,7 @@ export async function backfillInstrument(
 
   const needs = new Map<string, string>();
   for (const quote of quotes) {
-    const day = dayOf(quote.asOf);
+    const day = dayOf(quote.asOf, zone);
     const held = needs.get(quote.currency);
     if (held === undefined || day < held) needs.set(quote.currency, day);
   }
@@ -158,12 +159,13 @@ export async function backfillInstruments(
   targets: readonly BackfillTarget[],
   range: HistoryRange,
   rates: EnsureRates,
+  zone: string,
 ): Promise<BackfillReport[]> {
   const reports: BackfillReport[] = [];
   for (const target of targets) {
     try {
       reports.push(
-        await backfillInstrument(provider, prices, target, range, rates),
+        await backfillInstrument(provider, prices, target, range, rates, zone),
       );
     } catch (error) {
       if (!(error instanceof MarketDataUnavailableError)) throw error;

@@ -6,6 +6,10 @@ import { deflate, InflationIndex, Money, type TradeEvent } from "../domain";
 import { computePositions } from "./positions";
 import { computeRealizedGains } from "./realized";
 import { IPC_SYNC_MAX_AGE_DAYS, ipcSyncStale, realBasis } from "./real";
+import { jurisdictionOf } from "~/core/tax";
+
+const MADRID = "Europe/Madrid";
+const BIZKAIA = jurisdictionOf("bizkaia");
 
 const point = (period: string, indexValue: string, base = "2025") => ({
   period,
@@ -75,15 +79,15 @@ describe("realBasis", () => {
       sell("3", "2026-03-10T10:00:00Z", "4", "520", "1"),
     ];
 
-    const basis = realBasis(FLAT, events);
+    const basis = realBasis(FLAT, events, MADRID);
     expect(basis.ok).toBe(true);
     if (!basis.ok) return;
 
-    expect(computePositions(events, basis.revalue)).toEqual(
-      computePositions(events),
+    expect(computePositions(events, BIZKAIA, basis.revalue)).toEqual(
+      computePositions(events, BIZKAIA),
     );
-    expect(computeRealizedGains(events, basis.revalue)).toEqual(
-      computeRealizedGains(events),
+    expect(computeRealizedGains(events, BIZKAIA, basis.revalue)).toEqual(
+      computeRealizedGains(events, BIZKAIA),
     );
   });
 
@@ -93,18 +97,18 @@ describe("realBasis", () => {
       buy("2", "2026-08-10T10:00:00Z", "10", "1000"),
     ];
 
-    const basis = realBasis(RISING, events);
+    const basis = realBasis(RISING, events, MADRID);
     expect(basis.ok).toBe(true);
     if (!basis.ok) return;
 
     const perFlow = new Decimal(
-      computePositions(events, basis.revalue)[0]!.costBasis,
+      computePositions(events, BIZKAIA, basis.revalue)[0]!.costBasis,
     );
 
     const totalThenDeflate = new Decimal(
       deflate(
         RISING,
-        Money.fromString(computePositions(events)[0]!.costBasis),
+        Money.fromString(computePositions(events, BIZKAIA)[0]!.costBasis),
         "2025-02",
         basis.reference,
       )!.toString(),
@@ -130,11 +134,11 @@ describe("realBasis", () => {
 
   it("restates a purchase upward once the index has risen past it", () => {
     const events = [buy("1", "2025-01-10T10:00:00Z", "10", "1000")];
-    const basis = realBasis(RISING, events);
+    const basis = realBasis(RISING, events, MADRID);
     if (!basis.ok) throw new Error("expected a usable basis");
 
     const real = new Decimal(
-      computePositions(events, basis.revalue)[0]!.costBasis,
+      computePositions(events, BIZKAIA, basis.revalue)[0]!.costBasis,
     );
     expect(real.greaterThan(1000)).toBe(true);
   });
@@ -152,7 +156,7 @@ describe("realBasis", () => {
         buy("2", "2025-02-10T10:00:00Z", "10", "1000"),
       ];
 
-      const basis = realBasis(holed, events);
+      const basis = realBasis(holed, events, MADRID);
       expect(basis.ok).toBe(false);
       if (basis.ok) return;
       expect(basis.missing).toEqual(["2025-02"]);
@@ -165,7 +169,7 @@ describe("realBasis", () => {
         buy("2", "2025-02-10T10:00:00Z", "10", "1000"),
         buy("3", "2025-03-10T10:00:00Z", "10", "1000"),
       ];
-      const basis = realBasis(holed, events);
+      const basis = realBasis(holed, events, MADRID);
       expect(basis.ok).toBe(false);
     });
 
@@ -174,7 +178,7 @@ describe("realBasis", () => {
         buy("1", "2025-01-10T10:00:00Z", "10", "1000"),
         buy("2", "2025-04-10T10:00:00Z", "10", "1000"),
       ];
-      const basis = realBasis(InflationIndex.from("ES", []), events);
+      const basis = realBasis(InflationIndex.from("ES", []), events, MADRID);
       expect(basis.ok).toBe(false);
       if (basis.ok) return;
       expect(basis.reference).toBeNull();
@@ -192,7 +196,7 @@ describe("realBasis", () => {
       buy("2", "2025-06-10T10:00:00Z", "10", "1000"),
     ];
 
-    const basis = realBasis(index, events);
+    const basis = realBasis(index, events, MADRID);
     expect(basis.ok).toBe(true);
     if (!basis.ok) return;
     expect(basis.reference).toBe("2025-02");
@@ -211,10 +215,12 @@ describe("realBasis", () => {
     ]);
     const events = [buy("1", "2026-03-31T22:30:00Z", "10", "1000")];
 
-    const basis = realBasis(index, events);
+    const basis = realBasis(index, events, MADRID);
     if (!basis.ok) throw new Error("expected a usable basis");
 
-    expect(computePositions(events, basis.revalue)[0]!.costBasis).toBe("1000");
+    expect(computePositions(events, BIZKAIA, basis.revalue)[0]!.costBasis).toBe(
+      "1000",
+    );
   });
 });
 

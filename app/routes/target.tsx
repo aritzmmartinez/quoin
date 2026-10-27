@@ -27,17 +27,18 @@ import {
   TargetParseError,
   type PortfolioTarget,
 } from "~/core/domain";
+import { today } from "~/core/calendar";
 import { computePositions } from "~/core/projections";
 import {
   type Copy,
   copyFor,
   copyFromMatches,
   parseLocale,
-  todayInMadrid,
   toTargetRows,
   toTargetVersionRows,
   useCopy,
 } from "~/lib";
+import { loadResidence } from "~/lib/residence.server";
 
 export function meta({ matches }: Route.MetaArgs) {
   const t = copyFromMatches(matches);
@@ -50,16 +51,18 @@ export function meta({ matches }: Route.MetaArgs) {
 export const handle = { title: (t: Copy) => t.target.title };
 
 export async function loader(_: Route.LoaderArgs) {
-  const [targets, instruments, events] = await Promise.all([
+  const [targets, instruments, events, { jurisdiction }] = await Promise.all([
     new PrismaTargetRepository().list(),
     new PrismaInstrumentRepository().list(),
     new PrismaLedgerRepository().list(),
+    loadResidence(),
   ]);
+  const now = new Date();
 
-  const active = getActiveTarget(targets, new Date());
+  const active = getActiveTarget(targets, now);
 
   const held = new Set(
-    computePositions(events)
+    computePositions(events, jurisdiction)
       .filter((position) => !new Decimal(position.quantity).isZero())
       .map((position) => position.instrumentId),
   );
@@ -79,7 +82,7 @@ export async function loader(_: Route.LoaderArgs) {
       : null,
     rows,
     versions: toTargetVersionRows(targets, active?.id ?? null),
-    today: todayInMadrid(),
+    today: today(jurisdiction.zone, now),
     defaultLines: rows
       .map((row) => `${row.instrumentId} ${row.monthlyAmount}`)
       .join("\n"),

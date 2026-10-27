@@ -19,6 +19,7 @@ import { checkQuoteAgainstLedger } from "~/lib/symbol-check";
 import { ensureRatesNow } from "~/lib/fx-sync.server";
 
 import { announceDatabase } from "./lib/db-target";
+import { loadResidence } from "~/lib/residence.server";
 
 const USAGE = `Usage:
   pnpm prices:map <ISIN>                    show the current quote symbol
@@ -34,6 +35,7 @@ async function preview(symbol: string, instrumentId: string): Promise<void> {
       instrumentId,
       symbol,
       ensureRatesNow,
+      (await loadResidence()).jurisdiction,
     );
     if (!check) {
       console.log(
@@ -135,6 +137,7 @@ async function main(): Promise<void> {
       prices,
       provider: new YahooMarketDataProvider(),
       rates: ensureRatesNow,
+      zone: (await loadResidence()).calendarZone,
     },
     { instrumentId: id, symbol: symbolArg, range },
   );

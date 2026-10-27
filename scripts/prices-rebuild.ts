@@ -15,6 +15,7 @@ import { rangeSince } from "~/lib/prices-backfill";
 import { ensureRatesNow } from "~/lib/fx-sync.server";
 
 import { announceDatabase } from "./lib/db-target";
+import { loadResidence } from "~/lib/residence.server";
 
 async function main(): Promise<void> {
   announceDatabase();
@@ -53,6 +54,7 @@ async function main(): Promise<void> {
       prices,
       provider: new YahooMarketDataProvider(),
       rates: ensureRatesNow,
+      zone: (await loadResidence()).calendarZone,
     },
     targets,
     (outcome, index) => {

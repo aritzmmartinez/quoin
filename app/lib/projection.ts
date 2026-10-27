@@ -110,6 +110,7 @@ export function buildProjectionSource(
   instruments: ReadonlyMap<string, Instrument>,
   offPlanValues: ReadonlyMap<string, string>,
   asOf: Date,
+  zone: string,
 ): ProjectionSource {
   const lines: ProjectionSourceLine[] = [];
   const excluded: ExcludedLine[] = [];
@@ -122,6 +123,7 @@ export function buildProjectionSource(
     const monthlyReturns = toMonthlyReturns(
       histories.get(allocation.instrumentId) ?? [],
       asOf,
+      zone,
     );
 
     if (monthlyReturns.length === 0) {
@@ -150,7 +152,11 @@ export function buildProjectionSource(
     heldLines.push({
       instrumentId,
       value,
-      monthlyReturns: toMonthlyReturns(histories.get(instrumentId) ?? [], asOf),
+      monthlyReturns: toMonthlyReturns(
+        histories.get(instrumentId) ?? [],
+        asOf,
+        zone,
+      ),
       ter: instruments.get(instrumentId)?.ter ?? null,
     });
   }

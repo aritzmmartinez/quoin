@@ -18,12 +18,13 @@ import {
   InfoHint,
   signClass,
 } from "~/components";
+import { today } from "~/core/calendar";
 import { computeRealizedGains } from "~/core/projections";
 import {
   buildTaxYearView,
   type Copy,
   copyFromMatches,
-  createFormat,
+  intlTag,
   groupRealizedByYear,
   listTaxYears,
   parseLocale,
@@ -33,12 +34,12 @@ import {
   realizedTotals,
   taxExclusions,
   toRealizedRows,
-  todayInMadrid,
   unclassifiedSales,
   useCopy,
   useFormat,
 } from "~/lib";
 import { resolveRealView } from "~/lib/real.server";
+import { loadResidence } from "~/lib/residence.server";
 
 export function meta({ matches }: Route.MetaArgs) {
   const t = copyFromMatches(matches);
@@ -59,21 +60,25 @@ export async function loader({ request }: Route.LoaderArgs) {
   const view = parseRealizedView(params);
   const sort = parseRealizedSort(params);
   const locale = parseLocale(request.headers.get("Cookie"));
-  const tag = createFormat(locale).tag;
+  const tag = intlTag(locale);
 
-  const [events, instruments] = await Promise.all([
+  const [events, instruments, { jurisdiction }] = await Promise.all([
     new PrismaLedgerRepository().list(),
     new PrismaInstrumentRepository().list(),
+    loadResidence(),
   ]);
+  const { zone } = jurisdiction;
+  const now = new Date();
 
-  const real = await resolveRealView(request, events);
+  const real = await resolveRealView(request, events, zone);
   const rows = toRealizedRows(
-    computeRealizedGains(events, real.revalue),
+    computeRealizedGains(events, jurisdiction, real.revalue),
     instruments,
+    zone,
   );
 
-  const taxYears = listTaxYears(events);
-  const taxYear = parseTaxYear(params, taxYears);
+  const taxYears = listTaxYears(events, zone);
+  const taxYear = parseTaxYear(params, taxYears, zone, now);
 
   return {
     view,
@@ -97,7 +102,13 @@ export async function loader({ request }: Route.LoaderArgs) {
       view:
         view !== "tax" || taxYear === null
           ? null
-          : buildTaxYearView(events, instruments, taxYear, todayInMadrid()),
+          : buildTaxYearView(
+              events,
+              instruments,
+              taxYear,
+              jurisdiction,
+              today(zone, now),
+            ),
     },
   };
 }

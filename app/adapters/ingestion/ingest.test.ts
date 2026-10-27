@@ -13,6 +13,8 @@ import {
   type MappedBatch,
 } from "./ingest";
 
+const MADRID = "Europe/Madrid";
+
 function event(externalId: string): LedgerEvent {
   return {
     id: `id-${externalId}`,
@@ -28,7 +30,7 @@ function event(externalId: string): LedgerEvent {
 }
 
 function batch(events: LedgerEvent[]): MappedBatch {
-  const builder = new BatchBuilder();
+  const builder = new BatchBuilder(MADRID);
   for (const e of events)
     builder.add({ kind: "domain", instrument: null, event: e });
   return builder.build(events.length);
@@ -60,7 +62,7 @@ describe("counting by operation", () => {
   });
 
   function rewardBatch(): MappedBatch {
-    const builder = new BatchBuilder();
+    const builder = new BatchBuilder(MADRID);
     builder.addOperation([
       { kind: "domain", instrument: null, event: event("R1") },
       { kind: "domain", instrument: null, event: event("R1:income") },
@@ -92,7 +94,7 @@ describe("counting by operation", () => {
   });
 
   it("adds up to the operations in the file", async () => {
-    const builder = new BatchBuilder();
+    const builder = new BatchBuilder(MADRID);
     builder.addOperation([
       { kind: "domain", instrument: null, event: event("A") },
     ]);
@@ -122,10 +124,11 @@ describe("events the ledger cannot book as they stand", () => {
     rateBookFrom([
       { source: "ECB", base: "EUR", quote: "USD", day: "2025-11-14", rate: "1.25" },
     ]),
+    MADRID,
   );
 
   it("converts an amount in another currency at the ECB rate of its Madrid day", () => {
-    const builder = new BatchBuilder(rates);
+    const builder = new BatchBuilder(MADRID, rates);
     builder.add({ kind: "domain", instrument: null, event: usd("b") });
     const b = builder.build(1);
 
@@ -142,7 +145,7 @@ describe("events the ledger cannot book as they stand", () => {
   });
 
   it("sets aside an amount with no rate for its day as fx-unavailable, and keeps the rest", () => {
-    const builder = new BatchBuilder();
+    const builder = new BatchBuilder(MADRID);
     builder.add({ kind: "domain", instrument: null, event: event("a") });
     builder.add({ kind: "domain", instrument: null, event: usd("b") });
     const b = builder.build(2);
@@ -160,7 +163,7 @@ describe("events the ledger cannot book as they stand", () => {
   });
 
   it("names the instrument and the currency when the event has one", () => {
-    const builder = new BatchBuilder();
+    const builder = new BatchBuilder(MADRID);
     builder.add({
       kind: "domain",
       instrument: {
@@ -178,7 +181,7 @@ describe("events the ledger cannot book as they stand", () => {
   });
 
   it("records the earliest Madrid day each currency was missing a rate for", () => {
-    const builder = new BatchBuilder();
+    const builder = new BatchBuilder(MADRID);
     builder.add({ kind: "domain", instrument: null, event: usd("b") });
     builder.add({
       kind: "domain",
@@ -200,7 +203,7 @@ describe("events the ledger cannot book as they stand", () => {
   });
 
   it("sets aside a whole operation when one of its rows has no rate, counting it once", () => {
-    const builder = new BatchBuilder();
+    const builder = new BatchBuilder(MADRID);
     builder.addOperation([
       { kind: "domain", instrument: null, event: event("p") },
       { kind: "domain", instrument: null, event: usd("p:income") },
@@ -212,7 +215,7 @@ describe("events the ledger cannot book as they stand", () => {
   });
 
   it("refuses the whole batch on any other break of the rule, naming the row by its Madrid day", () => {
-    const builder = new BatchBuilder();
+    const builder = new BatchBuilder(MADRID);
     builder.add({ kind: "domain", instrument: null, event: event("a") });
     builder.add({
       kind: "domain",

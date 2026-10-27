@@ -7,10 +7,9 @@ import {
 } from "../domain";
 import { baseOf } from "../fx";
 import {
-  DEFAULT_TERRITORY,
   swapValuationRuleFor,
+  type Jurisdiction,
   type SwapValuationRule,
-  type Territory,
 } from "../tax/config";
 
 export interface SwapLegValue {
@@ -95,14 +94,13 @@ function loneLegValue(trade: TradeEvent): SwapLegValue {
 export type TradeAmounts = (trade: TradeEvent) => SwapLegValue;
 
 export interface TradeAmountsOptions {
-  territory?: Territory;
   rules?: readonly SwapValuationRule[];
 }
 
 /**
  * The gross and fees, in euros, that a trade is booked at. A plain trade is its
  * own row. A swap leg is valued through `swapPairValue` together with the leg
- * it is linked to, by the rule in force on the Madrid day of the swap. A leg
+ * it is linked to, by the rule in force on the day of the swap. A leg
  * with no partner in the ledger (one that does not pair as exactly one SELL and
  * one BUY) keeps its own market value, since the import writes both or neither.
  *
@@ -110,9 +108,9 @@ export interface TradeAmountsOptions {
  */
 export function tradeAmounts(
   events: readonly LedgerEvent[],
+  jurisdiction: Jurisdiction,
   options: TradeAmountsOptions = {},
 ): TradeAmounts {
-  const territory = options.territory ?? DEFAULT_TERRITORY;
   const groups = new Map<string, TradeEvent[]>();
   for (const event of events) {
     if (
@@ -139,7 +137,11 @@ export function tradeAmounts(
           receivedValue: baseOf(buy, "grossAmount").add(baseOf(buy, "fees")),
           receivedFee: baseOf(buy, "fees"),
         },
-        swapValuationRuleFor(territory, dayOf(sell.ts), options.rules),
+        swapValuationRuleFor(
+          jurisdiction.territory,
+          dayOf(sell.ts, jurisdiction.zone),
+          options.rules,
+        ),
       );
       values.set(sell.id, pair.sell);
       values.set(buy.id, pair.buy);

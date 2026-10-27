@@ -18,6 +18,7 @@ import { ErrorState } from "~/components/ui/ErrorState";
 import { parseBasis } from "~/lib/basis";
 import { useCopy } from "~/lib/i18n";
 import { parseLocale } from "~/lib/locale";
+import { loadResidence } from "~/lib/residence.server";
 import { parseTheme, resolveTheme, THEME_SCRIPT } from "~/lib/theme";
 import "./app.css";
 
@@ -34,12 +35,15 @@ export const links: Route.LinksFunction = () => [
   },
 ];
 
-export function loader({ request }: Route.LoaderArgs) {
+export async function loader({ request }: Route.LoaderArgs) {
   const cookie = request.headers.get("Cookie") ?? "";
+  const { calendarZone, displayZone } = await loadResidence();
   return {
     theme: parseTheme(cookie),
     basis: parseBasis(cookie),
     locale: parseLocale(cookie),
+    calendarZone,
+    displayZone,
   };
 }
 

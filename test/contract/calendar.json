@@ -1,0 +1,199 @@
+{
+  "contract": "calendar",
+  "version": 1,
+  "description": "What day, period and fiscal year an instant belongs to in a zone, and the instant a day starts. Shared with the mobile client: both implementations must reproduce every case.",
+  "assignments": [
+    {
+      "name": "New Year in Madrid: 23:30Z on 31 December is already the next day and the next fiscal year",
+      "instant": "2026-12-31T23:30:00.000Z",
+      "zone": "Europe/Madrid",
+      "day": "2027-01-01",
+      "period": "2027-01",
+      "fiscalYear": 2027
+    },
+    {
+      "name": "The last millisecond of 2026 in Madrid",
+      "instant": "2026-12-31T22:59:59.999Z",
+      "zone": "Europe/Madrid",
+      "day": "2026-12-31",
+      "period": "2026-12",
+      "fiscalYear": 2026
+    },
+    {
+      "name": "Midnight exactly in Madrid, winter (UTC+1)",
+      "instant": "2026-12-31T23:00:00.000Z",
+      "zone": "Europe/Madrid",
+      "day": "2027-01-01",
+      "period": "2027-01",
+      "fiscalYear": 2027
+    },
+    {
+      "name": "Midnight exactly in Madrid, summer (UTC+2)",
+      "instant": "2026-06-30T22:00:00.000Z",
+      "zone": "Europe/Madrid",
+      "day": "2026-07-01",
+      "period": "2026-07",
+      "fiscalYear": 2026
+    },
+    {
+      "name": "Midnight exactly in Madrid, across a month boundary in winter",
+      "instant": "2026-01-31T23:00:00.000Z",
+      "zone": "Europe/Madrid",
+      "day": "2026-02-01",
+      "period": "2026-02",
+      "fiscalYear": 2026
+    },
+    {
+      "name": "March switch, Madrid: the millisecond before 01:00Z",
+      "instant": "2026-03-29T00:59:59.999Z",
+      "zone": "Europe/Madrid",
+      "day": "2026-03-29",
+      "period": "2026-03",
+      "fiscalYear": 2026
+    },
+    {
+      "name": "March switch, Madrid: 01:00Z, clocks jump from 02:00 to 03:00",
+      "instant": "2026-03-29T01:00:00.000Z",
+      "zone": "Europe/Madrid",
+      "day": "2026-03-29",
+      "period": "2026-03",
+      "fiscalYear": 2026
+    },
+    {
+      "name": "March switch, Madrid: that evening the day turns at 22:00Z",
+      "instant": "2026-03-29T21:59:59.999Z",
+      "zone": "Europe/Madrid",
+      "day": "2026-03-29",
+      "period": "2026-03",
+      "fiscalYear": 2026
+    },
+    {
+      "name": "March switch, Madrid: 22:00Z is already the 30th",
+      "instant": "2026-03-29T22:00:00.000Z",
+      "zone": "Europe/Madrid",
+      "day": "2026-03-30",
+      "period": "2026-03",
+      "fiscalYear": 2026
+    },
+    {
+      "name": "October switch, Madrid: the millisecond before 01:00Z",
+      "instant": "2026-10-25T00:59:59.999Z",
+      "zone": "Europe/Madrid",
+      "day": "2026-10-25",
+      "period": "2026-10",
+      "fiscalYear": 2026
+    },
+    {
+      "name": "October switch, Madrid: 01:00Z, clocks fall back from 03:00 to 02:00",
+      "instant": "2026-10-25T01:00:00.000Z",
+      "zone": "Europe/Madrid",
+      "day": "2026-10-25",
+      "period": "2026-10",
+      "fiscalYear": 2026
+    },
+    {
+      "name": "October switch, Madrid: that evening the day turns at 23:00Z",
+      "instant": "2026-10-25T22:59:59.999Z",
+      "zone": "Europe/Madrid",
+      "day": "2026-10-25",
+      "period": "2026-10",
+      "fiscalYear": 2026
+    },
+    {
+      "name": "October switch, Madrid: 23:00Z is already the 26th",
+      "instant": "2026-10-25T23:00:00.000Z",
+      "zone": "Europe/Madrid",
+      "day": "2026-10-26",
+      "period": "2026-10",
+      "fiscalYear": 2026
+    },
+    {
+      "name": "Canary Islands: 23:30Z on 31 December is still the old year, an hour behind Madrid",
+      "instant": "2026-12-31T23:30:00.000Z",
+      "zone": "Atlantic/Canary",
+      "day": "2026-12-31",
+      "period": "2026-12",
+      "fiscalYear": 2026
+    },
+    {
+      "name": "Canary Islands: midnight exactly in winter (UTC+0)",
+      "instant": "2027-01-01T00:00:00.000Z",
+      "zone": "Atlantic/Canary",
+      "day": "2027-01-01",
+      "period": "2027-01",
+      "fiscalYear": 2027
+    },
+    {
+      "name": "Canary Islands: March switch at 01:00Z, clocks jump from 01:00 to 02:00",
+      "instant": "2026-03-29T01:00:00.000Z",
+      "zone": "Atlantic/Canary",
+      "day": "2026-03-29",
+      "period": "2026-03",
+      "fiscalYear": 2026
+    },
+    {
+      "name": "Canary Islands: midnight exactly in summer (UTC+1)",
+      "instant": "2026-07-31T23:00:00.000Z",
+      "zone": "Atlantic/Canary",
+      "day": "2026-08-01",
+      "period": "2026-08",
+      "fiscalYear": 2026
+    }
+  ],
+  "startOfDay": [
+    {
+      "name": "Madrid, the day before the March switch",
+      "day": "2026-03-28",
+      "zone": "Europe/Madrid",
+      "instant": "2026-03-27T23:00:00.000Z"
+    },
+    {
+      "name": "Madrid, the March switch day still starts at UTC+1",
+      "day": "2026-03-29",
+      "zone": "Europe/Madrid",
+      "instant": "2026-03-28T23:00:00.000Z"
+    },
+    {
+      "name": "Madrid, the day after the March switch starts at UTC+2",
+      "day": "2026-03-30",
+      "zone": "Europe/Madrid",
+      "instant": "2026-03-29T22:00:00.000Z"
+    },
+    {
+      "name": "Madrid, the October switch day still starts at UTC+2",
+      "day": "2026-10-25",
+      "zone": "Europe/Madrid",
+      "instant": "2026-10-24T22:00:00.000Z"
+    },
+    {
+      "name": "Madrid, the day after the October switch starts at UTC+1",
+      "day": "2026-10-26",
+      "zone": "Europe/Madrid",
+      "instant": "2026-10-25T23:00:00.000Z"
+    },
+    {
+      "name": "Madrid, New Year",
+      "day": "2027-01-01",
+      "zone": "Europe/Madrid",
+      "instant": "2026-12-31T23:00:00.000Z"
+    },
+    {
+      "name": "Canary Islands, the March switch day starts at UTC+0",
+      "day": "2026-03-29",
+      "zone": "Atlantic/Canary",
+      "instant": "2026-03-29T00:00:00.000Z"
+    },
+    {
+      "name": "Canary Islands, the day after the March switch starts at UTC+1",
+      "day": "2026-03-30",
+      "zone": "Atlantic/Canary",
+      "instant": "2026-03-29T23:00:00.000Z"
+    },
+    {
+      "name": "Canary Islands, the day after the October switch starts at UTC+0",
+      "day": "2026-10-26",
+      "zone": "Atlantic/Canary",
+      "instant": "2026-10-26T00:00:00.000Z"
+    }
+  ]
+}

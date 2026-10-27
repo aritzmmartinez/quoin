@@ -34,8 +34,9 @@ export function pricesInBase<P extends Priced>(
   prices: ReadonlyMap<string, P>,
   book: RateBook,
   now: Date,
+  zone: string,
 ): PricesInBase<P> {
-  const today = dayOf(now);
+  const today = dayOf(now, zone);
   const converted = new Map<string, P>();
   const unrated = new Map<string, string>();
   for (const [instrumentId, price] of prices) {
@@ -54,11 +55,12 @@ export interface HistoryInBase {
 export function historyInBase(
   history: readonly PriceSnapshot[],
   book: RateBook,
+  zone: string,
 ): HistoryInBase {
   const converted: PriceSnapshot[] = [];
   let unrated = 0;
   for (const snapshot of history) {
-    const based = inBase(snapshot, book, dayOf(snapshot.asOf));
+    const based = inBase(snapshot, book, dayOf(snapshot.asOf, zone));
     if (based === null) unrated += 1;
     else converted.push(based);
   }

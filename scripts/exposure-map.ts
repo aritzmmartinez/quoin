@@ -18,6 +18,7 @@ import {
 import { computePositions } from "~/core/projections";
 
 import { announceDatabase } from "./lib/db-target";
+import { loadResidence } from "~/lib/residence.server";
 
 const KINDS = exposureKindSchema.options;
 
@@ -40,7 +41,8 @@ Examples:
 
 async function heldQuantity(instrumentId: string): Promise<Decimal> {
   const events = await new PrismaLedgerRepository().list();
-  return computePositions(events)
+  const { jurisdiction } = await loadResidence();
+  return computePositions(events, jurisdiction)
     .filter((p) => p.instrumentId === instrumentId)
     .reduce((sum, p) => sum.plus(new Decimal(p.quantity)), new Decimal(0));
 }

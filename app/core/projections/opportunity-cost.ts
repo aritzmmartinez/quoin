@@ -49,7 +49,8 @@ export interface OpportunityCostInput {
   benchmarkHistory: readonly PriceSnapshot[];
   prices: ReadonlyMap<string, PriceLike>;
   baseCurrency?: string;
-  now?: Date;
+  now: Date;
+  zone: string;
 }
 
 interface Close {
@@ -61,6 +62,7 @@ function closesFrom(
   history: readonly PriceSnapshot[],
   instrumentId: string,
   baseCurrency: string,
+  zone: string,
 ): Close[] {
   const byDay = new Map<string, { t: number; price: Decimal }>();
   for (const snapshot of history) {
@@ -70,7 +72,7 @@ function closesFrom(
         `Benchmark close on ${snapshot.asOf.toISOString()} is in ${snapshot.currency}, not ${baseCurrency}; pass the history through historyInBase() first`,
       );
     }
-    const day = dayOf(snapshot.asOf);
+    const day = dayOf(snapshot.asOf, zone);
     const t = snapshot.asOf.getTime();
     const seen = byDay.get(day);
     if (seen && seen.t > t) continue;
@@ -128,13 +130,15 @@ export function computeOpportunityCost(
     benchmarkHistory,
     prices,
     baseCurrency = BASE_CURRENCY,
-    now = new Date(),
+    now,
+    zone,
   } = input;
 
   const closes = closesFrom(
     benchmarkHistory,
     benchmarkInstrumentId,
     baseCurrency,
+    zone,
   );
   const firstClose = closes[0];
   const lastClose = closes[closes.length - 1];
@@ -191,7 +195,7 @@ export function computeOpportunityCost(
     bucket.contributed = bucket.contributed.add(spent);
     bucket.flows.push({ t, amount: spent.negate().toNumber() });
 
-    const day = dayOf(trade.ts);
+    const day = dayOf(trade.ts, zone);
     const close = closeOn(closes, day);
     if (close === null || close.isZero()) {
       const reason =

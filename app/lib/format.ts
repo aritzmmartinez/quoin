@@ -1,6 +1,5 @@
 import Decimal from "decimal.js";
 
-import { dayOf } from "~/core/calendar";
 import { BASE_CURRENCY, Money } from "~/core/domain";
 
 import { intlTag, type Locale } from "./locale";
@@ -38,11 +37,13 @@ export interface Format {
   tag: string;
 }
 
+const CALENDAR_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
 function exact(value: string): `${number}` {
   return new Decimal(value).toFixed() as `${number}`;
 }
 
-export function createFormat(locale: Locale): Format {
+export function createFormat(locale: Locale, zone: string): Format {
   const tag = intlTag(locale);
 
   function formatMoney(value: string, maximumFractionDigits = 2): string {
@@ -98,11 +99,13 @@ export function createFormat(locale: Locale): Format {
     return { text: `+${magnitude}`, sign: "positive" };
   }
 
+  /** An instant is shown in `zone`; a bare `YYYY-MM-DD` is a day already, read in UTC like a period. */
   function formatDate(iso: string): string {
     return new Intl.DateTimeFormat(tag, {
       day: "numeric",
       month: "short",
       year: "numeric",
+      timeZone: CALENDAR_DATE.test(iso) ? "UTC" : zone,
     }).format(new Date(iso));
   }
 
@@ -116,6 +119,7 @@ export function createFormat(locale: Locale): Format {
         ? { day: "numeric", month: "short" }
         : { month: "short" }),
       ...(withYear ? { year: "2-digit" as const } : {}),
+      timeZone: zone,
     }).format(new Date(timestamp));
   }
 
@@ -180,7 +184,7 @@ export function createFormat(locale: Locale): Format {
   }
 
   const clock = new Intl.DateTimeFormat(tag, {
-    timeZone: "Europe/Madrid",
+    timeZone: zone,
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -203,8 +207,4 @@ export function createFormat(locale: Locale): Format {
     formatClock,
     tag,
   };
-}
-
-export function todayInMadrid(now: Date = new Date()): string {
-  return dayOf(now);
 }

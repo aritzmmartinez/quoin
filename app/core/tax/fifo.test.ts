@@ -3,6 +3,9 @@ import { describe, expect, it } from "vitest";
 import type { TradeEvent } from "../domain";
 
 import { walkFifo } from "./fifo";
+import { jurisdictionOf } from "~/core/tax";
+
+const BIZKAIA = jurisdictionOf("bizkaia");
 
 let seq = 0;
 
@@ -44,15 +47,20 @@ function trade(
 
 describe("walkFifo", () => {
   it("reports nothing when nothing has been sold", () => {
-    expect(walkFifo([]).sales).toEqual([]);
-    expect(walkFifo([trade("BUY", "X", "10", "1000")]).sales).toEqual([]);
+    expect(walkFifo([], BIZKAIA).sales).toEqual([]);
+    expect(walkFifo([trade("BUY", "X", "10", "1000")], BIZKAIA).sales).toEqual(
+      [],
+    );
   });
 
   it("empties a lot exactly on a matching sale", () => {
-    const walk = walkFifo([
-      trade("BUY", "X", "10", "1000", { ts: "2025-01-01" }),
-      trade("SELL", "X", "10", "1200", { ts: "2025-03-01" }),
-    ]);
+    const walk = walkFifo(
+      [
+        trade("BUY", "X", "10", "1000", { ts: "2025-01-01" }),
+        trade("SELL", "X", "10", "1200", { ts: "2025-03-01" }),
+      ],
+      BIZKAIA,
+    );
 
     expect(walk.sales).toHaveLength(1);
     const sale = walk.sales[0]!;
@@ -64,11 +72,14 @@ describe("walkFifo", () => {
   });
 
   it("crosses several lots oldest-first, keeping their own unit costs", () => {
-    const walk = walkFifo([
-      trade("BUY", "X", "5", "500", { ts: "2025-01-01" }), // unit cost 100
-      trade("BUY", "X", "5", "750", { ts: "2025-02-01" }), // unit cost 150
-      trade("SELL", "X", "8", "1600", { ts: "2025-03-01" }),
-    ]);
+    const walk = walkFifo(
+      [
+        trade("BUY", "X", "5", "500", { ts: "2025-01-01" }), // unit cost 100
+        trade("BUY", "X", "5", "750", { ts: "2025-02-01" }), // unit cost 150
+        trade("SELL", "X", "8", "1600", { ts: "2025-03-01" }),
+      ],
+      BIZKAIA,
+    );
 
     const sale = walk.sales[0]!;
     // 5 @ 100 + 3 @ 150 = 500 + 450 = 950
@@ -87,10 +98,13 @@ describe("walkFifo", () => {
   });
 
   it("treats a sale that exceeds every lot on record as zero-cost for the unmatched remainder", () => {
-    const walk = walkFifo([
-      trade("BUY", "X", "5", "500", { ts: "2025-01-01" }), // unit cost 100
-      trade("SELL", "X", "8", "1000", { ts: "2025-03-01" }),
-    ]);
+    const walk = walkFifo(
+      [
+        trade("BUY", "X", "5", "500", { ts: "2025-01-01" }), // unit cost 100
+        trade("SELL", "X", "8", "1000", { ts: "2025-03-01" }),
+      ],
+      BIZKAIA,
+    );
 
     const sale = walk.sales[0]!;
     expect(sale.lots).toHaveLength(1);
@@ -101,11 +115,14 @@ describe("walkFifo", () => {
   });
 
   it("keeps one FIFO queue per instrument and consumes the oldest lot first", () => {
-    const walk = walkFifo([
-      trade("BUY", "X", "5", "500", { ts: "2025-01-01" }),
-      trade("BUY", "X", "5", "600", { ts: "2025-01-02" }),
-      trade("SELL", "X", "5", "700", { ts: "2025-02-01" }),
-    ]);
+    const walk = walkFifo(
+      [
+        trade("BUY", "X", "5", "500", { ts: "2025-01-01" }),
+        trade("BUY", "X", "5", "600", { ts: "2025-01-02" }),
+        trade("SELL", "X", "5", "700", { ts: "2025-02-01" }),
+      ],
+      BIZKAIA,
+    );
 
     expect(walk.sales).toHaveLength(1);
     expect(walk.sales[0]!.costRemoved.toString()).toBe("500");
@@ -129,7 +146,7 @@ describe("walkFifo", () => {
       externalId: "a",
     });
 
-    const sale = walkFifo([sell, buyB, buyA]).sales[0]!;
+    const sale = walkFifo([sell, buyB, buyA], BIZKAIA).sales[0]!;
     expect(sale.lots.map((l) => l.lotId)).toEqual([buyA.id]);
     expect(sale.realizedPnL.toString()).toBe("100");
     expect(sale.lotsAfter.map((l) => [l.lotId, l.quantity.toFixed()])).toEqual([
@@ -138,10 +155,13 @@ describe("walkFifo", () => {
   });
 
   it("bakes fees into the acquisition cost, same as AVCO", () => {
-    const walk = walkFifo([
-      trade("BUY", "X", "10", "1000", { fees: "20", ts: "2025-01-01" }),
-      trade("SELL", "X", "10", "1200", { ts: "2025-03-01" }),
-    ]);
+    const walk = walkFifo(
+      [
+        trade("BUY", "X", "10", "1000", { fees: "20", ts: "2025-01-01" }),
+        trade("SELL", "X", "10", "1200", { ts: "2025-03-01" }),
+      ],
+      BIZKAIA,
+    );
 
     const sale = walk.sales[0]!;
     expect(sale.costRemoved.toString()).toBe("1020");

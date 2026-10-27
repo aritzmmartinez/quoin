@@ -42,6 +42,7 @@ import {
 } from "~/lib";
 import { loadExternalData } from "~/lib/external-data.server";
 import { loadRateBook } from "~/lib/rate-book.server";
+import { loadResidence } from "~/lib/residence.server";
 
 export function meta({ matches }: Route.MetaArgs) {
   const t = copyFromMatches(matches);
@@ -57,10 +58,11 @@ export async function loader({ request }: Route.LoaderArgs) {
   const cookie = request.headers.get("Cookie");
   const benchmark = parseBenchmark(cookie);
   const prices = new PrismaPriceRepository();
-  const [instruments, events, latest] = await Promise.all([
+  const [instruments, events, latest, { calendarZone }] = await Promise.all([
     new PrismaInstrumentRepository().list(),
     new PrismaLedgerRepository().list(),
     prices.latest(),
+    loadResidence(),
   ]);
 
   const currencies = [...new Set([...latest.values()].map((s) => s.currency))];
@@ -79,7 +81,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     benchmark,
     candidates: benchmarkCandidates(
       instruments,
-      convertibleStarts(new Map(starts), book),
+      convertibleStarts(new Map(starts), book, calendarZone),
       intlTag(parseLocale(cookie)),
     ),
     external: await loadExternalData(instruments, events, latest, benchmark),

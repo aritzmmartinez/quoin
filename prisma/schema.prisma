@@ -313,3 +313,12 @@ model SecurityIdentity {
 
   @@index([canonicalId])
 }
+
+/// Owner settings: exactly one row, id 1 (a CHECK in the migration keeps it so).
+/// `residence` is where the owner is tax resident; the territory and the
+/// calendar zone are derived from it in core. No CHECK on it — the vocabulary
+/// grows — so `residenceSchema` validates it at write.
+model Settings {
+  id        Int    @id @default(1)
+  residence String
+}

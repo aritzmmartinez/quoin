@@ -37,6 +37,7 @@ import { fillPrices } from "~/lib/ingest.server";
 import { loadRateBook } from "~/lib/rate-book.server";
 
 import { announceDatabase } from "./lib/db-target";
+import { loadResidence } from "~/lib/residence.server";
 
 const USAGE = `Usage: pnpm ingest --broker=<${BROKERS.join("|")}> <file.csv> [--yes]`;
 
@@ -159,15 +160,22 @@ async function main(): Promise<void> {
 
   const instruments = new PrismaInstrumentRepository();
   const ledger = new PrismaLedgerRepository();
+  const { calendarZone } = await loadResidence();
   const adapter =
     broker === "kraken"
       ? new KrakenCsvAdapter(
           instruments,
           ledger,
+          calendarZone,
           new PrismaPriceRepository(),
           loadRateBook,
         )
-      : new TradeRepublicCsvAdapter(instruments, ledger, loadRateBook);
+      : new TradeRepublicCsvAdapter(
+          instruments,
+          ledger,
+          calendarZone,
+          loadRateBook,
+        );
 
   const csv = readFileSync(resolve(file), "utf8");
 

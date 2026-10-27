@@ -35,6 +35,7 @@ import {
 } from "~/lib";
 import { loadOpportunityCost } from "~/lib/opportunity-cost.server";
 import { loadValuation } from "~/lib/rate-book.server";
+import { loadResidence } from "~/lib/residence.server";
 import { unratedNames } from "~/lib/unrated";
 
 export function meta({ matches }: Route.MetaArgs) {
@@ -48,11 +49,12 @@ export function meta({ matches }: Route.MetaArgs) {
 export const handle = { title: (t: Copy) => t.opportunity.title, parent: "/" };
 
 export async function loader({ request }: Route.LoaderArgs) {
+  const { calendarZone } = await loadResidence();
   const cookie = request.headers.get("Cookie");
   const [events, instruments, valuation] = await Promise.all([
     new PrismaLedgerRepository().list(),
     new PrismaInstrumentRepository().list(),
-    loadValuation(),
+    loadValuation(calendarZone),
   ]);
 
   const view = await loadOpportunityCost(
@@ -60,6 +62,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     instruments,
     valuation,
     parseBenchmark(cookie),
+    calendarZone,
   );
   if (!view.ok) {
     return { ok: false as const, symbol: view.symbol, reason: view.reason };

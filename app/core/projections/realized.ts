@@ -1,6 +1,7 @@
 import Decimal from "decimal.js";
 
 import type { LedgerEvent, Revalue } from "../domain";
+import type { Jurisdiction } from "../tax/config";
 
 import { walkAvco } from "./avco";
 
@@ -22,9 +23,10 @@ export interface RealizedSale {
 
 export function computeRealizedGains(
   events: readonly LedgerEvent[],
+  jurisdiction: Jurisdiction,
   revalue?: Revalue,
 ): RealizedSale[] {
-  return walkAvco(events, revalue).sales.map((sale) => {
+  return walkAvco(events, jurisdiction, revalue).sales.map((sale) => {
     const { trade } = sale;
     const costBasis = sale.costRemoved;
 

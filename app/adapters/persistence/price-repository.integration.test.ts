@@ -5,6 +5,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import type { Instrument } from "~/core/domain";
 
+const MADRID = "Europe/Madrid";
+
 type Client = typeof import("./db.server").prisma;
 
 let prisma: Client;
@@ -313,20 +315,34 @@ describe("PrismaPriceRepository.saveDaily (integration)", () => {
     ).map((r) => `${r.asOf.toISOString()} ${r.price} ${r.source}`);
 
   it("replaces the day's live row with a newer one", async () => {
-    await priceRepo.saveDaily(ID, [], live("2026-10-14T08:00:00Z", "1"));
-    await priceRepo.saveDaily(ID, [], live("2026-10-14T15:35:00Z", "2"));
-    expect(await stored()).toEqual([
-      "2026-10-14T15:35:00.000Z 2 YAHOO_LIVE",
-    ]);
+    await priceRepo.saveDaily(
+      ID,
+      [],
+      live("2026-10-14T08:00:00Z", "1"),
+      MADRID,
+    );
+    await priceRepo.saveDaily(
+      ID,
+      [],
+      live("2026-10-14T15:35:00Z", "2"),
+      MADRID,
+    );
+    expect(await stored()).toEqual(["2026-10-14T15:35:00.000Z 2 YAHOO_LIVE"]);
   });
 
   it("deletes the day's live row and any old YAHOO row when its candle arrives", async () => {
     await snapshot(ID, "2026-10-09T15:35:16Z", "9", "2026-10-09T16:44:00Z");
-    await priceRepo.saveDaily(ID, [], live("2026-10-13T15:35:00Z", "3"));
+    await priceRepo.saveDaily(
+      ID,
+      [],
+      live("2026-10-13T15:35:00Z", "3"),
+      MADRID,
+    );
     const written = await priceRepo.saveDaily(
       ID,
       [candle("2026-10-09T07:00:00Z", "10"), candle("2026-10-13T07:00:00Z", "13")],
       null,
+      MADRID,
     );
     expect(written).toEqual({ inserted: 2, corrected: 0, live: false });
     expect(await stored()).toEqual([
@@ -336,24 +352,54 @@ describe("PrismaPriceRepository.saveDaily (integration)", () => {
   });
 
   it("updates a candle with the same asOf instead of duplicating it", async () => {
-    await priceRepo.saveDaily(ID, [candle("2026-10-09T07:00:00Z", "10")], null);
+    await priceRepo.saveDaily(
+      ID,
+      [candle("2026-10-09T07:00:00Z", "10")],
+      null,
+      MADRID,
+    );
     expect(
-      await priceRepo.saveDaily(ID, [candle("2026-10-09T07:00:00Z", "11")], null),
+      await priceRepo.saveDaily(
+        ID,
+        [candle("2026-10-09T07:00:00Z", "11")],
+        null,
+        MADRID,
+      ),
     ).toEqual({ inserted: 0, corrected: 1, live: false });
     expect(
-      await priceRepo.saveDaily(ID, [candle("2026-10-09T07:00:00Z", "11")], null),
+      await priceRepo.saveDaily(
+        ID,
+        [candle("2026-10-09T07:00:00Z", "11")],
+        null,
+        MADRID,
+      ),
     ).toEqual({ inserted: 0, corrected: 0, live: false });
     expect(await stored()).toEqual(["2026-10-09T07:00:00.000Z 11 YAHOO"]);
   });
 
   it("never returns latest() to an earlier day when yesterday's candle lands", async () => {
-    await priceRepo.saveDaily(ID, [], live("2026-10-15T09:00:00Z", "15"));
-    await priceRepo.saveDaily(ID, [candle("2026-10-14T07:00:00Z", "14")], null);
+    await priceRepo.saveDaily(
+      ID,
+      [],
+      live("2026-10-15T09:00:00Z", "15"),
+      MADRID,
+    );
+    await priceRepo.saveDaily(
+      ID,
+      [candle("2026-10-14T07:00:00Z", "14")],
+      null,
+      MADRID,
+    );
     expect((await priceRepo.latest()).get(ID)?.price).toBe("15");
   });
 
   it("rolls the deletes back when a write fails", async () => {
-    await priceRepo.saveDaily(ID, [], live("2026-10-09T15:35:00Z", "9"));
+    await priceRepo.saveDaily(
+      ID,
+      [],
+      live("2026-10-09T15:35:00Z", "9"),
+      MADRID,
+    );
     await expect(
       priceRepo.saveDaily(
         ID,
@@ -362,14 +408,22 @@ describe("PrismaPriceRepository.saveDaily (integration)", () => {
           { ...candle("2026-10-10T07:00:00Z", "11"), price: null as unknown as string },
         ],
         null,
+        MADRID,
       ),
     ).rejects.toThrow();
     expect(await stored()).toEqual(["2026-10-09T15:35:00.000Z 9 YAHOO_LIVE"]);
   });
 
   it("lastAsOf is the newest row whatever its source", async () => {
-    await priceRepo.saveDaily(ID, [candle("2026-10-13T07:00:00Z", "13")], live("2026-10-14T15:35:00Z", "14"));
-    expect((await priceRepo.lastAsOf(ID))?.toISOString()).toBe("2026-10-14T15:35:00.000Z");
+    await priceRepo.saveDaily(
+      ID,
+      [candle("2026-10-13T07:00:00Z", "13")],
+      live("2026-10-14T15:35:00Z", "14"),
+      MADRID,
+    );
+    expect((await priceRepo.lastAsOf(ID))?.toISOString()).toBe(
+      "2026-10-14T15:35:00.000Z",
+    );
     expect(await priceRepo.lastAsOf("XS00TEST0003")).toBeNull();
   });
 });
