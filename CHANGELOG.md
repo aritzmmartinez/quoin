@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-10-29
+
 ### Upgrading
 - This version adds a settings table holding where you are tax resident (Bizkaia), from which the tax territory and the calendar zone are derived. There is nothing to set. The Docker image backs up the ledger before migrating, as usual.
 - If two versions of the savings plan were recorded for the same day, the migration keeps the one that was in force (the later one) and deletes the others with their lines. The backup taken before migrating still has them.
@@ -469,7 +471,8 @@ fund holdings must be supplied as CSV rather than the Excel most issuers publish
 Design rationale lives beside the code it explains, in `docs/ARCHITECTURE.md` and in the
 commit history — not here.
 
-[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/aritzmmartinez/quoin/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/aritzmmartinez/quoin/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/aritzmmartinez/quoin/compare/v0.12.1...v0.13.0
 [0.12.1]: https://github.com/aritzmmartinez/quoin/compare/v0.12.0...v0.12.1
