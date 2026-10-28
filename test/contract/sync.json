@@ -1,0 +1,2625 @@
+{
+  "contract": "sync",
+  "version": 1,
+  "description": "How two devices' user states merge, and which exchange files are refused. Shared with the mobile client: both implementations must reproduce every case. Omitted in a case: empty collections, peers [], settings { residence: bizkaia, residenceHlc: null }, schemaVersion 1 and deviceName null on the incoming file, and every optional row column (null; fees and taxWithheld \"0\", fxSource IDENTITY, funding CASH, hedgedToBase false, thesis CORE). An expected plan compares apply and effects only when it lists no conflicts, unless compareApply is true; apply.peers is compared only when the case lists it.",
+  "merges": [
+    {
+      "name": "Two identical states: nothing to apply",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "quoteSymbol": "TEST.DE",
+            "quoteSymbolHlc": "001761599940000-0000-dev-b",
+            "ter": "0.0022",
+            "terHlc": "001761599940000-0000-dev-b"
+          }
+        ],
+        "ledger": [
+          {
+            "source": "TR_CSV",
+            "externalId": "t-1",
+            "ts": "2026-01-05T09:00:00.000Z",
+            "type": "BUY",
+            "instrumentId": "IE00TEST0001",
+            "quantity": "1",
+            "price": "100",
+            "grossAmount": "100",
+            "currency": "EUR",
+            "account": "trade-republic"
+          }
+        ],
+        "targets": [
+          {
+            "id": "v1",
+            "name": "v1",
+            "activeFrom": "2026-11-01",
+            "createdAt": "2026-10-01T10:00:00.000Z",
+            "lines": [
+              {
+                "instrumentId": "IE00TEST0001",
+                "monthlyAmount": "300"
+              }
+            ]
+          }
+        ],
+        "holdings": [
+          {
+            "instrumentId": "IE00TEST0001",
+            "asOf": "2026-09-30",
+            "asOfInferred": false,
+            "hlc": "001761599940000-0000-dev-b",
+            "rows": [
+              {
+                "identity": "US00TEST0101",
+                "identityKind": "ISIN",
+                "name": "Alpha Corp",
+                "weight": "0.6"
+              },
+              {
+                "identity": "BETA.US",
+                "identityKind": "TICKER",
+                "name": "Beta Inc",
+                "weight": "0.4"
+              }
+            ]
+          }
+        ],
+        "identities": [
+          {
+            "identity": "US00TEST0101",
+            "identityKind": "ISIN",
+            "canonicalId": "TESTFIGI0001",
+            "exchCode": null,
+            "status": "resolved",
+            "source": "openfigi",
+            "resolvedAt": "2026-10-01T10:00:00.000Z"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "quoteSymbol": "TEST.DE",
+            "quoteSymbolHlc": "001761599940000-0000-dev-b",
+            "ter": "0.0022",
+            "terHlc": "001761599940000-0000-dev-b"
+          }
+        ],
+        "ledger": [
+          {
+            "source": "TR_CSV",
+            "externalId": "t-1",
+            "ts": "2026-01-05T09:00:00.000Z",
+            "type": "BUY",
+            "instrumentId": "IE00TEST0001",
+            "quantity": "1",
+            "price": "100",
+            "grossAmount": "100",
+            "currency": "EUR",
+            "account": "trade-republic"
+          }
+        ],
+        "targets": [
+          {
+            "id": "v1",
+            "name": "v1",
+            "activeFrom": "2026-11-01",
+            "createdAt": "2026-10-01T10:00:00.000Z",
+            "lines": [
+              {
+                "instrumentId": "IE00TEST0001",
+                "monthlyAmount": "300"
+              }
+            ]
+          }
+        ],
+        "holdings": [
+          {
+            "instrumentId": "IE00TEST0001",
+            "asOf": "2026-09-30",
+            "asOfInferred": false,
+            "hlc": "001761599940000-0000-dev-b",
+            "rows": [
+              {
+                "identity": "US00TEST0101",
+                "identityKind": "ISIN",
+                "name": "Alpha Corp",
+                "weight": "0.6"
+              },
+              {
+                "identity": "BETA.US",
+                "identityKind": "TICKER",
+                "name": "Beta Inc",
+                "weight": "0.4"
+              }
+            ]
+          }
+        ],
+        "identities": [
+          {
+            "identity": "US00TEST0101",
+            "identityKind": "ISIN",
+            "canonicalId": "TESTFIGI0001",
+            "exchCode": null,
+            "status": "resolved",
+            "source": "openfigi",
+            "resolvedAt": "2026-10-01T10:00:00.000Z"
+          }
+        ]
+      },
+      "expected": {
+        "apply": {
+          "peers": [
+            {
+              "deviceId": "dev-b",
+              "seen": "001761603600000-0000-dev-b"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "An empty PC receives everything, and is told to fetch prices and rates",
+      "local": {
+        "deviceId": "dev-a"
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "quoteSymbol": "TEST.DE",
+            "quoteSymbolHlc": "001761599940000-0000-dev-b",
+            "ter": "0.0022",
+            "terHlc": "001761599940000-0000-dev-b"
+          }
+        ],
+        "ledger": [
+          {
+            "source": "TR_CSV",
+            "externalId": "t-1",
+            "ts": "2026-01-05T09:00:00.000Z",
+            "type": "BUY",
+            "instrumentId": "IE00TEST0001",
+            "quantity": "1",
+            "price": "100",
+            "grossAmount": "100",
+            "currency": "EUR",
+            "account": "trade-republic"
+          },
+          {
+            "source": "KRAKEN_CSV",
+            "externalId": "t-2",
+            "ts": "2026-02-10T15:00:00.000Z",
+            "type": "DEPOSIT",
+            "instrumentId": null,
+            "quantity": null,
+            "price": null,
+            "grossAmount": "500",
+            "currency": "USD",
+            "account": "kraken",
+            "fxSource": "ECB",
+            "fxDate": "2026-02-10",
+            "fxRate": "1.0412",
+            "fxDirection": "QUOTE_PER_BASE"
+          }
+        ],
+        "targets": [
+          {
+            "id": "v1",
+            "name": "v1",
+            "activeFrom": "2026-11-01",
+            "createdAt": "2026-10-01T10:00:00.000Z",
+            "lines": [
+              {
+                "instrumentId": "IE00TEST0001",
+                "monthlyAmount": "300"
+              }
+            ]
+          }
+        ],
+        "holdings": [
+          {
+            "instrumentId": "IE00TEST0001",
+            "asOf": "2026-09-30",
+            "asOfInferred": false,
+            "hlc": "001761599940000-0000-dev-b",
+            "rows": [
+              {
+                "identity": "US00TEST0101",
+                "identityKind": "ISIN",
+                "name": "Alpha Corp",
+                "weight": "0.6"
+              },
+              {
+                "identity": "BETA.US",
+                "identityKind": "TICKER",
+                "name": "Beta Inc",
+                "weight": "0.4"
+              }
+            ]
+          }
+        ],
+        "identities": [
+          {
+            "identity": "US00TEST0101",
+            "identityKind": "ISIN",
+            "canonicalId": "TESTFIGI0001",
+            "exchCode": null,
+            "status": "resolved",
+            "source": "openfigi",
+            "resolvedAt": "2026-10-01T10:00:00.000Z"
+          }
+        ],
+        "tombstones": [
+          {
+            "entity": "PortfolioTarget",
+            "key": "v0",
+            "hlc": "001761599880000-0000-dev-b"
+          }
+        ]
+      },
+      "expected": {
+        "apply": {
+          "ledger": {
+            "insert": [
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "t-2",
+                "ts": "2026-02-10T15:00:00.000Z",
+                "type": "DEPOSIT",
+                "instrumentId": null,
+                "quantity": null,
+                "price": null,
+                "grossAmount": "500",
+                "currency": "USD",
+                "account": "kraken",
+                "fxSource": "ECB",
+                "fxDate": "2026-02-10",
+                "fxRate": "1.0412",
+                "fxDirection": "QUOTE_PER_BASE"
+              },
+              {
+                "source": "TR_CSV",
+                "externalId": "t-1",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "IE00TEST0001",
+                "quantity": "1",
+                "price": "100",
+                "grossAmount": "100",
+                "currency": "EUR",
+                "account": "trade-republic"
+              }
+            ]
+          },
+          "instruments": {
+            "insert": [
+              {
+                "id": "IE00TEST0001",
+                "name": "Test World ETF",
+                "type": "ETF",
+                "quoteSymbol": "TEST.DE",
+                "quoteSymbolHlc": "001761599940000-0000-dev-b",
+                "ter": "0.0022",
+                "terHlc": "001761599940000-0000-dev-b"
+              }
+            ]
+          },
+          "targets": {
+            "insert": [
+              {
+                "id": "v1",
+                "name": "v1",
+                "activeFrom": "2026-11-01",
+                "createdAt": "2026-10-01T10:00:00.000Z",
+                "lines": [
+                  {
+                    "instrumentId": "IE00TEST0001",
+                    "monthlyAmount": "300"
+                  }
+                ]
+              }
+            ]
+          },
+          "tombstones": [
+            {
+              "entity": "PortfolioTarget",
+              "key": "v0",
+              "hlc": "001761599880000-0000-dev-b"
+            }
+          ],
+          "holdings": [
+            {
+              "instrumentId": "IE00TEST0001",
+              "asOf": "2026-09-30",
+              "asOfInferred": false,
+              "hlc": "001761599940000-0000-dev-b",
+              "rows": [
+                {
+                  "identity": "US00TEST0101",
+                  "identityKind": "ISIN",
+                  "name": "Alpha Corp",
+                  "weight": "0.6"
+                },
+                {
+                  "identity": "BETA.US",
+                  "identityKind": "TICKER",
+                  "name": "Beta Inc",
+                  "weight": "0.4"
+                }
+              ]
+            }
+          ],
+          "identities": [
+            {
+              "identity": "US00TEST0101",
+              "identityKind": "ISIN",
+              "canonicalId": "TESTFIGI0001",
+              "exchCode": null,
+              "status": "resolved",
+              "source": "openfigi",
+              "resolvedAt": "2026-10-01T10:00:00.000Z"
+            }
+          ],
+          "peers": [
+            {
+              "deviceId": "dev-b",
+              "seen": "001761603600000-0000-dev-b"
+            }
+          ]
+        },
+        "effects": [
+          {
+            "kind": "prices",
+            "instrumentId": "IE00TEST0001",
+            "symbol": "TEST.DE"
+          },
+          {
+            "kind": "rates",
+            "currency": "USD",
+            "since": "2026-02-10T15:00:00.000Z"
+          }
+        ]
+      }
+    },
+    {
+      "name": "The same CSV imported on both sides: no duplicates, whatever the local ids were",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF"
+          }
+        ],
+        "ledger": [
+          {
+            "source": "TR_CSV",
+            "externalId": "t-1",
+            "ts": "2026-01-05T09:00:00.000Z",
+            "type": "BUY",
+            "instrumentId": "IE00TEST0001",
+            "quantity": "1",
+            "price": "100",
+            "grossAmount": "100",
+            "currency": "EUR",
+            "account": "trade-republic"
+          },
+          {
+            "source": "TR_CSV",
+            "externalId": "t-2",
+            "ts": "2026-01-05T09:00:00.000Z",
+            "type": "BUY",
+            "instrumentId": "IE00TEST0001",
+            "quantity": "2",
+            "price": "100",
+            "grossAmount": "200",
+            "currency": "EUR",
+            "account": "trade-republic"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF"
+          }
+        ],
+        "ledger": [
+          {
+            "source": "TR_CSV",
+            "externalId": "t-1",
+            "ts": "2026-01-05T09:00:00.000Z",
+            "type": "BUY",
+            "instrumentId": "IE00TEST0001",
+            "quantity": "1",
+            "price": "100",
+            "grossAmount": "100",
+            "currency": "EUR",
+            "account": "trade-republic"
+          },
+          {
+            "source": "TR_CSV",
+            "externalId": "t-2",
+            "ts": "2026-01-05T09:00:00.000Z",
+            "type": "BUY",
+            "instrumentId": "IE00TEST0001",
+            "quantity": "2",
+            "price": "100",
+            "grossAmount": "200",
+            "currency": "EUR",
+            "account": "trade-republic"
+          }
+        ]
+      },
+      "expected": {}
+    },
+    {
+      "name": "The same ledger key with another amount is a conflict",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF"
+          }
+        ],
+        "ledger": [
+          {
+            "source": "TR_CSV",
+            "externalId": "t-1",
+            "ts": "2026-01-05T09:00:00.000Z",
+            "type": "BUY",
+            "instrumentId": "IE00TEST0001",
+            "quantity": "1",
+            "price": "100",
+            "grossAmount": "100",
+            "currency": "EUR",
+            "account": "trade-republic"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF"
+          }
+        ],
+        "ledger": [
+          {
+            "source": "TR_CSV",
+            "externalId": "t-1",
+            "ts": "2026-01-05T09:00:00.000Z",
+            "type": "BUY",
+            "instrumentId": "IE00TEST0001",
+            "quantity": "1",
+            "price": "100",
+            "grossAmount": "101",
+            "currency": "EUR",
+            "account": "trade-republic"
+          }
+        ]
+      },
+      "expected": {
+        "conflicts": [
+          {
+            "kind": "ledger",
+            "key": "TR_CSV::t-1",
+            "fields": ["grossAmount"]
+          }
+        ]
+      }
+    },
+    {
+      "name": "A reward valued from two different price histories is a conflict, not a silent pick",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "TESTCOIN",
+            "name": "Test Coin",
+            "type": "CRYPTO"
+          }
+        ],
+        "ledger": [
+          {
+            "source": "KRAKEN_CSV",
+            "externalId": "R2",
+            "ts": "2026-01-05T09:00:00.000Z",
+            "type": "BUY",
+            "instrumentId": "TESTCOIN",
+            "quantity": "0.5",
+            "price": "2.10",
+            "grossAmount": "1.05",
+            "currency": "EUR",
+            "account": "kraken",
+            "funding": "IN_KIND",
+            "valuationSource": "yahoo"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "TESTCOIN",
+            "name": "Test Coin",
+            "type": "CRYPTO"
+          }
+        ],
+        "ledger": [
+          {
+            "source": "KRAKEN_CSV",
+            "externalId": "R2",
+            "ts": "2026-01-05T09:00:00.000Z",
+            "type": "BUY",
+            "instrumentId": "TESTCOIN",
+            "quantity": "0.5",
+            "price": "2.12",
+            "grossAmount": "1.06",
+            "currency": "EUR",
+            "account": "kraken",
+            "funding": "IN_KIND",
+            "valuationSource": "yahoo"
+          }
+        ]
+      },
+      "expected": {
+        "conflicts": [
+          {
+            "kind": "ledger",
+            "key": "KRAKEN_CSV::R2",
+            "fields": ["price", "grossAmount"]
+          }
+        ]
+      }
+    },
+    {
+      "name": "CASH here, IN_KIND there: the entry becomes IN_KIND",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF"
+          }
+        ],
+        "ledger": [
+          {
+            "source": "TR_CSV",
+            "externalId": "t-1",
+            "ts": "2026-01-05T09:00:00.000Z",
+            "type": "BUY",
+            "instrumentId": "IE00TEST0001",
+            "quantity": "1",
+            "price": "100",
+            "grossAmount": "100",
+            "currency": "EUR",
+            "account": "trade-republic"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF"
+          }
+        ],
+        "ledger": [
+          {
+            "source": "TR_CSV",
+            "externalId": "t-1",
+            "ts": "2026-01-05T09:00:00.000Z",
+            "type": "BUY",
+            "instrumentId": "IE00TEST0001",
+            "quantity": "1",
+            "price": "100",
+            "grossAmount": "100",
+            "currency": "EUR",
+            "account": "trade-republic",
+            "funding": "IN_KIND"
+          }
+        ]
+      },
+      "expected": {
+        "apply": {
+          "ledger": {
+            "markInKind": ["TR_CSV::t-1"]
+          }
+        }
+      }
+    },
+    {
+      "name": "IN_KIND here, CASH there: it stays IN_KIND",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF"
+          }
+        ],
+        "ledger": [
+          {
+            "source": "TR_CSV",
+            "externalId": "t-1",
+            "ts": "2026-01-05T09:00:00.000Z",
+            "type": "BUY",
+            "instrumentId": "IE00TEST0001",
+            "quantity": "1",
+            "price": "100",
+            "grossAmount": "100",
+            "currency": "EUR",
+            "account": "trade-republic",
+            "funding": "IN_KIND"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF"
+          }
+        ],
+        "ledger": [
+          {
+            "source": "TR_CSV",
+            "externalId": "t-1",
+            "ts": "2026-01-05T09:00:00.000Z",
+            "type": "BUY",
+            "instrumentId": "IE00TEST0001",
+            "quantity": "1",
+            "price": "100",
+            "grossAmount": "100",
+            "currency": "EUR",
+            "account": "trade-republic"
+          }
+        ]
+      },
+      "expected": {}
+    },
+    {
+      "name": "A complete swap enters with both legs",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "TESTCOIN",
+            "name": "Test Coin",
+            "type": "CRYPTO"
+          },
+          {
+            "id": "US00TEST0002",
+            "name": "Test Stock",
+            "type": "STOCK"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "TESTCOIN",
+            "name": "Test Coin",
+            "type": "CRYPTO"
+          },
+          {
+            "id": "US00TEST0002",
+            "name": "Test Stock",
+            "type": "STOCK"
+          }
+        ],
+        "ledger": [
+          {
+            "source": "KRAKEN_CSV",
+            "externalId": "S1:sell",
+            "ts": "2026-01-05T09:00:00.000Z",
+            "type": "SELL",
+            "instrumentId": "TESTCOIN",
+            "quantity": "1",
+            "price": "100",
+            "grossAmount": "100",
+            "currency": "EUR",
+            "account": "kraken",
+            "linkId": "S1",
+            "linkKind": "swap"
+          },
+          {
+            "source": "KRAKEN_CSV",
+            "externalId": "S1:buy",
+            "ts": "2026-01-05T09:00:00.000Z",
+            "type": "BUY",
+            "instrumentId": "US00TEST0002",
+            "quantity": "1",
+            "price": "100",
+            "grossAmount": "100",
+            "currency": "EUR",
+            "account": "kraken",
+            "linkId": "S1",
+            "linkKind": "swap"
+          }
+        ]
+      },
+      "expected": {
+        "apply": {
+          "ledger": {
+            "insert": [
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "S1:buy",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "US00TEST0002",
+                "quantity": "1",
+                "price": "100",
+                "grossAmount": "100",
+                "currency": "EUR",
+                "account": "kraken",
+                "linkId": "S1",
+                "linkKind": "swap"
+              },
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "S1:sell",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "SELL",
+                "instrumentId": "TESTCOIN",
+                "quantity": "1",
+                "price": "100",
+                "grossAmount": "100",
+                "currency": "EUR",
+                "account": "kraken",
+                "linkId": "S1",
+                "linkKind": "swap"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "A swap whose stored leg conflicts brings neither leg",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "TESTCOIN",
+            "name": "Test Coin",
+            "type": "CRYPTO"
+          },
+          {
+            "id": "US00TEST0002",
+            "name": "Test Stock",
+            "type": "STOCK"
+          }
+        ],
+        "ledger": [
+          {
+            "source": "KRAKEN_CSV",
+            "externalId": "S1:sell",
+            "ts": "2026-01-05T09:00:00.000Z",
+            "type": "SELL",
+            "instrumentId": "TESTCOIN",
+            "quantity": "1",
+            "price": "100",
+            "grossAmount": "100",
+            "currency": "EUR",
+            "account": "kraken",
+            "linkId": "S1",
+            "linkKind": "swap"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "TESTCOIN",
+            "name": "Test Coin",
+            "type": "CRYPTO"
+          },
+          {
+            "id": "US00TEST0002",
+            "name": "Test Stock",
+            "type": "STOCK"
+          }
+        ],
+        "ledger": [
+          {
+            "source": "KRAKEN_CSV",
+            "externalId": "S1:sell",
+            "ts": "2026-01-05T09:00:00.000Z",
+            "type": "SELL",
+            "instrumentId": "TESTCOIN",
+            "quantity": "1",
+            "price": "100",
+            "grossAmount": "99",
+            "currency": "EUR",
+            "account": "kraken",
+            "linkId": "S1",
+            "linkKind": "swap"
+          },
+          {
+            "source": "KRAKEN_CSV",
+            "externalId": "S1:buy",
+            "ts": "2026-01-05T09:00:00.000Z",
+            "type": "BUY",
+            "instrumentId": "US00TEST0002",
+            "quantity": "1",
+            "price": "100",
+            "grossAmount": "100",
+            "currency": "EUR",
+            "account": "kraken",
+            "linkId": "S1",
+            "linkKind": "swap"
+          }
+        ]
+      },
+      "expected": {
+        "conflicts": [
+          {
+            "kind": "ledger",
+            "key": "KRAKEN_CSV::S1:sell",
+            "fields": ["grossAmount"]
+          }
+        ],
+        "apply": {
+          "ledger": {
+            "insert": []
+          }
+        },
+        "compareApply": true
+      }
+    },
+    {
+      "name": "A field changed only there is taken, with its origin's mark",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "ter": "0.0022",
+            "terHlc": "001761599400000-0000-dev-a"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "ter": "0.0025",
+            "terHlc": "001761600300000-0000-dev-b"
+          }
+        ]
+      },
+      "expected": {
+        "apply": {
+          "instruments": {
+            "update": [
+              {
+                "id": "IE00TEST0001",
+                "patch": {
+                  "ter": "0.0025",
+                  "terHlc": "001761600300000-0000-dev-b"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "A field changed only here is kept",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "ter": "0.0025",
+            "terHlc": "001761600300000-0000-dev-a"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "ter": "0.0022",
+            "terHlc": "001761599400000-0000-dev-a"
+          }
+        ]
+      },
+      "expected": {}
+    },
+    {
+      "name": "A field changed on both sides to different values is a conflict",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "ter": "0.0025",
+            "terHlc": "001761600300000-0000-dev-a"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "ter": "0.0030",
+            "terHlc": "001761600300000-0000-dev-b"
+          }
+        ]
+      },
+      "expected": {
+        "conflicts": [
+          {
+            "kind": "field",
+            "entity": "instrument",
+            "key": "IE00TEST0001",
+            "field": "ter",
+            "local": "0.0025",
+            "incoming": "0.0030"
+          }
+        ]
+      }
+    },
+    {
+      "name": "A field changed on both sides to the same value is no conflict",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "thesis": "CONVICTION",
+            "thesisHlc": "001761600300000-0000-dev-a"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "thesis": "CONVICTION",
+            "thesisHlc": "001761600420000-0000-dev-b"
+          }
+        ]
+      },
+      "expected": {}
+    },
+    {
+      "name": "The exposure pair is one field: a new leaf comes with its kind",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "exposureKind": "COMMODITY",
+            "exposureLeafId": "XAU",
+            "exposureHlc": "001761599940000-0000-dev-a"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "exposureKind": "COMMODITY",
+            "exposureLeafId": "XAG",
+            "exposureHlc": "001761600060000-0000-dev-b"
+          }
+        ]
+      },
+      "expected": {
+        "apply": {
+          "instruments": {
+            "update": [
+              {
+                "id": "IE00TEST0001",
+                "patch": {
+                  "exposureKind": "COMMODITY",
+                  "exposureLeafId": "XAG",
+                  "exposureHlc": "001761600060000-0000-dev-b"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "A device whose clock runs 10 minutes slow still changes a field after the last sync",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "ter": "0.0022",
+            "terHlc": "001761599940000-0000-dev-a"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "ter": "0.0025",
+            "terHlc": "001761600000000-0001-dev-b"
+          }
+        ]
+      },
+      "expected": {
+        "apply": {
+          "instruments": {
+            "update": [
+              {
+                "id": "IE00TEST0001",
+                "patch": {
+                  "ter": "0.0025",
+                  "terHlc": "001761600000000-0001-dev-b"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "Echo: a value taken there and changed here since is no conflict",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "ter": "0.0025",
+            "terHlc": "001761600300000-0000-dev-a"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "ter": "0.0022",
+            "terHlc": "001761599400000-0000-dev-a"
+          }
+        ]
+      },
+      "expected": {}
+    },
+    {
+      "name": "Transitive: C takes from B a change A made, which C had not seen",
+      "local": {
+        "deviceId": "dev-c",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761599400000-0000-dev-a"
+          },
+          {
+            "deviceId": "dev-b",
+            "seen": "001761598200000-0000-dev-b"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "ter": "0.0022",
+            "terHlc": "001761599400000-0000-dev-a"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761601800000-0000-dev-a"
+          },
+          {
+            "deviceId": "dev-c",
+            "seen": "001761598200000-0000-dev-c"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "ter": "0.0025",
+            "terHlc": "001761601200000-0000-dev-a"
+          }
+        ]
+      },
+      "expected": {
+        "apply": {
+          "instruments": {
+            "update": [
+              {
+                "id": "IE00TEST0001",
+                "patch": {
+                  "ter": "0.0025",
+                  "terHlc": "001761601200000-0000-dev-a"
+                }
+              }
+            ]
+          },
+          "peers": [
+            {
+              "deviceId": "dev-a",
+              "seen": "001761601800000-0000-dev-a"
+            },
+            {
+              "deviceId": "dev-b",
+              "seen": "001761603600000-0000-dev-b"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Two values with no mark that differ are a conflict: nothing says which side changed",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "ter": "0.0022"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "ter": "0.0025"
+          }
+        ]
+      },
+      "expected": {
+        "conflicts": [
+          {
+            "kind": "field",
+            "entity": "instrument",
+            "key": "IE00TEST0001",
+            "field": "ter",
+            "local": "0.0022",
+            "incoming": "0.0025"
+          }
+        ]
+      }
+    },
+    {
+      "name": "A residence with no mark on either side that differs is a conflict",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "settings": {
+          "residence": "araba",
+          "residenceHlc": null
+        }
+      },
+      "expected": {
+        "conflicts": [
+          {
+            "kind": "field",
+            "entity": "settings",
+            "key": "settings",
+            "field": "residence",
+            "local": "bizkaia",
+            "incoming": "araba"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Ingestion fields keep the local value; a missing asset class is filled in",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Local Name",
+            "type": "ETF",
+            "assetClass": null
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Other Name",
+            "type": "STOCK",
+            "assetClass": "FUND"
+          }
+        ]
+      },
+      "expected": {
+        "apply": {
+          "instruments": {
+            "update": [
+              {
+                "id": "IE00TEST0001",
+                "patch": {
+                  "assetClass": "FUND"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "A new quote symbol is taken and its history fetched again",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "quoteSymbol": "OLD.DE",
+            "quoteSymbolHlc": "001761599940000-0000-dev-a"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "quoteSymbol": "NEW.DE",
+            "quoteSymbolHlc": "001761600060000-0000-dev-b"
+          }
+        ]
+      },
+      "expected": {
+        "apply": {
+          "instruments": {
+            "update": [
+              {
+                "id": "IE00TEST0001",
+                "patch": {
+                  "quoteSymbol": "NEW.DE",
+                  "quoteSymbolHlc": "001761600060000-0000-dev-b"
+                }
+              }
+            ]
+          }
+        },
+        "effects": [
+          {
+            "kind": "prices",
+            "instrumentId": "IE00TEST0001",
+            "symbol": "NEW.DE"
+          }
+        ]
+      }
+    },
+    {
+      "name": "A cleared quote symbol is taken, with nothing to fetch",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "quoteSymbol": "OLD.DE",
+            "quoteSymbolHlc": "001761599940000-0000-dev-a"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "quoteSymbol": null,
+            "quoteSymbolHlc": "001761600060000-0000-dev-b"
+          }
+        ]
+      },
+      "expected": {
+        "apply": {
+          "instruments": {
+            "update": [
+              {
+                "id": "IE00TEST0001",
+                "patch": {
+                  "quoteSymbol": null,
+                  "quoteSymbolHlc": "001761600060000-0000-dev-b"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "A target version deleted there and untouched here is deleted here",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "targets": [
+          {
+            "id": "v1",
+            "name": "v1",
+            "activeFrom": "2026-11-01",
+            "createdAt": "2026-10-01T10:00:00.000Z",
+            "lines": [
+              {
+                "instrumentId": "IE00TEST0001",
+                "monthlyAmount": "300"
+              }
+            ]
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "tombstones": [
+          {
+            "entity": "PortfolioTarget",
+            "key": "v1",
+            "hlc": "001761600060000-0000-dev-b"
+          }
+        ]
+      },
+      "expected": {
+        "apply": {
+          "targets": {
+            "delete": ["v1"]
+          },
+          "tombstones": [
+            {
+              "entity": "PortfolioTarget",
+              "key": "v1",
+              "hlc": "001761600060000-0000-dev-b"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "A target version deleted here does not come back",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "tombstones": [
+          {
+            "entity": "PortfolioTarget",
+            "key": "v1",
+            "hlc": "001761600060000-0000-dev-a"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "targets": [
+          {
+            "id": "v1",
+            "name": "v1",
+            "activeFrom": "2026-11-01",
+            "createdAt": "2026-10-01T10:00:00.000Z",
+            "lines": [
+              {
+                "instrumentId": "IE00TEST0001",
+                "monthlyAmount": "300"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {}
+    },
+    {
+      "name": "Two new target versions on the same day are a conflict",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "targets": [
+          {
+            "id": "v-here",
+            "name": "v-here",
+            "activeFrom": "2026-11-01",
+            "createdAt": "2026-10-01T10:00:00.000Z",
+            "lines": [
+              {
+                "instrumentId": "IE00TEST0001",
+                "monthlyAmount": "300"
+              }
+            ]
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "targets": [
+          {
+            "id": "v-there",
+            "name": "v-there",
+            "activeFrom": "2026-11-01",
+            "createdAt": "2026-10-01T10:00:00.000Z",
+            "lines": [
+              {
+                "instrumentId": "IE00TEST0001",
+                "monthlyAmount": "300"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "conflicts": [
+          {
+            "kind": "target-day",
+            "day": "2026-11-01",
+            "ids": ["v-here", "v-there"]
+          }
+        ]
+      }
+    },
+    {
+      "name": "A composition replaced only there is taken",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF"
+          }
+        ],
+        "holdings": [
+          {
+            "instrumentId": "IE00TEST0001",
+            "asOf": "2026-06-30",
+            "asOfInferred": false,
+            "hlc": "001761599940000-0000-dev-a",
+            "rows": [
+              {
+                "identity": "US00TEST0101",
+                "identityKind": "ISIN",
+                "name": "Alpha Corp",
+                "weight": "0.6"
+              },
+              {
+                "identity": "BETA.US",
+                "identityKind": "TICKER",
+                "name": "Beta Inc",
+                "weight": "0.4"
+              }
+            ]
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF"
+          }
+        ],
+        "holdings": [
+          {
+            "instrumentId": "IE00TEST0001",
+            "asOf": "2026-09-30",
+            "asOfInferred": false,
+            "hlc": "001761600060000-0000-dev-b",
+            "rows": [
+              {
+                "identity": "US00TEST0101",
+                "identityKind": "ISIN",
+                "name": "Alpha Corp",
+                "weight": "0.55"
+              },
+              {
+                "identity": "BETA.US",
+                "identityKind": "TICKER",
+                "name": "Beta Inc",
+                "weight": "0.45"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "apply": {
+          "holdings": [
+            {
+              "instrumentId": "IE00TEST0001",
+              "asOf": "2026-09-30",
+              "asOfInferred": false,
+              "hlc": "001761600060000-0000-dev-b",
+              "rows": [
+                {
+                  "identity": "US00TEST0101",
+                  "identityKind": "ISIN",
+                  "name": "Alpha Corp",
+                  "weight": "0.55"
+                },
+                {
+                  "identity": "BETA.US",
+                  "identityKind": "TICKER",
+                  "name": "Beta Inc",
+                  "weight": "0.45"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "A composition replaced on both sides from dated files: the later day wins",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF"
+          }
+        ],
+        "holdings": [
+          {
+            "instrumentId": "IE00TEST0001",
+            "asOf": "2026-09-30",
+            "asOfInferred": false,
+            "hlc": "001761600060000-0000-dev-a",
+            "rows": [
+              {
+                "identity": "US00TEST0101",
+                "identityKind": "ISIN",
+                "name": "Alpha Corp",
+                "weight": "0.6"
+              },
+              {
+                "identity": "BETA.US",
+                "identityKind": "TICKER",
+                "name": "Beta Inc",
+                "weight": "0.4"
+              }
+            ]
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF"
+          }
+        ],
+        "holdings": [
+          {
+            "instrumentId": "IE00TEST0001",
+            "asOf": "2026-08-31",
+            "asOfInferred": false,
+            "hlc": "001761600060000-0000-dev-b",
+            "rows": [
+              {
+                "identity": "US00TEST0101",
+                "identityKind": "ISIN",
+                "name": "Alpha Corp",
+                "weight": "0.55"
+              },
+              {
+                "identity": "BETA.US",
+                "identityKind": "TICKER",
+                "name": "Beta Inc",
+                "weight": "0.45"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {}
+    },
+    {
+      "name": "A composition replaced on both sides, one undated, is a conflict",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF"
+          }
+        ],
+        "holdings": [
+          {
+            "instrumentId": "IE00TEST0001",
+            "asOf": "2026-10-28",
+            "asOfInferred": true,
+            "hlc": "001761600060000-0000-dev-a",
+            "rows": [
+              {
+                "identity": "US00TEST0101",
+                "identityKind": "ISIN",
+                "name": "Alpha Corp",
+                "weight": "0.6"
+              },
+              {
+                "identity": "BETA.US",
+                "identityKind": "TICKER",
+                "name": "Beta Inc",
+                "weight": "0.4"
+              }
+            ]
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF"
+          }
+        ],
+        "holdings": [
+          {
+            "instrumentId": "IE00TEST0001",
+            "asOf": "2026-09-30",
+            "asOfInferred": false,
+            "hlc": "001761600060000-0000-dev-b",
+            "rows": [
+              {
+                "identity": "US00TEST0101",
+                "identityKind": "ISIN",
+                "name": "Alpha Corp",
+                "weight": "0.55"
+              },
+              {
+                "identity": "BETA.US",
+                "identityKind": "TICKER",
+                "name": "Beta Inc",
+                "weight": "0.45"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "conflicts": [
+          {
+            "kind": "holdings",
+            "instrumentId": "IE00TEST0001"
+          }
+        ]
+      }
+    },
+    {
+      "name": "The same composition dropped on both sides: a day read from the file beats one inferred",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF"
+          }
+        ],
+        "holdings": [
+          {
+            "instrumentId": "IE00TEST0001",
+            "asOf": "2026-10-28",
+            "asOfInferred": true,
+            "hlc": "001761600060000-0000-dev-a",
+            "rows": [
+              {
+                "identity": "US00TEST0101",
+                "identityKind": "ISIN",
+                "name": "Alpha Corp",
+                "weight": "0.6"
+              },
+              {
+                "identity": "BETA.US",
+                "identityKind": "TICKER",
+                "name": "Beta Inc",
+                "weight": "0.4"
+              }
+            ]
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF"
+          }
+        ],
+        "holdings": [
+          {
+            "instrumentId": "IE00TEST0001",
+            "asOf": "2026-09-30",
+            "asOfInferred": false,
+            "hlc": "001761600060000-0000-dev-b",
+            "rows": [
+              {
+                "identity": "US00TEST0101",
+                "identityKind": "ISIN",
+                "name": "Alpha Corp",
+                "weight": "0.6"
+              },
+              {
+                "identity": "BETA.US",
+                "identityKind": "TICKER",
+                "name": "Beta Inc",
+                "weight": "0.4"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "apply": {
+          "holdings": [
+            {
+              "instrumentId": "IE00TEST0001",
+              "asOf": "2026-09-30",
+              "asOfInferred": false,
+              "hlc": "001761600060000-0000-dev-b",
+              "rows": [
+                {
+                  "identity": "US00TEST0101",
+                  "identityKind": "ISIN",
+                  "name": "Alpha Corp",
+                  "weight": "0.6"
+                },
+                {
+                  "identity": "BETA.US",
+                  "identityKind": "TICKER",
+                  "name": "Beta Inc",
+                  "weight": "0.4"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "A resolved identity is not replaced by a later miss",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "identities": [
+          {
+            "identity": "US00TEST0101",
+            "identityKind": "ISIN",
+            "canonicalId": "TESTFIGI0001",
+            "exchCode": null,
+            "status": "resolved",
+            "source": "openfigi",
+            "resolvedAt": "2026-09-01T10:00:00.000Z"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "identities": [
+          {
+            "identity": "US00TEST0101",
+            "identityKind": "ISIN",
+            "canonicalId": null,
+            "exchCode": null,
+            "status": "not-found",
+            "source": "openfigi",
+            "resolvedAt": "2026-10-01T10:00:00.000Z"
+          }
+        ]
+      },
+      "expected": {}
+    },
+    {
+      "name": "A miss is replaced by an earlier resolution",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "identities": [
+          {
+            "identity": "US00TEST0101",
+            "identityKind": "ISIN",
+            "canonicalId": null,
+            "exchCode": null,
+            "status": "ambiguous",
+            "source": "openfigi",
+            "resolvedAt": "2026-10-01T10:00:00.000Z"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "identities": [
+          {
+            "identity": "US00TEST0101",
+            "identityKind": "ISIN",
+            "canonicalId": "TESTFIGI0001",
+            "exchCode": null,
+            "status": "resolved",
+            "source": "openfigi",
+            "resolvedAt": "2026-09-01T10:00:00.000Z"
+          }
+        ]
+      },
+      "expected": {
+        "apply": {
+          "identities": [
+            {
+              "identity": "US00TEST0101",
+              "identityKind": "ISIN",
+              "canonicalId": "TESTFIGI0001",
+              "exchCode": null,
+              "status": "resolved",
+              "source": "openfigi",
+              "resolvedAt": "2026-09-01T10:00:00.000Z"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "The same resolution with an exchange code beats one without, whatever the dates",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "identities": [
+          {
+            "identity": "US00TEST0101",
+            "identityKind": "ISIN",
+            "canonicalId": "TESTFIGI0001",
+            "exchCode": null,
+            "status": "resolved",
+            "source": "openfigi",
+            "resolvedAt": "2026-10-01T10:00:00.000Z"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "identities": [
+          {
+            "identity": "US00TEST0101",
+            "identityKind": "ISIN",
+            "canonicalId": "TESTFIGI0001",
+            "exchCode": "US",
+            "status": "resolved",
+            "source": "openfigi",
+            "resolvedAt": "2026-09-01T10:00:00.000Z"
+          }
+        ]
+      },
+      "expected": {
+        "apply": {
+          "identities": [
+            {
+              "identity": "US00TEST0101",
+              "identityKind": "ISIN",
+              "canonicalId": "TESTFIGI0001",
+              "exchCode": "US",
+              "status": "resolved",
+              "source": "openfigi",
+              "resolvedAt": "2026-09-01T10:00:00.000Z"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Converted rows and rows near midnight are taken exactly as written",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "US00TEST0002",
+            "name": "Test Stock",
+            "type": "STOCK"
+          }
+        ],
+        "ledger": [
+          {
+            "source": "TR_CSV",
+            "externalId": "t-9",
+            "ts": "2026-03-31T23:30:00.000+01:00",
+            "type": "BUY",
+            "instrumentId": "US00TEST0002",
+            "quantity": "1",
+            "price": "100",
+            "grossAmount": "100",
+            "currency": "EUR",
+            "account": "trade-republic"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "US00TEST0002",
+            "name": "Test Stock",
+            "type": "STOCK"
+          }
+        ],
+        "ledger": [
+          {
+            "source": "TR_CSV",
+            "externalId": "t-9",
+            "ts": "2026-03-31T22:30:00.000Z",
+            "type": "BUY",
+            "instrumentId": "US00TEST0002",
+            "quantity": "1",
+            "price": "100",
+            "grossAmount": "100",
+            "currency": "EUR",
+            "account": "trade-republic"
+          },
+          {
+            "source": "TR_CSV",
+            "externalId": "t-10",
+            "ts": "2026-12-31T23:30:00.000Z",
+            "type": "BUY",
+            "instrumentId": "US00TEST0002",
+            "quantity": "1",
+            "price": "110.50",
+            "grossAmount": "110.50",
+            "currency": "USD",
+            "account": "trade-republic",
+            "fxSource": "ECB",
+            "fxDate": "2026-12-31",
+            "fxRate": "1.1525",
+            "fxDirection": "QUOTE_PER_BASE",
+            "originalAmount": "110.50",
+            "originalCurrency": "USD"
+          }
+        ]
+      },
+      "expected": {
+        "apply": {
+          "ledger": {
+            "insert": [
+              {
+                "source": "TR_CSV",
+                "externalId": "t-10",
+                "ts": "2026-12-31T23:30:00.000Z",
+                "type": "BUY",
+                "instrumentId": "US00TEST0002",
+                "quantity": "1",
+                "price": "110.50",
+                "grossAmount": "110.50",
+                "currency": "USD",
+                "account": "trade-republic",
+                "fxSource": "ECB",
+                "fxDate": "2026-12-31",
+                "fxRate": "1.1525",
+                "fxDirection": "QUOTE_PER_BASE",
+                "originalAmount": "110.50",
+                "originalCurrency": "USD"
+              }
+            ]
+          }
+        },
+        "effects": [
+          {
+            "kind": "rates",
+            "currency": "USD",
+            "since": "2026-12-31T23:30:00.000Z"
+          }
+        ]
+      }
+    }
+  ],
+  "refusals": [
+    {
+      "name": "A schemaVersion this version does not read",
+      "file": {
+        "schemaVersion": 2,
+        "deviceId": "dev-b",
+        "exportHlc": "001761600000000-0000-dev-b",
+        "settings": {
+          "residence": "bizkaia",
+          "residenceHlc": null
+        }
+      },
+      "error": "unsupported-schema-version"
+    },
+    {
+      "name": "A file with no schemaVersion",
+      "file": {
+        "deviceId": "dev-b"
+      },
+      "error": "unsupported-schema-version"
+    },
+    {
+      "name": "A file exported by this same database",
+      "file": {
+        "schemaVersion": 1,
+        "deviceId": "dev-a",
+        "exportHlc": "001761600000000-0000-dev-a",
+        "settings": {
+          "residence": "bizkaia",
+          "residenceHlc": null
+        }
+      },
+      "localDeviceId": "dev-a",
+      "error": "same-device"
+    },
+    {
+      "name": "An export mark of another device",
+      "file": {
+        "schemaVersion": 1,
+        "deviceId": "dev-b",
+        "exportHlc": "001761600000000-0000-dev-c",
+        "settings": {
+          "residence": "bizkaia",
+          "residenceHlc": null
+        }
+      },
+      "error": "invalid"
+    },
+    {
+      "name": "A linked operation with one leg",
+      "file": {
+        "schemaVersion": 1,
+        "deviceId": "dev-b",
+        "exportHlc": "001761600000000-0000-dev-b",
+        "settings": {
+          "residence": "bizkaia",
+          "residenceHlc": null
+        },
+        "instruments": [
+          {
+            "id": "TESTCOIN",
+            "name": "Test Coin",
+            "type": "CRYPTO"
+          }
+        ],
+        "ledger": [
+          {
+            "source": "KRAKEN_CSV",
+            "externalId": "S1:sell",
+            "ts": "2026-01-05T09:00:00.000Z",
+            "type": "SELL",
+            "instrumentId": "TESTCOIN",
+            "quantity": "1",
+            "price": "100",
+            "grossAmount": "100",
+            "currency": "EUR",
+            "account": "kraken",
+            "linkId": "S1",
+            "linkKind": "swap"
+          }
+        ]
+      },
+      "error": "invalid"
+    },
+    {
+      "name": "Holdings of an instrument the file does not carry",
+      "file": {
+        "schemaVersion": 1,
+        "deviceId": "dev-b",
+        "exportHlc": "001761600000000-0000-dev-b",
+        "settings": {
+          "residence": "bizkaia",
+          "residenceHlc": null
+        },
+        "holdings": [
+          {
+            "instrumentId": "IE00TEST0001",
+            "asOf": "2026-09-30",
+            "asOfInferred": false,
+            "hlc": null,
+            "rows": [
+              {
+                "identity": "US00TEST0101",
+                "identityKind": "ISIN",
+                "name": "Alpha Corp",
+                "weight": "0.6"
+              },
+              {
+                "identity": "BETA.US",
+                "identityKind": "TICKER",
+                "name": "Beta Inc",
+                "weight": "0.4"
+              }
+            ]
+          }
+        ]
+      },
+      "error": "invalid"
+    }
+  ]
+}
