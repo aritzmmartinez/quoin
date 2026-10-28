@@ -7,6 +7,7 @@ import type {
 } from "~/core/ports";
 
 import { prisma } from "./db.server";
+import { stamp } from "./hlc";
 
 const DAY_MS = 86_400_000;
 
@@ -142,10 +143,16 @@ export class PrismaPriceRepository implements PriceRepository {
         });
       }
       if (quoteSymbol !== undefined) {
-        await tx.instrument.update({
+        const { quoteSymbol: stored } = await tx.instrument.findUniqueOrThrow({
           where: { id: instrumentId },
-          data: { quoteSymbol },
+          select: { quoteSymbol: true },
         });
+        if (stored !== quoteSymbol) {
+          await tx.instrument.update({
+            where: { id: instrumentId },
+            data: { quoteSymbol, quoteSymbolHlc: await stamp(tx) },
+          });
+        }
       }
       return count;
     });

@@ -225,7 +225,6 @@ describe("toInstrumentListItems obsolete venues", () => {
       identityKind: "TICKER" as const,
       name: "Alpha SA",
       weight: "0.5",
-      asOf: new Date("2026-07-27T00:00:00.000Z"),
     });
     const items = toInstrumentListItems(
       [

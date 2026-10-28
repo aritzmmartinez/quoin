@@ -843,6 +843,7 @@ export const en: Copy = {
     covered: "Covered",
     residual: "Residual",
     asOf: "Data as of:",
+    asOfUnrecognised: "Date not recognised: today's will be used",
     folded: (count: number): string =>
       count === 1
         ? "1 row with no identity folds into the residual"

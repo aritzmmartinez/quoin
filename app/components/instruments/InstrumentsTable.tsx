@@ -264,7 +264,7 @@ function Composition({
   open: boolean;
   onToggle: () => void;
 }) {
-  const { formatInstant, formatPercent } = useFormat();
+  const { formatCalendarDate, formatPercent } = useFormat();
   const copy = useCopy().holdings;
 
   return (
@@ -290,7 +290,7 @@ function Composition({
           </span>
           {item.holdingsAsOf && (
             <span className="shrink-0 text-[11px] text-muted">
-              {formatInstant(item.holdingsAsOf)}
+              {formatCalendarDate(item.holdingsAsOf)}
             </span>
           )}
         </>

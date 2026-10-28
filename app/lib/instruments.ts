@@ -8,7 +8,7 @@ import {
   type LeafId,
   type Thesis,
 } from "~/core/domain";
-import type { EtfHolding } from "~/core/ports";
+import type { EtfHolding, HoldingsBlock } from "~/core/ports";
 import type { MarketValue, Position } from "~/core/projections";
 
 import { isCoarseSeries } from "./coarse-candles";
@@ -46,6 +46,7 @@ export function toInstrumentListItems(
   tag = "es-ES",
   candleTimes: ReadonlyMap<string, readonly Date[]> = new Map(),
   dailyHistoryIds: ReadonlySet<string> = new Set(),
+  blocks: ReadonlyMap<string, HoldingsBlock> = new Map(),
 ): InstrumentListItem[] {
   const held = new Map<string, Decimal>();
   const valued = new Map<string, Decimal>();
@@ -87,7 +88,7 @@ export function toInstrumentListItems(
       value: value ? value.toFixed(2) : null,
       holdingsCount: composition.length,
       holdingsCovered: composition.length > 0 ? covered.toString() : null,
-      holdingsAsOf: composition[0]?.asOf.toISOString() ?? null,
+      holdingsAsOf: blocks.get(instrument.id)?.asOf ?? null,
       obsoleteVenues: hasObsoleteVenue(composition),
       historyStart: times[0]?.toISOString() ?? null,
       coarseHistory: isCoarseSeries(times),

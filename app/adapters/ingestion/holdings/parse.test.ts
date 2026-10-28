@@ -74,10 +74,12 @@ describe("parseHoldingsCsv — issuer agnosticism", () => {
 
   it("picks up the as-of date an issuer hides in its title line", () => {
     expect(parseHoldingsCsv(PREAMBLE_STYLE).asOfHint).toBe("15/Jul/2026");
+    expect(parseHoldingsCsv(PREAMBLE_STYLE).asOf).toBe("2026-07-15");
   });
 
   it("has no hint to offer when there is no preamble", () => {
     expect(parseHoldingsCsv(TICKER_STYLE).asOfHint).toBeNull();
+    expect(parseHoldingsCsv(TICKER_STYLE).asOf).toBeNull();
   });
 
   it("reads Spanish headers with no issuer-specific rule", () => {
@@ -199,28 +201,25 @@ BBBB,Beta Corp,Energy,7
 
 describe("parseAsOfHint", () => {
   it("reads a month name, which is unambiguous", () => {
-    expect(parseAsOfHint("15/Jul/2026")?.toISOString()).toBe(
-      "2026-07-15T00:00:00.000Z",
-    );
+    expect(parseAsOfHint("15/Jul/2026")).toBe("2026-07-15");
   });
 
   it("reads an ISO date", () => {
-    expect(parseAsOfHint("2026-07-15")?.toISOString()).toBe(
-      "2026-07-15T00:00:00.000Z",
-    );
+    expect(parseAsOfHint("2026-07-15")).toBe("2026-07-15");
   });
 
   it("resolves a numeric date when only one reading is possible", () => {
-    expect(parseAsOfHint("14/07/2026")?.toISOString()).toBe(
-      "2026-07-14T00:00:00.000Z",
-    );
-    expect(parseAsOfHint("7/17/2026")?.toISOString()).toBe(
-      "2026-07-17T00:00:00.000Z",
-    );
+    expect(parseAsOfHint("14/07/2026")).toBe("2026-07-14");
+    expect(parseAsOfHint("7/17/2026")).toBe("2026-07-17");
   });
 
   it("refuses to guess when both readings are possible", () => {
     expect(parseAsOfHint("07/08/2026")).toBeNull();
+  });
+
+  it("refuses a day that does not exist instead of rolling it over", () => {
+    expect(parseAsOfHint("31/02/2026")).toBeNull();
+    expect(parseAsOfHint("2026-02-30")).toBeNull();
   });
 
   it("returns null for no hint at all", () => {

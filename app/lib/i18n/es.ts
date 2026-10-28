@@ -858,6 +858,7 @@ export const es = {
     covered: "Cubierto",
     residual: "Residuo",
     asOf: "Fecha del dato:",
+    asOfUnrecognised: "Fecha no reconocida: se usará la de hoy",
     folded: (count: number): string =>
       count === 1
         ? "1 fila sin identidad va al residuo"
