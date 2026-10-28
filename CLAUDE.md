@@ -80,6 +80,8 @@ pnpm projection:converge [--sims=1000,3000] [--seeds=8] [--horizon=240] [--contr
 pnpm twr:explain [--top=N]            # print the portfolio TWR chain, worst link first
 pnpm twr:explain --around=YYYY-MM-DD  # open one link: holdings and implied prices at both ends
 pnpm tax:explain [YYYY|--year=YYYY]   # replay the Bizkaia foral FIFO, lot by lot
+pnpm sync:export <file>.quoin.json    # whole user state of DATABASE_URL, for another device
+pnpm sync:import <file> [--dry-run]   # merge an export into DATABASE_URL; backs the ledger up first
 ```
 
 Fund compositions have **no command**: the CSV is dropped onto the fund's row in
@@ -146,7 +148,9 @@ piece of the contract with the mobile client, which must assign the same days.
   the process's zone and the same row is two instants in Docker and in Madrid. Kraken's
   `time` has none and is UTC by definition (`parseTime` appends `Z`).
 - **Golden cases live in `test/contract/*.json`**, read through `loadContract(name,
-  schema)`. They are shared with the mobile client: change a case only together with the
+  schema)`. `sync.json` is written by `test/contract/sync-contract.ts`
+  (`pnpm tsx test/contract/sync-contract.ts`), its expectations by hand, never by
+  running `merge`; a test fails while the two disagree. They are shared with the mobile client: change a case only together with the
   implementation that reproduces it on both sides.
 
 ## A command's logic never lives in its script
@@ -397,13 +401,50 @@ ledger while that rule is in force. Useful, but do not mistake it for a sandbox.
   still refused. It must set `DATABASE_URL` from a constant before the guard runs, so a
   screenshot session is never one stale variable away from the ledger.
 
+## Sync
+
+Two installations (and, next, the mobile app) merge by exchanging **whole user states**,
+never operation logs. `core/sync` holds what the mobile client reproduces in Dart: the
+format (`exchange.ts`, `schemaVersion: 1`, Zod both ways) and `merge(local, incoming)`,
+pure. `app/lib/sync.ts` runs it over `PrismaSyncRepository`; the scripts only parse and print.
+
+- **A mark is `<ms 15>-<counter 4>-<deviceId>`** (`core/sync/hlc`), issued by `stamp(tx)`
+  inside the transaction of the write and never earlier than `SyncDevice.lastHlc`. A write
+  that changes nothing issues none: `/instruments` calls every setter on every save, and an
+  undated composition dropped again would otherwise move to today.
+- **A mark is compared only with what each side has seen of the device that wrote it**,
+  never with another clock: news to me if its origin is not me and it is newer than my
+  `SyncPeer.seen`; news to the sender likewise against the peers list in the file. A taken
+  value keeps its origin's mark — restamping it locally makes the next exchange an echo
+  conflict. Both new, or neither new with different values (two NULL marks), is a conflict.
+- **Copying the `.sqlite` copies `SyncDevice.deviceId`**, and an import refuses a file
+  carrying its own id. Restore a backup on another machine and it is the same device.
+- **A conflict writes nothing.** Apply is one transaction, seen marks included; effects
+  (download a new symbol's history, sync a new currency's rates) run after it and a failed
+  one is reported with exit ≠ 0, never rolled back: what it fetches is a cache. A patch that
+  carries `quoteSymbol` deletes that instrument's prices in the apply transaction, so two
+  symbols never share a series even if the download fails.
+- **A file that brings no data takes no backup.** `sync:import` says "Already up to
+  date" and writes only the seen marks, and only if they moved: the backup window holds 30
+  and the mobile app syncs often. The marks still matter — a stale `seen` lets an equal
+  value with a newer mark read as news, and the next local change becomes a false conflict.
+- **The ledger has no marks.** Union by `(source, externalId)` — which is why
+  `ledgerEventWriteSchema` refuses an entry without an `externalId` and the migration gave
+  every old one `local:<id>`. `funding` only moves CASH → IN_KIND; any other difference is a
+  conflict, including a Kraken reward valued from two different price histories.
+- **A composition is one `EtfHoldingBlock`**, the only place its day lives. `asOfInferred`
+  means the file stated no unambiguous date and the day is the drop's; between two blocks
+  changed on both sides only a day read from a file decides.
+- **`schemaVersion` is bumped for anything a v1 reader would misread**, e.g. deleting a
+  composition, which today has no caller and so no tombstone.
+
 ## Privacy and the no-clobber rule
 
 `Instrument.quoteSymbol`, `exposureKind`, `exposureLeafId`, `ter`, `hedgedToBase` and
 `thesis` are set by CLI or the instruments screen and live **only** in the local,
 gitignored SQLite database. Never commit symbols, ISINs, quantities, holdings or broker
 exports — this repo is public and that data would publish the author's portfolio.
-`*.csv` is gitignored.
+`*.csv` is gitignored, and so is `*.quoin.json`, the only name `sync:export` writes.
 
 **Test fixtures are synthetic, always.** This bites in a non-obvious place: the set of funds
 whose compositions get imported *is* the portfolio. A parser test using the real Vanguard
@@ -1346,7 +1387,10 @@ a release.
   (`feature/*` is the older prefix, still on the merged branches; match the commit type.)
   `main` is untouched until a release.
 - Conventional Commits (`feat:`, `fix:`, `chore:`, `refactor:`).
-- `CHANGELOG.md` follows Keep a Changelog, with an `[Unreleased]` section.
+- `CHANGELOG.md` follows Keep a Changelog, with an `[Unreleased]` section. Backticks
+  only for what the user types: commands, flags, file names and extensions, environment
+  variables. Never for example values, column names or internal codes — plain text reads
+  better, and a reader cannot type those anyway.
 - **The version is stated in two places and bumped by hand in both:** the
   `package.json` field and the `CHANGELOG.md` heading (`[Unreleased]` → `[x.y.z] - date`,
   plus the compare links at the foot of the file). The README status line carries no
@@ -1363,7 +1407,7 @@ a release.
 
 The image is **public**. Everything below was found by running it, not by reading it.
 
-- **`.dockerignore` is a privacy boundary.** It excludes `data/`, `*.sqlite`, `*.csv`,
+- **`.dockerignore` is a privacy boundary.** It excludes `data/`, `*.sqlite`, `*.csv`, `*.quoin.json`,
   `*.xlsx` and `.env*` even though no `COPY` names them, because one `COPY . .` would
   otherwise publish the portfolio. Keep it in step with `.gitignore`'s user-data block.
 - **`openssl` must be in both the toolchain and runtime stages.** `node:24-trixie-slim` has none,

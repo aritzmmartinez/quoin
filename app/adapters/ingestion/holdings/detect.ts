@@ -259,21 +259,27 @@ const MONTHS: Record<string, number> = {
   dic: 11,
 };
 
-export function parseAsOfHint(hint: string | null): Date | null {
+// A day that does not exist (31/02) is refused, not rolled into the next month.
+function calendarDay(year: number, month: number, day: number): string | null {
+  const date = new Date(Date.UTC(year, month, day));
+  if (date.getUTCMonth() !== month || date.getUTCDate() !== day) return null;
+  return date.toISOString().slice(0, 10);
+}
+
+/** The `YYYY-MM-DD` a hint names, or null when it names none unambiguously. */
+export function parseAsOfHint(hint: string | null): string | null {
   if (!hint) return null;
 
   const named = /^(\d{1,2})[/-]([A-Za-z]{3})[/-](\d{4})$/.exec(hint.trim());
   if (named) {
     const month = MONTHS[named[2]!.toLowerCase()];
     if (month === undefined) return null;
-    return new Date(Date.UTC(Number(named[3]), month, Number(named[1])));
+    return calendarDay(Number(named[3]), month, Number(named[1]));
   }
 
   const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(hint.trim());
   if (iso) {
-    return new Date(
-      Date.UTC(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3])),
-    );
+    return calendarDay(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
   }
 
   const numeric = /^(\d{1,2})[/.](\d{1,2})[/.](\d{4})$/.exec(hint.trim());
@@ -281,10 +287,8 @@ export function parseAsOfHint(hint: string | null): Date | null {
     const first = Number(numeric[1]);
     const second = Number(numeric[2]);
     const year = Number(numeric[3]);
-    if (first > 12 && second <= 12)
-      return new Date(Date.UTC(year, second - 1, first));
-    if (second > 12 && first <= 12)
-      return new Date(Date.UTC(year, first - 1, second));
+    if (first > 12 && second <= 12) return calendarDay(year, second - 1, first);
+    if (second > 12 && first <= 12) return calendarDay(year, first - 1, second);
     return null;
   }
 

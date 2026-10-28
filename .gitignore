@@ -19,6 +19,7 @@
 *.csv
 *.xlsx
 !/test/fixtures/**/*.xlsx
+*.quoin.json
 *.sqlite
 *.sqlite-*
 *.db

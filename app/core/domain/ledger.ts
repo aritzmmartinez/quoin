@@ -142,6 +142,10 @@ export const ledgerEventWriteSchema = ledgerEventSchema.superRefine(
     const issue = (message: string) =>
       ctx.addIssue({ code: "custom", message });
 
+    if (!event.externalId) {
+      issue("An entry needs the id its source gave it");
+    }
+
     if (
       event.valuationSource != null &&
       !valuationSourceSchema.safeParse(event.valuationSource).success

@@ -13,7 +13,6 @@ const holding = (
   identityKind,
   name: "Alpha SA",
   weight: "0.01",
-  asOf: new Date("2026-07-27T00:00:00.000Z"),
 });
 
 describe("hasObsoleteVenue", () => {
