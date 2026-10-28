@@ -143,6 +143,8 @@ pnpm identity:resolve             # give holdings a canonical id so duplicates m
 pnpm identity:resolve --report    # what merged, and what is still ambiguous
 pnpm ipc:sync                     # INE consumer price index (national + Bizkaia)
 pnpm target:set [<file>]          # show, or record a version of, the savings plan
+pnpm sync:export <file>.quoin.json        # this database's user state, for another device
+pnpm sync:import <file>.quoin.json [--dry-run]       # merge another device's export into this one
 ```
 
 `ingest`, `prices:sync` and `prices:backfill` do the same work as the import wizard
@@ -156,6 +158,14 @@ holdings CSV onto the fund's row. One parser handles every issuer — the weight
 is found by being the one that adds up to about 100, so it survives a different
 language, layout or number format without a rule per provider. There is no command
 for it on purpose.
+
+`sync:export` and `sync:import` keep two installations in step through a file: the
+ledger, instruments and what you set on them, savings-plan versions, fund compositions,
+identities and settings. Prices, rates and the CPI are not in it; the import downloads
+what a new symbol or currency needs. A field changed on both sides, or a ledger entry
+that differs, is a conflict: nothing is written and each one is listed. Into the live
+ledger, a verified backup is taken first. The file holds your portfolio, so its name
+must end in `.quoin.json`, which git and the Docker build ignore.
 
 Quote symbols and exposure classifications live only in your local database (never in
 the repo), so a public clone never discloses your holdings. A symbol quoted in another
@@ -306,6 +316,7 @@ on with decimal.js; data and secrets are never committed.
 - [ ] Watchlist and trade journal
 - [ ] DCF valuation module
 - [x] Kraken: every asset against fiat, and swaps between crypto assets (0.14.0)
+- [x] Sync-ready: one calendar zone everywhere, and a merge engine between installations (0.15.0)
 - [ ] Mobile app
 
 ## License

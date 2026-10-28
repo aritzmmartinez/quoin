@@ -1,7 +1,13 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 import { z, ZodError } from "zod";
 
 import { loadContract } from "../../../test/contract/load";
+import {
+  SYNC_CONTRACT_FILE,
+  syncContractJson,
+} from "../../../test/contract/sync-contract";
 
 import {
   holdingsBlockSchema,
@@ -151,4 +157,12 @@ describe("sync contract", () => {
       });
     },
   );
+});
+
+describe("sync contract source", () => {
+  it("is what test/contract/sync-contract.ts writes", () => {
+    expect(JSON.parse(readFileSync(SYNC_CONTRACT_FILE, "utf8"))).toEqual(
+      JSON.parse(syncContractJson()),
+    );
+  });
 });
