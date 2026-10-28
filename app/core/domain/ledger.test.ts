@@ -127,6 +127,15 @@ describe("ledgerEventWriteSchema", () => {
     },
   );
 
+  it.each([null, undefined, ""])(
+    "refuses an entry whose external id is %j at write, and still reads it",
+    (externalId) => {
+      const row = { ...baseTrade, externalId };
+      expect(ledgerEventWriteSchema.safeParse(row).success).toBe(false);
+      expect(ledgerEventSchema.safeParse(row).success).toBe(true);
+    },
+  );
+
   it("refuses a valuation source it does not know at write, and still reads it", () => {
     const row = { ...baseTrade, valuationSource: "guess" };
     expect(ledgerEventWriteSchema.safeParse(row).success).toBe(false);

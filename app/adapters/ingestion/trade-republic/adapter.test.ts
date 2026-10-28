@@ -158,6 +158,16 @@ describe("TradeRepublicCsvAdapter", () => {
     expect(ledger.appended).toHaveLength(5);
   });
 
+  it("refuses a file with a row that has no transaction id, before writing anything", async () => {
+    const unnamed = CSV.replace(`"EUR","t2"`, `"EUR",""`);
+
+    await expect(adapter.import(unnamed)).rejects.toBeInstanceOf(
+      InvalidLedgerEventError,
+    );
+    expect(instruments.upserted).toEqual([]);
+    expect(ledger.appended).toEqual([]);
+  });
+
   const SAVEBACK_CSV = [
     HEADER,
     `"2025-06-02T08:00:00Z","CASH","BENEFITS_SAVEBACK","","Test ETF","IE00AAA","","","1.000000","","","EUR","s-old"`,
