@@ -6,8 +6,10 @@ import {
   deflate,
   InflationIndex,
   Money,
-  periodOf,
 } from "./index";
+import { periodOf } from "../calendar";
+
+const MADRID = "Europe/Madrid";
 
 const point = (period: string, indexValue: string, base = "2025") => ({
   period,
@@ -17,27 +19,27 @@ const point = (period: string, indexValue: string, base = "2025") => ({
 
 describe("periodOf", () => {
   it("reads the month in Spanish civil time, not UTC", () => {
-    expect(periodOf(new Date("2026-06-15T12:00:00Z"))).toBe("2026-06");
+    expect(periodOf(new Date("2026-06-15T12:00:00Z"), MADRID)).toBe("2026-06");
   });
 
   it("puts a late-night trade on the summer-time month boundary in the next month", () => {
-    expect(periodOf(new Date("2026-03-31T22:30:00Z"))).toBe("2026-04");
+    expect(periodOf(new Date("2026-03-31T22:30:00Z"), MADRID)).toBe("2026-04");
   });
 
   it("puts a late-night trade on the winter-time month boundary in the next month", () => {
-    expect(periodOf(new Date("2026-10-31T23:30:00Z"))).toBe("2026-11");
+    expect(periodOf(new Date("2026-10-31T23:30:00Z"), MADRID)).toBe("2026-11");
   });
 
   it("keeps the month across the spring-forward switch itself", () => {
-    expect(periodOf(new Date("2026-03-29T00:30:00Z"))).toBe("2026-03");
+    expect(periodOf(new Date("2026-03-29T00:30:00Z"), MADRID)).toBe("2026-03");
   });
 
   it("keeps the month across the fall-back switch itself", () => {
-    expect(periodOf(new Date("2026-10-25T00:30:00Z"))).toBe("2026-10");
+    expect(periodOf(new Date("2026-10-25T00:30:00Z"), MADRID)).toBe("2026-10");
   });
 
   it("pads the month so periods sort chronologically as strings", () => {
-    expect(periodOf(new Date("2026-09-15T12:00:00Z"))).toBe("2026-09");
+    expect(periodOf(new Date("2026-09-15T12:00:00Z"), MADRID)).toBe("2026-09");
     expect("2026-09" < "2026-10").toBe(true);
   });
 });

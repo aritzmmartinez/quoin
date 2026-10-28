@@ -7,6 +7,7 @@ import {
   PrismaPriceRepository,
   PrismaTargetRepository,
 } from "~/adapters/persistence";
+import { today } from "~/core/calendar";
 import {
   averageMonthlyInflation,
   BASE_CURRENCY,
@@ -26,6 +27,7 @@ import { heldValuesByInstrument } from "./portfolio";
 import { buildProjectionSource, type ProjectionSource } from "./projection";
 import { loadValuation } from "./rate-book.server";
 import { DEFAULT_INFLATION_SERIES } from "./real.server";
+import { loadResidence } from "./residence.server";
 import { unratedNames, type UnratedNames } from "./unrated";
 import { createServerTiming, type ServerTiming } from "./server-timing";
 
@@ -56,6 +58,9 @@ export async function loadProjectionContext(
   timing: ServerTiming = createServerTiming(),
 ): Promise<ProjectionContext> {
   const priceRepository = new PrismaPriceRepository();
+  const { jurisdiction, calendarZone } = await timing.time("db-settings", () =>
+    loadResidence(),
+  );
   const events = await timing.time("db-ledger", () =>
     new PrismaLedgerRepository().list(),
   );
@@ -63,7 +68,7 @@ export async function loadProjectionContext(
     new PrismaInstrumentRepository().list(),
   );
   const valuation = await timing.time("db-prices-latest", () =>
-    loadValuation(asOf),
+    loadValuation(calendarZone, asOf),
   );
   const targets = await timing.time("db-targets", () =>
     new PrismaTargetRepository().list(),
@@ -78,11 +83,13 @@ export async function loadProjectionContext(
       ? null
       : new Decimal(monthlyInflation).plus(1).pow(12).minus(1).toFixed(6);
 
-  const target = getActiveTarget(targets, asOf);
+  const target = getActiveTarget(targets, today(calendarZone, asOf));
   const hasTrades = events.length > 0;
   if (target === null) return { hasTrades, annualInflation, plan: null };
 
-  const positions = timing.time("positions", () => computePositions(events));
+  const positions = timing.time("positions", () =>
+    computePositions(events, jurisdiction),
+  );
   const marketValues = timing.time("valuation", () =>
     computeMarketValues(positions, valuation.prices, BASE_CURRENCY),
   );
@@ -117,14 +124,20 @@ export async function loadProjectionContext(
       new Map(
         historyIds.map((id, index) => [
           id,
-          historyInBase(histories[index] ?? [], valuation.book).history.map(
-            (snapshot) => ({ asOf: snapshot.asOf, price: snapshot.price }),
-          ),
+          historyInBase(
+            histories[index] ?? [],
+            valuation.book,
+            calendarZone,
+          ).history.map((snapshot) => ({
+            asOf: snapshot.asOf,
+            price: snapshot.price,
+          })),
         ]),
       ),
       instrumentsById,
       offPlanValues,
       asOf,
+      calendarZone,
     ),
   );
 

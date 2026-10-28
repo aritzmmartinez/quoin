@@ -12,6 +12,8 @@ import {
   type RealizedRow,
 } from "./realized";
 
+const MADRID = "Europe/Madrid";
+
 function sale(overrides: Partial<RealizedSale> = {}): RealizedSale {
   return {
     eventId: "evt-1",
@@ -30,7 +32,7 @@ function sale(overrides: Partial<RealizedSale> = {}): RealizedSale {
 }
 
 function row(overrides: Partial<RealizedRow> = {}): RealizedRow {
-  return { ...toRealizedRows([sale()], [])[0]!, ...overrides };
+  return { ...toRealizedRows([sale()], [], MADRID)[0]!, ...overrides };
 }
 
 describe("toRealizedRows", () => {
@@ -46,6 +48,7 @@ describe("toRealizedRows", () => {
     const rows = toRealizedRows(
       [sale(), sale({ eventId: "evt-2", instrumentId: "Y" })],
       instruments,
+      MADRID,
     );
 
     expect(rows[0]!.name).toBe("Fondo Global");
@@ -58,6 +61,7 @@ describe("toRealizedRows", () => {
     const rows = toRealizedRows(
       [sale({ ts: new Date("2024-12-31T23:00:00Z") })],
       [],
+      MADRID,
     );
     expect(rows[0]!.year).toBe(2025);
   });

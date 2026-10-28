@@ -22,6 +22,7 @@ export interface FxSyncDeps {
   currencies: readonly string[];
   firstUse: ReadonlyMap<string, string>;
   now?: Date;
+  zone: string;
 }
 
 export type FxSyncOutcome =
@@ -49,11 +50,12 @@ export interface FxSyncResult {
 
 export function firstUseByCurrency(
   uses: Iterable<{ currency: string; at: Date }>,
+  zone: string,
 ): Map<string, string> {
   const first = new Map<string, string>();
   for (const { currency, at } of uses) {
     if (currency === BASE_CURRENCY) continue;
-    const day = dayOf(at);
+    const day = dayOf(at, zone);
     const held = first.get(currency);
     if (held === undefined || day < held) first.set(currency, day);
   }
@@ -72,7 +74,7 @@ export function syncStart(
 
 export async function syncFxRates(deps: FxSyncDeps): Promise<FxSyncResult> {
   const { repository, provider } = deps;
-  const today = dayOf(deps.now ?? new Date());
+  const today = dayOf(deps.now ?? new Date(), deps.zone);
   const outcomes: FxSyncOutcome[] = [];
 
   for (const quote of deps.currencies) {
@@ -145,6 +147,7 @@ export interface EnsureRatesDeps {
   >;
   provider: FxRateProvider;
   now?: Date;
+  zone: string;
 }
 
 export async function ensureRates(
@@ -161,6 +164,7 @@ export async function ensureRates(
     provider: deps.provider,
     currencies,
     firstUse: needs,
+    zone: deps.zone,
     ...(deps.now ? { now: deps.now } : {}),
   });
   return {

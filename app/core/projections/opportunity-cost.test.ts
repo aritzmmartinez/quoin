@@ -71,6 +71,7 @@ function run(
     benchmarkHistory: history,
     prices: priceMap,
     now: NOW,
+    zone: "Europe/Madrid",
   });
 }
 

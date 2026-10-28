@@ -25,6 +25,37 @@ const RECHARTS = {
 };
 const CHART_MODULE = "**/*Chart";
 
+/**
+ * Nothing reads a date in the process's own zone: Docker runs in UTC, the
+ * author's machine in Madrid, and the same instant would land on two days.
+ * A zone is always named, and core/calendar is where days are assigned.
+ */
+const LOCAL_TIME = [
+  {
+    selector:
+      "CallExpression[callee.property.name=/^(get|set)(FullYear|Month|Date|Day|Hours|Minutes|Seconds|Milliseconds)$/]",
+    message:
+      "Local-time getters and setters read the process's zone. Use the UTC variant, or core/calendar with an explicit zone.",
+  },
+  {
+    selector:
+      "CallExpression[callee.property.name=/^(getTimezoneOffset|toLocaleDateString|toLocaleTimeString|toDateString|toTimeString)$/]",
+    message:
+      "This reads the process's zone. Format through createFormat(locale, zone).",
+  },
+  {
+    selector: "NewExpression[callee.name='Date'][arguments.length>1]",
+    message:
+      "new Date(y, m, d…) builds local time. Use Date.UTC, or startOfDay(date, zone).",
+  },
+  {
+    selector:
+      "NewExpression[callee.property.name='DateTimeFormat']:not(:has(Property[key.name='timeZone']))",
+    message:
+      "An Intl.DateTimeFormat without timeZone formats in the process's zone. Name the zone.",
+  },
+];
+
 export default tseslint.config(
   {
     ignores: [
@@ -37,6 +68,18 @@ export default tseslint.config(
 
   js.configs.recommended,
   ...tseslint.configs.recommended,
+
+  {
+    files: ["app/**/*.{ts,tsx}", "scripts/**/*.ts"],
+    ignores: ["app/core/calendar/**"],
+    rules: { "no-restricted-syntax": ["error", ...LOCAL_TIME] },
+  },
+  {
+    // A backup's file name is read by a person restoring it, on their own
+    // clock; it is a label, not a date anything is assigned to.
+    files: ["scripts/lib/backup-names.ts", "scripts/lib/backup-names.test.ts"],
+    rules: { "no-restricted-syntax": "off" },
+  },
 
   {
     files: ["**/*.{ts,tsx}"],

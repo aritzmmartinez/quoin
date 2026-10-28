@@ -11,12 +11,15 @@ import {
   type InstrumentSync,
   type SyncDeps,
 } from "./prices-sync";
+import { loadResidence } from "./residence.server";
 
-export function defaultDeps(): SyncDeps {
+export async function defaultDeps(): Promise<SyncDeps> {
+  const { calendarZone } = await loadResidence();
   return {
     prices: new PrismaPriceRepository(),
     provider: new YahooMarketDataProvider(),
     checks: new PrismaPriceSyncRepository(),
+    zone: calendarZone,
   };
 }
 
@@ -26,9 +29,11 @@ export async function syncTargets() {
 
 export async function syncInstrument(
   instrumentId: string,
-  deps: SyncDeps = defaultDeps(),
+  deps?: SyncDeps,
 ): Promise<InstrumentSync | null> {
   const instrument = await new PrismaInstrumentRepository().get(instrumentId);
   const [target] = instrument ? toSyncTargets([instrument]).targets : [];
-  return target ? syncInstrumentPrices(deps, target) : null;
+  return target
+    ? syncInstrumentPrices(deps ?? (await defaultDeps()), target)
+    : null;
 }

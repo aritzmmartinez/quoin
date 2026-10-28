@@ -25,19 +25,22 @@ import {
   monthlyTotal,
   parseTargetLines,
   TargetParseError,
+  targetOnDay,
   type PortfolioTarget,
 } from "~/core/domain";
+import { today } from "~/core/calendar";
 import { computePositions } from "~/core/projections";
 import {
   type Copy,
   copyFor,
   copyFromMatches,
+  createFormat,
   parseLocale,
-  todayInMadrid,
   toTargetRows,
   toTargetVersionRows,
   useCopy,
 } from "~/lib";
+import { loadResidence } from "~/lib/residence.server";
 
 export function meta({ matches }: Route.MetaArgs) {
   const t = copyFromMatches(matches);
@@ -50,16 +53,18 @@ export function meta({ matches }: Route.MetaArgs) {
 export const handle = { title: (t: Copy) => t.target.title };
 
 export async function loader(_: Route.LoaderArgs) {
-  const [targets, instruments, events] = await Promise.all([
+  const [targets, instruments, events, { jurisdiction }] = await Promise.all([
     new PrismaTargetRepository().list(),
     new PrismaInstrumentRepository().list(),
     new PrismaLedgerRepository().list(),
+    loadResidence(),
   ]);
+  const now = new Date();
 
-  const active = getActiveTarget(targets, new Date());
+  const active = getActiveTarget(targets, today(jurisdiction.zone, now));
 
   const held = new Set(
-    computePositions(events)
+    computePositions(events, jurisdiction)
       .filter((position) => !new Decimal(position.quantity).isZero())
       .map((position) => position.instrumentId),
   );
@@ -72,14 +77,14 @@ export async function loader(_: Route.LoaderArgs) {
     active: active
       ? {
           name: active.name,
-          activeFrom: active.activeFrom.toISOString(),
+          activeFrom: active.activeFrom,
           note: active.note ?? null,
           total: monthlyTotal(active),
         }
       : null,
     rows,
     versions: toTargetVersionRows(targets, active?.id ?? null),
-    today: todayInMadrid(),
+    today: today(jurisdiction.zone, now),
     defaultLines: rows
       .map((row) => `${row.instrumentId} ${row.monthlyAmount}`)
       .join("\n"),
@@ -88,7 +93,7 @@ export async function loader(_: Route.LoaderArgs) {
 
 const createForm = z.object({
   name: z.string().trim().min(1),
-  activeFrom: z.string().min(1),
+  activeFrom: z.iso.date(),
   note: z.string().trim().default(""),
   lines: z.string().min(1),
 });
@@ -96,7 +101,8 @@ const createForm = z.object({
 const deleteForm = z.object({ id: z.string().min(1) });
 
 export async function action({ request }: Route.ActionArgs) {
-  const t = copyFor(parseLocale(request.headers.get("Cookie")));
+  const locale = parseLocale(request.headers.get("Cookie"));
+  const t = copyFor(locale);
   const form = Object.fromEntries(await request.formData());
 
   if (form.intent === "delete") {
@@ -113,10 +119,7 @@ export async function action({ request }: Route.ActionArgs) {
     return { ok: false as const, error: t.target.form.invalid };
   }
 
-  const activeFrom = new Date(parsed.data.activeFrom);
-  if (Number.isNaN(activeFrom.getTime())) {
-    return { ok: false as const, error: t.target.form.invalid };
-  }
+  const { activeFrom } = parsed.data;
 
   let target: PortfolioTarget;
   try {
@@ -153,8 +156,23 @@ export async function action({ request }: Route.ActionArgs) {
     };
   }
 
+  const repository = new PrismaTargetRepository();
+  const taken = targetOnDay(await repository.list(), activeFrom);
+  if (taken) {
+    return {
+      ok: false as const,
+      error: t.target.form.dayTaken(
+        taken.name,
+        createFormat(
+          locale,
+          (await loadResidence()).displayZone,
+        ).formatCalendarDate(taken.activeFrom),
+      ),
+    };
+  }
+
   try {
-    await new PrismaTargetRepository().create(target);
+    await repository.create(target);
   } catch (error) {
     console.error("Recording a target version failed", error);
     return { ok: false as const, error: t.target.form.saveFailed };

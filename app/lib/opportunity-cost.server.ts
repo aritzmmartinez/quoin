@@ -25,6 +25,7 @@ export async function loadOpportunityCost(
   instruments: readonly Instrument[],
   valuation: { prices: ReadonlyMap<string, PriceLike>; book: RateBook },
   symbol: string,
+  zone: string,
   now: Date = new Date(),
 ): Promise<OpportunityView> {
   const benchmark = findBenchmark(instruments, symbol);
@@ -34,7 +35,7 @@ export async function loadOpportunityCost(
     benchmark.id,
     firstTradeAt(events),
   );
-  const { history } = historyInBase(stored, valuation.book);
+  const { history } = historyInBase(stored, valuation.book, zone);
   if (history.length === 0) {
     return { ok: false, symbol, reason: "no-history" };
   }
@@ -50,6 +51,7 @@ export async function loadOpportunityCost(
       benchmarkHistory: history,
       prices: valuation.prices,
       now,
+      zone,
     }),
   };
 }

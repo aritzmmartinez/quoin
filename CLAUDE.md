@@ -27,15 +27,19 @@ License: AGPL-3.0-only.
 - **Copy lives in `app/lib/i18n/`** — `es.ts`, `en.ts`, `index.ts`. Components read it
   with `useCopy()`; everything else (pure helpers, loaders, actions, `*.server.ts`)
   takes a `Copy` argument. Route `meta` uses `copyFromMatches(matches)`.
-- Formatting goes through `useFormat()` in a component, `createFormat(locale)` anywhere
+- Formatting goes through `useFormat()` in a component, `createFormat(locale, zone)` anywhere
   else (`formatMoney`, `formatQuantity`, `formatSignedMoney`, `formatPercent`,
-  `formatDate`, `formatPeriod`, `formatTimeTick`, `formatRelativeTime`, `formatClock`).
+  `formatCalendarDate`, `formatInstant`, `formatPeriod`, `formatTimeTick`, `formatRelativeTime`, `formatClock`).
   **Never call `Intl` or `toLocaleString` from a component**, and never reintroduce a
   free `formatMoney`: the whole point of the factory is that no code path can format
   without saying which locale it means.
-- `todayInMadrid` stays a free function: it returns an ISO calendar date, not a display
-  string. It and `formatClock` are the only two that read the clock, and both resolve
-  through `Europe/Madrid`, the same rule as `periodOf` and `fiscalYearOf`.
+- The zone a formatter shows instants in is the **display zone**; it arrives from the root
+  loader (`useZones()`), never from inside the formatter. **A day and an instant are two
+  functions, chosen by what the value is, never by the shape of the string:**
+  `formatCalendarDate` takes a `YYYY-MM-DD` (it has no zone, is never shifted into one,
+  and throws on anything else); `formatInstant` takes an ISO instant or epoch ms and shows
+  its day in the display zone. `activeFrom`, a rate day, a closing day and the repurchase
+  window's end are days; a trade's `ts`, a price's `asOf` and a check time are instants.
 - Note on es-ES: CLDR `min2` means 4-digit numbers carry **no** thousands separator
   (`1234,56 €`). This is correct output, not a bug. English is **en-GB**, not en-US:
   the app is euro-denominated and day-first, so `€1,234.56` and `14/09/2026` are the
@@ -76,6 +80,8 @@ pnpm projection:converge [--sims=1000,3000] [--seeds=8] [--horizon=240] [--contr
 pnpm twr:explain [--top=N]            # print the portfolio TWR chain, worst link first
 pnpm twr:explain --around=YYYY-MM-DD  # open one link: holdings and implied prices at both ends
 pnpm tax:explain [YYYY|--year=YYYY]   # replay the Bizkaia foral FIFO, lot by lot
+pnpm sync:export <file>.quoin.json    # whole user state of DATABASE_URL, for another device
+pnpm sync:import <file> [--dry-run]   # merge an export into DATABASE_URL; backs the ledger up first
 ```
 
 Fund compositions have **no command**: the CSV is dropped onto the fund's row in
@@ -95,7 +101,8 @@ app  →  adapters  →  core
 per-folder overrides. (`eslint-plugin-boundaries` v6 was tried and abandoned — heavier
 and it did not enforce this correctly.)
 
-- **core** — domain and pure projections. No Prisma, no `fetch`, no I/O, no clock.
+- **core** — domain and pure projections. No Prisma, no `fetch`, no I/O, no clock: `now`
+  is a parameter with no default, like the zone.
   Anything from the outside is **injected**: e.g. `computeAllocation` receives a
   `Map<instrumentId, category>` because core cannot read `Instrument.type` from Prisma.
 - **adapters** — persistence (Prisma repositories), market data (Yahoo), ingestion (broker
@@ -109,6 +116,42 @@ and it did not enforce this correctly.)
 
 No monolithic files. Extract reusable primitives (`ui/`, `charts/`) rather than
 duplicating logic across screens.
+
+## Calendar and zones
+
+Which day, month or fiscal year an instant belongs to is decided in **`core/calendar`
+and nowhere else**: `dayOf`, `periodOf`, `fiscalYearOf`, `today(zone, now)`,
+`startOfDay`. Every one takes the zone as a parameter with no default. It is the first
+piece of the contract with the mobile client, which must assign the same days.
+
+- **The zone comes from the residence setting, resolved in one place.** `Settings` has
+  one row (`CHECK id = 1`); `residence` (today only `bizkaia`) has no CHECK — the
+  vocabulary grows, `residenceSchema` validates at write and at read. Core maps it two
+  ways, `territoryOfResidence` and `zoneOfResidence`, and they are separate because the
+  régimen común will be one territory in two zones (Canarias). `loadResidence()` is the
+  server's only reader: it yields the `Jurisdiction` (territory + zone, what AVCO, FIFO
+  and the swap rule take), the **calendar zone** and the **display zone** — the same zone
+  today, two decisions. The root loader hands both to the client.
+- **`toCalendarDate` caches by `(zone, UTC minute)`, bounded LRU, from 1980.** Not by
+  quarter-hour: offsets since 1980 are multiples of 15 minutes, but Goose Bay and St
+  John's switched at 00:01 local until 2011 and Casey did in 2020–2022, so one UTC
+  quarter-hour can hold two local days. Measured over every IANA zone; a test pins the
+  Goose Bay case.
+- **Nothing reads the process's zone.** ESLint (`LOCAL_TIME` in `eslint.config.js`)
+  refuses local getters and setters, `new Date(y, m, d…)` and an `Intl.DateTimeFormat`
+  without `timeZone`, outside `core/calendar`. The one exception is `backup-names.ts`: a
+  file name is read by a person on their own clock. Both vitest configs set
+  `TZ=Pacific/Kiritimati` (UTC+14) through `test.env`, which works on Windows, where a
+  `TZ=` set from Git Bash never reaches Node; a test pins it.
+- **An instant from outside carries its offset.** Trade Republic's `datetime` must have
+  `Z` or an offset (`z.iso.datetime({ offset: true })`); without one `new Date` reads
+  the process's zone and the same row is two instants in Docker and in Madrid. Kraken's
+  `time` has none and is UTC by definition (`parseTime` appends `Z`).
+- **Golden cases live in `test/contract/*.json`**, read through `loadContract(name,
+  schema)`. `sync.json` is written by `test/contract/sync-contract.ts`
+  (`pnpm tsx test/contract/sync-contract.ts`), its expectations by hand, never by
+  running `merge`; a test fails while the two disagree. They are shared with the mobile client: change a case only together with the
+  implementation that reproduces it on both sides.
 
 ## A command's logic never lives in its script
 
@@ -241,7 +284,7 @@ This has caused misdirected generation more than once:
   A live quote is not written on a day that has a candle, and replaces the day's earlier
   live row. `latest()` never returns to an **earlier day**; within one day it may move from
   the live row's time back to the session open, because the close it carries is newer
-  information. "Day" is `dayOf` in `core/calendar`, the same Madrid rule as `periodOf`.
+  information. "Day" is `dayOf` in `core/calendar`, in the calendar zone, like `periodOf`.
 - **Deleting an instrument's snapshots happens in two places, both atomic:** `saveDaily`
   above, and `PriceRepository.replaceHistory`. One transaction deletes the
   instrument's rows (all of them, or only those at or before `keepAfter`), writes the new
@@ -358,13 +401,50 @@ ledger while that rule is in force. Useful, but do not mistake it for a sandbox.
   still refused. It must set `DATABASE_URL` from a constant before the guard runs, so a
   screenshot session is never one stale variable away from the ledger.
 
+## Sync
+
+Two installations (and, next, the mobile app) merge by exchanging **whole user states**,
+never operation logs. `core/sync` holds what the mobile client reproduces in Dart: the
+format (`exchange.ts`, `schemaVersion: 1`, Zod both ways) and `merge(local, incoming)`,
+pure. `app/lib/sync.ts` runs it over `PrismaSyncRepository`; the scripts only parse and print.
+
+- **A mark is `<ms 15>-<counter 4>-<deviceId>`** (`core/sync/hlc`), issued by `stamp(tx)`
+  inside the transaction of the write and never earlier than `SyncDevice.lastHlc`. A write
+  that changes nothing issues none: `/instruments` calls every setter on every save, and an
+  undated composition dropped again would otherwise move to today.
+- **A mark is compared only with what each side has seen of the device that wrote it**,
+  never with another clock: news to me if its origin is not me and it is newer than my
+  `SyncPeer.seen`; news to the sender likewise against the peers list in the file. A taken
+  value keeps its origin's mark — restamping it locally makes the next exchange an echo
+  conflict. Both new, or neither new with different values (two NULL marks), is a conflict.
+- **Copying the `.sqlite` copies `SyncDevice.deviceId`**, and an import refuses a file
+  carrying its own id. Restore a backup on another machine and it is the same device.
+- **A conflict writes nothing.** Apply is one transaction, seen marks included; effects
+  (download a new symbol's history, sync a new currency's rates) run after it and a failed
+  one is reported with exit ≠ 0, never rolled back: what it fetches is a cache. A patch that
+  carries `quoteSymbol` deletes that instrument's prices in the apply transaction, so two
+  symbols never share a series even if the download fails.
+- **A file that brings no data takes no backup.** `sync:import` says "Already up to
+  date" and writes only the seen marks, and only if they moved: the backup window holds 30
+  and the mobile app syncs often. The marks still matter — a stale `seen` lets an equal
+  value with a newer mark read as news, and the next local change becomes a false conflict.
+- **The ledger has no marks.** Union by `(source, externalId)` — which is why
+  `ledgerEventWriteSchema` refuses an entry without an `externalId` and the migration gave
+  every old one `local:<id>`. `funding` only moves CASH → IN_KIND; any other difference is a
+  conflict, including a Kraken reward valued from two different price histories.
+- **A composition is one `EtfHoldingBlock`**, the only place its day lives. `asOfInferred`
+  means the file stated no unambiguous date and the day is the drop's; between two blocks
+  changed on both sides only a day read from a file decides.
+- **`schemaVersion` is bumped for anything a v1 reader would misread**, e.g. deleting a
+  composition, which today has no caller and so no tombstone.
+
 ## Privacy and the no-clobber rule
 
 `Instrument.quoteSymbol`, `exposureKind`, `exposureLeafId`, `ter`, `hedgedToBase` and
 `thesis` are set by CLI or the instruments screen and live **only** in the local,
 gitignored SQLite database. Never commit symbols, ISINs, quantities, holdings or broker
 exports — this repo is public and that data would publish the author's portfolio.
-`*.csv` is gitignored.
+`*.csv` is gitignored, and so is `*.quoin.json`, the only name `sync:export` writes.
 
 **Test fixtures are synthetic, always.** This bites in a non-obvious place: the set of funds
 whose compositions get imported *is* the portfolio. A parser test using the real Vanguard
@@ -767,8 +847,8 @@ manual aliasing was abandoned — 726 confirmations is not a system.
   inflates real P&L. `computeInvestedVsValueSeries` restates **both** lines — invested at
   each contribution's date, value at each price mark's — because restating one turns plain
   inflation into a gap between them.
-- **The month of a trade is Madrid's, never UTC's.** `periodOf` formats through `Intl` with
-  an explicit `timeZone`. Spain is +1 in winter and +2 in summer, so the last hour(s) of
+- **The month of a trade is Madrid's, never UTC's.** `periodOf` reads it in the calendar
+  zone (*Calendar and zones*). Spain is +1 in winter and +2 in summer, so the last hour(s) of
   every month are already the next month locally, by a different amount either side of the
   DST switch — a fixed offset does not fix it. Any test touching periods must include a
   month boundary in both March/October, or the bug is invisible.
@@ -850,9 +930,17 @@ manual aliasing was abandoned — 726 confirmations is not a system.
 ## Portfolio target (the savings plan)
 
 - **Versions are resolved by `activeFrom`, never by `createdAt`.** `getActiveTarget(targets,
-  asOf)` picks the latest `activeFrom <= asOf` — the same rule that makes `latest()` order
-  prices by `asOf`. A plan recorded late belongs to the past it was written for. `createdAt`
-  breaks an exact `activeFrom` tie and nothing else.
+  day)` picks the latest `activeFrom <= day` — the same rule that makes `latest()` order
+  prices by `asOf`. A plan recorded late belongs to the past it was written for.
+- **`activeFrom` is a calendar day (`YYYY-MM-DD`), one version per day.** It was an instant,
+  and a version recorded at 00:00Z took over at 01:00 Madrid. Callers pass
+  `today(zone, now)`. The column is `TEXT` with a format CHECK and a UNIQUE index, nullable
+  only because SQLite cannot ADD a NOT NULL column without a default; `portfolioTargetSchema`
+  requires the day on read and on write. The form and `target:set` refuse a taken day by
+  naming the version there (`targetOnDay`); the index is the backstop. `createdAt` is
+  audit only. The migration that converted it kept, per Madrid day, the version that was
+  in force and deleted the rest, because the container migrates on start and must not
+  fail on a duplicate.
 - **A target is never edited in place.** The repository exposes `create` / `list` / `remove`
   and no update: changing the plan records the next version, so "what was I aiming at in
   March" stays answerable. Reusing an id fails, deliberately.
@@ -930,9 +1018,9 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
 - **`TAX_SCALES` is keyed by `(territory, year)`.** A year not on file returns `null` from
   `getTaxScale` and the screen states the absence — never fall back to the nearest year's
   brackets. A rate is data; a superseded scale is a wrong number that looks right.
-- **The fiscal year is Madrid's calendar** (`fiscalYearOf` via `Intl`, `timeZone:
-  "Europe/Madrid"`), same trap as `periodOf` — the last hours of 31 December are already
-  the next year locally.
+- **The fiscal year is the calendar year in the residence's zone** (`fiscalYearOf`, Madrid
+  for Bizkaia), same trap as `periodOf` — the last hours of 31 December are already the
+  next year locally. The zone travels in `RepurchaseScope` beside the territory.
 
 ## Kraken rewards
 
@@ -1211,7 +1299,7 @@ the two controls sitting side by side behave differently on purpose.
   `string`, `en: Copy` makes a missing or misspelled key a **compile error** — that type
   is the only thing standing between a 1,100-key object and a string that silently stays
   Spanish forever. Do not "tighten" it back.
-- **A formatter has no default locale; a collator does.** `createFormat(locale)` exports
+- **A formatter has no default locale; a collator does.** `createFormat(locale, zone)` exports
   no free `formatMoney`, because a Spanish figure under an English label is unfalsifiable
   on screen — `1.234,56` is a valid English number too. The collator tag defaults to
   `es-ES` (`toInstrumentListItems`, `sortRealizedRows`, `groupRealizedByYear`,
@@ -1299,7 +1387,10 @@ a release.
   (`feature/*` is the older prefix, still on the merged branches; match the commit type.)
   `main` is untouched until a release.
 - Conventional Commits (`feat:`, `fix:`, `chore:`, `refactor:`).
-- `CHANGELOG.md` follows Keep a Changelog, with an `[Unreleased]` section.
+- `CHANGELOG.md` follows Keep a Changelog, with an `[Unreleased]` section. Backticks
+  only for what the user types: commands, flags, file names and extensions, environment
+  variables. Never for example values, column names or internal codes — plain text reads
+  better, and a reader cannot type those anyway.
 - **The version is stated in two places and bumped by hand in both:** the
   `package.json` field and the `CHANGELOG.md` heading (`[Unreleased]` → `[x.y.z] - date`,
   plus the compare links at the foot of the file). The README status line carries no
@@ -1316,7 +1407,7 @@ a release.
 
 The image is **public**. Everything below was found by running it, not by reading it.
 
-- **`.dockerignore` is a privacy boundary.** It excludes `data/`, `*.sqlite`, `*.csv`,
+- **`.dockerignore` is a privacy boundary.** It excludes `data/`, `*.sqlite`, `*.csv`, `*.quoin.json`,
   `*.xlsx` and `.env*` even though no `COPY` names them, because one `COPY . .` would
   otherwise publish the portfolio. Keep it in step with `.gitignore`'s user-data block.
 - **`openssl` must be in both the toolchain and runtime stages.** `node:24-trixie-slim` has none,

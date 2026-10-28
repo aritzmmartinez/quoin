@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import type { LedgerEvent, TradeEvent } from "../domain";
 import { computeInvestedVsValueSeries } from "./invested-vs-value";
+import { jurisdictionOf } from "~/core/tax";
+
+const BIZKAIA = jurisdictionOf("bizkaia");
 
 function trade(
   o: Partial<TradeEvent> & Pick<TradeEvent, "ts" | "grossAmount" | "quantity">,
@@ -30,7 +33,14 @@ describe("computeInvestedVsValueSeries", () => {
         grossAmount: "1000",
       }),
     ];
-    const s = computeInvestedVsValueSeries(events, "VWCE", [], "120", now);
+    const s = computeInvestedVsValueSeries(
+      events,
+      "VWCE",
+      [],
+      "120",
+      now,
+      BIZKAIA,
+    );
     expect(s).toEqual([
       { t: new Date("2026-01-01").getTime(), invested: "1000", value: "1000" },
       { t: now.getTime(), invested: "1000", value: "1200" },
@@ -46,14 +56,21 @@ describe("computeInvestedVsValueSeries", () => {
       }),
     ];
     const history = [{ asOf: new Date("2026-03-01"), price: "110" }];
-    const s = computeInvestedVsValueSeries(events, "VWCE", history, "120", now);
+    const s = computeInvestedVsValueSeries(
+      events,
+      "VWCE",
+      history,
+      "120",
+      now,
+      BIZKAIA,
+    );
     expect(s.map((p) => p.value)).toEqual(["1000", "1100", "1200"]);
     expect(s.every((p) => p.invested === "1000")).toBe(true);
   });
 
   it("is empty when the instrument has no trades", () => {
-    expect(computeInvestedVsValueSeries([], "VWCE", [], "120", now)).toEqual(
-      [],
-    );
+    expect(
+      computeInvestedVsValueSeries([], "VWCE", [], "120", now, BIZKAIA),
+    ).toEqual([]);
   });
 });

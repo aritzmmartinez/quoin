@@ -17,6 +17,10 @@ import {
   type WashSaleAssessment,
 } from "./wash-sale";
 import { walkFifo } from "./fifo";
+import { jurisdictionOf } from "~/core/tax";
+
+const MADRID = "Europe/Madrid";
+const BIZKAIA = jurisdictionOf("bizkaia");
 
 let seq = 0;
 
@@ -49,6 +53,7 @@ function assess(
 ) {
   const assessor = createWashSaleAssessor(trades, {
     territory: "bizkaia",
+    zone: MADRID,
     assetClasses: new Map(
       trades.map(
         (t) =>
@@ -64,7 +69,7 @@ function assess(
   });
   const bySale = new Map<string, WashSaleAssessment>();
   const notices = new Map<string, UnlistedRepurchaseNotice>();
-  for (const sale of walkFifo(trades).sales) {
+  for (const sale of walkFifo(trades, BIZKAIA).sales) {
     if (!sale.realizedPnL.isNegative()) continue;
     const rule = assessor.ruleFor(sale);
     if (rule === null) {
@@ -337,7 +342,7 @@ function tripsOn(saleTs: string, rebuyTs: string): boolean {
 }
 
 function windowOf(saleTs: string): string {
-  const { start, end } = washSaleWindow(new Date(saleTs), 2);
+  const { start, end } = washSaleWindow(new Date(saleTs), 2, MADRID);
   return `${toIsoDate(start)}..${toIsoDate(end)}`;
 }
 

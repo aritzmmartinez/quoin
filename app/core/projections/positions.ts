@@ -1,4 +1,5 @@
 import { Money, type LedgerEvent, type Revalue } from "../domain";
+import type { Jurisdiction } from "../tax/config";
 
 import { walkAvco } from "./avco";
 
@@ -33,18 +34,21 @@ export interface Position {
  */
 export function computePositions(
   events: readonly LedgerEvent[],
+  jurisdiction: Jurisdiction,
   revalue?: Revalue,
 ): Position[] {
-  return [...walkAvco(events, revalue).lots.values()].map((lot) => {
-    const averageCost = lot.quantity.isZero()
-      ? Money.zero()
-      : lot.costBasis.divideBy(lot.quantity);
-    return {
-      instrumentId: lot.instrumentId,
-      quantity: lot.quantity.toFixed(),
-      costBasis: lot.costBasis.toString(),
-      averageCost: averageCost.toString(),
-      realizedPnL: lot.realizedPnL.toString(),
-    };
-  });
+  return [...walkAvco(events, jurisdiction, revalue).lots.values()].map(
+    (lot) => {
+      const averageCost = lot.quantity.isZero()
+        ? Money.zero()
+        : lot.costBasis.divideBy(lot.quantity);
+      return {
+        instrumentId: lot.instrumentId,
+        quantity: lot.quantity.toFixed(),
+        costBasis: lot.costBasis.toString(),
+        averageCost: averageCost.toString(),
+        realizedPnL: lot.realizedPnL.toString(),
+      };
+    },
+  );
 }

@@ -27,6 +27,7 @@ import {
   resolveWithHoldings,
   type WeightedLeaf,
 } from "~/core/domain";
+import { today } from "~/core/calendar";
 import {
   computeAllFundOverlaps,
   computeCurrencyExposure,
@@ -65,6 +66,7 @@ import {
 } from "~/lib";
 import { UnratedNotice } from "~/components/ui/UnratedNotice";
 import { loadValuation } from "~/lib/rate-book.server";
+import { loadResidence } from "~/lib/residence.server";
 import { createServerTiming } from "~/lib/server-timing";
 import { openInstrumentIds, unratedNames } from "~/lib/unrated";
 
@@ -83,6 +85,7 @@ export function headers({ loaderHeaders }: Route.HeadersArgs) {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
+  const { jurisdiction, calendarZone } = await loadResidence();
   const params = new URL(request.url).searchParams;
   const view = parseAllocationView(params);
   const threshold = parseThreshold(request.headers.get("Cookie"));
@@ -102,7 +105,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     new PrismaInstrumentRepository().list(),
   );
   const valuation = await timing.time("db-prices-latest", () =>
-    loadValuation(),
+    loadValuation(calendarZone),
   );
   const holdings = await timing.time("db-holdings", () =>
     new PrismaHoldingsRepository().all(),
@@ -124,7 +127,9 @@ export async function loader({ request }: Route.LoaderArgs) {
     return map;
   });
 
-  const positions = timing.time("positions", () => computePositions(events));
+  const positions = timing.time("positions", () =>
+    computePositions(events, jurisdiction),
+  );
   const marketValues = timing.time("valuation", () =>
     computeMarketValues(positions, valuation.prices, BASE_CURRENCY),
   );
@@ -167,7 +172,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     readingFor(rows, summary.resolvedLeafCount, threshold),
   );
 
-  const target = getActiveTarget(targets, new Date());
+  const target = getActiveTarget(targets, today(calendarZone, new Date()));
 
   const hedged = new Set(
     instruments.filter((i) => i.hedgedToBase).map((i) => i.id),

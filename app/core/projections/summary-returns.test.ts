@@ -18,6 +18,9 @@ import {
   withoutInstruments,
 } from "./returns";
 import { YEAR_MS } from "./xirr";
+import { jurisdictionOf } from "~/core/tax";
+
+const BIZKAIA = jurisdictionOf("bizkaia");
 
 function trade(
   o: Partial<TradeEvent> &
@@ -44,7 +47,7 @@ function summarise(
   latest: Record<string, string>,
   history: History = {},
 ) {
-  const positions = computePositions(events);
+  const positions = computePositions(events, BIZKAIA);
   const prices = new Map(
     Object.entries(latest).map(([id, price]) => [
       id,
@@ -73,7 +76,7 @@ function seriesFor(
   skip: ReadonlySet<string> = new Set(),
 ) {
   const ids = [
-    ...new Set(computePositions(events).map((p) => p.instrumentId)),
+    ...new Set(computePositions(events, BIZKAIA).map((p) => p.instrumentId)),
   ].filter((id) => !skip.has(id));
   return computePortfolioInvestedVsValueSeries(
     ids.map((id) =>
@@ -83,6 +86,7 @@ function seriesFor(
         history[id] ?? [],
         latest[id] ?? null,
         NOW,
+        BIZKAIA,
       ),
     ),
   );
@@ -282,7 +286,7 @@ describe("exactly one year", () => {
     const instrument = computeReturns([buy], "A", "110", now).period;
     const portfolio = computePortfolioReturns(
       [buy],
-      computeInvestedVsValueSeries([buy], "A", [], "110", now),
+      computeInvestedVsValueSeries([buy], "A", [], "110", now, BIZKAIA),
     ).period;
     return { instrument, portfolio };
   }

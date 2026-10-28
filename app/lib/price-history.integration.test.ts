@@ -142,6 +142,7 @@ function deps(market: MarketDataProvider) {
     provider: market,
     rates: NO_RATES,
     now: NOW,
+    zone: "Europe/Madrid",
   };
 }
 

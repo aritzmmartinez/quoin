@@ -27,7 +27,7 @@ import {
   type Copy,
   DASH,
   copyFromMatches,
-  createFormat,
+  intlTag,
   heldValuesByInstrument,
   MIN_WINDOW_MONTHS,
   namesOf,
@@ -40,6 +40,7 @@ import {
 import { UnratedNotice } from "~/components/ui/UnratedNotice";
 import { loadProjectionContext } from "~/lib/projection.server";
 import { loadValuation } from "~/lib/rate-book.server";
+import { loadResidence } from "~/lib/residence.server";
 import { openInstrumentIds, unratedNames } from "~/lib/unrated";
 
 export function meta({ matches }: Route.MetaArgs) {
@@ -55,16 +56,17 @@ export const handle = { title: (t: Copy) => t.ter.title, parent: "/" };
 type Unavailable = "no-target" | "no-history" | "no-window" | "thin-window";
 
 export async function loader({ request }: Route.LoaderArgs) {
+  const { jurisdiction, calendarZone } = await loadResidence();
   const horizonYears = parseHorizonYears(new URL(request.url).searchParams);
   const locale = parseLocale(request.headers.get("Cookie"));
 
   const [events, instruments, valuation] = await Promise.all([
     new PrismaLedgerRepository().list(),
     new PrismaInstrumentRepository().list(),
-    loadValuation(),
+    loadValuation(calendarZone),
   ]);
 
-  const positions = computePositions(events);
+  const positions = computePositions(events, jurisdiction);
   const marketValues = computeMarketValues(
     positions,
     valuation.prices,
@@ -85,13 +87,13 @@ export async function loader({ request }: Route.LoaderArgs) {
   const empty = {
     horizonYears,
     weighted,
-    rows: toTerRows(lines, instruments, createFormat(locale).tag),
+    rows: toTerRows(lines, instruments, intlTag(locale)),
     unknown: namesOf(weighted.unknownInstrumentIds, instruments),
     unrated: unratedNames(
       valuation.unrated,
       instruments,
       openInstrumentIds(positions),
-      createFormat(locale).tag,
+      intlTag(locale),
     ),
     projected: null,
     contribution: "0.00",

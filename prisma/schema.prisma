@@ -31,9 +31,18 @@ model Instrument {
   thesis     String   @default("CORE")
   createdAt  DateTime @default(now())
 
-  entries  LedgerEntry[]
-  prices   PriceSnapshot[]
-  holdings EtfHolding[]
+  /// The sync mark of each hand-set field (the exposure pair shares one). Null:
+  /// not changed since the column was added.
+  quoteSymbolHlc  String?
+  exposureHlc     String?
+  terHlc          String?
+  hedgedToBaseHlc String?
+  thesisHlc       String?
+
+  entries       LedgerEntry[]
+  prices        PriceSnapshot[]
+  holdings      EtfHolding[]
+  holdingsBlock EtfHoldingBlock?
 }
 
 /// Immutable ledger: the source of truth. Positions, P&L, allocation... are DERIVED from here.
@@ -232,11 +241,21 @@ model EtfHolding {
 
   weight String // fraction of the fund as a decimal string ("0.044503")
 
-  asOf      DateTime // the issuer's as-of date, confirmed by a human on import
   createdAt DateTime @default(now())
 
   @@unique([instrumentId, identity])
   @@index([instrumentId])
+}
+
+/// A fund's composition as one block, the unit sync merges. `asOf` is the day the
+/// composition describes: read from the file when it states one unambiguously,
+/// otherwise the day of the import, and then `asOfInferred`. Nobody confirms it.
+model EtfHoldingBlock {
+  instrumentId String     @id
+  instrument   Instrument @relation(fields: [instrumentId], references: [id])
+  asOf         String // "YYYY-MM-DD", CHECK-constrained in the migration
+  asOfInferred Boolean    @default(false)
+  hlc          String?
 }
 
 // The savings plan: what the monthly contribution is SUPPOSED to look like.
@@ -249,13 +268,15 @@ model EtfHolding {
 model PortfolioTarget {
   id         String   @id // uuid
   name       String
-  activeFrom DateTime // the date this version takes over
+  /// The calendar day this version takes over, `YYYY-MM-DD` in the residence's
+  /// zone. One version per day. Nullable only because SQLite cannot ADD a NOT NULL
+  /// column without a default; a CHECK on the format lives in the migration and
+  /// the domain requires it on read and write.
+  activeFrom String?  @unique
   note       String?
-  createdAt  DateTime @default(now()) // tie-break only: two versions from the same day
+  createdAt  DateTime @default(now()) // audit only
 
   lines PortfolioTargetLine[]
-
-  @@index([activeFrom])
 }
 
 /// One instrument's slice of the monthly contribution.
@@ -312,4 +333,41 @@ model SecurityIdentity {
   resolvedAt DateTime @default(now())
 
   @@index([canonicalId])
+}
+
+/// Owner settings: exactly one row, id 1 (a CHECK in the migration keeps it so).
+/// `residence` is where the owner is tax resident; the territory and the
+/// calendar zone are derived from it in core. No CHECK on it — the vocabulary
+/// grows — so `residenceSchema` validates it at write.
+model Settings {
+  id           Int     @id @default(1)
+  residence    String
+  residenceHlc String?
+}
+
+/// This database's sync identity: one row, id 1 (CHECK in the migration). The
+/// device id is created by the migration; `lastHlc` is the last mark issued here.
+model SyncDevice {
+  id       Int     @id @default(1)
+  deviceId String
+  name     String?
+  lastHlc  String?
+}
+
+/// Every device this one has merged from, and the newest mark of that device
+/// whose effect it has seen.
+model SyncPeer {
+  deviceId     String    @id
+  name         String?
+  seen         String
+  lastSyncedAt DateTime?
+}
+
+/// What was deleted, so a merge does not bring it back. Never purged.
+model SyncTombstone {
+  entity String
+  key    String
+  hlc    String
+
+  @@id([entity, key])
 }

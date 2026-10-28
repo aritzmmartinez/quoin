@@ -1,16 +1,36 @@
 import Decimal from "decimal.js";
 
-import { toIsoDate, type CalendarDate } from "../calendar";
-import { Money } from "../domain";
+import { toIsoDate, zoneOfResidence, type CalendarDate } from "../calendar";
+import { Money, type Residence } from "../domain";
 
 /** Spanish IRPF territories only (foral and común) — not a multi-country abstraction. */
 export type Territory = "bizkaia";
 
-/** The one territory Quoin files in; core entry points that need one default to it. */
-export const DEFAULT_TERRITORY: Territory = "bizkaia";
+const TERRITORIES: Record<Residence, Territory> = {
+  bizkaia: "bizkaia",
+};
+
+export function territoryOfResidence(residence: Residence): Territory {
+  return TERRITORIES[residence];
+}
+
+/** The territory whose rules apply, and the zone its calendar is read in. */
+export interface Jurisdiction {
+  territory: Territory;
+  zone: string;
+}
+
+export function jurisdictionOf(residence: Residence): Jurisdiction {
+  return {
+    territory: territoryOfResidence(residence),
+    zone: zoneOfResidence(residence),
+  };
+}
 
 export type RepurchaseAssetClass =
-  "listed-security" | "fungible-crypto" | "unclassified";
+  | "listed-security"
+  | "fungible-crypto"
+  | "unclassified";
 
 export type RepurchaseLetter = "g" | "i";
 
@@ -153,11 +173,6 @@ export function swapValuationRuleFor(
  * whether a one-year repurchase rule reached those sales is unsettled.
  */
 export const UNLISTED_NOTICE_WINDOW_MONTHS = 12;
-/**
- * The zone every fiscal date is read in. Bizkaia files on Madrid's calendar, so a
- * trade at 23:30Z on 31 December belongs to the next day — and the next year.
- */
-export const FISCAL_TIME_ZONE = "Europe/Madrid";
 /** Art. 66 NF 13/2013 de Bizkaia — integración y compensación de rentas en la base imponible del ahorro (límite de cuatro años). */
 export const LOSS_CARRYFORWARD_YEARS = 4;
 

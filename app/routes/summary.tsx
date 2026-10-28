@@ -63,6 +63,7 @@ import { loadOpportunityCost } from "~/lib/opportunity-cost.server";
 import { loadValuation } from "~/lib/rate-book.server";
 import { openInstrumentIds, unratedNames } from "~/lib/unrated";
 import { resolveRealView } from "~/lib/real.server";
+import { loadResidence } from "~/lib/residence.server";
 import { createServerTiming } from "~/lib/server-timing";
 
 const TOP_POSITIONS = 5;
@@ -92,6 +93,10 @@ export async function loader({ request }: Route.LoaderArgs) {
   const priceRepository = new PrismaPriceRepository();
   const timing = createServerTiming();
 
+  const { jurisdiction } = await timing.time("db-settings", () =>
+    loadResidence(),
+  );
+  const { zone } = jurisdiction;
   const events = await timing.time("db-ledger", () =>
     new PrismaLedgerRepository().list(),
   );
@@ -100,15 +105,15 @@ export async function loader({ request }: Route.LoaderArgs) {
   );
   const now = new Date();
   const valuation = await timing.time("db-prices-latest", () =>
-    loadValuation(now),
+    loadValuation(zone, now),
   );
   const { prices } = valuation;
 
   const real = await timing.time("real-view", () =>
-    resolveRealView(request, events),
+    resolveRealView(request, events, zone),
   );
   const positions = timing.time("positions", () =>
-    computePositions(events, real.revalue),
+    computePositions(events, jurisdiction, real.revalue),
   );
   const marketValues = timing.time("valuation", () =>
     computeMarketValues(positions, prices, BASE_CURRENCY),
@@ -157,7 +162,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   );
 
   const marks = histories.map((history) =>
-    historyInBase(history, valuation.book).history.map((snapshot) => ({
+    historyInBase(history, valuation.book, zone).history.map((snapshot) => ({
       asOf: snapshot.asOf,
       price: snapshot.price,
     })),
@@ -171,6 +176,7 @@ export async function loader({ request }: Route.LoaderArgs) {
           marks[index] ?? [],
           prices.get(id)?.price ?? null,
           now,
+          jurisdiction,
           revalue,
         ),
       ),
@@ -194,6 +200,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       instruments,
       valuation,
       parseBenchmark(request.headers.get("Cookie")),
+      zone,
       now,
     ),
   );

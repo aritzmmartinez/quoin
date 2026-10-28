@@ -1,6 +1,6 @@
+import { periodOf } from "../calendar";
 import {
   deflate,
-  periodOf,
   type InflationIndex,
   type LedgerEvent,
   type Period,
@@ -18,9 +18,10 @@ function isTrade(event: LedgerEvent): boolean {
 export function realBasis(
   index: InflationIndex,
   events: readonly LedgerEvent[],
+  zone: string,
 ): RealBasis {
   const periods = [
-    ...new Set(events.filter(isTrade).map((event) => periodOf(event.ts))),
+    ...new Set(events.filter(isTrade).map((event) => periodOf(event.ts, zone))),
   ].sort();
 
   const reference = index.latestPeriod();
@@ -34,7 +35,7 @@ export function realBasis(
     ok: true,
     reference,
     revalue: (money, ts) => {
-      const from = periodOf(ts);
+      const from = periodOf(ts, zone);
       if (from > reference) return money;
       const restated = deflate(index, money, from, reference);
       if (restated === null) {

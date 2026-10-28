@@ -1,6 +1,6 @@
 {
   "name": "quoin",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -23,6 +23,8 @@
     "ipc:sync": "tsx scripts/ipc-sync.ts",
     "fx:sync": "tsx scripts/fx-sync.ts",
     "exposure:map": "tsx scripts/exposure-map.ts",
+    "sync:export": "tsx scripts/sync-export.ts",
+    "sync:import": "tsx scripts/sync-import.ts",
     "target:set": "tsx scripts/target-set.ts",
     "twr:explain": "tsx scripts/twr-explain.ts",
     "tax:explain": "tsx scripts/tax-explain.ts",

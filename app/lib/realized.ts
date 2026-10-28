@@ -2,7 +2,7 @@ import Decimal from "decimal.js";
 
 import type { Instrument, Thesis } from "~/core/domain";
 import type { RealizedSale } from "~/core/projections";
-import { fiscalYearOf } from "~/core/tax";
+import { fiscalYearOf } from "~/core/calendar";
 
 export interface RealizedRow {
   id: string;
@@ -88,13 +88,14 @@ export function nextRealizedSort(
 export function toRealizedRows(
   sales: readonly RealizedSale[],
   instruments: readonly Instrument[],
+  zone: string,
 ): RealizedRow[] {
   const byId = new Map(instruments.map((i) => [i.id, i]));
 
   return sales.map((sale) => ({
     id: sale.eventId,
     t: sale.ts.toISOString(),
-    year: fiscalYearOf(sale.ts),
+    year: fiscalYearOf(sale.ts, zone),
     instrumentId: sale.instrumentId,
     name: byId.get(sale.instrumentId)?.name ?? sale.instrumentId,
     thesis: byId.get(sale.instrumentId)?.thesis ?? "CORE",

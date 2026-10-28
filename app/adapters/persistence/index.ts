@@ -9,3 +9,5 @@ export * from "./fx-repository";
 export * from "./target-repository";
 export * from "./mappers";
 export { prisma } from "./db.server";
+export * from "./settings-repository";
+export * from "./sync-repository";

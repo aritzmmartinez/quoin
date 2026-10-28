@@ -6,6 +6,9 @@ import type { LedgerEvent, TradeEvent } from "../domain";
 import { computePortfolioSummary } from "./portfolio";
 import { computePositions } from "./positions";
 import { computeRealizedGains } from "./realized";
+import { jurisdictionOf } from "~/core/tax";
+
+const BIZKAIA = jurisdictionOf("bizkaia");
 
 let seq = 0;
 
@@ -53,16 +56,21 @@ function sumRealized(sales: ReturnType<typeof computeRealizedGains>): Decimal {
 
 describe("computeRealizedGains", () => {
   it("reports nothing when nothing has been sold", () => {
-    expect(computeRealizedGains([])).toEqual([]);
-    expect(computeRealizedGains([trade("BUY", "X", "10", "1000")])).toEqual([]);
+    expect(computeRealizedGains([], BIZKAIA)).toEqual([]);
+    expect(
+      computeRealizedGains([trade("BUY", "X", "10", "1000")], BIZKAIA),
+    ).toEqual([]);
   });
 
   it("values a partial sell at the average cost, leaving the rest held", () => {
     const sale = only(
-      computeRealizedGains([
-        trade("BUY", "X", "10", "1000", { ts: "2025-01-01" }),
-        trade("SELL", "X", "4", "600", { ts: "2025-03-01" }),
-      ]),
+      computeRealizedGains(
+        [
+          trade("BUY", "X", "10", "1000", { ts: "2025-01-01" }),
+          trade("SELL", "X", "4", "600", { ts: "2025-03-01" }),
+        ],
+        BIZKAIA,
+      ),
     );
 
     expect(sale.quantity).toBe("4");
@@ -75,10 +83,13 @@ describe("computeRealizedGains", () => {
 
   it("consumes the whole cost basis on a full sell", () => {
     const sale = only(
-      computeRealizedGains([
-        trade("BUY", "X", "10", "1000", { ts: "2025-01-01" }),
-        trade("SELL", "X", "10", "1200", { ts: "2025-03-01" }),
-      ]),
+      computeRealizedGains(
+        [
+          trade("BUY", "X", "10", "1000", { ts: "2025-01-01" }),
+          trade("SELL", "X", "10", "1200", { ts: "2025-03-01" }),
+        ],
+        BIZKAIA,
+      ),
     );
 
     expect(sale.costBasis).toBe("1000");
@@ -88,11 +99,14 @@ describe("computeRealizedGains", () => {
 
   it("blends buys at different prices into one average cost", () => {
     const sale = only(
-      computeRealizedGains([
-        trade("BUY", "X", "10", "1000", { ts: "2025-01-01" }),
-        trade("BUY", "X", "10", "2000", { ts: "2025-02-01" }),
-        trade("SELL", "X", "15", "3000", { ts: "2025-03-01" }),
-      ]),
+      computeRealizedGains(
+        [
+          trade("BUY", "X", "10", "1000", { ts: "2025-01-01" }),
+          trade("BUY", "X", "10", "2000", { ts: "2025-02-01" }),
+          trade("SELL", "X", "15", "3000", { ts: "2025-03-01" }),
+        ],
+        BIZKAIA,
+      ),
     );
 
     expect(sale.costBasis).toBe("2250");
@@ -101,10 +115,13 @@ describe("computeRealizedGains", () => {
 
   it("subtracts the sale commission from the proceeds and keeps buy fees in the cost", () => {
     const sale = only(
-      computeRealizedGains([
-        trade("BUY", "X", "10", "1000", { fees: "10", ts: "2025-01-01" }),
-        trade("SELL", "X", "5", "600", { fees: "5", ts: "2025-02-01" }),
-      ]),
+      computeRealizedGains(
+        [
+          trade("BUY", "X", "10", "1000", { fees: "10", ts: "2025-01-01" }),
+          trade("SELL", "X", "5", "600", { fees: "5", ts: "2025-02-01" }),
+        ],
+        BIZKAIA,
+      ),
     );
 
     expect(sale.fees).toBe("5");
@@ -114,12 +131,15 @@ describe("computeRealizedGains", () => {
   });
 
   it("starts a reopened position from zero cost, not from the closed one", () => {
-    const sales = computeRealizedGains([
-      trade("BUY", "X", "10", "1000", { ts: "2025-01-01" }),
-      trade("SELL", "X", "10", "1200", { ts: "2025-02-01" }),
-      trade("BUY", "X", "5", "1500", { ts: "2025-03-01" }),
-      trade("SELL", "X", "5", "1600", { ts: "2025-04-01" }),
-    ]);
+    const sales = computeRealizedGains(
+      [
+        trade("BUY", "X", "10", "1000", { ts: "2025-01-01" }),
+        trade("SELL", "X", "10", "1200", { ts: "2025-02-01" }),
+        trade("BUY", "X", "5", "1500", { ts: "2025-03-01" }),
+        trade("SELL", "X", "5", "1600", { ts: "2025-04-01" }),
+      ],
+      BIZKAIA,
+    );
 
     expect(sales).toHaveLength(2);
     expect(sales[0]!.costBasis).toBe("1000");
@@ -130,12 +150,15 @@ describe("computeRealizedGains", () => {
   });
 
   it("measures holding days from the quantity-weighted acquisition date", () => {
-    const sales = computeRealizedGains([
-      trade("BUY", "X", "10", "1000", { ts: "2025-01-01" }),
-      trade("BUY", "X", "10", "1000", { ts: "2025-01-31" }),
-      trade("SELL", "X", "5", "600", { ts: "2025-02-15" }),
-      trade("SELL", "X", "5", "600", { ts: "2025-03-17" }),
-    ]);
+    const sales = computeRealizedGains(
+      [
+        trade("BUY", "X", "10", "1000", { ts: "2025-01-01" }),
+        trade("BUY", "X", "10", "1000", { ts: "2025-01-31" }),
+        trade("SELL", "X", "5", "600", { ts: "2025-02-15" }),
+        trade("SELL", "X", "5", "600", { ts: "2025-03-17" }),
+      ],
+      BIZKAIA,
+    );
 
     expect(sales[0]!.holdingDays).toBe(30);
     expect(sales[1]!.holdingDays).toBe(60);
@@ -143,9 +166,10 @@ describe("computeRealizedGains", () => {
 
   it("reports no holding period for a sale with nothing to sell", () => {
     const sale = only(
-      computeRealizedGains([
-        trade("SELL", "X", "5", "600", { ts: "2025-02-01" }),
-      ]),
+      computeRealizedGains(
+        [trade("SELL", "X", "5", "600", { ts: "2025-02-01" })],
+        BIZKAIA,
+      ),
     );
 
     expect(sale.costBasis).toBe("0");
@@ -156,10 +180,19 @@ describe("computeRealizedGains", () => {
 
   it("converts to base currency at the rate it was booked at", () => {
     const sale = only(
-      computeRealizedGains([
-        trade("BUY", "X", "10", "1000", { eurPerUnit: "0.9", ts: "2025-01-01" }),
-        trade("SELL", "X", "10", "1200", { eurPerUnit: "0.9", ts: "2025-02-01" }),
-      ]),
+      computeRealizedGains(
+        [
+          trade("BUY", "X", "10", "1000", {
+            eurPerUnit: "0.9",
+            ts: "2025-01-01",
+          }),
+          trade("SELL", "X", "10", "1200", {
+            eurPerUnit: "0.9",
+            ts: "2025-02-01",
+          }),
+        ],
+        BIZKAIA,
+      ),
     );
 
     expect(sale.grossAmount).toBe("1080");
@@ -168,12 +201,15 @@ describe("computeRealizedGains", () => {
   });
 
   it("reports sales chronologically off one blended average", () => {
-    const sales = computeRealizedGains([
-      trade("SELL", "X", "5", "700", { ts: "2025-04-01" }),
-      trade("BUY", "X", "10", "1000", { ts: "2025-01-01" }),
-      trade("BUY", "X", "10", "2000", { ts: "2025-02-01" }),
-      trade("SELL", "X", "5", "600", { ts: "2025-03-01" }),
-    ]);
+    const sales = computeRealizedGains(
+      [
+        trade("SELL", "X", "5", "700", { ts: "2025-04-01" }),
+        trade("BUY", "X", "10", "1000", { ts: "2025-01-01" }),
+        trade("BUY", "X", "10", "2000", { ts: "2025-02-01" }),
+        trade("SELL", "X", "5", "600", { ts: "2025-03-01" }),
+      ],
+      BIZKAIA,
+    );
 
     expect(sales.map((s) => s.ts.toISOString().slice(0, 10))).toEqual([
       "2025-03-01",
@@ -185,9 +221,9 @@ describe("computeRealizedGains", () => {
 
 describe("realized gains vs the portfolio total", () => {
   function expectSumMatchesSummary(events: readonly LedgerEvent[]) {
-    const sales = computeRealizedGains(events);
+    const sales = computeRealizedGains(events, BIZKAIA);
     const summary = computePortfolioSummary(
-      computePositions(events),
+      computePositions(events, BIZKAIA),
       new Map(),
     );
 

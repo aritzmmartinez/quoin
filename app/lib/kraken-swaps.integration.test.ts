@@ -12,6 +12,11 @@ import { walkAvco } from "~/core/projections/avco";
 import { walkFifo } from "~/core/tax/fifo";
 
 import { buildTaxYearView } from "./tax";
+import { jurisdictionOf } from "~/core/tax";
+
+const MADRID = "Europe/Madrid";
+
+const BIZKAIA = jurisdictionOf("bizkaia");
 
 type Persistence = typeof import("~/adapters/persistence");
 type Ingestion = typeof import("~/adapters/ingestion");
@@ -114,6 +119,7 @@ function adapter() {
   return new ingestion.KrakenCsvAdapter(
     new persistence.PrismaInstrumentRepository(),
     new persistence.PrismaLedgerRepository(),
+    MADRID,
     new persistence.PrismaPriceRepository(),
     async () => usd,
   );
@@ -196,17 +202,23 @@ describe("a Kraken swap through SQLite (integration)", () => {
     const instruments =
       await new persistence.PrismaInstrumentRepository().list();
 
-    const sale = walkFifo(events).sales[0]!;
+    const sale = walkFifo(events, BIZKAIA).sales[0]!;
     expect(sale.trade.externalId).toBe("S1:sell");
     expect(sale.gross.toString()).toBe("132");
     expect(sale.fees.toString()).toBe("0.26");
     expect(sale.gross.subtract(sale.fees).toString()).toBe("131.74");
 
-    const btc = walkAvco(events).lots.get("BTC")!;
+    const btc = walkAvco(events, BIZKAIA).lots.get("BTC")!;
     expect(btc.costBasis.toString()).toBe("131.74");
     expect(btc.quantity.toString()).toBe("0.001497");
 
-    const view = buildTaxYearView(events, instruments, 2026, "2026-12-31");
+    const view = buildTaxYearView(
+      events,
+      instruments,
+      2026,
+      BIZKAIA,
+      "2026-12-31",
+    );
     expect(view.sales).toHaveLength(1);
     expect(view.sales[0]).toMatchObject({
       instrumentId: "ETH",

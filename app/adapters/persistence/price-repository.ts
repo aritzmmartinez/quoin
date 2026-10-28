@@ -7,6 +7,7 @@ import type {
 } from "~/core/ports";
 
 import { prisma } from "./db.server";
+import { stamp } from "./hlc";
 
 const DAY_MS = 86_400_000;
 
@@ -37,6 +38,7 @@ export class PrismaPriceRepository implements PriceRepository {
     instrumentId: string,
     candles: readonly PriceSnapshot[],
     live: PriceSnapshot | null,
+    zone: string,
   ): Promise<DailyWriteCount> {
     const incoming = live ? [...candles, live] : candles;
     if (incoming.length === 0)
@@ -54,7 +56,7 @@ export class PrismaPriceRepository implements PriceRepository {
           currency: true,
         },
       });
-      const plan = planDailyWrite(stored, candles, live);
+      const plan = planDailyWrite(stored, candles, live, zone);
       if (plan.remove.length > 0) {
         await tx.priceSnapshot.deleteMany({
           where: { id: { in: plan.remove } },
@@ -141,10 +143,16 @@ export class PrismaPriceRepository implements PriceRepository {
         });
       }
       if (quoteSymbol !== undefined) {
-        await tx.instrument.update({
+        const { quoteSymbol: stored } = await tx.instrument.findUniqueOrThrow({
           where: { id: instrumentId },
-          data: { quoteSymbol },
+          select: { quoteSymbol: true },
         });
+        if (stored !== quoteSymbol) {
+          await tx.instrument.update({
+            where: { id: instrumentId },
+            data: { quoteSymbol, quoteSymbolHlc: await stamp(tx) },
+          });
+        }
       }
       return count;
     });

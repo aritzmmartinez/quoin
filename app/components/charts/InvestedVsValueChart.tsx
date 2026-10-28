@@ -11,11 +11,11 @@ import {
   YAxis,
 } from "recharts";
 
-import { useFormat } from "~/lib";
+import { useFormat, useZones } from "~/lib";
 
 import { ChartSkeleton } from "../ui/ChartSkeleton";
 import { legendOrder } from "./legend-order";
-import { timeTicks } from "./time-ticks";
+import { startsYear, timeTicks } from "./time-ticks";
 import { useHydrated } from "./use-hydrated";
 
 export interface InvestedVsValueDatum {
@@ -60,15 +60,17 @@ export function InvestedVsValueChart({
   labels: { value: string; invested: string };
   height?: number;
 }) {
-  const { formatMoney, formatDate, formatTimeTick } = useFormat();
+  const { formatMoney, formatInstant, formatTimeTick } = useFormat();
+  const { displayZone } = useZones();
   const axisEur = (v: number) => formatMoney(String(v), 0);
   const hydrated = useHydrated();
 
   const [gradientId] = useState(() => `ivvValueFill-${(gradientSeq += 1)}`);
 
   const { unit, ticks } = useMemo(
-    () => timeTicks(data[0]?.t ?? 0, data[data.length - 1]?.t ?? 0),
-    [data],
+    () =>
+      timeTicks(data[0]?.t ?? 0, data[data.length - 1]?.t ?? 0, displayZone),
+    [data, displayZone],
   );
 
   if (!hydrated) return <ChartSkeleton height={height} />;
@@ -105,7 +107,7 @@ export function InvestedVsValueChart({
           domain={["dataMin", "dataMax"]}
           ticks={ticks}
           tickFormatter={(t: number, index: number) =>
-            formatTimeTick(t, unit, index === 0 || new Date(t).getMonth() === 0)
+            formatTimeTick(t, unit, index === 0 || startsYear(t, displayZone))
           }
           stroke="var(--color-faint)"
           fontSize={11}
@@ -133,7 +135,7 @@ export function InvestedVsValueChart({
           labelStyle={TOOLTIP_LABEL_STYLE}
           itemStyle={TOOLTIP_ITEM_STYLE}
           labelFormatter={(t) =>
-            typeof t === "number" ? formatDate(new Date(t).toISOString()) : ""
+            typeof t === "number" ? formatInstant(t) : ""
           }
           formatter={(value, name) => [formatMoney(String(value)), name]}
         />

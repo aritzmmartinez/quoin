@@ -8,6 +8,7 @@ import {
 } from "../domain";
 import { bookable } from "../fx";
 import { tradeAmounts } from "../swap";
+import type { Jurisdiction } from "../tax/config";
 
 export interface CostBasisPoint {
   ts: string;
@@ -33,12 +34,13 @@ function isTrade(event: LedgerEvent): event is TradeEvent {
 export function computeCostBasisTimeline(
   events: readonly LedgerEvent[],
   instrumentId: string,
+  jurisdiction: Jurisdiction,
   revalue?: Revalue,
 ): CostBasisPoint[] {
   const restate: Revalue = revalue ?? ((money) => money);
 
   const allTrades = bookable(events).filter(isTrade);
-  const amountsOf = tradeAmounts(allTrades);
+  const amountsOf = tradeAmounts(allTrades, jurisdiction);
   const trades = allTrades
     .filter((t) => t.instrumentId === instrumentId)
     .slice()

@@ -8,6 +8,9 @@ import {
 } from "../tax/config";
 
 import { swapPairValue, tradeAmounts } from "./values";
+import { jurisdictionOf } from "~/core/tax";
+
+const BIZKAIA = jurisdictionOf("bizkaia");
 
 const eur = Money.fromString;
 const RULE = SWAP_VALUATION_RULES[0]!;
@@ -132,13 +135,13 @@ describe("tradeAmounts", () => {
 
   it("reads a plain trade as it was booked", () => {
     const plain = leg("BUY", "ETH", "10", "1000", { fees: "2" });
-    const amounts = tradeAmounts([plain])(plain);
+    const amounts = tradeAmounts([plain], BIZKAIA)(plain);
     expect(amounts.gross.toString()).toBe("1000");
     expect(amounts.fees.toString()).toBe("2");
   });
 
   it("values the two legs of a swap together", () => {
-    const amountsOf = tradeAmounts([sell, buy]);
+    const amountsOf = tradeAmounts([sell, buy], BIZKAIA);
     expect(amountsOf(sell).gross.toString()).toBe("480");
     expect(amountsOf(sell).fees.toString()).toBe("5");
     expect(amountsOf(buy).gross.toString()).toBe("475");
@@ -158,7 +161,7 @@ describe("tradeAmounts", () => {
       ...swap(usd),
       fees: "6.25",
     });
-    const amountsOf = tradeAmounts([sellUsd, buyUsd]);
+    const amountsOf = tradeAmounts([sellUsd, buyUsd], BIZKAIA);
     expect(amountsOf(sellUsd).gross.toString()).toBe("480");
     expect(amountsOf(sellUsd).fees.toString()).toBe("5");
     expect(amountsOf(buyUsd).gross.toString()).toBe("475");
@@ -167,22 +170,22 @@ describe("tradeAmounts", () => {
   it("takes the received side as the units it holds plus the fee, when that is worth more", () => {
     const delivered = leg("SELL", "ETH", "4", "460", swap());
     const received = leg("BUY", "BTC", "0.0099", "465", swap({ fees: "5" }));
-    const amountsOf = tradeAmounts([delivered, received]);
+    const amountsOf = tradeAmounts([delivered, received], BIZKAIA);
     expect(amountsOf(delivered).gross.toString()).toBe("470");
     expect(amountsOf(delivered).fees.toString()).toBe("5");
     expect(amountsOf(received).gross.toString()).toBe("465");
   });
 
   it("keeps a leg with no partner at its own market value", () => {
-    const amountsOf = tradeAmounts([sell]);
+    const amountsOf = tradeAmounts([sell], BIZKAIA);
     expect(amountsOf(sell).gross.toString()).toBe("480");
-    const alone = tradeAmounts([buy]);
+    const alone = tradeAmounts([buy], BIZKAIA);
     expect(alone(buy).gross.toString()).toBe("465");
     expect(alone(buy).fees.toString()).toBe("0");
   });
 
   it("keeps each leg at its own market value when no rule is in force that day", () => {
-    const amountsOf = tradeAmounts([sell, buy], {
+    const amountsOf = tradeAmounts([sell, buy], BIZKAIA, {
       rules: [
         { territory: "bizkaia", from: "2030-01-01", to: null, source: "t" },
       ],
@@ -201,7 +204,7 @@ describe("tradeAmounts", () => {
       swap({ linkId: "refid-2", fees: "1" }),
     );
     const events: LedgerEvent[] = [sell, buy, sell2, buy2];
-    const amountsOf = tradeAmounts(events);
+    const amountsOf = tradeAmounts(events, BIZKAIA);
     expect(amountsOf(sell2).gross.toString()).toBe("100");
     expect(amountsOf(buy2).gross.toString()).toBe("99");
     expect(amountsOf(buy).gross.toString()).toBe("475");

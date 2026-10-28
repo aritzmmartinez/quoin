@@ -43,6 +43,7 @@ import {
   useFormat,
 } from "~/lib";
 import { loadValuation } from "~/lib/rate-book.server";
+import { loadResidence } from "~/lib/residence.server";
 import { unratedNames } from "~/lib/unrated";
 
 export function meta({ matches }: Route.MetaArgs) {
@@ -56,17 +57,18 @@ export function meta({ matches }: Route.MetaArgs) {
 export const handle = { title: (t: Copy) => t.portfolio.title };
 
 export async function loader({ request }: Route.LoaderArgs) {
+  const { jurisdiction, calendarZone } = await loadResidence();
   const sort = parseSort(new URL(request.url).searchParams);
   const locale = parseLocale(request.headers.get("Cookie"));
 
   const [events, instruments, valuation] = await Promise.all([
     new PrismaLedgerRepository().list(),
     new PrismaInstrumentRepository().list(),
-    loadValuation(),
+    loadValuation(calendarZone),
   ]);
   const { latest: prices } = valuation;
 
-  const positions = computePositions(events);
+  const positions = computePositions(events, jurisdiction);
   const tradeMeta = computeTradeMeta(events);
   const marketValues = computeMarketValues(
     positions,

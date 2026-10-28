@@ -25,7 +25,7 @@ export function TargetVersions({ versions }: { versions: TargetVersionRow[] }) {
 }
 
 function VersionRow({ version }: { version: TargetVersionRow }) {
-  const { formatMoney, formatDate } = useFormat();
+  const { formatMoney, formatCalendarDate } = useFormat();
   const t = useCopy();
   const copy = t.target.history;
   const fetcher = useFetcher();
@@ -43,7 +43,7 @@ function VersionRow({ version }: { version: TargetVersionRow }) {
           )}
         </div>
         <div className="text-[11px] text-muted">
-          {formatDate(version.activeFrom)} ·{" "}
+          {formatCalendarDate(version.activeFrom)} ·{" "}
           {copy.summary(version.lineCount, formatMoney(version.monthlyTotal))}
         </div>
         {version.note && (

@@ -2,6 +2,9 @@ import { portfolioTargetSchema, type PortfolioTarget } from "~/core/domain";
 import type { TargetRepository } from "~/core/ports";
 
 import { prisma } from "./db.server";
+import { stamp } from "./hlc";
+
+export const TARGET_TOMBSTONE = "PortfolioTarget";
 
 export class PrismaTargetRepository implements TargetRepository {
   async list(): Promise<PortfolioTarget[]> {
@@ -25,7 +28,8 @@ export class PrismaTargetRepository implements TargetRepository {
     );
   }
 
-  async create(target: PortfolioTarget): Promise<void> {
+  async create(input: PortfolioTarget): Promise<void> {
+    const target = portfolioTargetSchema.parse(input);
     await prisma.portfolioTarget.create({
       data: {
         id: target.id,
@@ -43,6 +47,11 @@ export class PrismaTargetRepository implements TargetRepository {
   }
 
   async remove(id: string): Promise<void> {
-    await prisma.portfolioTarget.delete({ where: { id } });
+    await prisma.$transaction(async (tx) => {
+      await tx.portfolioTarget.delete({ where: { id } });
+      await tx.syncTombstone.create({
+        data: { entity: TARGET_TOMBSTONE, key: id, hlc: await stamp(tx) },
+      });
+    });
   }
 }

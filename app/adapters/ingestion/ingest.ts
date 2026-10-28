@@ -69,7 +69,10 @@ export class InvalidLedgerEventError extends Error {
 }
 
 export class BatchBuilder {
-  constructor(private readonly rateAt: RateAt = noRates) {}
+  constructor(
+    private readonly zone: string,
+    private readonly rateAt: RateAt = noRates,
+  ) {}
 
   private invalid: InvalidLedgerEventError | null = null;
   private readonly events: LedgerEvent[] = [];
@@ -98,7 +101,7 @@ export class BatchBuilder {
       }
       const rate = this.rateAt(item.event.currency, item.event.ts);
       if (rate === null) {
-        this.needRate(item.event.currency, dayOf(item.event.ts));
+        this.needRate(item.event.currency, dayOf(item.event.ts, this.zone));
         this.addItem(unratedDiscard(item), operation);
         return;
       }
@@ -121,7 +124,7 @@ export class BatchBuilder {
         !ledgerEventWriteSchema.safeParse(item.event).success
       ) {
         this.invalid = new InvalidLedgerEventError(
-          dayOf(item.event.ts),
+          dayOf(item.event.ts, this.zone),
           item.event.type,
           item.event.currency,
         );

@@ -15,6 +15,8 @@ import {
   toOpportunityRows,
 } from "./opportunity-cost";
 
+const MADRID = "Europe/Madrid";
+
 const instrument = (
   id: string,
   name: string,
@@ -98,6 +100,7 @@ describe("convertibleStarts", () => {
           ["EUR", new Map([["IE00TEST0001", start("2019-05-01T16:00:00Z")]])],
         ]),
         book,
+        MADRID,
       ),
     ).toEqual(new Map([["IE00TEST0001", start("2019-05-01T16:00:00Z")]]));
   });
@@ -114,6 +117,7 @@ describe("convertibleStarts", () => {
         ],
       ]),
       book,
+      MADRID,
     );
 
     expect(starts.get("US00TEST0001")).toEqual(start("2020-01-03T21:00:00Z"));
@@ -127,6 +131,7 @@ describe("convertibleStarts", () => {
           ["GBP", new Map([["GB00TEST0001", start("2020-01-03T16:00:00Z")]])],
         ]),
         book,
+        MADRID,
       ).size,
     ).toBe(0);
   });

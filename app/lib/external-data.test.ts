@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import { inflationStatus, pricesStatus, ratesStatus } from "./external-data";
 
+const MADRID = "Europe/Madrid";
+
 const at = (iso: string) => new Date(iso);
 
 describe("pricesStatus", () => {
   it("dates the data by the instrument whose newest price is oldest, and names it", () => {
     const status = pricesStatus({
+      zone: MADRID,
       relevant: [
         { id: "A", name: "Alpha" },
         { id: "B", name: "Beta" },
@@ -33,6 +36,7 @@ describe("pricesStatus", () => {
 
   it("names no instrument when every one reaches the same day", () => {
     const status = pricesStatus({
+      zone: MADRID,
       relevant: [
         { id: "A", name: "Alpha" },
         { id: "B", name: "Beta" },
@@ -53,6 +57,7 @@ describe("pricesStatus", () => {
 
   it("names the one behind even when it is listed first", () => {
     const status = pricesStatus({
+      zone: MADRID,
       relevant: [
         { id: "B", name: "Beta" },
         { id: "A", name: "Alpha" },
@@ -69,6 +74,7 @@ describe("pricesStatus", () => {
 
   it("leaves a sold instrument with a stale symbol out of both figures", () => {
     const status = pricesStatus({
+      zone: MADRID,
       relevant: [{ id: "A", name: "Alpha" }],
       latest: new Map([
         ["A", { asOf: at("2026-10-21T15:30:00Z") }],
@@ -88,6 +94,7 @@ describe("pricesStatus", () => {
   it("has no date when nothing relevant has a price yet", () => {
     expect(
       pricesStatus({
+        zone: MADRID,
         relevant: [{ id: "A", name: "Alpha" }],
         latest: new Map(),
         checked: new Map(),
@@ -98,6 +105,7 @@ describe("pricesStatus", () => {
   it("dates the data by the Madrid day of the price", () => {
     expect(
       pricesStatus({
+        zone: MADRID,
         relevant: [{ id: "A", name: "Alpha" }],
         latest: new Map([["A", { asOf: at("2026-10-20T22:30:00Z") }]]),
         checked: new Map(),

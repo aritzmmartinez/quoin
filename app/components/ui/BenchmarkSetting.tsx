@@ -19,13 +19,13 @@ export function BenchmarkSetting({
 }) {
   const t = useCopy();
   const copy = t.settings.portfolio.benchmark;
-  const { formatDate } = useFormat();
+  const { formatInstant } = useFormat();
   const [symbol, setSymbol] = useState(benchmark);
 
   const options: SelectOption[] = candidates.map((candidate) => ({
     value: candidate.symbol,
     label: candidate.symbol,
-    desc: `${candidate.name} · ${copy.since(formatDate(candidate.since))}`,
+    desc: `${candidate.name} · ${copy.since(formatInstant(candidate.since))}`,
   }));
   const usable = options.some((option) => option.value === symbol);
   if (!usable) {

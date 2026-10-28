@@ -6,7 +6,13 @@ export interface EtfHolding {
   name: string;
   /** Fraction of the fund, as a decimal string. */
   weight: string;
-  asOf: Date;
+}
+
+/** What a fund's composition as a whole describes, apart from its rows. */
+export interface HoldingsBlock {
+  /** `YYYY-MM-DD`: read from the file, or the day of the import when inferred. */
+  asOf: string;
+  asOfInferred: boolean;
 }
 
 export interface HoldingsRepository {
@@ -14,8 +20,12 @@ export interface HoldingsRepository {
    * Replace a fund's composition wholesale. A holdings file is a snapshot, not
    * an event: appending would keep constituents that have left the index.
    */
-  replaceFor(instrumentId: string, holdings: readonly EtfHolding[]): Promise<number>;
+  replaceFor(
+    instrumentId: string,
+    holdings: readonly EtfHolding[],
+    block: HoldingsBlock,
+  ): Promise<number>;
   all(): Promise<Map<string, EtfHolding[]>>;
+  blocks(): Promise<Map<string, HoldingsBlock>>;
   forInstrument(instrumentId: string): Promise<EtfHolding[]>;
-  deleteForInstrument(instrumentId: string): Promise<number>;
 }

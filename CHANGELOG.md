@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-10-29
+
+### Upgrading
+- This version adds a settings table holding where you are tax resident (Bizkaia), from which the tax territory and the calendar zone are derived. There is nothing to set. The Docker image backs up the ledger before migrating, as usual.
+- If two versions of the savings plan were recorded for the same day, the migration keeps the one that was in force (the later one) and deletes the others with their lines. The backup taken before migrating still has them.
+- The database gets an identity of its own, created once on start, and every value you set by hand records when it last changed. Copying the database file copies that identity, so a copy cannot sync with its original: from source, set up a second installation by importing an export into an empty database instead.
+- Ledger entries without an id from their source get one of their own. No broker import produces them, so an ordinary ledger is unchanged.
+- A fund composition imported from a file without a readable date keeps the day it was imported, now marked as inferred.
+
+### Added
+- From source, `pnpm sync:export` and `pnpm sync:import` keep two installations in step through a file. It carries the ledger, your instruments and what you set on them, the savings-plan versions, fund compositions and settings. Prices, exchange rates and the CPI are not in it: each installation downloads its own.
+- A value changed on both sides, or a ledger entry that differs, is a conflict: nothing is written and each conflict is listed. `--dry-run` shows what an import would change, and a file with nothing new reports that everything is already up to date.
+- Importing into the live ledger takes a verified backup first. A new quote symbol or currency gets its prices or rates after the import; a download that fails is reported, and the import stays.
+- The file holds your whole portfolio, so its name must end in `.quoin.json`, which git and the Docker build ignore.
+
+### Changed
+- Every date is assigned and shown in the zone of your tax residence (Madrid), on the server and in the browser alike. Chart axes and tooltips no longer follow the browser's clock.
+- Savings plan: a day holds one version only. Recording a second one for the same day is refused, naming the version already there.
+- Import: a file with a row that has no transaction id is refused whole, before anything is written. A Trade Republic file whose dates carry no time zone is refused too, since each machine would read it differently. None of the exports seen so far has either.
+- Fund compositions: dropping the same file again changes nothing, its date included.
+
+### Fixed
+- A date with no time of day could show as the day before in a time zone west of Greenwich.
+- A savings-plan version took over at 01:00 or 02:00 in Madrid, midnight UTC, instead of at the start of its day.
+- Fund compositions: a date the file wrote ambiguously, such as 05/06/2026, or one that does not exist, such as 31/02/2026, was shown in the preview but not stored, and the import's day was stored instead. Such a date is no longer read, and the preview says the import's day will be used.
+
 ## [0.14.0] - 2026-10-26
 
 ### Upgrading
@@ -445,7 +471,8 @@ fund holdings must be supplied as CSV rather than the Excel most issuers publish
 Design rationale lives beside the code it explains, in `docs/ARCHITECTURE.md` and in the
 commit history — not here.
 
-[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/aritzmmartinez/quoin/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/aritzmmartinez/quoin/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/aritzmmartinez/quoin/compare/v0.12.1...v0.13.0
 [0.12.1]: https://github.com/aritzmmartinez/quoin/compare/v0.12.0...v0.12.1

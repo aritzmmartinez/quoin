@@ -4,7 +4,6 @@ import type { Route } from "./+types/instruments";
 
 import {
   HoldingsParseError,
-  parseAsOfHint,
   parseHoldingsCsv,
 } from "~/adapters/ingestion/holdings";
 import {
@@ -15,6 +14,7 @@ import {
 } from "~/adapters/persistence";
 import { Card, InstrumentsTable, RebuildHistories } from "~/components";
 import { UnratedNotice } from "~/components/ui/UnratedNotice";
+import { today } from "~/core/calendar";
 import {
   BASE_CURRENCY,
   KINDS_NEEDING_LEAF,
@@ -28,13 +28,14 @@ import {
   type Copy,
   copyFor,
   copyFromMatches,
-  createFormat,
+  intlTag,
   needsMapping,
   parseLocale,
   toInstrumentListItems,
   useCopy,
 } from "~/lib";
 import { loadValuation } from "~/lib/rate-book.server";
+import { loadResidence } from "~/lib/residence.server";
 import { openInstrumentIds, unratedNames } from "~/lib/unrated";
 
 export function meta({ matches }: Route.MetaArgs) {
@@ -48,30 +49,33 @@ export function meta({ matches }: Route.MetaArgs) {
 export const handle = { title: (t: Copy) => t.instruments.title };
 
 export async function loader({ request }: Route.LoaderArgs) {
+  const { jurisdiction, calendarZone } = await loadResidence();
   const priceRepository = new PrismaPriceRepository();
   const [
     events,
     instruments,
     valuation,
     holdings,
+    blocks,
     candleTimes,
     dailyHistoryIds,
   ] = await Promise.all([
     new PrismaLedgerRepository().list(),
     new PrismaInstrumentRepository().list(),
-    loadValuation(),
+    loadValuation(calendarZone),
     new PrismaHoldingsRepository().all(),
+    new PrismaHoldingsRepository().blocks(),
     priceRepository.candleTimes(),
     priceRepository.dailyHistoryIds(),
   ]);
 
-  const positions = computePositions(events);
+  const positions = computePositions(events, jurisdiction);
   const marketValues = computeMarketValues(
     positions,
     valuation.prices,
     BASE_CURRENCY,
   );
-  const tag = createFormat(parseLocale(request.headers.get("Cookie"))).tag;
+  const tag = intlTag(parseLocale(request.headers.get("Cookie")));
   const items = toInstrumentListItems(
     instruments,
     positions,
@@ -80,6 +84,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     tag,
     candleTimes,
     dailyHistoryIds,
+    blocks,
   );
 
   return {
@@ -106,7 +111,6 @@ const exposureForm = z.object({
 const holdingsForm = z.object({
   id: z.string().min(1),
   csv: z.string().min(1),
-  asOf: z.string().optional(),
   identity: z.string().optional(),
   name: z.string().optional(),
   weight: z.string().optional(),
@@ -155,7 +159,7 @@ async function importHoldings(t: Copy, form: Record<string, unknown>) {
   if (!parsed.success) {
     return { ok: false as const, error: t.instruments.invalid };
   }
-  const { id, csv, asOf, identity, name, weight } = parsed.data;
+  const { id, csv, identity, name, weight } = parsed.data;
 
   const instrument = await new PrismaInstrumentRepository().get(id);
   if (!instrument) {
@@ -172,8 +176,7 @@ async function importHoldings(t: Copy, form: Record<string, unknown>) {
       ...(weight ? { weight } : {}),
     });
 
-    const asOfDate = parseAsOfHint(asOf ?? null) ?? new Date();
-
+    const { calendarZone } = await loadResidence();
     const imported = await new PrismaHoldingsRepository().replaceFor(
       id,
       result.holdings.map((h) => ({
@@ -182,8 +185,11 @@ async function importHoldings(t: Copy, form: Record<string, unknown>) {
         identityKind: h.identityKind,
         name: h.name,
         weight: h.weight,
-        asOf: asOfDate,
       })),
+      {
+        asOf: result.asOf ?? today(calendarZone, new Date()),
+        asOfInferred: result.asOf === null,
+      },
     );
     return { ok: true as const, imported };
   } catch (e) {

@@ -24,6 +24,7 @@ export async function assignQuoteSymbol(
   id: string,
   symbol: string,
   rates: EnsureRates,
+  zone: string,
   now: Date = new Date(),
 ): Promise<AssignResult> {
   const instrument = await instruments.get(id);
@@ -38,7 +39,7 @@ export async function assignQuoteSymbol(
   if (!quote) return { ok: false, reason: "no-quote" };
   const series = rateSeriesOf(
     await rates(
-      new Map([[quote.currency, shiftDay(dayOf(now), -RATE_PROBE_DAYS)]]),
+      new Map([[quote.currency, shiftDay(dayOf(now, zone), -RATE_PROBE_DAYS)]]),
     ),
     quote.currency,
   );

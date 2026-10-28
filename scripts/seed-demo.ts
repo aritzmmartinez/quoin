@@ -436,14 +436,12 @@ const SHARED = [
 function holdingsFor(
   instrumentId: string,
   count: number,
-  asOf: Date,
 ): {
   instrumentId: string;
   identity: string;
   identityKind: string;
   name: string;
   weight: string;
-  asOf: Date;
 }[] {
   const random = mulberry32(hashSeed(`holdings:${instrumentId}`));
   const rows = [
@@ -467,7 +465,6 @@ function holdingsFor(
       .mul(0.965)
       .toDecimalPlaces(6)
       .toFixed(6),
-    asOf,
   }));
 }
 
@@ -484,6 +481,9 @@ async function main(): Promise<void> {
   );
 
   await prisma.etfHolding.deleteMany();
+  await prisma.etfHoldingBlock.deleteMany();
+  await prisma.syncTombstone.deleteMany();
+  await prisma.syncPeer.deleteMany();
   await prisma.priceSnapshot.deleteMany();
   await prisma.ledgerEntry.deleteMany();
   await prisma.securityIdentity.deleteMany();
@@ -533,12 +533,18 @@ async function main(): Promise<void> {
 
   const holdingsAsOf = new Date(
     Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth() - 1, 28),
-  );
+  )
+    .toISOString()
+    .slice(0, 10);
+  const funds = ["IE00DEMO0001", "IE00DEMO0005"];
   const holdings = [
-    ...holdingsFor("IE00DEMO0001", 120, holdingsAsOf),
-    ...holdingsFor("IE00DEMO0005", 40, holdingsAsOf),
+    ...holdingsFor("IE00DEMO0001", 120),
+    ...holdingsFor("IE00DEMO0005", 40),
   ];
   await prisma.etfHolding.createMany({ data: holdings });
+  await prisma.etfHoldingBlock.createMany({
+    data: funds.map((instrumentId) => ({ instrumentId, asOf: holdingsAsOf })),
+  });
 
   await prisma.securityIdentity.createMany({
     data: [

@@ -13,14 +13,16 @@ export function TargetLines({
   activeFrom: string;
   note: string | null;
 }) {
-  const { formatMoney, formatDate, formatPercent } = useFormat();
+  const { formatMoney, formatCalendarDate, formatPercent } = useFormat();
   const t = useCopy();
   const copy = t.target;
 
   return (
     <div>
       <div className="border-b border-border px-gutter py-row">
-        <p className="text-[13px]">{copy.activeFrom(formatDate(activeFrom))}</p>
+        <p className="text-[13px]">
+          {copy.activeFrom(formatCalendarDate(activeFrom))}
+        </p>
         {note && <p className="mt-1 text-[12px] text-muted">{note}</p>}
       </div>
 

@@ -843,6 +843,7 @@ export const en: Copy = {
     covered: "Covered",
     residual: "Residual",
     asOf: "Data as of:",
+    asOfUnrecognised: "Date not recognised: today's will be used",
     folded: (count: number): string =>
       count === 1
         ? "1 row with no identity folds into the residual"
@@ -1030,6 +1031,8 @@ export const en: Copy = {
       idMismatch: (pairs: string): string =>
         `Nothing was saved. These identifiers do not match the imported ones: ${pairs}. A line joins its instrument by exact identifier, so they would never resolve.`,
       saveFailed: "The version could not be saved.",
+      dayTaken: (name: string, day: string): string =>
+        `Nothing was saved. "${name}" already takes over on ${day}, and a day takes one version only. Delete it first if this one replaces it.`,
     },
   },
   projection: {

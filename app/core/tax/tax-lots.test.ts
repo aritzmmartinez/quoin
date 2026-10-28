@@ -2,13 +2,15 @@ import { describe, expect, it } from "vitest";
 
 import type { LedgerEvent, TradeEvent } from "../domain";
 
-import { fiscalYearOf } from "./fiscal-year";
+import { fiscalYearOf } from "../calendar";
 import {
   computeTaxHistory,
   computeTaxLots,
   taxYearOf,
   type TaxOptions,
 } from "./tax-lots";
+
+const MADRID = "Europe/Madrid";
 
 let seq = 0;
 
@@ -40,6 +42,7 @@ function options(
 ): TaxOptions {
   return {
     territory: "bizkaia",
+    zone: MADRID,
     assetClasses: new Map(
       events.flatMap((e) =>
         "instrumentId" in e
@@ -63,8 +66,8 @@ function year(events: TradeEvent[], y: number, crypto: string[] = []) {
 
 describe("fiscalYearOf", () => {
   it("uses the calendar year in Madrid time, not UTC's", () => {
-    expect(fiscalYearOf(new Date("2025-12-31T23:30:00Z"))).toBe(2026);
-    expect(fiscalYearOf(new Date("2025-12-31T20:00:00Z"))).toBe(2025);
+    expect(fiscalYearOf(new Date("2025-12-31T23:30:00Z"), MADRID)).toBe(2026);
+    expect(fiscalYearOf(new Date("2025-12-31T20:00:00Z"), MADRID)).toBe(2025);
   });
 });
 

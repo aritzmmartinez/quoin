@@ -5,6 +5,8 @@ import type { TradeEvent } from "../domain";
 import { computeNetWithCarryforward } from "./carryforward";
 import type { TaxOptions } from "./tax-lots";
 
+const MADRID = "Europe/Madrid";
+
 let seq = 0;
 
 function trade(
@@ -45,6 +47,7 @@ function yearRoundTrip(
 function listed(events: readonly TradeEvent[]): TaxOptions {
   return {
     territory: "bizkaia",
+    zone: MADRID,
     assetClasses: new Map(
       events.map((e) => [e.instrumentId, "listed-security"] as const),
     ),

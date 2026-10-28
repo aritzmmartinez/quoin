@@ -91,7 +91,6 @@ export function HoldingsUpload({
                 intent: "holdings",
                 id: instrumentId,
                 csv: csv ?? "",
-                asOf: preview.asOfHint ?? "",
                 ...override,
               },
               { method: "post", encType: "application/x-www-form-urlencoded" },
@@ -124,7 +123,7 @@ function Preview({
   onConfirm: () => void;
   busy: boolean;
 }) {
-  const { formatPercent } = useFormat();
+  const { formatCalendarDate, formatPercent } = useFormat();
   const t = useCopy();
   const copy = t.holdings;
   const residual = Number(preview.residual);
@@ -165,11 +164,18 @@ function Preview({
         {preview.foldedRows > 0 && (
           <span className="text-muted">{copy.folded(preview.foldedRows)}</span>
         )}
-        {preview.asOfHint && (
-          <span className="text-muted">
-            {copy.asOf} <span className="text-text">{preview.asOfHint}</span>
-          </span>
-        )}
+        <span className="text-muted">
+          {preview.asOf ? (
+            <>
+              {copy.asOf}{" "}
+              <span className="font-mono text-text">
+                {formatCalendarDate(preview.asOf)}
+              </span>
+            </>
+          ) : (
+            copy.asOfUnrecognised
+          )}
+        </span>
       </div>
 
       {preview.qualifier && (

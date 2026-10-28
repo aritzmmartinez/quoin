@@ -2,6 +2,7 @@ import Decimal from "decimal.js";
 
 import {
   detectAsOfHint,
+  parseAsOfHint,
   detectColumns,
   detectQualifierColumn,
   detectTable,
@@ -26,6 +27,8 @@ export interface ParsedHoldings {
   qualifier: string | null;
   headers: string[];
   asOfHint: string | null;
+  /** The day `asOfHint` names, or null when there is none or it is ambiguous. */
+  asOf: string | null;
   holdings: ParsedHolding[];
   covered: string;
   residual: string;
@@ -138,12 +141,14 @@ export function parseHoldingsCsv(
     new Decimal(b.weight).comparedTo(new Decimal(a.weight)),
   );
 
+  const asOfHint = detectAsOfHint(table.preamble);
   return {
     columns,
     weightScale: scale.toString(),
     qualifier,
     headers: table.headers,
-    asOfHint: detectAsOfHint(table.preamble),
+    asOfHint,
+    asOf: parseAsOfHint(asOfHint),
     holdings,
     covered: coveredFraction.toString(),
     residual: residual.toString(),

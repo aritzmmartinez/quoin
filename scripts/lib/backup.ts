@@ -32,7 +32,7 @@ function destinationFor(now: Date): string {
   const base = join(BACKUP_DIR, backupFileName(now));
   if (!existsSync(base)) return base;
 
-  return join(BACKUP_DIR, backupFileName(now, now.getSeconds()));
+  return join(BACKUP_DIR, backupFileName(now, now.getUTCSeconds()));
 }
 
 function rotate(): number {

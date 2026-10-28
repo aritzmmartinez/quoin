@@ -16,10 +16,12 @@ import {
   parseHorizonYears,
 } from "./projection";
 
+const MADRID = "Europe/Madrid";
+
 const target = (lines: [string, string][]): PortfolioTarget => ({
   id: "v1",
   name: "Plan",
-  activeFrom: new Date("2026-01-01T00:00:00.000Z"),
+  activeFrom: "2026-01-01",
   note: null,
   createdAt: new Date("2026-01-01T00:00:00.000Z"),
   lines: lines.map(([instrumentId, monthlyAmount]) => ({
@@ -139,6 +141,7 @@ describe("buildProjectionSource", () => {
       instruments,
       new Map(),
       asOf,
+      MADRID,
     );
 
     expect(source.lines.map((line) => line.instrumentId)).toEqual(["A"]);
@@ -161,6 +164,7 @@ describe("buildProjectionSource", () => {
       instruments,
       new Map(),
       asOf,
+      MADRID,
     );
 
     expect(source.lines).toHaveLength(2);
@@ -181,6 +185,7 @@ describe("buildProjectionSource", () => {
         ["EMPTY", "0.00"],
       ]),
       asOf,
+      MADRID,
     );
 
     expect(source.lines.map((line) => line.instrumentId)).toEqual(["A"]);
@@ -197,6 +202,7 @@ describe("buildProjectionSource", () => {
       instruments,
       new Map([["NEW", "800.00"]]),
       asOf,
+      MADRID,
     );
 
     expect(source.heldLines).toHaveLength(1);

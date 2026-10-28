@@ -99,11 +99,12 @@ function Cell({
   row: MovementRow;
   column: MovementColumnKey;
 }) {
-  const { formatMoney, formatPrice, formatQuantity, formatDate } = useFormat();
+  const { formatMoney, formatPrice, formatQuantity, formatInstant } =
+    useFormat();
   const t = useCopy();
   switch (column) {
     case "date":
-      return <>{formatDate(row.t)}</>;
+      return <>{formatInstant(row.t)}</>;
 
     case "type":
       if (row.swap)

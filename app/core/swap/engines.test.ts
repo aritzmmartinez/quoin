@@ -11,6 +11,10 @@ import {
 } from "../projections/returns";
 import { walkFifo } from "../tax/fifo";
 import { computeTaxHistory, taxYearOf } from "../tax/tax-lots";
+import { jurisdictionOf } from "~/core/tax";
+
+const MADRID = "Europe/Madrid";
+const BIZKAIA = jurisdictionOf("bizkaia");
 
 let seq = 0;
 
@@ -64,7 +68,11 @@ const CRYPTO = new Map([
   ["ETH", "fungible-crypto" as const],
   ["BTC", "fungible-crypto" as const],
 ]);
-const taxOptions = { territory: "bizkaia" as const, assetClasses: CRYPTO };
+const taxOptions = {
+  territory: "bizkaia" as const,
+  zone: MADRID,
+  assetClasses: CRYPTO,
+};
 
 const START = trade("BUY", "ETH", "10", "1000", "2026-01-05T10:00:00Z");
 
@@ -79,7 +87,7 @@ describe("a swap through FIFO and AVCO", () => {
   const events: LedgerEvent[] = [START, GAIN.sell, GAIN.buy];
 
   it("transmits at the delivered value less the fee taken from what was received", () => {
-    const sale = walkFifo(events).sales[0]!;
+    const sale = walkFifo(events, BIZKAIA).sales[0]!;
     expect(sale.gross.toString()).toBe("480");
     expect(sale.fees.toString()).toBe("5");
     expect(sale.costRemoved.toString()).toBe("400");
@@ -87,7 +95,7 @@ describe("a swap through FIFO and AVCO", () => {
   });
 
   it("acquires what was received at that same figure, so the fee is counted once", () => {
-    const lots = walkAvco(events).lots;
+    const lots = walkAvco(events, BIZKAIA).lots;
     const btc = lots.get("BTC")!;
     expect(btc.costBasis.toString()).toBe("475");
     expect(btc.quantity.toString()).toBe("0.0099");
@@ -97,13 +105,13 @@ describe("a swap through FIFO and AVCO", () => {
   });
 
   it("gives the position a cost on the cost line: an asset got only by swap is not free", () => {
-    const [point] = computeCostBasisTimeline(events, "BTC");
+    const [point] = computeCostBasisTimeline(events, "BTC", BIZKAIA);
     expect(point?.investedAfter).toBe("475");
     expect(point?.quantityAfter).toBe("0.0099");
   });
 
   it("queues the received units in FIFO at that cost", () => {
-    const lot = walkFifo(events).lots.get("BTC")![0]!;
+    const lot = walkFifo(events, BIZKAIA).lots.get("BTC")![0]!;
     expect(lot.unitCost.scaleBy("0.0099").toString()).toBe("475");
   });
 });

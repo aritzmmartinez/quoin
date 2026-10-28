@@ -54,7 +54,7 @@ function DiscardGroup({ group, pending }: { group: Group; pending: boolean }) {
 }
 
 function DetailList({ details }: { details: readonly DiscardDetail[] }) {
-  const { formatDate } = useFormat();
+  const { formatInstant } = useFormat();
   const t = useCopy();
   const copy = t.ingest.summary;
 
@@ -71,7 +71,7 @@ function DetailList({ details }: { details: readonly DiscardDetail[] }) {
             {row.subtype ? ` / ${row.subtype}` : ""}
           </span>
           <span className="shrink-0 tabular-nums text-muted">
-            {formatDate(row.date)}
+            {formatInstant(row.date)}
           </span>
         </li>
       ))}

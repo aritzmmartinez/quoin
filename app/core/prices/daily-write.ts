@@ -27,17 +27,18 @@ export function planDailyWrite(
   stored: readonly StoredPrice[],
   candles: readonly PriceSnapshot[],
   live: PriceSnapshot | null,
+  zone: string,
 ): DailyWrite {
   const candleByDay = new Map<string, PriceSnapshot>();
   for (const candle of candles) {
-    const day = dayOf(candle.asOf);
+    const day = dayOf(candle.asOf, zone);
     const held = candleByDay.get(day);
     if (!held || held.asOf < candle.asOf) candleByDay.set(day, candle);
   }
 
   const remove = new Set<string>();
   for (const row of stored) {
-    const candle = candleByDay.get(dayOf(row.asOf));
+    const candle = candleByDay.get(dayOf(row.asOf, zone));
     if (candle && candle.asOf.getTime() !== row.asOf.getTime()) {
       remove.add(row.id);
     }
@@ -64,9 +65,9 @@ export function planDailyWrite(
 
   let wroteLive = false;
   if (live) {
-    const day = dayOf(live.asOf);
+    const day = dayOf(live.asOf, zone);
     const sameDay = stored.filter(
-      (row) => !remove.has(row.id) && dayOf(row.asOf) === day,
+      (row) => !remove.has(row.id) && dayOf(row.asOf, zone) === day,
     );
     const covered =
       candleByDay.has(day) || sameDay.some((row) => row.source !== live.source);

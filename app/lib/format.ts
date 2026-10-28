@@ -1,6 +1,6 @@
 import Decimal from "decimal.js";
 
-import { dayOf } from "~/core/calendar";
+import { parseIsoDate } from "~/core/calendar";
 import { BASE_CURRENCY, Money } from "~/core/domain";
 
 import { intlTag, type Locale } from "./locale";
@@ -21,7 +21,10 @@ export interface Format {
     value: string,
     maximumFractionDigits?: number,
   ) => SignedMoney;
-  formatDate: (iso: string) => string;
+  /** A calendar day, `YYYY-MM-DD`: it has no zone and is never shifted into one. */
+  formatCalendarDate: (day: string) => string;
+  /** An instant (ISO string or epoch ms), shown on its day in the display zone. */
+  formatInstant: (instant: string | number) => string;
   formatTimeTick: (
     timestamp: number,
     unit: "day" | "month",
@@ -42,7 +45,7 @@ function exact(value: string): `${number}` {
   return new Decimal(value).toFixed() as `${number}`;
 }
 
-export function createFormat(locale: Locale): Format {
+export function createFormat(locale: Locale, zone: string): Format {
   const tag = intlTag(locale);
 
   function formatMoney(value: string, maximumFractionDigits = 2): string {
@@ -98,12 +101,25 @@ export function createFormat(locale: Locale): Format {
     return { text: `+${magnitude}`, sign: "positive" };
   }
 
-  function formatDate(iso: string): string {
+  const DATE_PARTS = {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  } as const satisfies Intl.DateTimeFormatOptions;
+
+  function formatCalendarDate(day: string): string {
+    const { year, month, day: d } = parseIsoDate(day);
     return new Intl.DateTimeFormat(tag, {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    }).format(new Date(iso));
+      ...DATE_PARTS,
+      timeZone: "UTC",
+    }).format(Date.UTC(year, month - 1, d));
+  }
+
+  function formatInstant(instant: string | number): string {
+    return new Intl.DateTimeFormat(tag, {
+      ...DATE_PARTS,
+      timeZone: zone,
+    }).format(new Date(instant));
   }
 
   function formatTimeTick(
@@ -116,6 +132,7 @@ export function createFormat(locale: Locale): Format {
         ? { day: "numeric", month: "short" }
         : { month: "short" }),
       ...(withYear ? { year: "2-digit" as const } : {}),
+      timeZone: zone,
     }).format(new Date(timestamp));
   }
 
@@ -180,7 +197,7 @@ export function createFormat(locale: Locale): Format {
   }
 
   const clock = new Intl.DateTimeFormat(tag, {
-    timeZone: "Europe/Madrid",
+    timeZone: zone,
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -195,7 +212,8 @@ export function createFormat(locale: Locale): Format {
     formatPrice,
     formatQuantity,
     formatSignedMoney,
-    formatDate,
+    formatCalendarDate,
+    formatInstant,
     formatTimeTick,
     formatPeriod,
     formatPercent,
@@ -203,8 +221,4 @@ export function createFormat(locale: Locale): Format {
     formatClock,
     tag,
   };
-}
-
-export function todayInMadrid(now: Date = new Date()): string {
-  return dayOf(now);
 }

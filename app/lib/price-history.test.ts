@@ -23,6 +23,8 @@ import {
   type ReplaceOutcome,
 } from "./price-history";
 
+const MADRID = "Europe/Madrid";
+
 const NOW = new Date("2026-10-08T15:00:00.000Z");
 
 const NO_RATES: EnsureRates = async () => ({ book: new Map(), unavailable: [] });
@@ -146,6 +148,7 @@ describe("replaceQuoteHistory", () => {
 
     const outcome = await replaceQuoteHistory(
       {
+        zone: MADRID,
         instruments,
         prices,
         provider: provider({}),
@@ -168,6 +171,7 @@ describe("replaceQuoteHistory", () => {
     await expect(
       replaceQuoteHistory(
         {
+          zone: MADRID,
           instruments,
           prices,
           provider: provider({ "AAA.DE": unavailable }),
@@ -186,6 +190,7 @@ describe("replaceQuoteHistory", () => {
 
     const outcome = await replaceQuoteHistory(
       {
+        zone: MADRID,
         instruments,
         prices,
         provider: provider({ "AAA.DE": [] }),
@@ -206,7 +211,14 @@ describe("replaceQuoteHistory", () => {
     const { rates, asked } = ratesFor("USD", ["2026-10-05"]);
 
     const outcome = await replaceQuoteHistory(
-      { instruments, prices, provider: provider({ AAA: usd }), rates, now: NOW },
+      {
+        zone: MADRID,
+        instruments,
+        prices,
+        provider: provider({ AAA: usd }),
+        rates,
+        now: NOW,
+      },
       { instrumentId: INSTRUMENT.id, symbol: "AAA", range: "5y" },
     );
 
@@ -222,6 +234,7 @@ describe("replaceQuoteHistory", () => {
 
     const outcome = await replaceQuoteHistory(
       {
+        zone: MADRID,
         instruments,
         prices,
         provider: provider({ AAA: xyz }),
@@ -247,6 +260,7 @@ describe("replaceQuoteHistory", () => {
 
     const outcome = await replaceQuoteHistory(
       {
+        zone: MADRID,
         instruments,
         prices,
         provider: provider({ AAA: usd }),
@@ -270,6 +284,7 @@ describe("replaceQuoteHistory", () => {
 
     await replaceQuoteHistory(
       {
+        zone: MADRID,
         instruments,
         prices,
         provider: provider({ "NEW.DE": DAILY_NEW("NEW.DE") }, [live]),
@@ -289,6 +304,7 @@ describe("replaceQuoteHistory", () => {
 
     const outcome = await replaceQuoteHistory(
       {
+        zone: MADRID,
         instruments,
         prices,
         provider: provider({ "NEW.DE": DAILY_NEW("NEW.DE") }, [live]),
@@ -322,6 +338,7 @@ describe("replaceQuoteHistory", () => {
 
     await replaceQuoteHistory(
       {
+        zone: MADRID,
         instruments,
         prices,
         provider: provider({ "AAA.DE": DAILY_NEW("AAA.DE") }, [live]),
@@ -345,6 +362,7 @@ describe("replaceQuoteHistory", () => {
 
     const outcome = await replaceQuoteHistory(
       {
+        zone: MADRID,
         instruments,
         prices,
         provider: provider({ "AAA.DE": DAILY_NEW("AAA.DE") }, [stale]),
@@ -370,6 +388,7 @@ describe("replaceQuoteHistory", () => {
 
     await replaceQuoteHistory(
       {
+        zone: MADRID,
         instruments,
         prices,
         provider: provider({ "NEW.DE": DAILY_NEW("NEW.DE") }),
@@ -389,6 +408,7 @@ describe("replaceQuoteHistory", () => {
 
     const outcome = await replaceQuoteHistory(
       {
+        zone: MADRID,
         instruments,
         prices,
         provider: provider({ "AAA.DE": DAILY_NEW("AAA.DE") }, [old]),
@@ -408,6 +428,7 @@ describe("replaceQuoteHistory", () => {
 
     await replaceQuoteHistory(
       {
+        zone: MADRID,
         instruments,
         prices,
         provider: provider({ "AAA.DE": repeated }),
@@ -426,6 +447,7 @@ describe("replaceQuoteHistory", () => {
     await expect(
       replaceQuoteHistory(
         {
+          zone: MADRID,
           instruments,
           prices,
           provider: provider({}),
@@ -446,6 +468,7 @@ describe("replaceQuoteHistories", () => {
 
     const outcomes = await replaceQuoteHistories(
       {
+        zone: MADRID,
         instruments,
         prices,
         provider: provider({

@@ -15,6 +15,7 @@ export class TradeRepublicCsvAdapter {
   constructor(
     private readonly instruments: InstrumentRepository,
     private readonly ledger: LedgerRepository,
+    private readonly zone: string,
     private readonly rates: RateBookLoader | null = null,
   ) {}
 
@@ -28,9 +29,11 @@ export class TradeRepublicCsvAdapter {
     }
 
     const builder = new BatchBuilder(
+      this.zone,
       await rateLookupFor(
         this.rates,
         rows.map((row) => row.currency),
+        this.zone,
       ),
     );
     for (const row of rows) {
