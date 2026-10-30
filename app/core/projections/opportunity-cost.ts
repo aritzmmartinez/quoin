@@ -3,6 +3,7 @@ import Decimal from "decimal.js";
 import {
   BASE_CURRENCY,
   Money,
+  compareTrades,
   isInKind,
   isSwapLeg,
   type LedgerEvent,
@@ -149,10 +150,7 @@ export function computeOpportunityCost(
     );
   }
 
-  const trades = bookable(events)
-    .filter(isTrade)
-    .slice()
-    .sort((a, b) => a.ts.getTime() - b.ts.getTime());
+  const trades = bookable(events).filter(isTrade).slice().sort(compareTrades);
 
   const buckets = new Map<string, Bucket>();
   const excluded = {

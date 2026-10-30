@@ -4,15 +4,11 @@ import { z } from "zod";
 import { parseIsoDate } from "../calendar";
 
 import { exposureKindSchema } from "./exposure";
-import { BASE_CURRENCY } from "./money";
+import { BASE_CURRENCY, isDecimalString } from "./money";
 
-export const decimalString = z.string().refine((value) => {
-  try {
-    return new Decimal(value).isFinite();
-  } catch {
-    return false;
-  }
-}, "must be a finite decimal string");
+export const decimalString = z
+  .string()
+  .refine(isDecimalString, "must be a finite decimal string");
 
 export const thesisSchema = z.enum(["CORE", "CONVICTION", "TACTICAL"]);
 export type Thesis = z.infer<typeof thesisSchema>;
@@ -91,6 +87,25 @@ export const tradeEventSchema = baseEventSchema.extend({
   funding: fundingSchema.optional(),
 });
 export type TradeEvent = z.infer<typeof tradeEventSchema>;
+
+/**
+ * The one order of trades: by instant, then BUY before SELL, then the source's
+ * id, then the row's. The repository sorts by `ts` alone and SQLite breaks
+ * ties however it likes, so every fold over trades sorts with this.
+ */
+export function compareTrades(a: TradeEvent, b: TradeEvent): number {
+  const byTs = a.ts.getTime() - b.ts.getTime();
+  if (byTs !== 0) return byTs;
+  if (a.type !== b.type) return a.type === "BUY" ? -1 : 1;
+  const byExternal = compareCodeUnits(a.externalId ?? "", b.externalId ?? "");
+  return byExternal !== 0 ? byExternal : compareCodeUnits(a.id, b.id);
+}
+
+/** Orders ids, never names: by code unit, the same on every runtime. */
+export function compareCodeUnits(a: string, b: string): number {
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
+}
 
 export const dividendEventSchema = baseEventSchema.extend({
   type: z.literal("DIVIDEND"),

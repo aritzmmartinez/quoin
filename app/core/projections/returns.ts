@@ -2,6 +2,7 @@ import Decimal from "decimal.js";
 
 import {
   Money,
+  compareTrades,
   isInKind,
   isSwapLeg,
   type LedgerEvent,
@@ -98,7 +99,7 @@ export function computeReturns(
     .filter(isTrade)
     .filter((t) => t.instrumentId === instrumentId)
     .slice()
-    .sort((a, b) => a.ts.getTime() - b.ts.getTime());
+    .sort(compareTrades);
 
   const buys = trades.filter(
     (t) => t.type === "BUY" && !isInKind(t) && !isSwapLeg(t),
