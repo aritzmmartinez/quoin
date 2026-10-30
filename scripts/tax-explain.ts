@@ -218,7 +218,7 @@ async function main(): Promise<void> {
   }
 
   const netBase = new Decimal(carry.netSavingsBase);
-  const quota = netBase.isPositive()
+  const quota = netBase.gt(0)
     ? computeSavingsQuota(Money.fromString(carry.netSavingsBase), scale)
     : Money.zero();
 

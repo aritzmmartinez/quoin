@@ -41,7 +41,7 @@ export function computeRebalance(input: RebalanceInput): RebalanceResult {
 
   const totalWeight = input.lines.reduce((sum, line) => {
     const weight = new Decimal(line.targetWeight);
-    if (weight.isNegative()) {
+    if (weight.lt(0)) {
       throw new Error(`Negative target weight for ${line.instrumentId}.`);
     }
     return sum.plus(weight);

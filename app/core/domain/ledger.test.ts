@@ -64,6 +64,9 @@ describe("ledger schemas", () => {
   it("validates decimal strings directly", () => {
     expect(decimalString.safeParse("1234.56").success).toBe(true);
     expect(decimalString.safeParse("not-a-number").success).toBe(false);
+    expect(decimalString.safeParse("0x1F").success).toBe(false);
+    expect(decimalString.safeParse("1_000").success).toBe(false);
+    expect(decimalString.safeParse("Infinity").success).toBe(false);
   });
 });
 

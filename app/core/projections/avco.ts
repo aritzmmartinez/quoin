@@ -2,6 +2,7 @@ import Decimal from "decimal.js";
 
 import {
   Money,
+  compareTrades,
   type LedgerEvent,
   type Revalue,
   type TradeEvent,
@@ -42,10 +43,7 @@ export function walkAvco(
   jurisdiction: Jurisdiction,
   revalue?: Revalue,
 ): AvcoWalk {
-  const trades = bookable(events)
-    .filter(isTrade)
-    .slice()
-    .sort((a, b) => a.ts.getTime() - b.ts.getTime());
+  const trades = bookable(events).filter(isTrade).slice().sort(compareTrades);
   const amountsOf = tradeAmounts(trades, jurisdiction);
 
   const restate: Revalue = revalue ?? ((money) => money);

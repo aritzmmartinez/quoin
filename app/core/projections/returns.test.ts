@@ -111,9 +111,30 @@ describe("computeReturns", () => {
     expect(r.mwr).toBeNull();
     expect(r.totalInvested).toBe("1000");
   });
+
+  it("orders a sale and a purchase at the same instant the same way, whatever the input order", () => {
+    const first = trade({
+      ts: new Date("2026-01-01"),
+      quantity: "10",
+      grossAmount: "1000",
+    });
+    const at = new Date("2026-03-01T10:00:00Z");
+    const sell = trade({
+      ts: at,
+      type: "SELL",
+      quantity: "10",
+      grossAmount: "1100",
+    });
+    const buy = trade({ ts: at, quantity: "10", grossAmount: "1200" });
+    const twrOf = (events: LedgerEvent[]) =>
+      computeReturns(events, "VWCE", "120", new Date("2026-06-01")).twr;
+
+    expect(twrOf([first, sell, buy])).toBe("0.200000");
+    expect(twrOf([first, buy, sell])).toBe("0.200000");
+  });
 });
 
-const T = (date: string): number => new Date(date).getTime();
+const T =(date: string): number => new Date(date).getTime();
 
 function point(date: string, value: string, invested = "0") {
   return { t: T(date), invested, value };

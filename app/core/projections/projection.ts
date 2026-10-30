@@ -188,7 +188,7 @@ function bounds(monthlyReturns: readonly MonthlyReturn[]): {
 function weightsOf(lines: readonly ProjectionSourceLine[]): number[] {
   const raw = lines.map((line) => {
     const weight = new Decimal(line.targetWeight);
-    if (weight.isNegative()) {
+    if (weight.lt(0)) {
       throw new Error(`Negative target weight for ${line.instrumentId}.`);
     }
     return weight;
@@ -227,7 +227,7 @@ function grossSeries(line: FeeBearing): readonly MonthlyReturn[] {
   if (line.ter == null || line.ter === "") return line.monthlyReturns;
 
   const ter = new Decimal(line.ter);
-  if (!ter.isFinite() || ter.isNegative()) {
+  if (!ter.isFinite() || ter.lt(0)) {
     throw new Error(`Not an annual fee for ${line.instrumentId}: ${line.ter}`);
   }
   if (ter.isZero()) return line.monthlyReturns;

@@ -1,6 +1,6 @@
 import Decimal from "decimal.js";
 
-import { Money } from "../domain";
+import { Money, compareCodeUnits } from "../domain";
 import type { InvestedVsValuePoint } from "./invested-vs-value";
 import type { MarketValue } from "./market-value";
 import type { Position } from "./positions";
@@ -123,7 +123,7 @@ export function computeAllocation(
     .sort(
       (a, b) =>
         new Decimal(b.value).comparedTo(new Decimal(a.value)) ||
-        a.category.localeCompare(b.category),
+        compareCodeUnits(a.category, b.category),
     );
 }
 
@@ -171,7 +171,7 @@ export function computeTopPositions(
     .sort(
       (a, b) =>
         new Decimal(b.marketValue).comparedTo(new Decimal(a.marketValue)) ||
-        a.instrumentId.localeCompare(b.instrumentId),
+        compareCodeUnits(a.instrumentId, b.instrumentId),
     )
     .slice(0, limit);
 }

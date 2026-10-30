@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Two more sets of reference cases shared with the mobile app: decimal arithmetic, and what the home screen shows (positions, their value and unrealised gain, the summary and the allocation). Some of the home screen figures are also worked out by hand, with the arithmetic in the case. Each set is written by a script in the repository, and a test fails if the file and the script disagree.
+
+### Changed
+- An amount is read only as a plain decimal, optionally with an exponent of at most a thousand. Hexadecimal, binary and octal forms and digits grouped with underscores are refused, like any other malformed value. No broker export or price source writes them.
+- Lists ordered by instrument id break ties by the characters of the id, the same on every system, instead of by language rules. Names on screen are still sorted the Spanish way.
+
+### Fixed
+- A purchase and a sale of the same instrument at the same instant are always booked purchase first, as the tax calculation already did. Before, the average cost and the instrument's time-weighted return depended on the order the database returned them in.
+- Zero counts as neither positive nor negative, whatever its sign. No figure on screen changes.
+- Kraken: a row whose fee takes all the units received or delivered is set aside as not supported. A reward like that was counted as an error with no detail, or stored as zero units, and a purchase like that recorded a cost with no units.
+
 ## [0.15.0] - 2026-10-29
 
 ### Upgrading

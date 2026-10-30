@@ -150,8 +150,13 @@ piece of the contract with the mobile client, which must assign the same days.
 - **Golden cases live in `test/contract/*.json`**, read through `loadContract(name,
   schema)`. `sync.json` is written by `test/contract/sync-contract.ts`
   (`pnpm tsx test/contract/sync-contract.ts`), its expectations by hand, never by
-  running `merge`; a test fails while the two disagree. They are shared with the mobile client: change a case only together with the
-  implementation that reproduces it on both sides.
+  running `merge`; a test fails while the two disagree. `decimal.json` and `portfolio.json`
+  have generators beside them too, but their results come from decimal.js and the core
+  (the random decimal cases from mulberry32 with a fixed seed); `portfolio.json` keeps a
+  `byHand` block in some cases, worked out by hand and checked against the core, which is
+  what stops a regenerated file from blessing a regression. They are shared with the
+  mobile client: change a case only together with the implementation that reproduces it
+  on both sides.
 
 ## A command's logic never lives in its script
 
@@ -1005,9 +1010,10 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
   would apply a one-year repurchase rule, and it is unsettled — and changes no figure.
   Do not tie that rule to securities not admitted to trading: an earlier wording did,
   and it misattributed the doctrine.
-- **Core fixes the trade order: `ts`, then BUY before SELL, then `externalId`.** The same
-  `compareTrades` drives `walkFifo` and the rule; the repository's `orderBy` sorts by `ts`
-  alone and SQLite breaks ties however it likes. Before/after a sale is by instant, never by
+- **Core fixes the trade order: `ts`, then BUY before SELL, then `externalId`.** One
+  `compareTrades` (`core/domain/ledger.ts`) drives `walkFifo`, the rule, AVCO, the cost
+  line, an instrument's TWR and the opportunity cost; the repository's `orderBy` sorts by
+  `ts` alone and SQLite breaks ties however it likes. Before/after a sale is by instant, never by
   calendar day — the window itself is Madrid calendar days (`washSaleWindow`).
 - **Nothing FIFO is persisted, and it is one pass.** `computeTaxHistory` walks the whole
   ledger once — a deferred loss can compute years after the sale that created it — and

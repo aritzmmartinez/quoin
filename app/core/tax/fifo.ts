@@ -2,6 +2,7 @@ import Decimal from "decimal.js";
 
 import {
   Money,
+  compareTrades,
   type LedgerEvent,
   type Revalue,
   type TradeEvent,
@@ -51,19 +52,6 @@ export interface FifoWalk {
 
 function isTrade(event: LedgerEvent): event is TradeEvent {
   return event.type === "BUY" || event.type === "SELL";
-}
-
-export function compareTrades(a: TradeEvent, b: TradeEvent): number {
-  const byTs = a.ts.getTime() - b.ts.getTime();
-  if (byTs !== 0) return byTs;
-  if (a.type !== b.type) return a.type === "BUY" ? -1 : 1;
-  const byExternal = compareText(a.externalId ?? "", b.externalId ?? "");
-  return byExternal !== 0 ? byExternal : compareText(a.id, b.id);
-}
-
-function compareText(a: string, b: string): number {
-  if (a === b) return 0;
-  return a < b ? -1 : 1;
 }
 
 export function sortTrades(events: readonly LedgerEvent[]): TradeEvent[] {

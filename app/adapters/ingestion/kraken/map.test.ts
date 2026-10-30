@@ -783,6 +783,60 @@ describe("Kraken mapGroup", () => {
     });
   });
 
+  describe("a row whose fee takes every unit", () => {
+    const reasons = (items: ReturnType<typeof mapGroup>) =>
+      items.map((item) => (item.kind === "discard" ? item.reason : item.kind));
+    const fiat = (amount: string) =>
+      row({ refid: "Z1", type: "spend", asset: "EUR", amount });
+    const coin = (over: Partial<KrakenRow>) =>
+      row({ refid: "Z1", subclass: "crypto", asset: "BTC", ...over });
+
+    it("sets aside a reward valued at Kraken's figure instead of dividing by zero", () => {
+      const reward = coin({
+        type: "reward",
+        amount: "0.001",
+        fee: "0.001",
+        amountusd: "80",
+        feeusd: "40",
+      });
+      expect(reasons(mapGroup([reward], () => AT_80K))).toEqual([
+        "unsupported",
+      ]);
+    });
+
+    it("sets aside a reward valued from the history instead of booking zero units", () => {
+      const reward = coin({ type: "reward", amount: "0.001", fee: "0.001" });
+      expect(reasons(mapGroup([reward], () => AT_80K))).toEqual([
+        "unsupported",
+      ]);
+    });
+
+    it("sets aside a purchase that would book a cost with no units", () => {
+      const received = coin({ type: "receive", amount: "0.001", fee: "0.001" });
+      expect(reasons(mapGroup([fiat("-80"), received]))).toEqual([
+        "unsupported",
+      ]);
+    });
+
+    it("sets aside a sale that delivers no units", () => {
+      const delivered = coin({
+        type: "spend",
+        amount: "-0.001",
+        fee: "-0.001",
+      });
+      const proceeds = row({ refid: "Z1", type: "receive", amount: "80" });
+      expect(reasons(mapGroup([delivered, proceeds]))).toEqual(["unsupported"]);
+    });
+
+    it("sets aside a swap that receives no units", () => {
+      const delivered = coin({ type: "spend", asset: "ETH", amount: "-0.05" });
+      const received = coin({ type: "receive", amount: "0.001", fee: "0.001" });
+      expect(reasons(mapGroup([delivered, received], () => AT_80K))).toEqual([
+        "unsupported",
+      ]);
+    });
+  });
+
   it("discards an unrecognized row type as unsupported, keeping the row", () => {
     const result = mapGroup([
       row({

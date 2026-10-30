@@ -40,7 +40,7 @@ export function parseDriftThreshold(params: URLSearchParams): string {
   } catch {
     return DEFAULT_DRIFT_THRESHOLD;
   }
-  if (!parsed.isFinite() || parsed.isNegative() || parsed.gt(50)) {
+  if (!parsed.isFinite() || parsed.lt(0) || parsed.gt(50)) {
     return DEFAULT_DRIFT_THRESHOLD;
   }
   return parsed.div(100).toString();
@@ -56,7 +56,7 @@ export function parseContribution(params: URLSearchParams): string | null {
   } catch {
     return null;
   }
-  if (!parsed.isFinite() || parsed.isNegative()) return null;
+  if (!parsed.isFinite() || parsed.lt(0)) return null;
   return parsed.toFixed(2);
 }
 

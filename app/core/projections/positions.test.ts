@@ -47,6 +47,23 @@ describe("computePositions (AVCO)", () => {
     expect(computePositions([], BIZKAIA)).toEqual([]);
   });
 
+  it("books a purchase before a sale at the same instant, whatever order the ledger reads them in", () => {
+    const opening = trade("BUY", "X", "10", "1000", { ts: "2025-01-01" });
+    const at = "2025-02-01T10:00:00Z";
+    const sell = trade("SELL", "X", "5", "1000", { ts: at });
+    const buy = trade("BUY", "X", "10", "3000", { ts: at });
+
+    for (const events of [
+      [opening, sell, buy],
+      [opening, buy, sell],
+    ]) {
+      const p = only(computePositions(events, BIZKAIA));
+      expect(p.quantity).toBe("15");
+      expect(p.costBasis).toBe("3000");
+      expect(p.realizedPnL).toBe("0");
+    }
+  });
+
   it("computes weighted-average cost across buys", () => {
     const p = only(
       computePositions(

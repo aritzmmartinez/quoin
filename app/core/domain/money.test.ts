@@ -32,8 +32,31 @@ describe("Money", () => {
     expect(() => Money.fromString("abc")).toThrow(/Invalid money/);
     expect(() => Money.fromString("")).toThrow(/Invalid money/);
     expect(() => Money.fromString("1.2.3")).toThrow(/Invalid money/);
-    expect(() => Money.fromString("Infinity")).toThrow(/finite/);
-    expect(() => Money.fromString("NaN")).toThrow(/finite/);
+    expect(() => Money.fromString("Infinity")).toThrow(/Invalid money/);
+    expect(() => Money.fromString("NaN")).toThrow(/Invalid money/);
+  });
+
+  it("reads only plain decimals, not every form decimal.js accepts", () => {
+    for (const value of ["0x1F", "0b11", "0o7", "1_000", " 1", "1e", "٣"]) {
+      expect(() => Money.fromString(value)).toThrow(/Invalid money/);
+    }
+    expect(Money.fromString("+.5e-3").toString()).toBe("0.0005");
+    expect(Money.fromString("5.").toString()).toBe("5");
+    expect(Money.fromString("1e1000").isPositive()).toBe(true);
+    expect(() => Money.fromString("1e1001")).toThrow(/Invalid money/);
+    expect(() => Money.fromString("1e-1001")).toThrow(/Invalid money/);
+  });
+
+  it("counts zero as neither positive nor negative, whatever its sign", () => {
+    for (const zero of [
+      Money.zero(),
+      Money.fromString("-0"),
+      Money.zero().negate(),
+    ]) {
+      expect(zero.isPositive()).toBe(false);
+      expect(zero.isNegative()).toBe(false);
+      expect(zero.isZero()).toBe(true);
+    }
   });
 
   it("compares and checks sign", () => {
