@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.1] - 2026-10-30
+
 ### Added
 - Two more sets of reference cases shared with the mobile app: decimal arithmetic, and what the home screen shows (positions, their value and unrealised gain, the summary and the allocation). Some of the home screen figures are also worked out by hand, with the arithmetic in the case. Each set is written by a script in the repository, and a test fails if the file and the script disagree.
 
@@ -483,7 +485,8 @@ fund holdings must be supplied as CSV rather than the Excel most issuers publish
 Design rationale lives beside the code it explains, in `docs/ARCHITECTURE.md` and in the
 commit history — not here.
 
-[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.15.0...HEAD
+[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.15.1...HEAD
+[0.15.1]: https://github.com/aritzmmartinez/quoin/compare/v0.15.0...v0.15.1
 [0.15.0]: https://github.com/aritzmmartinez/quoin/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/aritzmmartinez/quoin/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/aritzmmartinez/quoin/compare/v0.12.1...v0.13.0
