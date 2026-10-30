@@ -42,7 +42,7 @@
     "@prisma/client": "^7.10.1",
     "@react-router/node": "8.4.0",
     "@react-router/serve": "8.4.0",
-    "better-sqlite3": "^12.11.1",
+    "better-sqlite3": "^13.0.3",
     "decimal.js": "^10.6.0",
     "dotenv": "^18.0.8",
     "isbot": "^5.2.2",
