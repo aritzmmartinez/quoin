@@ -1,3 +1,5 @@
+import { compareCodeUnits } from "../domain";
+
 import {
   ledgerKey,
   type Exchange,
@@ -176,7 +178,9 @@ export function merge(local: SyncState, incoming: Exchange): MergePlan {
       peers: mergeSeen(me, them, incoming.exportHlc),
     },
     conflicts,
-    effects: effects.sort((a, b) => effectKey(a).localeCompare(effectKey(b))),
+    effects: effects.sort((a, b) =>
+      compareCodeUnits(effectKey(a), effectKey(b)),
+    ),
   };
 }
 
@@ -249,7 +253,7 @@ function mergeLedger(
   }
 
   return {
-    insert: insert.sort((a, b) => ledgerKey(a).localeCompare(ledgerKey(b))),
+    insert: insert.sort((a, b) => compareCodeUnits(ledgerKey(a), ledgerKey(b))),
     markInKind: markInKind.sort(),
   };
 }
@@ -316,8 +320,8 @@ function mergeInstruments(
   }
 
   return {
-    insert: insert.sort((a, b) => a.id.localeCompare(b.id)),
-    update: update.sort((a, b) => a.id.localeCompare(b.id)),
+    insert: insert.sort((a, b) => compareCodeUnits(a.id, b.id)),
+    update: update.sort((a, b) => compareCodeUnits(a.id, b.id)),
   };
 }
 
@@ -329,7 +333,7 @@ function mergeTargets(
   const buried = new Set(local.tombstones.map((t) => t.key));
   const tombstones = incoming.tombstones
     .filter((t) => !buried.has(t.key))
-    .sort((a, b) => a.key.localeCompare(b.key));
+    .sort((a, b) => compareCodeUnits(a.key, b.key));
   const dead = new Set([...buried, ...tombstones.map((t) => t.key)]);
 
   const stored = byKey(local.targets, (t) => t.id);
@@ -356,14 +360,16 @@ function mergeTargets(
       target.id,
     ]);
   }
-  for (const [day, ids] of [...byDay].sort(([a], [b]) => a.localeCompare(b))) {
+  for (const [day, ids] of [...byDay].sort(([a], [b]) =>
+    compareCodeUnits(a, b),
+  )) {
     if (ids.length > 1)
       conflicts.push({ kind: "target-day", day, ids: ids.sort() });
   }
 
   return {
     targets: {
-      insert: insert.sort((a, b) => a.id.localeCompare(b.id)),
+      insert: insert.sort((a, b) => compareCodeUnits(a.id, b.id)),
       delete: remove,
     },
     tombstones,
@@ -380,7 +386,7 @@ function mergeHoldings(
   const stored = byKey(local, (b) => b.instrumentId);
   const replace: HoldingsBlockRow[] = [];
   const sortedRows = (b: HoldingsBlockRow) =>
-    [...b.rows].sort((x, y) => x.identity.localeCompare(y.identity));
+    [...b.rows].sort((x, y) => compareCodeUnits(x.identity, y.identity));
 
   for (const block of incoming) {
     const mine = stored.get(block.instrumentId);
@@ -409,7 +415,9 @@ function mergeHoldings(
       conflicts.push({ kind: "holdings", instrumentId: block.instrumentId });
     }
   }
-  return replace.sort((a, b) => a.instrumentId.localeCompare(b.instrumentId));
+  return replace.sort((a, b) =>
+    compareCodeUnits(a.instrumentId, b.instrumentId),
+  );
 }
 
 function prefersIncoming(mine: IdentityRow, theirs: IdentityRow): boolean {
@@ -436,7 +444,7 @@ function mergeIdentities(
       const mine = stored.get(row.identity);
       return !mine || (!same(mine, row) && prefersIncoming(mine, row));
     })
-    .sort((a, b) => a.identity.localeCompare(b.identity));
+    .sort((a, b) => compareCodeUnits(a.identity, b.identity));
 }
 
 function mergeSeen(me: Side, them: Side, exportHlc: string): Peer[] {
@@ -450,5 +458,5 @@ function mergeSeen(me: Side, them: Side, exportHlc: string): Peer[] {
   raise(them.self, exportHlc);
   return [...seen]
     .map(([deviceId, mark]) => ({ deviceId, seen: mark }))
-    .sort((a, b) => a.deviceId.localeCompare(b.deviceId));
+    .sort((a, b) => compareCodeUnits(a.deviceId, b.deviceId));
 }

@@ -56,8 +56,10 @@ export function computeWeightedTer(
     }
 
     const ter = new Decimal(line.ter);
-    if (!ter.isFinite() || ter.isNegative()) {
-      throw new Error(`Not an annual fee for ${line.instrumentId}: ${line.ter}`);
+    if (!ter.isFinite() || ter.lt(0)) {
+      throw new Error(
+        `Not an annual fee for ${line.instrumentId}: ${line.ter}`,
+      );
     }
 
     coveredValue = coveredValue.add(value);

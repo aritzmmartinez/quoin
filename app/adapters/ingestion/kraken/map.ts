@@ -145,7 +145,7 @@ function isSpotToEarn(row: KrakenRow): boolean {
   return (
     row.type === "hybridearnwithdrawal" &&
     isSpotWallet(row) &&
-    new Decimal(row.amount || "0").isNegative()
+    new Decimal(row.amount || "0").lt(0)
   );
 }
 
@@ -199,7 +199,7 @@ export function mapGroup(
         cash(
           refid,
           first,
-          new Decimal(first.amount).isNegative() ? "WITHDRAWAL" : "DEPOSIT",
+          new Decimal(first.amount).lt(0) ? "WITHDRAWAL" : "DEPOSIT",
           ACCOUNT_TRANSFER_NOTE,
         ),
         notice("account-transfer", first),
@@ -231,7 +231,7 @@ function tradeEvent(
     type,
     instrumentId: instrument.id,
     quantity: quantity.toFixed(),
-    price: quantity.isZero() ? "0" : fiatAmount.dividedBy(quantity).toFixed(),
+    price: fiatAmount.dividedBy(quantity).toFixed(),
     grossAmount: fiatAmount.toFixed(),
     fees: abs(fiat.fee),
     currency: fiat.asset,
@@ -248,6 +248,8 @@ function buy(
   fiat: KrakenRow,
   received: KrakenRow,
 ): MappedItem {
+  const quantity = net(received);
+  if (!quantity.gt(0)) return unsupported(received);
   return {
     kind: "domain",
     instrument,
@@ -256,7 +258,7 @@ function buy(
       instrument,
       "BUY",
       fiat,
-      net(received),
+      quantity,
       new Decimal(abs(fiat.amount)),
     ),
   };
@@ -268,6 +270,8 @@ function sell(
   fiat: KrakenRow,
   delivered: KrakenRow,
 ): MappedItem {
+  const quantity = net(delivered).abs();
+  if (quantity.isZero()) return unsupported(delivered);
   return {
     kind: "domain",
     instrument,
@@ -276,7 +280,7 @@ function sell(
       instrument,
       "SELL",
       fiat,
-      net(delivered).abs(),
+      quantity,
       new Decimal(abs(fiat.amount)),
     ),
   };
@@ -337,7 +341,7 @@ function swap(
 
   const deliveredQuantity = net(spend).abs();
   const receivedQuantity = net(receive);
-  if (deliveredQuantity.isZero() || !receivedQuantity.isPositive())
+  if (deliveredQuantity.isZero() || !receivedQuantity.gt(0))
     return [unsupported(receive)];
 
   const out = swapLegValue(spend, delivered, priceAt, false);
@@ -454,7 +458,7 @@ function reward(refid: string, row: KrakenRow, priceAt: PriceAt): MappedItem[] {
 
   const ts = parseTime(row.time);
   const quantity = net(row);
-  if (!quantity.isPositive()) return [unsupported(row)];
+  if (!quantity.gt(0)) return [unsupported(row)];
 
   const value =
     valueAtKraken(row, quantity) ??

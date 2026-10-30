@@ -56,9 +56,9 @@ export function carryforwardFrom(
     let consumed = new Decimal(0);
     let finalNet = ownNet;
 
-    if (ownNet.isNegative()) {
+    if (ownNet.lt(0)) {
       pending.push({ year: y, remaining: ownNet.abs() });
-    } else if (ownNet.isPositive()) {
+    } else if (ownNet.gt(0)) {
       let remaining = ownNet;
       for (const loss of pending) {
         if (remaining.lte(0)) break;

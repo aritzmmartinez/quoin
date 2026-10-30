@@ -2,6 +2,7 @@ import Decimal from "decimal.js";
 
 import {
   Money,
+  compareTrades,
   type LedgerEvent,
   type Revalue,
   type TradeEvent,
@@ -44,7 +45,7 @@ export function computeCostBasisTimeline(
   const trades = allTrades
     .filter((t) => t.instrumentId === instrumentId)
     .slice()
-    .sort((a, b) => a.ts.getTime() - b.ts.getTime());
+    .sort(compareTrades);
 
   let quantity = new Decimal(0);
   let costBasis = Money.zero();

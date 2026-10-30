@@ -374,7 +374,7 @@ export function buildTaxYearView(
   const scale = getTaxScale(result.territory, year);
   const netBase = new Decimal(carry.netSavingsBase);
   const quota = scale
-    ? (netBase.isPositive()
+    ? (netBase.gt(0)
         ? computeSavingsQuota(Money.fromString(carry.netSavingsBase), scale)
         : Money.zero()
       ).toString()
@@ -417,7 +417,7 @@ export function windowOpenUntil(
   gain: RealizedGainDetail,
   today: string,
 ): string | null {
-  if (!gain.repurchaseWindow || !new Decimal(gain.realizedPnL).isNegative())
+  if (!gain.repurchaseWindow || !new Decimal(gain.realizedPnL).lt(0))
     return null;
   const end = toIsoDate(gain.repurchaseWindow.window.end);
   return today <= end ? end : null;

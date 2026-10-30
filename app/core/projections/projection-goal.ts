@@ -21,7 +21,7 @@ export function solveContribution(
   targetAmount: string,
 ): string | null {
   const goal = new Decimal(Money.fromString(targetAmount).toString());
-  if (goal.isNegative()) {
+  if (goal.lt(0)) {
     throw new Error("A goal cannot be negative.");
   }
 
@@ -58,7 +58,7 @@ export function solveHorizon(
   maxMonths: number = MAX_HORIZON_MONTHS,
 ): number | null {
   const goal = new Decimal(Money.fromString(targetAmount).toString());
-  if (goal.isNegative()) {
+  if (goal.lt(0)) {
     throw new Error("A goal cannot be negative.");
   }
 

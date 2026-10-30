@@ -8,6 +8,23 @@ import Decimal from "decimal.js";
 
 Decimal.set({ precision: 40, toExpNeg: -30, toExpPos: 40 });
 
+const DECIMAL_SHAPE = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE]([+-]?\d+))?$/;
+export const MAX_DECIMAL_EXPONENT = 1000;
+
+/**
+ * The one written form of a decimal everything stored or parsed must have.
+ * decimal.js alone also reads `0x1F`, `0b11` and `1_000`, which the mobile
+ * client does not, and an exponent with no bound.
+ */
+export function isDecimalString(value: string): boolean {
+  const match = DECIMAL_SHAPE.exec(value);
+  if (match === null) return false;
+  const exponent = match[1];
+  return (
+    exponent === undefined || Math.abs(Number(exponent)) <= MAX_DECIMAL_EXPONENT
+  );
+}
+
 export class Money {
   private constructor(private readonly amount: Decimal) {}
 
@@ -16,16 +33,10 @@ export class Money {
   }
 
   static fromString(value: string): Money {
-    let parsed: Decimal;
-    try {
-      parsed = new Decimal(value);
-    } catch {
+    if (!isDecimalString(value)) {
       throw new Error(`Invalid money value: "${value}"`);
     }
-    if (!parsed.isFinite()) {
-      throw new Error(`Money must be finite, got "${value}"`);
-    }
-    return new Money(parsed);
+    return new Money(new Decimal(value));
   }
 
   private static fromDecimal(value: Decimal): Money {
@@ -61,11 +72,11 @@ export class Money {
   }
 
   isNegative(): boolean {
-    return this.amount.isNegative();
+    return this.amount.lt(0);
   }
 
   isPositive(): boolean {
-    return this.amount.isPositive();
+    return this.amount.gt(0);
   }
 
   compare(other: Money): number {

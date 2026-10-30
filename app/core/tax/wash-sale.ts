@@ -6,7 +6,7 @@ import {
   toCalendarDate,
   type CalendarDate,
 } from "../calendar";
-import { isInKind, type TradeEvent } from "../domain";
+import { compareTrades, isInKind, type TradeEvent } from "../domain";
 
 import {
   UNLISTED_NOTICE_WINDOW_MONTHS,
@@ -15,7 +15,7 @@ import {
   type RepurchaseRule,
   type Jurisdiction,
 } from "./config";
-import { compareTrades, type FifoSale } from "./fifo";
+import type { FifoSale } from "./fifo";
 
 export interface WashSaleWindow {
   start: CalendarDate;
