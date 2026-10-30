@@ -1,0 +1,1132 @@
+{
+  "contract": "portfolio",
+  "version": 1,
+  "description": "What the home screen shows: AVCO positions, prices in euros, market values, the summary, the allocation by category and the top positions. Shared with the mobile client: both implementations must reproduce every case. Events are LedgerEvents; an absent fxSource is IDENTITY and an absent funding is CASH. Positions come in the order of each instrument's first trade, trades ordered by instant, then BUY before SELL, then externalId, then id; pricesInBase, marketValues, summary, allocation and top come from those positions, and an instrument with no category falls into OTHER. expect is written by running the TypeScript core; byHand, where a case has it, is worked out by hand and its arithmetic says how.",
+  "cases": [
+    {
+      "name": "Fees on every trade and a partial sale, two instruments",
+      "residence": "bizkaia",
+      "now": "2025-12-31T23:30:00.000Z",
+      "events": [
+        {
+          "id": "e-1",
+          "ts": "2025-01-10T09:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "IE00TEST0001",
+          "quantity": "10",
+          "price": "100",
+          "grossAmount": "1000",
+          "fees": "1",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-1"
+        },
+        {
+          "id": "e-2",
+          "ts": "2025-02-10T09:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "IE00TEST0001",
+          "quantity": "5",
+          "price": "120",
+          "grossAmount": "600",
+          "fees": "1",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-2"
+        },
+        {
+          "id": "e-3",
+          "ts": "2025-03-10T09:00:00.000Z",
+          "type": "SELL",
+          "instrumentId": "IE00TEST0001",
+          "quantity": "6",
+          "price": "120",
+          "grossAmount": "720",
+          "fees": "1",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-3"
+        },
+        {
+          "id": "e-4",
+          "ts": "2025-04-10T09:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "US00TEST0002",
+          "quantity": "4",
+          "price": "100",
+          "grossAmount": "400",
+          "fees": "2",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-4"
+        }
+      ],
+      "prices": [
+        {
+          "instrumentId": "IE00TEST0001",
+          "price": "110",
+          "currency": "EUR",
+          "asOf": "2025-12-31T16:30:00.000Z"
+        },
+        {
+          "instrumentId": "US00TEST0002",
+          "price": "95",
+          "currency": "EUR",
+          "asOf": "2025-12-31T21:00:00.000Z"
+        }
+      ],
+      "rates": [],
+      "categories": {
+        "IE00TEST0001": "EQUITY_FUND",
+        "US00TEST0002": "COMPANY"
+      },
+      "topLimit": 5,
+      "byHand": {
+        "arithmetic": "Fund: 10 for 1000 + 1 and 5 for 600 + 1 is 15 units costing 1602, 106.8 each. Selling 6 takes 6 × 106.8 = 640.8 out: 9 units costing 961.2, and 720 − 1 − 640.8 = 78.2 realised. Stock: 4 for 400 + 2 = 402. Value 9 × 110 + 4 × 95 = 990 + 380 = 1370; cost 961.2 + 402 = 1363.2; unrealised 1370 − 1363.2 = 6.8.",
+        "positions": {
+          "IE00TEST0001": {
+            "quantity": "9",
+            "costBasis": "961.2"
+          },
+          "US00TEST0002": {
+            "quantity": "4",
+            "costBasis": "402"
+          }
+        },
+        "totalValue": "1370",
+        "unrealizedPnL": "6.8",
+        "realizedPnL": "78.2"
+      },
+      "expect": {
+        "unconvertible": [],
+        "positions": [
+          {
+            "instrumentId": "IE00TEST0001",
+            "quantity": "9",
+            "costBasis": "961.2",
+            "averageCost": "106.8",
+            "realizedPnL": "78.2"
+          },
+          {
+            "instrumentId": "US00TEST0002",
+            "quantity": "4",
+            "costBasis": "402",
+            "averageCost": "100.5",
+            "realizedPnL": "0"
+          }
+        ],
+        "pricesInBase": {
+          "prices": {
+            "IE00TEST0001": {
+              "instrumentId": "IE00TEST0001",
+              "price": "110",
+              "currency": "EUR",
+              "asOf": "2025-12-31T16:30:00.000Z"
+            },
+            "US00TEST0002": {
+              "instrumentId": "US00TEST0002",
+              "price": "95",
+              "currency": "EUR",
+              "asOf": "2025-12-31T21:00:00.000Z"
+            }
+          },
+          "unrated": {}
+        },
+        "marketValues": {
+          "IE00TEST0001": {
+            "marketValue": "990",
+            "unrealizedPnL": "28.8",
+            "weight": "0.722628"
+          },
+          "US00TEST0002": {
+            "marketValue": "380",
+            "unrealizedPnL": "-22",
+            "weight": "0.277372"
+          }
+        },
+        "summary": {
+          "totalValue": "1370",
+          "totalInvested": "1363.2",
+          "openCost": "1363.2",
+          "pricedCost": "1363.2",
+          "unpricedCost": "0",
+          "unrealizedPnL": "6.8",
+          "realizedPnL": "78.2",
+          "returnPct": "0.004988",
+          "pricedCount": 2,
+          "unpricedCount": 0
+        },
+        "allocation": [
+          {
+            "category": "EQUITY_FUND",
+            "value": "990",
+            "weight": "0.722628"
+          },
+          {
+            "category": "COMPANY",
+            "value": "380",
+            "weight": "0.277372"
+          }
+        ],
+        "top": [
+          {
+            "instrumentId": "IE00TEST0001",
+            "marketValue": "990",
+            "weight": "0.722628",
+            "unrealizedPnL": "28.8",
+            "unrealizedPnLPct": "0.029963"
+          },
+          {
+            "instrumentId": "US00TEST0002",
+            "marketValue": "380",
+            "weight": "0.277372",
+            "unrealizedPnL": "-22",
+            "unrealizedPnLPct": "-0.054726"
+          }
+        ]
+      }
+    },
+    {
+      "name": "A full sale and a rebuy, then a sale and a purchase at the same instant, the sale listed first",
+      "residence": "bizkaia",
+      "now": "2026-01-15T12:00:00.000Z",
+      "events": [
+        {
+          "id": "e-5",
+          "ts": "2025-01-15T10:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "US00TEST0002",
+          "quantity": "10",
+          "price": "100",
+          "grossAmount": "1000",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-5"
+        },
+        {
+          "id": "e-6",
+          "ts": "2025-04-01T10:00:00.000Z",
+          "type": "SELL",
+          "instrumentId": "US00TEST0002",
+          "quantity": "10",
+          "price": "120",
+          "grossAmount": "1200",
+          "fees": "2",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-6"
+        },
+        {
+          "id": "e-7",
+          "ts": "2025-10-26T00:30:00.000Z",
+          "type": "BUY",
+          "instrumentId": "US00TEST0002",
+          "quantity": "5",
+          "price": "110",
+          "grossAmount": "550",
+          "fees": "1",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-7"
+        },
+        {
+          "id": "e-8",
+          "ts": "2025-12-31T23:30:00.000Z",
+          "type": "SELL",
+          "instrumentId": "US00TEST0002",
+          "quantity": "2",
+          "price": "120",
+          "grossAmount": "240",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-8"
+        },
+        {
+          "id": "e-9",
+          "ts": "2025-12-31T23:30:00.000Z",
+          "type": "BUY",
+          "instrumentId": "US00TEST0002",
+          "quantity": "3",
+          "price": "110",
+          "grossAmount": "330",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-9"
+        }
+      ],
+      "prices": [
+        {
+          "instrumentId": "US00TEST0002",
+          "price": "120",
+          "currency": "EUR",
+          "asOf": "2026-01-14T21:00:00.000Z"
+        }
+      ],
+      "rates": [],
+      "categories": {
+        "US00TEST0002": "COMPANY"
+      },
+      "topLimit": 5,
+      "byHand": {
+        "arithmetic": "10 for 1000, then all 10 sold for 1200 − 2: 1198 − 1000 = 198 realised and the position is empty, cost 0. Rebuy 5 for 550 + 1 = 551. At one instant the purchase goes first whatever the order listed: 8 units costing 881, 110.125 each; selling 2 takes 220.25 out, 240 − 220.25 = 19.75 realised, leaving 6 units costing 660.75. Value 6 × 120 = 720; unrealised 720 − 660.75 = 59.25; realised 198 + 19.75 = 217.75. With the sale first it would have been 6 units costing 661.2.",
+        "positions": {
+          "US00TEST0002": {
+            "quantity": "6",
+            "costBasis": "660.75"
+          }
+        },
+        "totalValue": "720",
+        "unrealizedPnL": "59.25",
+        "realizedPnL": "217.75"
+      },
+      "expect": {
+        "unconvertible": [],
+        "positions": [
+          {
+            "instrumentId": "US00TEST0002",
+            "quantity": "6",
+            "costBasis": "660.75",
+            "averageCost": "110.125",
+            "realizedPnL": "217.75"
+          }
+        ],
+        "pricesInBase": {
+          "prices": {
+            "US00TEST0002": {
+              "instrumentId": "US00TEST0002",
+              "price": "120",
+              "currency": "EUR",
+              "asOf": "2026-01-14T21:00:00.000Z"
+            }
+          },
+          "unrated": {}
+        },
+        "marketValues": {
+          "US00TEST0002": {
+            "marketValue": "720",
+            "unrealizedPnL": "59.25",
+            "weight": "1.000000"
+          }
+        },
+        "summary": {
+          "totalValue": "720",
+          "totalInvested": "660.75",
+          "openCost": "660.75",
+          "pricedCost": "660.75",
+          "unpricedCost": "0",
+          "unrealizedPnL": "59.25",
+          "realizedPnL": "217.75",
+          "returnPct": "0.089671",
+          "pricedCount": 1,
+          "unpricedCount": 0
+        },
+        "allocation": [
+          {
+            "category": "COMPANY",
+            "value": "720",
+            "weight": "1.000000"
+          }
+        ],
+        "top": [
+          {
+            "instrumentId": "US00TEST0002",
+            "marketValue": "720",
+            "weight": "1.000000",
+            "unrealizedPnL": "59.25",
+            "unrealizedPnLPct": "0.089671"
+          }
+        ]
+      }
+    },
+    {
+      "name": "An in-kind purchase, a row converted at the ECB rate and an instrument with a row that has none; valued just after midnight in Madrid",
+      "residence": "bizkaia",
+      "now": "2025-10-23T22:30:00.000Z",
+      "events": [
+        {
+          "id": "e-10",
+          "ts": "2025-06-02T08:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "IE00TEST0001",
+          "quantity": "10",
+          "price": "100",
+          "grossAmount": "1000",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-10"
+        },
+        {
+          "id": "e-11",
+          "ts": "2025-06-03T08:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "IE00TEST0001",
+          "quantity": "0.5",
+          "price": "104",
+          "grossAmount": "52",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-11",
+          "funding": "IN_KIND"
+        },
+        {
+          "id": "e-12",
+          "ts": "2025-06-02T15:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "US00TEST0003",
+          "quantity": "10",
+          "price": "108.5",
+          "grossAmount": "1085",
+          "fees": "1.085",
+          "currency": "USD",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-12",
+          "fxSource": "ECB",
+          "fxRate": "1.085",
+          "fxDirection": "QUOTE_PER_BASE",
+          "fxDate": "2025-06-02"
+        },
+        {
+          "id": "e-13",
+          "ts": "2025-06-02T15:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "US00TEST0004",
+          "quantity": "2",
+          "price": "108.5",
+          "grossAmount": "217",
+          "fees": "0",
+          "currency": "USD",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-13",
+          "fxSource": "ECB",
+          "fxRate": "1.085",
+          "fxDirection": "QUOTE_PER_BASE",
+          "fxDate": "2025-06-02"
+        },
+        {
+          "id": "e-14",
+          "ts": "2025-06-04T15:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "US00TEST0004",
+          "quantity": "3",
+          "price": "100",
+          "grossAmount": "300",
+          "fees": "0",
+          "currency": "USD",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-14"
+        }
+      ],
+      "prices": [
+        {
+          "instrumentId": "IE00TEST0001",
+          "price": "100",
+          "currency": "EUR",
+          "asOf": "2025-10-23T15:30:00.000Z"
+        },
+        {
+          "instrumentId": "US00TEST0003",
+          "price": "120",
+          "currency": "USD",
+          "asOf": "2025-10-23T20:00:00.000Z"
+        },
+        {
+          "instrumentId": "US00TEST0004",
+          "price": "50",
+          "currency": "USD",
+          "asOf": "2025-10-23T20:00:00.000Z"
+        }
+      ],
+      "rates": [
+        {
+          "base": "EUR",
+          "quote": "USD",
+          "day": "2025-10-23",
+          "rate": "1.1",
+          "source": "ECB"
+        },
+        {
+          "base": "EUR",
+          "quote": "USD",
+          "day": "2025-10-24",
+          "rate": "1.2",
+          "source": "ECB"
+        }
+      ],
+      "categories": {
+        "IE00TEST0001": "EQUITY_FUND",
+        "US00TEST0003": "COMPANY"
+      },
+      "topLimit": 5,
+      "byHand": {
+        "arithmetic": "Fund: 10 for 1000 plus 0.5 received in kind at 52 is 10.5 units costing 1052. USD stock: 1085 USD and 1.085 USD of fees at 1.085 USD per euro are 1000 + 1 = 1001. The other USD instrument has one row in USD with no rate, so every row of it is left out. 22:30Z on 23 October is 00:30 on the 24th in Madrid, so its rate 1.2 applies, not the 23rd's 1.1: 120 USD is 100 €. Value 10.5 × 100 + 10 × 100 = 2050; cost 1052 + 1001 = 2053; unrealised −3.",
+        "positions": {
+          "IE00TEST0001": {
+            "quantity": "10.5",
+            "costBasis": "1052"
+          },
+          "US00TEST0003": {
+            "quantity": "10",
+            "costBasis": "1001"
+          }
+        },
+        "totalValue": "2050",
+        "unrealizedPnL": "-3"
+      },
+      "expect": {
+        "unconvertible": [
+          "US00TEST0004"
+        ],
+        "positions": [
+          {
+            "instrumentId": "IE00TEST0001",
+            "quantity": "10.5",
+            "costBasis": "1052",
+            "averageCost": "100.1904761904761904761904761904761904762",
+            "realizedPnL": "0"
+          },
+          {
+            "instrumentId": "US00TEST0003",
+            "quantity": "10",
+            "costBasis": "1001",
+            "averageCost": "100.1",
+            "realizedPnL": "0"
+          }
+        ],
+        "pricesInBase": {
+          "prices": {
+            "IE00TEST0001": {
+              "instrumentId": "IE00TEST0001",
+              "price": "100",
+              "currency": "EUR",
+              "asOf": "2025-10-23T15:30:00.000Z"
+            },
+            "US00TEST0003": {
+              "instrumentId": "US00TEST0003",
+              "price": "100",
+              "currency": "EUR",
+              "asOf": "2025-10-23T20:00:00.000Z"
+            },
+            "US00TEST0004": {
+              "instrumentId": "US00TEST0004",
+              "price": "41.66666666666666666666666666666666666667",
+              "currency": "EUR",
+              "asOf": "2025-10-23T20:00:00.000Z"
+            }
+          },
+          "unrated": {}
+        },
+        "marketValues": {
+          "IE00TEST0001": {
+            "marketValue": "1050",
+            "unrealizedPnL": "-2",
+            "weight": "0.512195"
+          },
+          "US00TEST0003": {
+            "marketValue": "1000",
+            "unrealizedPnL": "-1",
+            "weight": "0.487805"
+          }
+        },
+        "summary": {
+          "totalValue": "2050",
+          "totalInvested": "2053",
+          "openCost": "2053",
+          "pricedCost": "2053",
+          "unpricedCost": "0",
+          "unrealizedPnL": "-3",
+          "realizedPnL": "0",
+          "returnPct": "-0.001461",
+          "pricedCount": 2,
+          "unpricedCount": 0
+        },
+        "allocation": [
+          {
+            "category": "EQUITY_FUND",
+            "value": "1050",
+            "weight": "0.512195"
+          },
+          {
+            "category": "COMPANY",
+            "value": "1000",
+            "weight": "0.487805"
+          }
+        ],
+        "top": [
+          {
+            "instrumentId": "IE00TEST0001",
+            "marketValue": "1050",
+            "weight": "0.512195",
+            "unrealizedPnL": "-2",
+            "unrealizedPnLPct": "-0.001901"
+          },
+          {
+            "instrumentId": "US00TEST0003",
+            "marketValue": "1000",
+            "weight": "0.487805",
+            "unrealizedPnL": "-1",
+            "unrealizedPnLPct": "-0.000999"
+          }
+        ]
+      }
+    },
+    {
+      "name": "A crypto swap valued at the greater side, and a line quoted in a currency with no rate",
+      "residence": "bizkaia",
+      "now": "2025-04-02T10:00:00.000Z",
+      "events": [
+        {
+          "id": "e-15",
+          "ts": "2025-03-01T12:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "TESTCOIN",
+          "quantity": "1",
+          "price": "1000",
+          "grossAmount": "1000",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-15"
+        },
+        {
+          "id": "e-16",
+          "ts": "2025-03-31T22:30:00.000Z",
+          "type": "BUY",
+          "instrumentId": "TESTTOKEN",
+          "quantity": "10",
+          "price": "58",
+          "grossAmount": "580",
+          "fees": "25",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-16",
+          "linkId": "swap-1",
+          "linkKind": "swap"
+        },
+        {
+          "id": "e-17",
+          "ts": "2025-03-31T22:30:00.000Z",
+          "type": "SELL",
+          "instrumentId": "TESTCOIN",
+          "quantity": "0.5",
+          "price": "1200",
+          "grossAmount": "600",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-17",
+          "linkId": "swap-1",
+          "linkKind": "swap"
+        },
+        {
+          "id": "e-18",
+          "ts": "2025-03-15T10:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "GB00TEST0005",
+          "quantity": "2",
+          "price": "100",
+          "grossAmount": "200",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-18"
+        }
+      ],
+      "prices": [
+        {
+          "instrumentId": "TESTCOIN",
+          "price": "1100",
+          "currency": "EUR",
+          "asOf": "2025-04-02T09:59:00.000Z"
+        },
+        {
+          "instrumentId": "TESTTOKEN",
+          "price": "50",
+          "currency": "EUR",
+          "asOf": "2025-04-02T09:59:00.000Z"
+        },
+        {
+          "instrumentId": "GB00TEST0005",
+          "price": "90",
+          "currency": "GBP",
+          "asOf": "2025-04-01T15:30:00.000Z"
+        }
+      ],
+      "rates": [],
+      "categories": {
+        "TESTCOIN": "CRYPTO",
+        "TESTTOKEN": "CRYPTO"
+      },
+      "topLimit": 5,
+      "byHand": {
+        "arithmetic": "Swap: 0.5 coin delivered worth 600; 10 tokens received worth 580 + a 25 fee = 605. The greater, 605, is the transmission value; the fee comes off it, so the sale's proceeds and the tokens' cost are both 605 − 25 = 580. Coin: 1 for 1000, half sold takes 500 out, leaving 0.5 costing 500. Tokens: 10 costing 580. The GBP line has no rate and stays unvalued at its cost of 200. Value 0.5 × 1100 + 10 × 50 = 550 + 500 = 1050; priced cost 500 + 580 = 1080; unrealised −30; cost of everything held 1080 + 200 = 1280.",
+        "positions": {
+          "TESTCOIN": {
+            "quantity": "0.5",
+            "costBasis": "500"
+          },
+          "TESTTOKEN": {
+            "quantity": "10",
+            "costBasis": "580"
+          },
+          "GB00TEST0005": {
+            "quantity": "2",
+            "costBasis": "200"
+          }
+        },
+        "totalValue": "1050",
+        "unrealizedPnL": "-30",
+        "openCost": "1280"
+      },
+      "expect": {
+        "unconvertible": [],
+        "positions": [
+          {
+            "instrumentId": "TESTCOIN",
+            "quantity": "0.5",
+            "costBasis": "500",
+            "averageCost": "1000",
+            "realizedPnL": "80"
+          },
+          {
+            "instrumentId": "GB00TEST0005",
+            "quantity": "2",
+            "costBasis": "200",
+            "averageCost": "100",
+            "realizedPnL": "0"
+          },
+          {
+            "instrumentId": "TESTTOKEN",
+            "quantity": "10",
+            "costBasis": "580",
+            "averageCost": "58",
+            "realizedPnL": "0"
+          }
+        ],
+        "pricesInBase": {
+          "prices": {
+            "TESTCOIN": {
+              "instrumentId": "TESTCOIN",
+              "price": "1100",
+              "currency": "EUR",
+              "asOf": "2025-04-02T09:59:00.000Z"
+            },
+            "TESTTOKEN": {
+              "instrumentId": "TESTTOKEN",
+              "price": "50",
+              "currency": "EUR",
+              "asOf": "2025-04-02T09:59:00.000Z"
+            }
+          },
+          "unrated": {
+            "GB00TEST0005": "GBP"
+          }
+        },
+        "marketValues": {
+          "TESTCOIN": {
+            "marketValue": "550",
+            "unrealizedPnL": "50",
+            "weight": "0.523810"
+          },
+          "GB00TEST0005": {
+            "marketValue": null,
+            "unrealizedPnL": null,
+            "weight": null
+          },
+          "TESTTOKEN": {
+            "marketValue": "500",
+            "unrealizedPnL": "-80",
+            "weight": "0.476190"
+          }
+        },
+        "summary": {
+          "totalValue": "1050",
+          "totalInvested": "1080",
+          "openCost": "1280",
+          "pricedCost": "1080",
+          "unpricedCost": "200",
+          "unrealizedPnL": "-30",
+          "realizedPnL": "80",
+          "returnPct": "-0.027778",
+          "pricedCount": 2,
+          "unpricedCount": 1
+        },
+        "allocation": [
+          {
+            "category": "CRYPTO",
+            "value": "1050",
+            "weight": "1.000000"
+          }
+        ],
+        "top": [
+          {
+            "instrumentId": "TESTCOIN",
+            "marketValue": "550",
+            "weight": "0.523810",
+            "unrealizedPnL": "50",
+            "unrealizedPnLPct": "0.100000"
+          },
+          {
+            "instrumentId": "TESTTOKEN",
+            "marketValue": "500",
+            "weight": "0.476190",
+            "unrealizedPnL": "-80",
+            "unrealizedPnLPct": "-0.137931"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Several instruments, a closed position, an uncategorised one and a top list cut short, valued on the night the clocks go forward",
+      "residence": "bizkaia",
+      "now": "2026-03-29T01:30:00.000Z",
+      "events": [
+        {
+          "id": "e-19",
+          "ts": "2025-11-03T09:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "IE00TEST0001",
+          "quantity": "12.345678",
+          "price": "100.0001782000146124011982168982537856568",
+          "grossAmount": "1234.57",
+          "fees": "0.99",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-19"
+        },
+        {
+          "id": "e-20",
+          "ts": "2026-01-05T09:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "IE00TEST0001",
+          "quantity": "4.2",
+          "price": "107.1428571428571428571428571428571428571",
+          "grossAmount": "450",
+          "fees": "0.99",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-20"
+        },
+        {
+          "id": "e-21",
+          "ts": "2025-11-03T09:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "IE00TEST0006",
+          "quantity": "30",
+          "price": "50",
+          "grossAmount": "1500",
+          "fees": "1.5",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-21"
+        },
+        {
+          "id": "e-22",
+          "ts": "2026-02-02T09:00:00.000Z",
+          "type": "SELL",
+          "instrumentId": "IE00TEST0006",
+          "quantity": "7.5",
+          "price": "50.66666666666666666666666666666666666667",
+          "grossAmount": "380",
+          "fees": "1.5",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-22"
+        },
+        {
+          "id": "e-23",
+          "ts": "2025-12-01T15:30:00.000Z",
+          "type": "BUY",
+          "instrumentId": "US00TEST0002",
+          "quantity": "3",
+          "price": "217",
+          "grossAmount": "651",
+          "fees": "1.085",
+          "currency": "USD",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-23",
+          "fxSource": "ECB",
+          "fxRate": "1.085",
+          "fxDirection": "QUOTE_PER_BASE",
+          "fxDate": "2025-12-01"
+        },
+        {
+          "id": "e-24",
+          "ts": "2026-03-28T23:30:00.000Z",
+          "type": "BUY",
+          "instrumentId": "XS00TEST0007",
+          "quantity": "1",
+          "price": "250",
+          "grossAmount": "250",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-24"
+        },
+        {
+          "id": "e-25",
+          "ts": "2025-11-03T09:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "IE00TEST0008",
+          "quantity": "5",
+          "price": "100",
+          "grossAmount": "500",
+          "fees": "1",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-25"
+        },
+        {
+          "id": "e-26",
+          "ts": "2026-03-01T09:00:00.000Z",
+          "type": "SELL",
+          "instrumentId": "IE00TEST0008",
+          "quantity": "5",
+          "price": "96",
+          "grossAmount": "480",
+          "fees": "1",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-26"
+        }
+      ],
+      "prices": [
+        {
+          "instrumentId": "IE00TEST0001",
+          "price": "104.37",
+          "currency": "EUR",
+          "asOf": "2026-03-27T16:30:00.000Z"
+        },
+        {
+          "instrumentId": "IE00TEST0006",
+          "price": "50.12",
+          "currency": "EUR",
+          "asOf": "2026-03-27T16:30:00.000Z"
+        },
+        {
+          "instrumentId": "US00TEST0002",
+          "price": "231.4",
+          "currency": "USD",
+          "asOf": "2026-03-27T20:00:00.000Z"
+        },
+        {
+          "instrumentId": "XS00TEST0007",
+          "price": "251.3",
+          "currency": "EUR",
+          "asOf": "2026-03-27T16:30:00.000Z"
+        },
+        {
+          "instrumentId": "IE00TEST0008",
+          "price": "97",
+          "currency": "EUR",
+          "asOf": "2026-03-27T16:30:00.000Z"
+        }
+      ],
+      "rates": [
+        {
+          "base": "EUR",
+          "quote": "USD",
+          "day": "2026-03-26",
+          "rate": "1.0821",
+          "source": "ECB"
+        },
+        {
+          "base": "EUR",
+          "quote": "USD",
+          "day": "2026-03-27",
+          "rate": "1.0794",
+          "source": "ECB"
+        }
+      ],
+      "categories": {
+        "IE00TEST0001": "EQUITY_FUND",
+        "IE00TEST0006": "BOND_FUND",
+        "US00TEST0002": "COMPANY",
+        "IE00TEST0008": "EQUITY_FUND"
+      },
+      "topLimit": 2,
+      "expect": {
+        "unconvertible": [],
+        "positions": [
+          {
+            "instrumentId": "IE00TEST0001",
+            "quantity": "16.545678",
+            "costBasis": "1686.55",
+            "averageCost": "101.9329640042553711005375542785251834346",
+            "realizedPnL": "0"
+          },
+          {
+            "instrumentId": "IE00TEST0006",
+            "quantity": "22.5",
+            "costBasis": "1126.125",
+            "averageCost": "50.05",
+            "realizedPnL": "3.125"
+          },
+          {
+            "instrumentId": "IE00TEST0008",
+            "quantity": "0",
+            "costBasis": "0",
+            "averageCost": "0",
+            "realizedPnL": "-22"
+          },
+          {
+            "instrumentId": "US00TEST0002",
+            "quantity": "3",
+            "costBasis": "601",
+            "averageCost": "200.3333333333333333333333333333333333333",
+            "realizedPnL": "0"
+          },
+          {
+            "instrumentId": "XS00TEST0007",
+            "quantity": "1",
+            "costBasis": "250",
+            "averageCost": "250",
+            "realizedPnL": "0"
+          }
+        ],
+        "pricesInBase": {
+          "prices": {
+            "IE00TEST0001": {
+              "instrumentId": "IE00TEST0001",
+              "price": "104.37",
+              "currency": "EUR",
+              "asOf": "2026-03-27T16:30:00.000Z"
+            },
+            "IE00TEST0006": {
+              "instrumentId": "IE00TEST0006",
+              "price": "50.12",
+              "currency": "EUR",
+              "asOf": "2026-03-27T16:30:00.000Z"
+            },
+            "US00TEST0002": {
+              "instrumentId": "US00TEST0002",
+              "price": "214.3783583472299425606818602927552343895",
+              "currency": "EUR",
+              "asOf": "2026-03-27T20:00:00.000Z"
+            },
+            "XS00TEST0007": {
+              "instrumentId": "XS00TEST0007",
+              "price": "251.3",
+              "currency": "EUR",
+              "asOf": "2026-03-27T16:30:00.000Z"
+            },
+            "IE00TEST0008": {
+              "instrumentId": "IE00TEST0008",
+              "price": "97",
+              "currency": "EUR",
+              "asOf": "2026-03-27T16:30:00.000Z"
+            }
+          },
+          "unrated": {}
+        },
+        "marketValues": {
+          "IE00TEST0001": {
+            "marketValue": "1726.87241286",
+            "unrealizedPnL": "40.32241286",
+            "weight": "0.460621"
+          },
+          "IE00TEST0006": {
+            "marketValue": "1127.7",
+            "unrealizedPnL": "1.575",
+            "weight": "0.300800"
+          },
+          "IE00TEST0008": {
+            "marketValue": "0",
+            "unrealizedPnL": "0",
+            "weight": "0.000000"
+          },
+          "US00TEST0002": {
+            "marketValue": "643.1350750416898276820455808782657031685",
+            "unrealizedPnL": "42.1350750416898276820455808782657031685",
+            "weight": "0.171548"
+          },
+          "XS00TEST0007": {
+            "marketValue": "251.3",
+            "unrealizedPnL": "1.3",
+            "weight": "0.067031"
+          }
+        },
+        "summary": {
+          "totalValue": "3749.007487901689827682045580878265703169",
+          "totalInvested": "3663.675",
+          "openCost": "3663.675",
+          "pricedCost": "3663.675",
+          "unpricedCost": "0",
+          "unrealizedPnL": "85.332487901689827682045580878265703169",
+          "realizedPnL": "-18.875",
+          "returnPct": "0.023292",
+          "pricedCount": 4,
+          "unpricedCount": 0
+        },
+        "allocation": [
+          {
+            "category": "EQUITY_FUND",
+            "value": "1726.87241286",
+            "weight": "0.460621"
+          },
+          {
+            "category": "BOND_FUND",
+            "value": "1127.7",
+            "weight": "0.300800"
+          },
+          {
+            "category": "COMPANY",
+            "value": "643.1350750416898276820455808782657031685",
+            "weight": "0.171548"
+          },
+          {
+            "category": "OTHER",
+            "value": "251.3",
+            "weight": "0.067031"
+          }
+        ],
+        "top": [
+          {
+            "instrumentId": "IE00TEST0001",
+            "marketValue": "1726.87241286",
+            "weight": "0.460621",
+            "unrealizedPnL": "40.32241286",
+            "unrealizedPnLPct": "0.023908"
+          },
+          {
+            "instrumentId": "IE00TEST0006",
+            "marketValue": "1127.7",
+            "weight": "0.300800",
+            "unrealizedPnL": "1.575",
+            "unrealizedPnLPct": "0.001399"
+          }
+        ]
+      }
+    }
+  ]
+}
