@@ -9,6 +9,7 @@ import type {
 import {
   BatchBuilder,
   persistBatch,
+  rowErrorReason,
   type ImportSummary,
   type MappedBatch,
 } from "../ingest";
@@ -22,7 +23,7 @@ import {
   mapGroup,
   priceLookupFrom,
 } from "./map";
-import { parseKrakenCsv, parseTime, type KrakenRow } from "./row";
+import { krakenRowRef, parseKrakenCsv, parseTime, type KrakenRow } from "./row";
 
 export class KrakenCsvAdapter {
   constructor(
@@ -61,11 +62,19 @@ export class KrakenCsvAdapter {
     );
     const internal: KrakenRow[] = [];
     for (const group of groups.values()) {
-      if (group.every(isInternalMove)) internal.push(group[0]!);
+      const first = group[0]!;
+      if (group.some((row) => Number.isNaN(parseTime(row.time).getTime()))) {
+        builder.addError({ ...krakenRowRef(first), reason: "invalid-date" });
+        continue;
+      }
+      if (group.every(isInternalMove)) internal.push(first);
       try {
         builder.addOperation(mapGroup(group, priceAt));
-      } catch {
-        builder.addError();
+      } catch (error) {
+        builder.addError({
+          ...krakenRowRef(first),
+          reason: rowErrorReason(error),
+        });
       }
     }
     for (const row of await this.bookedAsRewards(internal)) {

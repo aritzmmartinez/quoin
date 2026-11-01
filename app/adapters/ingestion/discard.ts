@@ -8,6 +8,7 @@ export const DISCARD_REASONS = [
   "internal-move",
   "card-spending",
   "saveback-unpaired",
+  "unsupported-asset-class",
   "unsupported",
 ] as const;
 
@@ -23,6 +24,7 @@ export const AFFECTS_POSITION: Record<DiscardReason, boolean> = {
   "internal-move": false,
   "card-spending": false,
   "saveback-unpaired": false,
+  "unsupported-asset-class": true,
   unsupported: false,
 };
 
@@ -39,4 +41,36 @@ export interface DiscardDetail {
   subtype: string | null;
   instrument: string | null;
   unpriced?: string[];
+  affectsPosition?: boolean;
 }
+
+export const ROW_ERROR_REASONS = [
+  "invalid-date",
+  "invalid-number",
+  "missing-instrument",
+  "wrong-field-count",
+  "unexpected",
+] as const;
+
+export type RowErrorReason = (typeof ROW_ERROR_REASONS)[number];
+
+export interface RowRef {
+  externalId: string | null;
+  position: number | null;
+  date: string | null;
+  type: string | null;
+}
+
+export interface RowError extends RowRef {
+  reason: RowErrorReason;
+}
+
+export const FILE_ERROR_REASONS = [
+  "invalid-encoding",
+  "unparseable",
+  "missing-column",
+  "invalid-number",
+  "wrong-field-count",
+] as const;
+
+export type FileErrorReason = (typeof FILE_ERROR_REASONS)[number];

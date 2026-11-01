@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { discardGroups, discardTypeLabel } from "./discards";
+import {
+  describeRow,
+  discardGroups,
+  discardTypeLabel,
+  fileErrorMessage,
+} from "./discards";
 import { en } from "./i18n/en";
 import { es } from "./i18n/es";
 
@@ -85,4 +90,55 @@ describe("discardTypeLabel", () => {
       expect(discardTypeLabel(es, type)).toBe(type);
     },
   );
+});
+
+describe("a row-level warning", () => {
+  it("warns for a group when any of its rows changes a position", () => {
+    const dividend = { ...at("Test Bond"), affectsPosition: false };
+    const trade = { ...at("Test Bond"), affectsPosition: true };
+    const flag = (details: (typeof dividend)[]) =>
+      discardGroups({
+        discarded: { "unsupported-asset-class": details.length },
+        discardedDetails: { "unsupported-asset-class": details },
+      })[0]?.affectsPosition;
+
+    expect(flag([dividend])).toBe(false);
+    expect(flag([dividend, trade])).toBe(true);
+  });
+});
+
+describe("describeRow", () => {
+  it("names a row by its type, date and id, or by its position when it has no id", () => {
+    const row = { date: "2025-01-04T10:00:00Z", type: "BUY" };
+    expect(describeRow(en, { ...row, externalId: "t1", position: null })).toBe(
+      "Buy · 2025-01-04T10:00:00Z · t1",
+    );
+    expect(describeRow(es, { ...row, externalId: null, position: 4 })).toBe(
+      "Compra · 2025-01-04T10:00:00Z · fila 4",
+    );
+  });
+});
+
+describe("fileErrorMessage", () => {
+  it("names the column, or the row and why it cannot be read", () => {
+    expect(
+      fileErrorMessage(en, {
+        reason: "missing-column",
+        column: "asset_class",
+        row: null,
+      }),
+    ).toContain("asset_class");
+    expect(
+      fileErrorMessage(en, {
+        reason: "invalid-number",
+        column: null,
+        row: {
+          externalId: "D1",
+          position: null,
+          date: "2026-01-05 10:00:00",
+          type: "deposit",
+        },
+      }),
+    ).toContain("D1: Invalid number");
+  });
 });

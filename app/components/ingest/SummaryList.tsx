@@ -1,10 +1,15 @@
 import { ChevronDown } from "lucide-react";
 
-import type { DiscardDetail, ImportSummary } from "~/adapters/ingestion";
+import type {
+  DiscardDetail,
+  ImportSummary,
+  RowError,
+} from "~/adapters/ingestion";
 
 import {
   type DiscardGroup as Group,
   type NoticeGroup as Notice,
+  describeRow,
   discardGroups,
   discardTypeLabel,
   noticeGroups,
@@ -105,6 +110,40 @@ function NoticeGroupItem({ group }: { group: Notice }) {
   );
 }
 
+function ErrorList({ errors }: { errors: readonly RowError[] }) {
+  const t = useCopy();
+  const copy = t.ingest.summary;
+
+  return (
+    <details open className="group mt-3 border-t border-border pt-3">
+      <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[12px] text-muted marker:content-[''] [&::-webkit-details-marker]:hidden">
+        <ChevronDown
+          size={12}
+          strokeWidth={1.75}
+          aria-hidden
+          className="shrink-0 transition-transform group-open:rotate-0 -rotate-90"
+        />
+        <span className="font-medium text-negative">{copy.errors}</span>
+        <span>· {copy.details(errors.length)}</span>
+      </summary>
+      <p className="mt-2 text-[12px] text-negative">{copy.errorsHelp}</p>
+      <ul className="mt-2">
+        {errors.map((error, i) => (
+          <li
+            key={i}
+            className="flex justify-between gap-3 border-b border-border py-1.5 text-[12px] last:border-b-0"
+          >
+            <span className="min-w-0 truncate">{describeRow(t, error)}</span>
+            <span className="shrink-0 text-muted">
+              {copy.rowErrors[error.reason]}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 export function SummaryList({
   summary,
   pendingPrice = false,
@@ -151,8 +190,8 @@ export function SummaryList({
               .join(" · ")}
           />
         )}
-        {summary.errors > 0 && (
-          <Row label={copy.errors} value={String(summary.errors)} />
+        {summary.errors.length > 0 && (
+          <Row label={copy.errors} value={String(summary.errors.length)} />
         )}
       </dl>
 
@@ -168,6 +207,7 @@ export function SummaryList({
       {notices.map((group) => (
         <NoticeGroupItem key={group.reason} group={group} />
       ))}
+      {summary.errors.length > 0 && <ErrorList errors={summary.errors} />}
     </>
   );
 }

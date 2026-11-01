@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mapRow } from "./map";
+import { mapRow, mapSavebackPurchase } from "./map";
 import type { TradeRepublicRow } from "./row";
 
 function row(over: Partial<TradeRepublicRow> = {}): TradeRepublicRow {
@@ -192,9 +192,46 @@ describe("mapRow", () => {
     );
   });
 
-  it("throws on an unknown asset class (surfaced, not silently mis-typed)", () => {
-    expect(() => mapRow(row({ asset_class: "WEIRD" }))).toThrow(
-      /Unknown asset class/,
-    );
+  it("sets an unknown asset class aside by name, flagging the position only for a trade", () => {
+    for (const [over, affectsPosition] of [
+      [{ type: "BUY" }, true],
+      [{ type: "SELL" }, true],
+      [{ category: "CASH", type: "DIVIDEND" }, false],
+    ] as const) {
+      expect(
+        mapRow(row({ ...over, asset_class: "BOND", name: "Test Bond" })),
+      ).toEqual({
+        kind: "discard",
+        reason: "unsupported-asset-class",
+        detail: {
+          date: "2025-01-01T10:00:00.000Z",
+          type: over.type,
+          subtype: "BOND",
+          instrument: "Test Bond",
+          affectsPosition,
+        },
+      });
+    }
+  });
+
+  it("does not read an asset class off the object prototype", () => {
+    expect(mapRow(row({ asset_class: "constructor" }))).toMatchObject({
+      reason: "unsupported-asset-class",
+    });
+  });
+
+  it("sets a saveback aside with the purchase it paid for when that purchase is set aside", () => {
+    const saveback = row({
+      category: "CASH",
+      type: "BENEFITS_SAVEBACK",
+      amount: "15",
+      transaction_id: "sb-1",
+    });
+    expect(
+      mapSavebackPurchase(
+        row({ asset_class: "BOND", amount: "-15" }),
+        saveback,
+      ).map((item) => item.kind === "discard" && item.reason),
+    ).toEqual(["unsupported-asset-class", "saveback-unpaired"]);
   });
 });

@@ -120,8 +120,10 @@ function net(row: KrakenRow): Decimal {
   return new Decimal(row.amount || "0").minus(row.fee || "0");
 }
 
-export function groupByRefid(rows: KrakenRow[]): Map<string, KrakenRow[]> {
-  const groups = new Map<string, KrakenRow[]>();
+export function groupByRefid<T extends KrakenRow>(
+  rows: readonly T[],
+): Map<string, T[]> {
+  const groups = new Map<string, T[]>();
   for (const row of rows) {
     const group = groups.get(row.refid) ?? [];
     group.push(row);
@@ -249,18 +251,12 @@ function buy(
   received: KrakenRow,
 ): MappedItem {
   const quantity = net(received);
-  if (!quantity.gt(0)) return unsupported(received);
+  const amount = new Decimal(abs(fiat.amount));
+  if (!quantity.gt(0) || amount.isZero()) return unsupported(received);
   return {
     kind: "domain",
     instrument,
-    event: tradeEvent(
-      refid,
-      instrument,
-      "BUY",
-      fiat,
-      quantity,
-      new Decimal(abs(fiat.amount)),
-    ),
+    event: tradeEvent(refid, instrument, "BUY", fiat, quantity, amount),
   };
 }
 
@@ -271,18 +267,12 @@ function sell(
   delivered: KrakenRow,
 ): MappedItem {
   const quantity = net(delivered).abs();
-  if (quantity.isZero()) return unsupported(delivered);
+  const amount = new Decimal(abs(fiat.amount));
+  if (quantity.isZero() || amount.isZero()) return unsupported(delivered);
   return {
     kind: "domain",
     instrument,
-    event: tradeEvent(
-      refid,
-      instrument,
-      "SELL",
-      fiat,
-      quantity,
-      new Decimal(abs(fiat.amount)),
-    ),
+    event: tradeEvent(refid, instrument, "SELL", fiat, quantity, amount),
   };
 }
 

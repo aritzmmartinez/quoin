@@ -33,7 +33,7 @@ const summary = (over: Partial<ImportSummary> = {}): ImportSummary => ({
   discarded: {},
   discardedDetails: {},
   noticed: {},
-  errors: 0,
+  errors: [],
   instruments: 1,
   ...over,
 });

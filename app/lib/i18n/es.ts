@@ -1,4 +1,8 @@
-import type { DiscardReason, NoticeReason } from "~/adapters/ingestion/discard";
+import type {
+  DiscardReason,
+  NoticeReason,
+  RowErrorReason,
+} from "~/adapters/ingestion/discard";
 import type {
   ExposureKind,
   InstrumentType,
@@ -35,6 +39,7 @@ const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
   "internal-move": "Movimientos entre tus monederos de Kraken",
   "card-spending": "Pagos con tarjeta",
   "saveback-unpaired": "Saveback sin compra emparejada",
+  "unsupported-asset-class": "Clase de activo sin soporte",
   unsupported: "Sin soporte",
 };
 
@@ -52,7 +57,17 @@ const DISCARD_REASON_HELP: Record<DiscardReason, string | null> = {
   "card-spending": null,
   "saveback-unpaired":
     "No se ha encontrado la compra que pagó este saveback (una compra del mismo importe en los 7 días siguientes, y solo una). Si esa compra está en el fichero, cuenta como aportación tuya. Si está en otro export, importa uno que cubra las dos fechas.",
+  "unsupported-asset-class":
+    "Filas con una clase de activo (la columna asset_class del export) que Quoin todavía no lee, como bonos o derivados. No se han importado. Si son compras o ventas, la posición de ese activo no las incluye y puede no cuadrar con la del bróker.",
   unsupported: null,
+};
+
+const ROW_ERROR_LABELS: Record<RowErrorReason, string> = {
+  "invalid-date": "Fecha no válida",
+  "invalid-number": "Número no válido",
+  "missing-instrument": "Sin identificador del instrumento",
+  "wrong-field-count": "Número de campos distinto del de la cabecera",
+  unexpected: "Fallo inesperado de Quoin al leerla",
 };
 
 const NOTICE_LABELS: Record<NoticeReason, string> = {
@@ -695,6 +710,14 @@ export const es = {
     unknownBroker:
       "No reconozco este export. Se espera un CSV de Trade Republic (con columna transaction_id) o de Kraken (con columna refid).",
     failed: "La importación ha fallado.",
+    invalidEncoding:
+      "El fichero no está en UTF-8: tiene bytes que no son texto. Descárgalo de nuevo desde el bróker, sin abrirlo ni guardarlo con otro programa. No se ha importado nada.",
+    unparseable:
+      "No se puede leer como un CSV separado por comas: tiene comillas sin cerrar o usa otro separador, como «;». Descárgalo de nuevo desde el bróker, sin abrirlo ni guardarlo con otro programa. No se ha importado nada.",
+    missingColumn: (column: string): string =>
+      `Al fichero le falta la columna ${column}. No se ha importado nada.`,
+    rowRejected: (row: string, reason: string): string =>
+      `Una fila no se puede leer (${row}: ${reason}), y Quoin necesita todas las de Kraken para comprobar los saldos. No se ha importado nada.`,
     invalidEvent: (date: string, type: string, currency: string): string =>
       `La operación ${type} del ${date} en ${currency} no cumple las reglas del registro. Es un fallo de Quoin al leer este export, no del fichero: no se ha importado nada.`,
     krakenLegacyExport:
@@ -719,6 +742,10 @@ export const es = {
       instruments: "Instrumentos",
       discarded: "Descartadas",
       errors: "Con error",
+      errorsHelp:
+        "Estas filas no se han importado. Corrige el fichero o descarga otro y vuelve a importarlo: lo ya registrado no se duplica.",
+      rowErrors: ROW_ERROR_LABELS,
+      rowNumber: (position: number): string => `fila ${position}`,
       none: "ninguna",
       reasons: DISCARD_REASON_LABELS,
       reasonHelp: DISCARD_REASON_HELP,
