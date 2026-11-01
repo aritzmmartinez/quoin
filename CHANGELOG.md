@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.2] - 2026-11-01
+
 ### Added
 - Reference cases for importing a broker CSV, shared with the mobile app: invented Trade Republic and Kraken files and what each becomes (instruments, entries, set-aside rows, notices, row errors, missing exchange rates), or why the whole file is refused. They are written by a script in the repository, and a test fails if the file and the script disagree.
 
@@ -498,7 +500,8 @@ fund holdings must be supplied as CSV rather than the Excel most issuers publish
 Design rationale lives beside the code it explains, in `docs/ARCHITECTURE.md` and in the
 commit history — not here.
 
-[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.15.1...HEAD
+[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.15.2...HEAD
+[0.15.2]: https://github.com/aritzmmartinez/quoin/compare/v0.15.1...v0.15.2
 [0.15.1]: https://github.com/aritzmmartinez/quoin/compare/v0.15.0...v0.15.1
 [0.15.0]: https://github.com/aritzmmartinez/quoin/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/aritzmmartinez/quoin/compare/v0.13.0...v0.14.0
