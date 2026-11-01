@@ -154,9 +154,11 @@ piece of the contract with the mobile client, which must assign the same days.
   have generators beside them too, but their results come from decimal.js and the core
   (the random decimal cases from mulberry32 with a fixed seed); `portfolio.json` keeps a
   `byHand` block in some cases, worked out by hand and checked against the core, which is
-  what stops a regenerated file from blessing a regression. They are shared with the
-  mobile client: change a case only together with the implementation that reproduces it
-  on both sides.
+  what stops a regenerated file from blessing a regression. `ingest.json` runs the real
+  adapters over invented CSVs with in-memory repositories; its results come from them, and
+  the per-adapter unit tests are the hand-checked guard. Event ids are random, so it omits
+  them. They are shared with the mobile client: change a case only together with the
+  implementation that reproduces it on both sides.
 
 ## A command's logic never lives in its script
 
@@ -1170,6 +1172,22 @@ and are applied defensively to every adapter:
 
 1. `skipEmptyLines: 'greedy'`
 2. a pre-validation filter dropping any row without a `type` field
+
+Both go through `readCsv` (`adapters/ingestion/csv.ts`), which also fixes the delimiter at
+`,`: Papa never guesses it. Detection, by contrast, splits the header on `, ; tab |`, so a
+file saved with `;` is recognised and then refused as `unparseable` rather than passing
+for an unknown broker. Bytes reach text only through `decodeCsv`, strict UTF-8
+(`invalid-encoding`), in the wizard and in `pnpm ingest`; the server receives text.
+
+**A row is never an anonymous error and never a 500.** A row the file cannot describe is a
+`RowError` named by its `externalId`, date and type as written — by its position among
+non-empty records only when it has no id — with a typed reason; the rest imports. A file
+that cannot be imported at all is a `CsvFileError` (`invalid-encoding`, `unparseable`,
+`missing-column`, or a Kraken row: every Kraken row is needed for the balance check, so
+one unreadable row refuses the file), and `api/ingest` answers it with a 400. A class
+Trade Republic sends that Quoin does not read is a discard, `unsupported-asset-class`,
+never a guessed type; `DiscardDetail.affectsPosition` overrides `AFFECTS_POSITION` per
+row (a trade warns, a dividend does not) and a group warns if any row does.
 
 Append is idempotent: dedup by `source` + `externalId`.
 

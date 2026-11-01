@@ -11,7 +11,7 @@ describe("parseTradeRepublicCsv", () => {
       `"2025-01-02T10:00:00.000Z","TRADING","BUY","FUND","Vanguard FTSE All-World, USD Acc","IE00BK5BQT80","1","100","-100","","","EUR","tx-1","5411"`,
     ].join("\n");
 
-    const rows = parseTradeRepublicCsv(csv);
+    const { rows } = parseTradeRepublicCsv(csv);
     expect(rows).toHaveLength(1);
     expect(rows[0]!.name).toBe("Vanguard FTSE All-World, USD Acc");
     expect(rows[0]!.symbol).toBe("IE00BK5BQT80");
@@ -28,11 +28,13 @@ describe("parseTradeRepublicCsv", () => {
       "2025-01-02T10:00:00.123456Z",
       "2025-01-02T11:00:00.000+01:00",
     ]) {
-      expect(parseTradeRepublicCsv(row(datetime))[0]!.datetime).toBe(datetime);
+      expect(parseTradeRepublicCsv(row(datetime)).rows[0]!.datetime).toBe(
+        datetime,
+      );
     }
   });
 
-  it("refuses a datetime with no offset, which each machine would read in its own zone", () => {
+  it("names a datetime with no offset as that row's error, which each machine would read in its own zone", () => {
     const row = (datetime: string) =>
       `${HEADER}
 "${datetime}","TRADING","BUY","FUND","Fund","XS00TEST0001","1","100","-100","","","EUR","tx-1",""`;
@@ -42,12 +44,23 @@ describe("parseTradeRepublicCsv", () => {
       "2025-01-02 10:00:00",
       "2025-01-02",
     ]) {
-      expect(() => parseTradeRepublicCsv(row(datetime))).toThrow();
+      expect(parseTradeRepublicCsv(row(datetime))).toEqual({
+        rows: [],
+        errors: [
+          {
+            externalId: "tx-1",
+            position: null,
+            date: datetime,
+            type: "BUY",
+            reason: "invalid-date",
+          },
+        ],
+      });
     }
   });
 
   it("skips empty lines", () => {
     const csv = `${HEADER}\n\n`;
-    expect(parseTradeRepublicCsv(csv)).toHaveLength(0);
+    expect(parseTradeRepublicCsv(csv).rows).toHaveLength(0);
   });
 });

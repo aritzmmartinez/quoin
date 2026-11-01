@@ -9,7 +9,9 @@ import {
   DISCARD_REASONS,
   NOTICE_REASONS,
   type DiscardReason,
+  type FileErrorReason,
   type NoticeReason,
+  type RowRef,
 } from "~/adapters/ingestion/discard";
 
 import type { Copy } from "./i18n";
@@ -38,7 +40,7 @@ export function discardGroups(summary: {
       {
         reason,
         count,
-        affectsPosition: AFFECTS_POSITION[reason],
+        affectsPosition: affectsPosition(reason, count, details),
         details,
         byInstrument: [...tally]
           .map(([instrument, n]) => ({ instrument, count: n }))
@@ -50,6 +52,18 @@ export function discardGroups(summary: {
       },
     ];
   });
+}
+
+function affectsPosition(
+  reason: DiscardReason,
+  count: number,
+  details: readonly DiscardDetail[],
+): boolean {
+  const byReason = AFFECTS_POSITION[reason];
+  return (
+    (details.length < count && byReason) ||
+    details.some((detail) => detail.affectsPosition ?? byReason)
+  );
 }
 
 export interface NoticeGroup {
@@ -69,4 +83,39 @@ export function noticeGroups(summary: {
 export function discardTypeLabel(t: Copy, type: string): string {
   const types: Readonly<Record<string, string>> = t.movements.types;
   return Object.hasOwn(types, type) ? (types[type] ?? type) : type;
+}
+
+export function describeRow(t: Copy, row: RowRef): string {
+  return [
+    row.type === null ? null : discardTypeLabel(t, row.type),
+    row.date,
+    row.externalId ??
+      (row.position === null ? null : t.ingest.summary.rowNumber(row.position)),
+  ]
+    .filter((part) => part !== null && part !== "")
+    .join(" · ");
+}
+
+export function fileErrorMessage(
+  t: Copy,
+  error: {
+    reason: FileErrorReason;
+    column: string | null;
+    row: RowRef | null;
+  },
+): string {
+  switch (error.reason) {
+    case "invalid-encoding":
+      return t.ingest.invalidEncoding;
+    case "unparseable":
+      return t.ingest.unparseable;
+    case "missing-column":
+      return t.ingest.missingColumn(error.column ?? "");
+    case "invalid-number":
+    case "wrong-field-count":
+      return t.ingest.rowRejected(
+        error.row ? describeRow(t, error.row) : "",
+        t.ingest.summary.rowErrors[error.reason],
+      );
+  }
 }

@@ -26,3 +26,6 @@
 
 # Prisma generated client (regenerated via `prisma generate`)
 /app/adapters/persistence/generated/
+
+# Commit message drafts
+msg*.txt

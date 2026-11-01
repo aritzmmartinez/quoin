@@ -99,7 +99,13 @@ describe("counting by operation", () => {
       { kind: "domain", instrument: null, event: event("A") },
     ]);
     builder.addOperation([{ kind: "discard", reason: "card-spending" }]);
-    builder.addError();
+    builder.addError({
+      externalId: "x",
+      position: null,
+      date: "2025-01-02",
+      type: "BUY",
+      reason: "invalid-number",
+    });
     const b = builder.build(3);
 
     const summary = await previewBatch(ledgerWith([]), b);
@@ -108,7 +114,7 @@ describe("counting by operation", () => {
       0,
     );
     expect(
-      summary.imported + summary.duplicates + discarded + summary.errors,
+      summary.imported + summary.duplicates + discarded + summary.errors.length,
     ).toBe(summary.total);
   });
 });
@@ -122,7 +128,13 @@ describe("events the ledger cannot book as they stand", () => {
 
   const rates = rateLookupFrom(
     rateBookFrom([
-      { source: "ECB", base: "EUR", quote: "USD", day: "2025-11-14", rate: "1.25" },
+      {
+        source: "ECB",
+        base: "EUR",
+        quote: "USD",
+        day: "2025-11-14",
+        rate: "1.25",
+      },
     ]),
     MADRID,
   );

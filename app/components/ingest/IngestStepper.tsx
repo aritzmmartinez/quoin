@@ -2,10 +2,12 @@ import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type { Broker, ImportSummary } from "~/adapters/ingestion";
+import { CsvFileError, decodeCsv } from "~/adapters/ingestion/decode";
 import type { PendingMapping, PriceFillResult } from "~/lib/ingest";
 
 import {
   earliestUnpriced,
+  fileErrorMessage,
   mergeRetry,
   retryAfterFill,
   rangeSince,
@@ -75,10 +77,14 @@ export function IngestStepper({
     setBusy(copy.analysing);
     let csv: string;
     try {
-      csv = await dropped.text();
-    } catch {
+      csv = decodeCsv(await dropped.arrayBuffer());
+    } catch (error) {
       setBusy(null);
-      setError(copy.unreadable);
+      setError(
+        error instanceof CsvFileError
+          ? fileErrorMessage(t, error)
+          : copy.unreadable,
+      );
       return;
     }
 

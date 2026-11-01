@@ -24,19 +24,17 @@ function absOrZero(value: string): string {
   return trimmed === "" ? "0" : abs(trimmed);
 }
 
-function assetClassToType(assetClass: string): InstrumentType {
-  switch (assetClass) {
-    case "FUND":
-      return "ETF";
-    case "STOCK":
-      return "STOCK";
-    case "CRYPTO":
-      return "CRYPTO";
-    case "SYNTHETIC":
-      return "ETF";
-    default:
-      throw new Error(`Unknown asset class: "${assetClass}"`);
-  }
+const TYPE_OF_ASSET_CLASS: Readonly<Record<string, InstrumentType>> = {
+  FUND: "ETF",
+  STOCK: "STOCK",
+  CRYPTO: "CRYPTO",
+  SYNTHETIC: "ETF",
+};
+
+function assetClassToType(assetClass: string): InstrumentType | null {
+  return Object.hasOwn(TYPE_OF_ASSET_CLASS, assetClass)
+    ? (TYPE_OF_ASSET_CLASS[assetClass] ?? null)
+    : null;
 }
 
 function instrumentIdOf(row: TradeRepublicRow): string | null {
@@ -45,11 +43,15 @@ function instrumentIdOf(row: TradeRepublicRow): string | null {
     : row.symbol;
 }
 
-function toInstrument(row: TradeRepublicRow, id: string): Instrument {
+function toInstrument(
+  row: TradeRepublicRow,
+  id: string,
+  type: InstrumentType,
+): Instrument {
   return instrumentSchema.parse({
     id,
     name: row.name,
-    type: assetClassToType(row.asset_class),
+    type,
     assetClass: row.asset_class || null,
   });
 }
@@ -96,15 +98,36 @@ function invalidCryptoCode(row: TradeRepublicRow): MappedItem {
   };
 }
 
+/**
+ * A bond, a derivative or any class Quoin does not read yet: the row is set
+ * aside by name instead of guessing an instrument type. Only a trade changes a
+ * position; a dividend set aside does not.
+ */
+function unsupportedAssetClass(row: TradeRepublicRow): MappedItem {
+  return {
+    kind: "discard",
+    reason: "unsupported-asset-class",
+    detail: {
+      date: row.datetime,
+      type: row.type,
+      subtype: row.asset_class || null,
+      instrument: row.name || row.symbol || null,
+      affectsPosition: row.category === "TRADING",
+    },
+  };
+}
+
 export function mapRow(row: TradeRepublicRow): MappedItem {
   switch (`${row.category}|${row.type}`) {
     case "TRADING|BUY":
     case "TRADING|SELL": {
+      const type = assetClassToType(row.asset_class);
+      if (type === null) return unsupportedAssetClass(row);
       const id = instrumentIdOf(row);
       if (id === null) return invalidCryptoCode(row);
       return {
         kind: "domain",
-        instrument: toInstrument(row, id),
+        instrument: toInstrument(row, id, type),
         event: tradeEventSchema.parse({
           ...base(row),
           type: row.type,
@@ -118,11 +141,13 @@ export function mapRow(row: TradeRepublicRow): MappedItem {
     }
 
     case "CASH|DIVIDEND": {
+      const type = assetClassToType(row.asset_class);
+      if (type === null) return unsupportedAssetClass(row);
       const id = instrumentIdOf(row);
       if (id === null) return invalidCryptoCode(row);
       return {
         kind: "domain",
-        instrument: toInstrument(row, id),
+        instrument: toInstrument(row, id, type),
         event: dividendEventSchema.parse({
           ...base(row),
           type: "DIVIDEND",
@@ -158,16 +183,7 @@ export function mapRow(row: TradeRepublicRow): MappedItem {
       };
 
     case "CASH|BENEFITS_SAVEBACK":
-      return {
-        kind: "discard",
-        reason: "saveback-unpaired",
-        detail: {
-          date: row.datetime,
-          type: row.type,
-          subtype: null,
-          instrument: row.name || null,
-        },
-      };
+      return savebackUnpaired(row);
 
     case "CASH|CARD_TRANSACTION":
     case "CASH|CARD_TRANSACTION_INTERNATIONAL":
@@ -187,13 +203,27 @@ export function mapRow(row: TradeRepublicRow): MappedItem {
   }
 }
 
+function savebackUnpaired(row: TradeRepublicRow): MappedItem {
+  return {
+    kind: "discard",
+    reason: "saveback-unpaired",
+    detail: {
+      date: row.datetime,
+      type: row.type,
+      subtype: null,
+      instrument: row.name || null,
+    },
+  };
+}
+
+/** A purchase set aside takes its saveback with it, named, never silently. */
 export function mapSavebackPurchase(
   buy: TradeRepublicRow,
   saveback: TradeRepublicRow,
 ): MappedItem[] {
   const purchase = mapRow(buy);
-  if (purchase.kind === "discard" && purchase.reason === "invalid-crypto-code")
-    return [purchase];
+  if (purchase.kind === "discard")
+    return [purchase, savebackUnpaired(saveback)];
   if (purchase.kind !== "domain" || purchase.event.type !== "BUY") {
     throw new Error(
       `Saveback ${saveback.transaction_id} paired with a non-buy`,

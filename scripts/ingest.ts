@@ -7,7 +7,9 @@ import { createInterface } from "node:readline/promises";
 import { parseArgs } from "node:util";
 
 import {
+  CsvFileError,
   KrakenCsvAdapter,
+  decodeCsv,
   TradeRepublicCsvAdapter,
   persistBatch,
   previewBatch,
@@ -23,8 +25,10 @@ import {
 } from "~/adapters/persistence";
 import {
   copyFor,
+  describeRow,
   discardGroups,
   earliestUnpriced,
+  fileErrorMessage,
   mergeRetry,
   noticeGroups,
   rangeSince,
@@ -41,7 +45,8 @@ import { loadResidence } from "~/lib/residence.server";
 
 const USAGE = `Usage: pnpm ingest --broker=<${BROKERS.join("|")}> <file.csv> [--yes]`;
 
-const copy = copyFor("en").ingest.summary;
+const t = copyFor("en");
+const copy = t.ingest.summary;
 
 function printSummary(title: string, summary: ImportSummary): void {
   const groups = discardGroups(summary);
@@ -77,7 +82,12 @@ function printSummary(title: string, summary: ImportSummary): void {
     console.log(`  ${copy.notices[reason]}: ${details.length}`);
     console.log(`        ${copy.noticeHelp[reason]}`);
   }
-  console.log(`  errors             : ${summary.errors}`);
+  console.log(`  errors             : ${summary.errors.length || "none"}`);
+  for (const error of summary.errors) {
+    console.log(
+      `  !     ${copy.rowErrors[error.reason]}: ${describeRow(t, error)}`,
+    );
+  }
   console.log(`  instruments        : ${summary.instruments}`);
 }
 
@@ -177,7 +187,7 @@ async function main(): Promise<void> {
           loadRateBook,
         );
 
-  const csv = readFileSync(resolve(file), "utf8");
+  const csv = decodeCsv(readFileSync(resolve(file)));
 
   const batch = await planWithRates(() => adapter.plan(csv), ensureRatesNow);
   const preview = await previewBatch(ledger, batch);
@@ -202,7 +212,11 @@ main()
   .catch((error: unknown) => {
     console.error(
       "\nImport failed:",
-      error instanceof Error ? error.message : error,
+      error instanceof CsvFileError
+        ? fileErrorMessage(t, error)
+        : error instanceof Error
+          ? error.message
+          : error,
     );
     exit(1);
   })

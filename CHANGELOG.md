@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.2] - 2026-11-01
+
+### Added
+- Reference cases for importing a broker CSV, shared with the mobile app: invented Trade Republic and Kraken files and what each becomes (instruments, entries, set-aside rows, notices, row errors, missing exchange rates), or why the whole file is refused. They are written by a script in the repository, and a test fails if the file and the script disagree.
+
+### Changed
+- Trade Republic: a row with an asset class Quoin does not read yet, such as a bond or a derivative, is set aside by name, with its date, type and asset class, instead of being counted as an error. The import warns when it is a purchase or a sale, because the position then does not include it.
+- A row that cannot be read is listed with its id, date and type, and why (an invalid date or number, no instrument identifier, the wrong number of fields), in the import window and in `pnpm ingest`, instead of a bare count. A row without an id is named by its place in the file.
+- A file that cannot be imported is refused with the reason, and nothing is written: not UTF-8, not comma-separated (another separator or an unclosed quote), or missing a column. A Kraken row that cannot be read refuses the whole file, because every row is needed to check the balances. Before, these failed with a generic error.
+
+### Fixed
+- Trade Republic: a row with a date without a time zone offset is an error of that row alone; the rest of the file imports. Before, it stopped the whole import.
+- Trade Republic: a saveback paired with a purchase that is set aside or cannot be read is now listed beside it. Before, it disappeared from the summary.
+- Kraken: a purchase that pays nothing in fiat, or a sale that receives nothing, is set aside as not supported. A purchase like that was recorded as free units bought with cash.
+
 ## [0.15.1] - 2026-10-30
 
 ### Added
@@ -485,7 +500,8 @@ fund holdings must be supplied as CSV rather than the Excel most issuers publish
 Design rationale lives beside the code it explains, in `docs/ARCHITECTURE.md` and in the
 commit history — not here.
 
-[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.15.1...HEAD
+[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.15.2...HEAD
+[0.15.2]: https://github.com/aritzmmartinez/quoin/compare/v0.15.1...v0.15.2
 [0.15.1]: https://github.com/aritzmmartinez/quoin/compare/v0.15.0...v0.15.1
 [0.15.0]: https://github.com/aritzmmartinez/quoin/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/aritzmmartinez/quoin/compare/v0.13.0...v0.14.0

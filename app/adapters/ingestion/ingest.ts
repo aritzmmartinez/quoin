@@ -1,3 +1,5 @@
+import { ZodError } from "zod";
+
 import { dayOf } from "~/core/calendar";
 import {
   fxSourceSchema,
@@ -12,10 +14,21 @@ import {
   type LedgerRepository,
 } from "~/core/ports";
 
-import type { DiscardDetail, DiscardReason, NoticeReason } from "./discard";
+import type {
+  DiscardDetail,
+  DiscardReason,
+  NoticeReason,
+  RowError,
+  RowErrorReason,
+} from "./discard";
 import { noRates, type RateAt } from "./fx";
 
-export type { DiscardDetail, DiscardReason, NoticeReason } from "./discard";
+export type {
+  DiscardDetail,
+  DiscardReason,
+  NoticeReason,
+  RowError,
+} from "./discard";
 
 export type DiscardCounts = Partial<Record<DiscardReason, number>>;
 export type DiscardDetails = Partial<Record<DiscardReason, DiscardDetail[]>>;
@@ -40,7 +53,7 @@ export interface MappedBatch {
   discarded: DiscardCounts;
   discardedDetails: DiscardDetails;
   noticed: NoticeDetails;
-  errors: number;
+  errors: RowError[];
   ratesNeeded: Map<string, string>;
 }
 
@@ -51,7 +64,7 @@ export interface ImportSummary {
   discarded: DiscardCounts;
   discardedDetails: DiscardDetails;
   noticed: NoticeDetails;
-  errors: number;
+  errors: RowError[];
   instruments: number;
 }
 
@@ -82,7 +95,7 @@ export class BatchBuilder {
   private readonly discarded: DiscardCounts = {};
   private readonly discardedDetails: DiscardDetails = {};
   private readonly noticed: NoticeDetails = {};
-  private errors = 0;
+  private readonly errors: RowError[] = [];
   private readonly ratesNeeded = new Map<string, string>();
 
   add(item: MappedItem): void {
@@ -168,8 +181,8 @@ export class BatchBuilder {
     if (held === undefined || day < held) this.ratesNeeded.set(currency, day);
   }
 
-  addError(): void {
-    this.errors += 1;
+  addError(error: RowError): void {
+    this.errors.push(error);
   }
 
   build(total: number): MappedBatch {
@@ -186,6 +199,16 @@ export class BatchBuilder {
       ratesNeeded: this.ratesNeeded,
     };
   }
+}
+
+export function rowErrorReason(error: unknown): RowErrorReason {
+  if (error instanceof ZodError) {
+    const fields = error.issues.map((issue) => issue.path[0]);
+    return fields.includes("id") ? "missing-instrument" : "invalid-number";
+  }
+  if (error instanceof Error && error.message.startsWith("[DecimalError]"))
+    return "invalid-number";
+  return "unexpected";
 }
 
 function unratedDiscard(

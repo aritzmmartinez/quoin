@@ -835,6 +835,17 @@ describe("Kraken mapGroup", () => {
         "unsupported",
       ]);
     });
+
+    it("sets aside a purchase that pays no fiat, never a free CASH buy", () => {
+      const received = coin({ type: "receive", amount: "0.001" });
+      expect(reasons(mapGroup([fiat("0"), received]))).toEqual(["unsupported"]);
+    });
+
+    it("sets aside a sale that receives no fiat", () => {
+      const delivered = coin({ type: "spend", amount: "-0.001" });
+      const proceeds = row({ refid: "Z1", type: "receive", amount: "0" });
+      expect(reasons(mapGroup([delivered, proceeds]))).toEqual(["unsupported"]);
+    });
   });
 
   it("discards an unrecognized row type as unsupported, keeping the row", () => {

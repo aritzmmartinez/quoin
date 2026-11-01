@@ -499,12 +499,12 @@ describe("the summary counts operations, like the file and the discards (integra
   const accounted = (summary: {
     imported: number;
     duplicates: number;
-    errors: number;
+    errors: readonly unknown[];
     discarded: Partial<Record<string, number>>;
   }) =>
     summary.imported +
     summary.duplicates +
-    summary.errors +
+    summary.errors.length +
     Object.values(summary.discarded).reduce(
       (sum: number, n) => sum + (n ?? 0),
       0,

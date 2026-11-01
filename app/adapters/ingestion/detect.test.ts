@@ -37,4 +37,9 @@ describe("detectBroker", () => {
   it("refuses rather than guess when both signatures are present", () => {
     expect(detectBroker(`refid,transaction_id,type\nA,B,buy`)).toBeNull();
   });
+
+  it("recognises the broker whatever the separator, so the parser can name the problem", () => {
+    expect(detectBroker('"txid";"refid";"time"\n')).toBe("kraken");
+    expect(detectBroker("datetime;transaction_id\n")).toBe("trade-republic");
+  });
 });
