@@ -1,4 +1,5 @@
 import {
+  CsvFileError,
   InvalidLedgerEventError,
   KrakenBalanceMismatchError,
   KrakenCsvAdapter,
@@ -32,6 +33,7 @@ import {
   type PendingMapping,
   type PriceFillResult,
 } from "./ingest";
+import { fileErrorMessage } from "./discards";
 import { ensureRatesNow } from "./fx-sync.server";
 import { planWithRates } from "./ingest-rates";
 import { backfillInstruments } from "./prices-backfill";
@@ -91,6 +93,9 @@ async function plan(
       throw new IngestError(
         t.ingest.invalidEvent(error.date, error.type, error.currency),
       );
+    }
+    if (error instanceof CsvFileError) {
+      throw new IngestError(fileErrorMessage(t, error));
     }
     if (error instanceof KrakenLegacyExportError) {
       throw new IngestError(t.ingest.krakenLegacyExport);

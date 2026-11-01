@@ -1,4 +1,8 @@
-import type { DiscardReason, NoticeReason } from "~/adapters/ingestion/discard";
+import type {
+  DiscardReason,
+  NoticeReason,
+  RowErrorReason,
+} from "~/adapters/ingestion/discard";
 import type {
   ExposureKind,
   InstrumentType,
@@ -27,6 +31,7 @@ const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
   "internal-move": "Moves between your Kraken wallets",
   "card-spending": "Card payments",
   "saveback-unpaired": "Saveback with no paired purchase",
+  "unsupported-asset-class": "Unsupported asset class",
   unsupported: "Unsupported",
 };
 
@@ -44,7 +49,17 @@ const DISCARD_REASON_HELP: Record<DiscardReason, string | null> = {
   "card-spending": null,
   "saveback-unpaired":
     "The purchase this saveback paid for was not found (one purchase of the same amount in the 7 days after it, and only one). If that purchase is in the file, it counts as your own contribution. If it is in another export, import one that covers both dates.",
+  "unsupported-asset-class":
+    "Rows with an asset class (the export's asset_class column) that Quoin does not read yet, such as bonds or derivatives. They were not imported. If they are purchases or sales, that asset's position does not include them and may not match the broker's.",
   unsupported: null,
+};
+
+const ROW_ERROR_LABELS: Record<RowErrorReason, string> = {
+  "invalid-date": "Invalid date",
+  "invalid-number": "Invalid number",
+  "missing-instrument": "No instrument identifier",
+  "wrong-field-count": "Number of fields differs from the header",
+  unexpected: "Unexpected fault in Quoin while reading it",
 };
 
 const NOTICE_LABELS: Record<NoticeReason, string> = {
@@ -684,6 +699,14 @@ export const en: Copy = {
     unknownBroker:
       "I do not recognise this export. A Trade Republic CSV (with a transaction_id column) or a Kraken one (with a refid column) is expected.",
     failed: "The import failed.",
+    invalidEncoding:
+      "The file is not UTF-8: it has bytes that are not text. Download it again from the broker, without opening or saving it in another program. Nothing was imported.",
+    unparseable:
+      "It cannot be read as a comma-separated CSV: it has an unclosed quote or uses another separator, such as “;”. Download it again from the broker, without opening or saving it in another program. Nothing was imported.",
+    missingColumn: (column: string): string =>
+      `The file has no ${column} column. Nothing was imported.`,
+    rowRejected: (row: string, reason: string): string =>
+      `One row cannot be read (${row}: ${reason}), and Quoin needs every Kraken row to check the balances. Nothing was imported.`,
     invalidEvent: (date: string, type: string, currency: string): string =>
       `The ${type} of ${date} in ${currency} breaks the ledger's rules. This is a fault in how Quoin reads this export, not in the file: nothing was imported.`,
     krakenLegacyExport:
@@ -708,6 +731,10 @@ export const en: Copy = {
       instruments: "Instruments",
       discarded: "Discarded",
       errors: "With errors",
+      errorsHelp:
+        "These rows were not imported. Fix the file or download another and import it again: what is already recorded is not duplicated.",
+      rowErrors: ROW_ERROR_LABELS,
+      rowNumber: (position: number): string => `row ${position}`,
       none: "none",
       reasons: DISCARD_REASON_LABELS,
       reasonHelp: DISCARD_REASON_HELP,

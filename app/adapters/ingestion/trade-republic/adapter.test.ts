@@ -143,7 +143,7 @@ describe("TradeRepublicCsvAdapter", () => {
       "card-spending": 1,
       "saveback-unpaired": 1,
     });
-    expect(summary.errors).toBe(0);
+    expect(summary.errors).toEqual([]);
     expect(summary.instruments).toBe(2);
     expect(instruments.upserted).toHaveLength(2);
     expect(ledger.appended).toHaveLength(5);
@@ -302,7 +302,13 @@ describe("TradeRepublicCsvAdapter with a row in another currency", () => {
       async (currencies) => {
         asked.push([...currencies]);
         return rateBookFrom([
-          { source: "ECB", base: "EUR", quote: "USD", day: "2025-01-02", rate: "1.04" },
+          {
+            source: "ECB",
+            base: "EUR",
+            quote: "USD",
+            day: "2025-01-02",
+            rate: "1.04",
+          },
         ]);
       },
     );
@@ -389,7 +395,7 @@ describe("TradeRepublicCsvAdapter with crypto", () => {
     }
   });
 
-  it("sets aside each row with an invalid code by name and imports the rest", async () => {
+  it("sets aside each row with an invalid code by name, the saveback it paid for too, and imports the rest", async () => {
     const instruments = new FakeInstrumentRepository();
     const ledger = new FakeLedgerRepository();
 
@@ -400,8 +406,11 @@ describe("TradeRepublicCsvAdapter with crypto", () => {
     ).import(CRYPTO_CSV);
 
     expect(summary.imported).toBe(2);
-    expect(summary.errors).toBe(0);
-    expect(summary.discarded).toEqual({ "invalid-crypto-code": 2 });
+    expect(summary.errors).toEqual([]);
+    expect(summary.discarded).toEqual({
+      "invalid-crypto-code": 2,
+      "saveback-unpaired": 1,
+    });
     expect(
       summary.discardedDetails["invalid-crypto-code"]?.map((d) => d.instrument),
     ).toEqual(["XF000BTC0017", "XF000BTC0017"]);
@@ -411,5 +420,96 @@ describe("TradeRepublicCsvAdapter with crypto", () => {
       "s-btc",
       "t-btc",
     ]);
+  });
+});
+
+describe("TradeRepublicCsvAdapter and rows it cannot read", () => {
+  const plan = (lines: string[]) =>
+    new TradeRepublicCsvAdapter(
+      new FakeInstrumentRepository(),
+      new FakeLedgerRepository(),
+      MADRID,
+    ).plan([HEADER, ...lines].join("\n"));
+
+  it("sets aside an unknown asset class by name and warns only for a trade", async () => {
+    const batch = await plan([
+      `"2025-01-01T10:00:00Z","TRADING","BUY","BOND","Test Bond","XS00TEST0001","1","100","-100","","","EUR","t1"`,
+      `"2025-01-02T10:00:00Z","CASH","DIVIDEND","BOND","Test Bond","XS00TEST0001","","","3","","","EUR","t2"`,
+    ]);
+    expect(batch.events).toEqual([]);
+    expect(batch.errors).toEqual([]);
+    expect(
+      batch.discardedDetails["unsupported-asset-class"]?.map(
+        (detail) => detail.affectsPosition,
+      ),
+    ).toEqual([true, false]);
+  });
+
+  it("names each unreadable row and imports the rest", async () => {
+    const batch = await plan([
+      `"2025-01-01T10:00:00Z","TRADING","BUY","FUND","F","IE00TEST0001","","100","-100","","","EUR","t1"`,
+      `"2025-01-02T10:00:00Z","TRADING","BUY","FUND","F","","1","100","-100","","","EUR","t2"`,
+      `"2025-01-03T10:00:00","TRADING","BUY","FUND","F","IE00TEST0001","1","100","-100","","","EUR","t3"`,
+      `"2025-01-04T10:00:00Z","TRADING","BUY","FUND"`,
+      `"2025-01-05T10:00:00Z","TRADING","BUY","FUND","F","IE00TEST0001","1","100","-100","","","EUR","t5"`,
+    ]);
+    expect(batch.events.map((event) => event.externalId)).toEqual(["t5"]);
+    expect(batch.total).toBe(5);
+    expect(batch.errors).toEqual([
+      {
+        externalId: "t3",
+        position: null,
+        date: "2025-01-03T10:00:00",
+        type: "BUY",
+        reason: "invalid-date",
+      },
+      {
+        externalId: null,
+        position: 4,
+        date: "2025-01-04T10:00:00Z",
+        type: "BUY",
+        reason: "wrong-field-count",
+      },
+      {
+        externalId: "t1",
+        position: null,
+        date: "2025-01-01T10:00:00Z",
+        type: "BUY",
+        reason: "invalid-number",
+      },
+      {
+        externalId: "t2",
+        position: null,
+        date: "2025-01-02T10:00:00Z",
+        type: "BUY",
+        reason: "missing-instrument",
+      },
+    ]);
+  });
+
+  it("names a saveback with the purchase it paid for when that purchase cannot be read", async () => {
+    const batch = await plan([
+      `"2025-01-01T10:00:00Z","CASH","BENEFITS_SAVEBACK","","","","","","15","","","EUR","s1"`,
+      `"2025-01-02T10:00:00Z","TRADING","BUY","FUND","F","IE00TEST0001","x","100","-15","","","EUR","b1"`,
+    ]);
+    expect(
+      batch.errors.map((error) => [error.externalId, error.reason]),
+    ).toEqual([
+      ["s1", "invalid-number"],
+      ["b1", "invalid-number"],
+    ]);
+  });
+
+  it("refuses a file missing a column, naming it", async () => {
+    await expect(
+      new TradeRepublicCsvAdapter(
+        new FakeInstrumentRepository(),
+        new FakeLedgerRepository(),
+        MADRID,
+      ).plan(HEADER.replace(",asset_class", "")),
+    ).rejects.toMatchObject({
+      reason: "missing-column",
+      column: "asset_class",
+    });
   });
 });

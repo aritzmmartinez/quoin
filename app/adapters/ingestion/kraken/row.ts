@@ -1,5 +1,7 @@
-import Papa from "papaparse";
 import { z } from "zod";
+
+import { CsvFileError, readCsv, requireColumns, rowRef } from "../csv";
+import type { RowRef } from "../discard";
 
 export const krakenRowSchema = z.object({
   txid: z.string(),
@@ -33,18 +35,28 @@ export function parseTime(time: string): Date {
   return new Date(`${time.replace(" ", "T")}Z`);
 }
 
-export function parseKrakenCsv(csv: string): KrakenRow[] {
-  const { data, errors, meta } = Papa.parse<Record<string, string>>(csv, {
-    header: true,
-    skipEmptyLines: "greedy",
+const COLUMNS = Object.entries(krakenRowSchema.shape)
+  .filter(([, schema]) => !schema.safeParse(undefined).success)
+  .map(([column]) => column);
+
+export type KrakenParsedRow = KrakenRow & { position: number };
+
+export function krakenRowRef(row: KrakenParsedRow): RowRef {
+  return rowRef(row.refid, row.position, row.time, row.type);
+}
+
+export function parseKrakenCsv(csv: string): KrakenParsedRow[] {
+  const read = readCsv(csv, COLUMNS);
+  if (read.missing.includes("wallet")) throw new KrakenLegacyExportError();
+  requireColumns(read);
+  return read.records.map(({ raw, position, malformed }) => {
+    if (malformed) {
+      throw new CsvFileError(
+        "wrong-field-count",
+        null,
+        rowRef(raw.refid, position, raw.time, raw.type),
+      );
+    }
+    return { ...krakenRowSchema.parse(raw), position };
   });
-  if (errors.length > 0) {
-    throw new Error(`CSV parse error: ${errors[0]!.message}`);
-  }
-  if (!(meta.fields ?? []).includes("wallet")) {
-    throw new KrakenLegacyExportError();
-  }
-  return data
-    .filter((raw) => (raw.type ?? "").trim() !== "")
-    .map((raw) => krakenRowSchema.parse(raw));
 }

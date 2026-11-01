@@ -529,6 +529,7 @@ describe("KrakenCsvAdapter discards", () => {
       "fx-unavailable",
       "invalid-crypto-code",
       "earn-return-unverified",
+      "unsupported-asset-class",
     ]);
   });
 });
@@ -979,9 +980,9 @@ describe("KrakenCsvAdapter and swaps", () => {
     expect(amountsOf(sell).fees.toString()).toBe("0.26");
     expect(amountsOf(buy).gross.toString()).toBe("131.74");
     expect(buy.quantity).toBe("0.001497");
-    expect(
-      baseOf(buy, "grossAmount").add(baseOf(buy, "fees")).toString(),
-    ).toBe("130.8");
+    expect(baseOf(buy, "grossAmount").add(baseOf(buy, "fees")).toString()).toBe(
+      "130.8",
+    );
   });
 
   it("charges nothing twice when the fee was on the delivered leg", async () => {
@@ -1085,9 +1086,7 @@ describe("KrakenCsvAdapter and money moved to Earn", () => {
 
     expect(summary.imported).toBe(2);
     expect(summary.discarded).toEqual({ "internal-move": 1 });
-    expect(
-      ledger.appended.map((e) => [e.externalId, e.type]),
-    ).toEqual([
+    expect(ledger.appended.map((e) => [e.externalId, e.type])).toEqual([
       ["D1", "DEPOSIT"],
       ["B1", "BUY"],
     ]);
@@ -1110,5 +1109,63 @@ describe("KrakenCsvAdapter and money moved to Earn", () => {
     ]);
     expect(ledger.appended).toHaveLength(2);
     expect(AFFECTS_POSITION["earn-return-unverified"]).toBe(true);
+  });
+});
+
+describe("KrakenCsvAdapter and rows it cannot read", () => {
+  const plan = (csv: string) =>
+    new KrakenCsvAdapter(
+      new FakeInstrumentRepository(),
+      new FakeLedgerRepository(),
+      MADRID,
+    ).plan(csv);
+  const deposit = {
+    refid: "D1",
+    time: "2026-01-05 10:00:00",
+    type: "deposit",
+    subclass: "fiat",
+    asset: "EUR",
+    amount: "500",
+  };
+
+  it("refuses the file on a balance it cannot read, naming the row", async () => {
+    await expect(
+      plan(krakenCsv([{ ...deposit, balance: "" }])),
+    ).rejects.toMatchObject({
+      reason: "invalid-number",
+      row: {
+        externalId: "D1",
+        position: null,
+        date: "2026-01-05 10:00:00",
+        type: "deposit",
+      },
+    });
+  });
+
+  it("refuses the file on a row with the wrong number of fields: every balance needs every row", async () => {
+    const csv = `${krakenCsv([deposit])}\n"L2","D2","2026-01-06 10:00:00"`;
+    await expect(plan(csv)).rejects.toMatchObject({
+      reason: "wrong-field-count",
+      row: { externalId: "D2", position: null },
+    });
+  });
+
+  it("names an operation whose time it cannot read and imports the rest", async () => {
+    const batch = await plan(
+      krakenCsv([
+        { ...deposit, refid: "D0", time: "yesterday" },
+        { ...deposit, time: "2026-01-06 10:00:00" },
+      ]),
+    );
+    expect(batch.events.map((event) => event.externalId)).toEqual(["D1"]);
+    expect(batch.errors).toEqual([
+      {
+        externalId: "D0",
+        position: null,
+        date: "yesterday",
+        type: "deposit",
+        reason: "invalid-date",
+      },
+    ]);
   });
 });

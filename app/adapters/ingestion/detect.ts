@@ -1,5 +1,3 @@
-import Papa from "papaparse";
-
 export const BROKERS = ["trade-republic", "kraken"] as const;
 
 export type Broker = (typeof BROKERS)[number];
@@ -10,16 +8,17 @@ const SIGNATURES: Readonly<Record<Broker, string>> = {
 };
 
 export function detectBroker(csv: string): Broker | null {
-  const header = Papa.parse<string[]>(csv, {
-    preview: 1,
-    skipEmptyLines: "greedy",
-  }).data[0];
-  if (!header) return null;
+  const header = csv
+    .replace(/^\uFEFF/, "")
+    .split(/\r?\n/)
+    .find((line) => line.trim() !== "");
+  if (header === undefined) return null;
 
   const columns = new Set(
-    header.map((cell) =>
+    header.split(/[,;\t|]/).map((cell) =>
       cell
-        .replace(/^\uFEFF/, "")
+        .trim()
+        .replace(/^"(.*)"$/, "$1")
         .trim()
         .toLowerCase(),
     ),

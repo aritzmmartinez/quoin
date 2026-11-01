@@ -1,6 +1,9 @@
 import Decimal from "decimal.js";
 
-import type { KrakenRow } from "./row";
+import { isDecimalString } from "~/core/domain";
+
+import { CsvFileError } from "../csv";
+import { krakenRowRef, type KrakenParsedRow } from "./row";
 
 export interface BalanceMismatch {
   asset: string;
@@ -22,10 +25,15 @@ export class KrakenBalanceMismatchError extends Error {
 }
 
 export function findBalanceMismatch(
-  rows: readonly KrakenRow[],
+  rows: readonly KrakenParsedRow[],
 ): BalanceMismatch | null {
   const held = new Map<string, Decimal>();
   for (const row of rows) {
+    if (
+      ![row.amount || "0", row.fee || "0", row.balance].every(isDecimalString)
+    ) {
+      throw new CsvFileError("invalid-number", null, krakenRowRef(row));
+    }
     const key = `${row.asset}\u0000${row.wallet}`;
     const movement = new Decimal(row.amount || "0").minus(row.fee || "0");
     const balance = new Decimal(row.balance);

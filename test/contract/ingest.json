@@ -1,0 +1,1152 @@
+{
+  "contract": "ingest",
+  "version": 1,
+  "description": "What a broker CSV becomes before anything is written: the broker detected, then instruments, ledger events, discards with their detail, notices, named row errors, the currencies whose ECB rates are missing, and how many operations are new against the keys already stored — or the whole file refused with a named reason. Shared with the mobile client: both implementations must reproduce every case. Input: the csv text is encoded as `encoding` and decoded as strict UTF-8 (a BOM is dropped); `rates` is the ECB rate book, a row booked at the rate of its own day in `zone`; `prices` is the price history Kraken rewards and swaps fall back to; `stored.names` are instrument names already stored (they win over the file's), `stored.rewardRefids` are Kraken refids an earlier import booked as rewards, and `stored.existing` are ledger keys `source::externalId`. Output: events omit `id`, which is random; ts is ISO; operationOf gives each event's operation; a row error names the row by externalId, date and type as written, and by its 1-based position among the file's non-empty records only when it has no id. Detection splits the first non-empty line on , ; tab or |; parsing reads commas only. expect is written by running the TypeScript adapters.",
+  "cases": [
+    {
+      "name": "Neither broker's signature column: unknown broker",
+      "zone": "Europe/Madrid",
+      "encoding": "utf-8",
+      "csv": "name,isin,weight\nTest Fund,XS00TEST0001,100",
+      "rates": [],
+      "prices": [],
+      "stored": {
+        "names": {},
+        "rewardRefids": [],
+        "existing": []
+      },
+      "expect": {
+        "broker": null,
+        "rejected": {
+          "reason": "unknown-broker"
+        }
+      }
+    },
+    {
+      "name": "Both signature columns: refused rather than guessed",
+      "zone": "Europe/Madrid",
+      "encoding": "utf-8",
+      "csv": "refid,transaction_id,type\nR1,T1,BUY",
+      "rates": [],
+      "prices": [],
+      "stored": {
+        "names": {},
+        "rewardRefids": [],
+        "existing": []
+      },
+      "expect": {
+        "broker": null,
+        "rejected": {
+          "reason": "unknown-broker"
+        }
+      }
+    },
+    {
+      "name": "Bytes that are not UTF-8: refused before anything is read",
+      "zone": "Europe/Madrid",
+      "encoding": "latin1",
+      "csv": "datetime,category,type,asset_class,name,symbol,shares,price,amount,fee,tax,currency,transaction_id\n2025-01-10T09:00:00Z,TRADING,BUY,FUND,Fondo Café,XS00TEST0001,1,100,-100,,,EUR,t1",
+      "rates": [],
+      "prices": [],
+      "stored": {
+        "names": {},
+        "rewardRefids": [],
+        "existing": []
+      },
+      "expect": {
+        "broker": null,
+        "rejected": {
+          "reason": "invalid-encoding"
+        }
+      }
+    },
+    {
+      "name": "Trade Republic, a BOM, CRLF and blank lines: read as plain rows",
+      "zone": "Europe/Madrid",
+      "encoding": "utf-8",
+      "csv": "﻿datetime,category,type,asset_class,name,symbol,shares,price,amount,fee,tax,currency,transaction_id\r\n\r\n2025-01-10T09:00:00Z,TRADING,BUY,FUND,Test Fund,XS00TEST0001,2,50,-100,-1,,EUR,t1\r\n,,,,,,,,,,,,\r\n\r\n",
+      "rates": [],
+      "prices": [],
+      "stored": {
+        "names": {},
+        "rewardRefids": [],
+        "existing": []
+      },
+      "expect": {
+        "broker": "trade-republic",
+        "total": 1,
+        "instruments": [
+          {
+            "id": "XS00TEST0001",
+            "name": "Test Fund",
+            "type": "ETF",
+            "assetClass": "FUND",
+            "thesis": "CORE"
+          }
+        ],
+        "events": [
+          {
+            "ts": "2025-01-10T09:00:00.000Z",
+            "currency": "EUR",
+            "account": "trade-republic",
+            "source": "TR_CSV",
+            "externalId": "t1",
+            "note": null,
+            "type": "BUY",
+            "instrumentId": "XS00TEST0001",
+            "quantity": "2",
+            "price": "50",
+            "grossAmount": "100",
+            "fees": "1"
+          }
+        ],
+        "operationOf": [
+          0
+        ],
+        "discarded": {},
+        "discardedDetails": {},
+        "noticed": {},
+        "errors": [],
+        "ratesNeeded": {},
+        "imported": 1,
+        "duplicates": 0
+      }
+    },
+    {
+      "name": "Trade Republic in EUR: buys and a partial sale with fees, a taxed dividend, interest, a deposit, a withdrawal and a card payment",
+      "zone": "Europe/Madrid",
+      "encoding": "utf-8",
+      "csv": "datetime,category,type,asset_class,name,symbol,shares,price,amount,fee,tax,currency,transaction_id\n2025-01-10T09:00:00Z,TRADING,BUY,FUND,Test Fund,XS00TEST0001,10,100,-1000,-1,,EUR,t1\n2025-02-10T09:00:00.000+01:00,TRADING,BUY,STOCK,Test Stock,XS00TEST0002,3,50.5,-151.5,-1,,EUR,t2\n2025-03-10T09:00:00Z,TRADING,SELL,FUND,Test Fund,XS00TEST0001,4,110,440,-1,-2.5,EUR,t3\n2025-04-10T09:00:00Z,CASH,DIVIDEND,STOCK,Test Stock,XS00TEST0002,,,3.6,,-0.68,EUR,t4\n2025-05-01T09:00:00Z,CASH,INTEREST_PAYMENT,,,,,,1.23,,,EUR,t5\n2025-05-02T09:00:00Z,CASH,CUSTOMER_INPAYMENT,,,,,,500,,,EUR,t6\n2025-05-03T09:00:00Z,CASH,TRANSFER_INSTANT_OUTBOUND,,,,,,-50,,,EUR,t7\n2025-05-04T09:00:00Z,CASH,CARD_TRANSACTION,,Test Shop,,,,-9.99,,,EUR,t8",
+      "rates": [],
+      "prices": [],
+      "stored": {
+        "names": {},
+        "rewardRefids": [],
+        "existing": []
+      },
+      "expect": {
+        "broker": "trade-republic",
+        "total": 8,
+        "instruments": [
+          {
+            "id": "XS00TEST0001",
+            "name": "Test Fund",
+            "type": "ETF",
+            "assetClass": "FUND",
+            "thesis": "CORE"
+          },
+          {
+            "id": "XS00TEST0002",
+            "name": "Test Stock",
+            "type": "STOCK",
+            "assetClass": "STOCK",
+            "thesis": "CORE"
+          }
+        ],
+        "events": [
+          {
+            "ts": "2025-01-10T09:00:00.000Z",
+            "currency": "EUR",
+            "account": "trade-republic",
+            "source": "TR_CSV",
+            "externalId": "t1",
+            "note": null,
+            "type": "BUY",
+            "instrumentId": "XS00TEST0001",
+            "quantity": "10",
+            "price": "100",
+            "grossAmount": "1000",
+            "fees": "1"
+          },
+          {
+            "ts": "2025-02-10T08:00:00.000Z",
+            "currency": "EUR",
+            "account": "trade-republic",
+            "source": "TR_CSV",
+            "externalId": "t2",
+            "note": null,
+            "type": "BUY",
+            "instrumentId": "XS00TEST0002",
+            "quantity": "3",
+            "price": "50.5",
+            "grossAmount": "151.5",
+            "fees": "1"
+          },
+          {
+            "ts": "2025-03-10T09:00:00.000Z",
+            "currency": "EUR",
+            "account": "trade-republic",
+            "source": "TR_CSV",
+            "externalId": "t3",
+            "note": null,
+            "type": "SELL",
+            "instrumentId": "XS00TEST0001",
+            "quantity": "4",
+            "price": "110",
+            "grossAmount": "440",
+            "fees": "1"
+          },
+          {
+            "ts": "2025-04-10T09:00:00.000Z",
+            "currency": "EUR",
+            "account": "trade-republic",
+            "source": "TR_CSV",
+            "externalId": "t4",
+            "note": null,
+            "type": "DIVIDEND",
+            "instrumentId": "XS00TEST0002",
+            "grossAmount": "3.6",
+            "taxWithheld": "0.68"
+          },
+          {
+            "ts": "2025-05-01T09:00:00.000Z",
+            "currency": "EUR",
+            "account": "trade-republic",
+            "source": "TR_CSV",
+            "externalId": "t5",
+            "note": null,
+            "type": "INTEREST",
+            "grossAmount": "1.23"
+          },
+          {
+            "ts": "2025-05-02T09:00:00.000Z",
+            "currency": "EUR",
+            "account": "trade-republic",
+            "source": "TR_CSV",
+            "externalId": "t6",
+            "note": null,
+            "type": "DEPOSIT",
+            "grossAmount": "500"
+          },
+          {
+            "ts": "2025-05-03T09:00:00.000Z",
+            "currency": "EUR",
+            "account": "trade-republic",
+            "source": "TR_CSV",
+            "externalId": "t7",
+            "note": null,
+            "type": "WITHDRAWAL",
+            "grossAmount": "50"
+          }
+        ],
+        "operationOf": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "discarded": {
+          "card-spending": 1
+        },
+        "discardedDetails": {},
+        "noticed": {},
+        "errors": [],
+        "ratesNeeded": {},
+        "imported": 7,
+        "duplicates": 0
+      }
+    },
+    {
+      "name": "Trade Republic, re-imported: rows already in the ledger are duplicates",
+      "zone": "Europe/Madrid",
+      "encoding": "utf-8",
+      "csv": "datetime,category,type,asset_class,name,symbol,shares,price,amount,fee,tax,currency,transaction_id\n2025-01-10T09:00:00Z,TRADING,BUY,FUND,Test Fund,XS00TEST0001,1,100,-100,,,EUR,t1\n2025-01-11T09:00:00Z,TRADING,BUY,FUND,Test Fund,XS00TEST0001,1,101,-101,,,EUR,t2",
+      "rates": [],
+      "prices": [],
+      "stored": {
+        "names": {},
+        "rewardRefids": [],
+        "existing": [
+          "TR_CSV::t1"
+        ]
+      },
+      "expect": {
+        "broker": "trade-republic",
+        "total": 2,
+        "instruments": [
+          {
+            "id": "XS00TEST0001",
+            "name": "Test Fund",
+            "type": "ETF",
+            "assetClass": "FUND",
+            "thesis": "CORE"
+          }
+        ],
+        "events": [
+          {
+            "ts": "2025-01-10T09:00:00.000Z",
+            "currency": "EUR",
+            "account": "trade-republic",
+            "source": "TR_CSV",
+            "externalId": "t1",
+            "note": null,
+            "type": "BUY",
+            "instrumentId": "XS00TEST0001",
+            "quantity": "1",
+            "price": "100",
+            "grossAmount": "100",
+            "fees": "0"
+          },
+          {
+            "ts": "2025-01-11T09:00:00.000Z",
+            "currency": "EUR",
+            "account": "trade-republic",
+            "source": "TR_CSV",
+            "externalId": "t2",
+            "note": null,
+            "type": "BUY",
+            "instrumentId": "XS00TEST0001",
+            "quantity": "1",
+            "price": "101",
+            "grossAmount": "101",
+            "fees": "0"
+          }
+        ],
+        "operationOf": [
+          0,
+          1
+        ],
+        "discarded": {},
+        "discardedDetails": {},
+        "noticed": {},
+        "errors": [],
+        "ratesNeeded": {},
+        "imported": 1,
+        "duplicates": 1
+      }
+    },
+    {
+      "name": "Trade Republic saveback, both regimes and one with no purchase",
+      "zone": "Europe/Madrid",
+      "encoding": "utf-8",
+      "csv": "datetime,category,type,asset_class,name,symbol,shares,price,amount,fee,tax,currency,transaction_id\n2025-10-01T08:00:00Z,CASH,BENEFITS_SAVEBACK,,Test Fund,XS00TEST0001,,,15,,,EUR,s1\n2025-10-03T09:00:00Z,TRADING,BUY,FUND,Test Fund,XS00TEST0001,0.15,100,-15,,-2.85,EUR,b1\n2025-12-01T08:00:00Z,CASH,BENEFITS_SAVEBACK,,,,,,15,,-2.85,EUR,s2\n2025-12-02T09:00:00Z,TRADING,BUY,FUND,Test Fund,XS00TEST0001,0.1215,100,-12.15,,,EUR,b2\n2026-01-05T08:00:00Z,CASH,BENEFITS_SAVEBACK,,,,,,7,,,EUR,s3",
+      "rates": [],
+      "prices": [],
+      "stored": {
+        "names": {},
+        "rewardRefids": [],
+        "existing": []
+      },
+      "expect": {
+        "broker": "trade-republic",
+        "total": 5,
+        "instruments": [
+          {
+            "id": "XS00TEST0001",
+            "name": "Test Fund",
+            "type": "ETF",
+            "assetClass": "FUND",
+            "thesis": "CORE"
+          }
+        ],
+        "events": [
+          {
+            "ts": "2025-10-03T09:00:00.000Z",
+            "currency": "EUR",
+            "account": "trade-republic",
+            "source": "TR_CSV",
+            "externalId": "b1",
+            "note": null,
+            "type": "BUY",
+            "instrumentId": "XS00TEST0001",
+            "quantity": "0.15",
+            "price": "100",
+            "grossAmount": "15",
+            "fees": "0",
+            "funding": "IN_KIND"
+          },
+          {
+            "ts": "2025-10-01T08:00:00.000Z",
+            "currency": "EUR",
+            "account": "trade-republic",
+            "source": "TR_CSV",
+            "externalId": "s1",
+            "note": null,
+            "type": "DIVIDEND",
+            "instrumentId": "XS00TEST0001",
+            "grossAmount": "15",
+            "taxWithheld": "2.85",
+            "funding": "IN_KIND"
+          },
+          {
+            "ts": "2025-12-02T09:00:00.000Z",
+            "currency": "EUR",
+            "account": "trade-republic",
+            "source": "TR_CSV",
+            "externalId": "b2",
+            "note": null,
+            "type": "BUY",
+            "instrumentId": "XS00TEST0001",
+            "quantity": "0.1215",
+            "price": "100",
+            "grossAmount": "12.15",
+            "fees": "0",
+            "funding": "IN_KIND"
+          },
+          {
+            "ts": "2025-12-01T08:00:00.000Z",
+            "currency": "EUR",
+            "account": "trade-republic",
+            "source": "TR_CSV",
+            "externalId": "s2",
+            "note": null,
+            "type": "DIVIDEND",
+            "instrumentId": "XS00TEST0001",
+            "grossAmount": "15",
+            "taxWithheld": "2.85",
+            "funding": "IN_KIND"
+          }
+        ],
+        "operationOf": [
+          0,
+          0,
+          1,
+          1
+        ],
+        "discarded": {
+          "saveback-unpaired": 1
+        },
+        "discardedDetails": {
+          "saveback-unpaired": [
+            {
+              "date": "2026-01-05T08:00:00Z",
+              "type": "BENEFITS_SAVEBACK",
+              "subtype": null,
+              "instrument": null
+            }
+          ]
+        },
+        "noticed": {},
+        "errors": [],
+        "ratesNeeded": {},
+        "imported": 2,
+        "duplicates": 0
+      }
+    },
+    {
+      "name": "Trade Republic rows in another currency, one day with an ECB rate and one without",
+      "zone": "Europe/Madrid",
+      "encoding": "utf-8",
+      "csv": "datetime,category,type,asset_class,name,symbol,shares,price,amount,fee,tax,currency,transaction_id\n2025-03-03T15:00:00Z,TRADING,BUY,STOCK,Test US Stock,XS00TEST0003,2,100,-200,-1,,USD,u1\n2025-03-04T15:00:00Z,TRADING,BUY,STOCK,Test US Stock,XS00TEST0003,1,101,-101,,,USD,u2",
+      "rates": [
+        {
+          "base": "EUR",
+          "quote": "USD",
+          "day": "2025-03-03",
+          "rate": "1.0500",
+          "source": "ECB"
+        }
+      ],
+      "prices": [],
+      "stored": {
+        "names": {},
+        "rewardRefids": [],
+        "existing": []
+      },
+      "expect": {
+        "broker": "trade-republic",
+        "total": 2,
+        "instruments": [
+          {
+            "id": "XS00TEST0003",
+            "name": "Test US Stock",
+            "type": "STOCK",
+            "assetClass": "STOCK",
+            "thesis": "CORE"
+          }
+        ],
+        "events": [
+          {
+            "ts": "2025-03-03T15:00:00.000Z",
+            "currency": "USD",
+            "account": "trade-republic",
+            "source": "TR_CSV",
+            "externalId": "u1",
+            "note": null,
+            "type": "BUY",
+            "instrumentId": "XS00TEST0003",
+            "quantity": "2",
+            "price": "100",
+            "grossAmount": "200",
+            "fees": "1",
+            "fxSource": "ECB",
+            "fxRate": "1.0500",
+            "fxDirection": "QUOTE_PER_BASE",
+            "fxDate": "2025-03-03"
+          }
+        ],
+        "operationOf": [
+          0
+        ],
+        "discarded": {
+          "fx-unavailable": 1
+        },
+        "discardedDetails": {
+          "fx-unavailable": [
+            {
+              "date": "2025-03-04T15:00:00.000Z",
+              "type": "BUY",
+              "subtype": null,
+              "instrument": "Test US Stock (USD)"
+            }
+          ]
+        },
+        "noticed": {},
+        "errors": [],
+        "ratesNeeded": {
+          "USD": "2025-03-04"
+        },
+        "imported": 1,
+        "duplicates": 0
+      }
+    },
+    {
+      "name": "Trade Republic asset classes Quoin does not read: set aside by name, a trade flagged and a dividend not",
+      "zone": "Europe/Madrid",
+      "encoding": "utf-8",
+      "csv": "datetime,category,type,asset_class,name,symbol,shares,price,amount,fee,tax,currency,transaction_id\n2025-06-02T09:00:00Z,TRADING,BUY,BOND,Test Bond,XS00TEST0004,1,99,-99,-1,,EUR,x1\n2025-06-03T09:00:00Z,CASH,DIVIDEND,BOND,Test Bond,XS00TEST0004,,,2.5,,,EUR,x2\n2025-06-04T09:00:00Z,TRADING,SELL,DERIVATIVE,Test Option,XS00TEST0005,1,5,5,-1,,EUR,x3",
+      "rates": [],
+      "prices": [],
+      "stored": {
+        "names": {},
+        "rewardRefids": [],
+        "existing": []
+      },
+      "expect": {
+        "broker": "trade-republic",
+        "total": 3,
+        "instruments": [],
+        "events": [],
+        "operationOf": [],
+        "discarded": {
+          "unsupported-asset-class": 3
+        },
+        "discardedDetails": {
+          "unsupported-asset-class": [
+            {
+              "date": "2025-06-02T09:00:00Z",
+              "type": "BUY",
+              "subtype": "BOND",
+              "instrument": "Test Bond",
+              "affectsPosition": true
+            },
+            {
+              "date": "2025-06-03T09:00:00Z",
+              "type": "DIVIDEND",
+              "subtype": "BOND",
+              "instrument": "Test Bond",
+              "affectsPosition": false
+            },
+            {
+              "date": "2025-06-04T09:00:00Z",
+              "type": "SELL",
+              "subtype": "DERIVATIVE",
+              "instrument": "Test Option",
+              "affectsPosition": true
+            }
+          ]
+        },
+        "noticed": {},
+        "errors": [],
+        "ratesNeeded": {},
+        "imported": 0,
+        "duplicates": 0
+      }
+    },
+    {
+      "name": "Trade Republic rows it cannot read: each named, the rest imported",
+      "zone": "Europe/Madrid",
+      "encoding": "utf-8",
+      "csv": "datetime,category,type,asset_class,name,symbol,shares,price,amount,fee,tax,currency,transaction_id\n2025-07-01T09:00:00,TRADING,BUY,FUND,Test Fund,XS00TEST0001,1,100,-100,,,EUR,m1\n2025-07-02T09:00:00Z,TRADING,BUY,FUND\n2025-07-03T09:00:00Z,TRADING,BUY,FUND,Test Fund,XS00TEST0001,,100,-100,,,EUR,m3\n2025-07-04T09:00:00Z,TRADING,BUY,FUND,Test Fund,,1,100,-100,,,EUR,m4\n2025-07-05T09:00:00Z,TRADING,BUY,FUND,Test Fund,XS00TEST0001,1,100,-100,,,EUR,m5",
+      "rates": [],
+      "prices": [],
+      "stored": {
+        "names": {},
+        "rewardRefids": [],
+        "existing": []
+      },
+      "expect": {
+        "broker": "trade-republic",
+        "total": 5,
+        "instruments": [
+          {
+            "id": "XS00TEST0001",
+            "name": "Test Fund",
+            "type": "ETF",
+            "assetClass": "FUND",
+            "thesis": "CORE"
+          }
+        ],
+        "events": [
+          {
+            "ts": "2025-07-05T09:00:00.000Z",
+            "currency": "EUR",
+            "account": "trade-republic",
+            "source": "TR_CSV",
+            "externalId": "m5",
+            "note": null,
+            "type": "BUY",
+            "instrumentId": "XS00TEST0001",
+            "quantity": "1",
+            "price": "100",
+            "grossAmount": "100",
+            "fees": "0"
+          }
+        ],
+        "operationOf": [
+          0
+        ],
+        "discarded": {},
+        "discardedDetails": {},
+        "noticed": {},
+        "errors": [
+          {
+            "externalId": "m1",
+            "position": null,
+            "date": "2025-07-01T09:00:00",
+            "type": "BUY",
+            "reason": "invalid-date"
+          },
+          {
+            "externalId": null,
+            "position": 2,
+            "date": "2025-07-02T09:00:00Z",
+            "type": "BUY",
+            "reason": "wrong-field-count"
+          },
+          {
+            "externalId": "m3",
+            "position": null,
+            "date": "2025-07-03T09:00:00Z",
+            "type": "BUY",
+            "reason": "invalid-number"
+          },
+          {
+            "externalId": "m4",
+            "position": null,
+            "date": "2025-07-04T09:00:00Z",
+            "type": "BUY",
+            "reason": "missing-instrument"
+          }
+        ],
+        "ratesNeeded": {},
+        "imported": 1,
+        "duplicates": 0
+      }
+    },
+    {
+      "name": "Trade Republic with a column missing: refused, naming it",
+      "zone": "Europe/Madrid",
+      "encoding": "utf-8",
+      "csv": "datetime,category,type,name,symbol,shares,price,amount,fee,tax,currency,transaction_id\n2025-01-10T09:00:00Z,TRADING,BUY,Test Fund,XS00TEST0001,1,100,-100,,,EUR,t1",
+      "rates": [],
+      "prices": [],
+      "stored": {
+        "names": {},
+        "rewardRefids": [],
+        "existing": []
+      },
+      "expect": {
+        "broker": "trade-republic",
+        "rejected": {
+          "reason": "missing-column",
+          "column": "asset_class"
+        }
+      }
+    },
+    {
+      "name": "Trade Republic saved with ';': recognised, then refused as unparseable",
+      "zone": "Europe/Madrid",
+      "encoding": "utf-8",
+      "csv": "datetime;category;type;asset_class;name;symbol;shares;price;amount;fee;tax;currency;transaction_id\n2025-01-10T09:00:00Z;TRADING;BUY;FUND;Test Fund;XS00TEST0001;1;100;-100;;;EUR;t1",
+      "rates": [],
+      "prices": [],
+      "stored": {
+        "names": {},
+        "rewardRefids": [],
+        "existing": []
+      },
+      "expect": {
+        "broker": "trade-republic",
+        "rejected": {
+          "reason": "unparseable"
+        }
+      }
+    },
+    {
+      "name": "Kraken in EUR: a deposit, a buy with a fee in fiat, a sale, and a withdrawal",
+      "zone": "Europe/Madrid",
+      "encoding": "utf-8",
+      "csv": "txid,refid,time,type,subtype,aclass,subclass,asset,wallet,amount,fee,balance,amountusd,feeusd,balanceusd,feecurrency\n\"L1\",\"D1\",\"2025-02-01 10:00:00\",\"deposit\",\"\",\"currency\",\"fiat\",\"EUR\",\"spot / main\",1000,0,1000,,,,\"\"\n\"L2\",\"B1\",\"2025-02-02 10:00:00\",\"spend\",\"\",\"currency\",\"fiat\",\"EUR\",\"spot / main\",-500,2,498,,,,\"\"\n\"L3\",\"B1\",\"2025-02-02 10:00:00\",\"receive\",\"\",\"currency\",\"crypto\",\"TESTCOIN\",\"spot / main\",0.5,0,0.5,,,,\"\"\n\"L4\",\"S1\",\"2025-03-02 10:00:00\",\"spend\",\"\",\"currency\",\"crypto\",\"TESTCOIN\",\"spot / main\",-0.2,0,0.3,,,,\"\"\n\"L5\",\"S1\",\"2025-03-02 10:00:00\",\"receive\",\"\",\"currency\",\"fiat\",\"EUR\",\"spot / main\",240,1,737,,,,\"\"\n\"L6\",\"W1\",\"2025-03-03 10:00:00\",\"withdrawal\",\"\",\"currency\",\"fiat\",\"EUR\",\"spot / main\",-200,0,537,,,,\"\"",
+      "rates": [],
+      "prices": [],
+      "stored": {
+        "names": {},
+        "rewardRefids": [],
+        "existing": []
+      },
+      "expect": {
+        "broker": "kraken",
+        "total": 4,
+        "instruments": [
+          {
+            "id": "TESTCOIN",
+            "name": "TESTCOIN",
+            "type": "CRYPTO",
+            "assetClass": "crypto",
+            "thesis": "CORE"
+          }
+        ],
+        "events": [
+          {
+            "ts": "2025-02-01T10:00:00.000Z",
+            "currency": "EUR",
+            "account": "kraken",
+            "source": "KRAKEN_CSV",
+            "externalId": "D1",
+            "note": null,
+            "type": "DEPOSIT",
+            "grossAmount": "1000"
+          },
+          {
+            "ts": "2025-02-02T10:00:00.000Z",
+            "currency": "EUR",
+            "account": "kraken",
+            "source": "KRAKEN_CSV",
+            "externalId": "B1",
+            "note": null,
+            "type": "BUY",
+            "instrumentId": "TESTCOIN",
+            "quantity": "0.5",
+            "price": "1000",
+            "grossAmount": "500",
+            "fees": "2"
+          },
+          {
+            "ts": "2025-03-02T10:00:00.000Z",
+            "currency": "EUR",
+            "account": "kraken",
+            "source": "KRAKEN_CSV",
+            "externalId": "S1",
+            "note": null,
+            "type": "SELL",
+            "instrumentId": "TESTCOIN",
+            "quantity": "0.2",
+            "price": "1200",
+            "grossAmount": "240",
+            "fees": "1"
+          },
+          {
+            "ts": "2025-03-03T10:00:00.000Z",
+            "currency": "EUR",
+            "account": "kraken",
+            "source": "KRAKEN_CSV",
+            "externalId": "W1",
+            "note": null,
+            "type": "WITHDRAWAL",
+            "grossAmount": "200"
+          }
+        ],
+        "operationOf": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "discarded": {},
+        "discardedDetails": {},
+        "noticed": {},
+        "errors": [],
+        "ratesNeeded": {},
+        "imported": 4,
+        "duplicates": 0
+      }
+    },
+    {
+      "name": "Kraken rewards: at Kraken's own USD figure, from the price history, and one with neither",
+      "zone": "Europe/Madrid",
+      "encoding": "utf-8",
+      "csv": "txid,refid,time,type,subtype,aclass,subclass,asset,wallet,amount,fee,balance,amountusd,feeusd,balanceusd,feecurrency\n\"L1\",\"R1\",\"2025-04-01 12:00:00\",\"earn\",\"reward\",\"currency\",\"crypto\",\"TESTCOIN\",\"spot / main\",0.001,0,0.001,1.10,0.05,,\"\"\n\"L2\",\"R2\",\"2025-04-08 12:00:00\",\"reward\",\"\",\"currency\",\"crypto\",\"TESTCOIN\",\"spot / main\",0.002,0,0.003,,,,\"\"\n\"L3\",\"R3\",\"2025-04-08 12:00:00\",\"reward\",\"\",\"currency\",\"crypto\",\"TESTTOKEN\",\"spot / main\",3,0,3,,,,\"\"",
+      "rates": [
+        {
+          "base": "EUR",
+          "quote": "USD",
+          "day": "2025-04-01",
+          "rate": "1.0800",
+          "source": "ECB"
+        }
+      ],
+      "prices": [
+        {
+          "instrumentId": "TESTCOIN",
+          "price": "1000",
+          "currency": "EUR",
+          "asOf": "2025-04-06T00:00:00.000Z",
+          "source": "YAHOO"
+        }
+      ],
+      "stored": {
+        "names": {},
+        "rewardRefids": [],
+        "existing": []
+      },
+      "expect": {
+        "broker": "kraken",
+        "total": 3,
+        "instruments": [
+          {
+            "id": "TESTCOIN",
+            "name": "TESTCOIN",
+            "type": "CRYPTO",
+            "assetClass": "crypto",
+            "thesis": "CORE"
+          },
+          {
+            "id": "TESTTOKEN",
+            "name": "TESTTOKEN",
+            "type": "CRYPTO",
+            "assetClass": "crypto",
+            "thesis": "CORE"
+          }
+        ],
+        "events": [
+          {
+            "ts": "2025-04-01T12:00:00.000Z",
+            "currency": "USD",
+            "valuationSource": "kraken-amountusd",
+            "account": "kraken",
+            "source": "KRAKEN_CSV",
+            "externalId": "R1",
+            "note": "kraken-reward",
+            "type": "BUY",
+            "instrumentId": "TESTCOIN",
+            "quantity": "0.001",
+            "price": "1050",
+            "grossAmount": "1.05",
+            "fees": "0",
+            "funding": "IN_KIND",
+            "fxSource": "ECB",
+            "fxRate": "1.0800",
+            "fxDirection": "QUOTE_PER_BASE",
+            "fxDate": "2025-04-01"
+          },
+          {
+            "ts": "2025-04-01T12:00:00.000Z",
+            "currency": "USD",
+            "valuationSource": "kraken-amountusd",
+            "account": "kraken",
+            "source": "KRAKEN_CSV",
+            "externalId": "R1:income",
+            "note": "kraken-reward-income",
+            "type": "DIVIDEND",
+            "instrumentId": "TESTCOIN",
+            "grossAmount": "1.05",
+            "taxWithheld": "0",
+            "funding": "IN_KIND",
+            "fxSource": "ECB",
+            "fxRate": "1.0800",
+            "fxDirection": "QUOTE_PER_BASE",
+            "fxDate": "2025-04-01"
+          },
+          {
+            "ts": "2025-04-08T12:00:00.000Z",
+            "currency": "EUR",
+            "valuationSource": "yahoo",
+            "account": "kraken",
+            "source": "KRAKEN_CSV",
+            "externalId": "R2",
+            "note": "kraken-reward",
+            "type": "BUY",
+            "instrumentId": "TESTCOIN",
+            "quantity": "0.002",
+            "price": "1000",
+            "grossAmount": "2",
+            "fees": "0",
+            "funding": "IN_KIND"
+          },
+          {
+            "ts": "2025-04-08T12:00:00.000Z",
+            "currency": "EUR",
+            "valuationSource": "yahoo",
+            "account": "kraken",
+            "source": "KRAKEN_CSV",
+            "externalId": "R2:income",
+            "note": "kraken-reward-income",
+            "type": "DIVIDEND",
+            "instrumentId": "TESTCOIN",
+            "grossAmount": "2",
+            "taxWithheld": "0",
+            "funding": "IN_KIND"
+          }
+        ],
+        "operationOf": [
+          0,
+          0,
+          1,
+          1
+        ],
+        "discarded": {
+          "reward-unpriced": 1
+        },
+        "discardedDetails": {
+          "reward-unpriced": [
+            {
+              "date": "2025-04-08T12:00:00.000Z",
+              "type": "reward",
+              "subtype": null,
+              "instrument": "TESTTOKEN"
+            }
+          ]
+        },
+        "noticed": {},
+        "errors": [],
+        "ratesNeeded": {},
+        "imported": 2,
+        "duplicates": 0
+      }
+    },
+    {
+      "name": "Kraken swap between two crypto assets at Kraken's USD figure",
+      "zone": "Europe/Madrid",
+      "encoding": "utf-8",
+      "csv": "txid,refid,time,type,subtype,aclass,subclass,asset,wallet,amount,fee,balance,amountusd,feeusd,balanceusd,feecurrency\n\"L1\",\"X2\",\"2025-05-06 10:00:00\",\"spend\",\"\",\"currency\",\"crypto\",\"TESTCOIN\",\"spot / main\",-0.5,0,-0.5,-540,,,\"\"\n\"L2\",\"X2\",\"2025-05-06 10:00:00\",\"receive\",\"\",\"currency\",\"crypto\",\"TESTTOKEN\",\"spot / main\",100,1,99,540,5.4,,\"\"",
+      "rates": [
+        {
+          "base": "EUR",
+          "quote": "USD",
+          "day": "2025-05-06",
+          "rate": "1.1320",
+          "source": "ECB"
+        }
+      ],
+      "prices": [],
+      "stored": {
+        "names": {},
+        "rewardRefids": [],
+        "existing": []
+      },
+      "expect": {
+        "broker": "kraken",
+        "total": 1,
+        "instruments": [
+          {
+            "id": "TESTCOIN",
+            "name": "TESTCOIN",
+            "type": "CRYPTO",
+            "assetClass": "crypto",
+            "thesis": "CORE"
+          },
+          {
+            "id": "TESTTOKEN",
+            "name": "TESTTOKEN",
+            "type": "CRYPTO",
+            "assetClass": "crypto",
+            "thesis": "CORE"
+          }
+        ],
+        "events": [
+          {
+            "ts": "2025-05-06T10:00:00.000Z",
+            "currency": "USD",
+            "valuationSource": "kraken-amountusd",
+            "linkId": "X2",
+            "linkKind": "swap",
+            "account": "kraken",
+            "source": "KRAKEN_CSV",
+            "externalId": "X2:sell",
+            "note": null,
+            "type": "SELL",
+            "instrumentId": "TESTCOIN",
+            "quantity": "0.5",
+            "price": "1080",
+            "grossAmount": "540",
+            "fees": "0",
+            "fxSource": "ECB",
+            "fxRate": "1.1320",
+            "fxDirection": "QUOTE_PER_BASE",
+            "fxDate": "2025-05-06"
+          },
+          {
+            "ts": "2025-05-06T10:00:00.000Z",
+            "currency": "USD",
+            "valuationSource": "kraken-amountusd",
+            "linkId": "X2",
+            "linkKind": "swap",
+            "account": "kraken",
+            "source": "KRAKEN_CSV",
+            "externalId": "X2:buy",
+            "note": null,
+            "type": "BUY",
+            "instrumentId": "TESTTOKEN",
+            "quantity": "99",
+            "price": "5.4",
+            "grossAmount": "534.6",
+            "fees": "5.4",
+            "fxSource": "ECB",
+            "fxRate": "1.1320",
+            "fxDirection": "QUOTE_PER_BASE",
+            "fxDate": "2025-05-06"
+          }
+        ],
+        "operationOf": [
+          0,
+          0
+        ],
+        "discarded": {},
+        "discardedDetails": {},
+        "noticed": {},
+        "errors": [],
+        "ratesNeeded": {},
+        "imported": 1,
+        "duplicates": 0
+      }
+    },
+    {
+      "name": "Kraken trades with nothing on one side: a fee that takes every unit, and a purchase that pays no fiat",
+      "zone": "Europe/Madrid",
+      "encoding": "utf-8",
+      "csv": "txid,refid,time,type,subtype,aclass,subclass,asset,wallet,amount,fee,balance,amountusd,feeusd,balanceusd,feecurrency\n\"L1\",\"Z1\",\"2025-06-01 10:00:00\",\"spend\",\"\",\"currency\",\"fiat\",\"EUR\",\"spot / main\",-80,0,-80,,,,\"\"\n\"L2\",\"Z1\",\"2025-06-01 10:00:00\",\"receive\",\"\",\"currency\",\"crypto\",\"TESTCOIN\",\"spot / main\",0.001,0.001,0,,,,\"\"\n\"L3\",\"Z2\",\"2025-06-02 10:00:00\",\"spend\",\"\",\"currency\",\"fiat\",\"EUR\",\"spot / main\",0,0,-80,,,,\"\"\n\"L4\",\"Z2\",\"2025-06-02 10:00:00\",\"receive\",\"\",\"currency\",\"crypto\",\"TESTCOIN\",\"spot / main\",0.001,0,0.001,,,,\"\"",
+      "rates": [],
+      "prices": [],
+      "stored": {
+        "names": {},
+        "rewardRefids": [],
+        "existing": []
+      },
+      "expect": {
+        "broker": "kraken",
+        "total": 2,
+        "instruments": [],
+        "events": [],
+        "operationOf": [],
+        "discarded": {
+          "unsupported": 2
+        },
+        "discardedDetails": {
+          "unsupported": [
+            {
+              "date": "2025-06-01T10:00:00.000Z",
+              "type": "receive",
+              "subtype": null,
+              "instrument": "TESTCOIN"
+            },
+            {
+              "date": "2025-06-02T10:00:00.000Z",
+              "type": "receive",
+              "subtype": null,
+              "instrument": "TESTCOIN"
+            }
+          ]
+        },
+        "noticed": {},
+        "errors": [],
+        "ratesNeeded": {},
+        "imported": 0,
+        "duplicates": 0
+      }
+    },
+    {
+      "name": "Kraken internal move booked as a reward by an earlier import, and an operation whose time cannot be read",
+      "zone": "Europe/Madrid",
+      "encoding": "utf-8",
+      "csv": "txid,refid,time,type,subtype,aclass,subclass,asset,wallet,amount,fee,balance,amountusd,feeusd,balanceusd,feecurrency\n\"L1\",\"I1\",\"2025-07-01 10:00:00\",\"earn\",\"allocation\",\"currency\",\"crypto\",\"TESTCOIN\",\"spot / main\",0,0,0,,,,\"\"\n\"L2\",\"I2\",\"not a time\",\"deposit\",\"\",\"currency\",\"fiat\",\"EUR\",\"spot / main\",10,0,10,,,,\"\"",
+      "rates": [],
+      "prices": [],
+      "stored": {
+        "names": {
+          "TESTCOIN": "Test Coin"
+        },
+        "rewardRefids": [
+          "I1"
+        ],
+        "existing": []
+      },
+      "expect": {
+        "broker": "kraken",
+        "total": 2,
+        "instruments": [],
+        "events": [],
+        "operationOf": [],
+        "discarded": {
+          "internal-move": 1
+        },
+        "discardedDetails": {
+          "internal-move": [
+            {
+              "date": "2025-07-01T10:00:00.000Z",
+              "type": "earn",
+              "subtype": "allocation",
+              "instrument": "TESTCOIN"
+            }
+          ]
+        },
+        "noticed": {
+          "internal-booked-as-reward": [
+            {
+              "date": "2025-07-01T10:00:00.000Z",
+              "type": "earn",
+              "subtype": "allocation",
+              "instrument": "TESTCOIN"
+            }
+          ]
+        },
+        "errors": [
+          {
+            "externalId": "I2",
+            "position": null,
+            "date": "not a time",
+            "type": "deposit",
+            "reason": "invalid-date"
+          }
+        ],
+        "ratesNeeded": {},
+        "imported": 0,
+        "duplicates": 0
+      }
+    },
+    {
+      "name": "Kraken export of the old format, without a wallet column: refused",
+      "zone": "Europe/Madrid",
+      "encoding": "utf-8",
+      "csv": "txid,refid,time,type,subtype,aclass,asset,amount,fee,balance\n\"L1\",\"D1\",\"2021-03-01 10:00:00\",\"deposit\",\"\",\"currency\",\"ZEUR\",200,0,200",
+      "rates": [],
+      "prices": [],
+      "stored": {
+        "names": {},
+        "rewardRefids": [],
+        "existing": []
+      },
+      "expect": {
+        "broker": "kraken",
+        "rejected": {
+          "reason": "kraken-legacy-export"
+        }
+      }
+    },
+    {
+      "name": "Kraken balance that does not follow from the rows before it: refused, naming where",
+      "zone": "Europe/Madrid",
+      "encoding": "utf-8",
+      "csv": "txid,refid,time,type,subtype,aclass,subclass,asset,wallet,amount,fee,balance,amountusd,feeusd,balanceusd,feecurrency\n\"L1\",\"D1\",\"2025-02-01 10:00:00\",\"deposit\",\"\",\"currency\",\"fiat\",\"EUR\",\"spot / main\",100,0,100,,,,\"\"\n\"L2\",\"D2\",\"2025-02-02 10:00:00\",\"deposit\",\"\",\"currency\",\"fiat\",\"EUR\",\"spot / main\",50,0,160,,,,\"\"",
+      "rates": [],
+      "prices": [],
+      "stored": {
+        "names": {},
+        "rewardRefids": [],
+        "existing": []
+      },
+      "expect": {
+        "broker": "kraken",
+        "rejected": {
+          "reason": "kraken-balance-mismatch",
+          "asset": "EUR",
+          "wallet": "spot / main",
+          "date": "2025-02-02 10:00:00 UTC"
+        }
+      }
+    }
+  ]
+}
