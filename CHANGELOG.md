@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Importing a file in another currency: when the ECB now publishes a different rate for a day already stored, the import window and `pnpm ingest` say so, with the currency, the day and both rates, and that the series was not updated. Before, nothing was said, and the trades of days with no stored rate appeared only as trades with no exchange rate, with advice to refresh the rates that could not help.
+
 ## [0.15.2] - 2026-11-01
 
 ### Added

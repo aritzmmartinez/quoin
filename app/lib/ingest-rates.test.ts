@@ -34,7 +34,8 @@ describe("planWithRates", () => {
 
     expect(plans).toBe(1);
     expect(asked).toEqual([]);
-    expect(planned.total).toBe(1);
+    expect(planned.batch.total).toBe(1);
+    expect(planned.rateConflicts).toEqual([]);
   });
 
   it("syncs the currencies and days the first plan missed, then plans again", async () => {
@@ -50,6 +51,23 @@ describe("planWithRates", () => {
     );
 
     expect(asked).toEqual([new Map([["USD", "2026-01-05"]])]);
-    expect(planned.total).toBe(2);
+    expect(planned.batch.total).toBe(2);
+  });
+
+  it("passes on the days the ECB now publishes at another rate", async () => {
+    const conflict = {
+      currency: "USD",
+      day: "2026-01-05",
+      stored: "1.0832",
+      incoming: "1.0830",
+    };
+    const plans = [batch([["USD", "2026-01-05"]], 1), batch([], 1)];
+
+    const planned = await planWithRates(
+      async () => plans.shift()!,
+      async () => ({ book: new Map(), unavailable: [], conflicts: [conflict] }),
+    );
+
+    expect(planned.rateConflicts).toEqual([conflict]);
   });
 });

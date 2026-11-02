@@ -35,6 +35,7 @@ import {
   unpricedAssetIds,
   unpricedEntries,
 } from "~/lib";
+import type { RateConflict } from "~/lib/fx-sync";
 import { ensureRatesNow } from "~/lib/fx-sync.server";
 import { planWithRates } from "~/lib/ingest-rates";
 import { fillPrices } from "~/lib/ingest.server";
@@ -47,6 +48,23 @@ const USAGE = `Usage: pnpm ingest --broker=<${BROKERS.join("|")}> <file.csv> [--
 
 const t = copyFor("en");
 const copy = t.ingest.summary;
+
+function printRateConflicts(conflicts: readonly RateConflict[]): void {
+  if (conflicts.length === 0) return;
+  const currencies = [...new Set(conflicts.map((c) => c.currency))];
+  console.log(
+    `
+ECB rates differ from the stored ones; ${currencies.join(", ")} not updated`,
+  );
+  for (const c of conflicts) {
+    console.log(
+      `  ${c.currency} ${c.day}: stored ${c.stored}, ECB now ${c.incoming}`,
+    );
+  }
+  console.log(
+    "  Rows in that currency on a day with no stored rate are set aside (no ECB rate).",
+  );
+}
 
 function printSummary(title: string, summary: ImportSummary): void {
   const groups = discardGroups(summary);
@@ -142,7 +160,7 @@ async function retryUnpriced(
   const retried = await persistBatch(
     instruments,
     ledger,
-    await planWithRates(() => adapter.plan(csv), ensureRatesNow),
+    (await planWithRates(() => adapter.plan(csv), ensureRatesNow)).batch,
   );
   const merged = mergeRetry(first, retried);
   console.log(`  recovered          : ${merged.recovered}`);
@@ -189,9 +207,13 @@ async function main(): Promise<void> {
 
   const csv = decodeCsv(readFileSync(resolve(file)));
 
-  const batch = await planWithRates(() => adapter.plan(csv), ensureRatesNow);
+  const { batch, rateConflicts } = await planWithRates(
+    () => adapter.plan(csv),
+    ensureRatesNow,
+  );
   const preview = await previewBatch(ledger, batch);
   printSummary(`Preview (${broker})`, preview);
+  printRateConflicts(rateConflicts);
 
   if (preview.imported === 0 && unpricedEntries(preview) === 0) {
     console.log("\nNothing new to import.");

@@ -766,6 +766,17 @@ export const es = {
     confirmPending: "Continuar para valorar las recompensas y los intercambios",
     confirmCount: (count: number): string =>
       count === 1 ? "Importar 1 operación" : `Importar ${count} operaciones`,
+    rateConflict: {
+      title: (currencies: readonly string[]): string =>
+        `El BCE publica ahora otro tipo para días ya guardados de ${currencies.join(", ")}, así que esa serie no se ha actualizado. Las operaciones en esa divisa de un día sin tipo guardado quedan aparte, sin tipo de cambio, y actualizar los tipos no lo resuelve mientras no coincidan.`,
+      line: (
+        currency: string,
+        day: string,
+        stored: string,
+        incoming: string,
+      ): string =>
+        `${currency}, ${day}: guardado ${stored}, el BCE da ${incoming}`,
+    },
     appliesNow:
       "Las operaciones se guardan en el registro al pulsar. Los pasos siguientes solo añaden símbolos y precios: cerrar el asistente después no revierte la importación.",
     closeConfirm: {
