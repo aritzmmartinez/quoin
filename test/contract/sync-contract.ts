@@ -47,9 +47,44 @@ const buy = (externalId: string, extra: Row = {}) => ({
   ...extra,
 });
 
-const target = (id: string, activeFrom: string) => ({
+const kraken = { source: "KRAKEN_CSV", account: "kraken" };
+const reward = (refid: string, price: string, grossAmount: string) =>
+  buy(refid, {
+    ...kraken,
+    instrumentId: COIN,
+    quantity: "0.5",
+    price,
+    grossAmount,
+    funding: "IN_KIND",
+    valuationSource: "yahoo",
+  });
+const rewardIncome = (refid: string, grossAmount: string) =>
+  buy(`${refid}:income`, {
+    ...kraken,
+    type: "DIVIDEND",
+    instrumentId: COIN,
+    quantity: null,
+    price: null,
+    grossAmount,
+    funding: "IN_KIND",
+    valuationSource: "yahoo",
+  });
+const swapLeg = (
+  externalId: string,
+  linkId: string | null,
+  type: "BUY" | "SELL" = "BUY",
+) =>
+  buy(externalId, {
+    ...kraken,
+    type,
+    instrumentId: type === "SELL" ? COIN : STOCK,
+    linkId,
+    linkKind: linkId ? "swap" : null,
+  });
+
+const target = (id: string, activeFrom: string, name = id) => ({
   id,
-  name: id,
+  name,
   activeFrom,
   createdAt: "2026-10-01T10:00:00.000Z",
   lines: [{ instrumentId: FUND, monthlyAmount: "300" }],
@@ -212,57 +247,37 @@ const merges = [
     expected: {},
   },
   {
-    name: "The same ledger key with another amount is a conflict",
+    name: "The same ledger key with another amount is set aside, and the rest applies",
     local: local({ instruments: [fund()], ledger: [buy("t-1")] }),
     incoming: incoming({
       instruments: [fund()],
-      ledger: [buy("t-1", { grossAmount: "101" })],
+      ledger: [buy("t-1", { grossAmount: "101" }), buy("t-2")],
     }),
     expected: {
-      conflicts: [
+      setAside: [
         { kind: "ledger", key: "TR_CSV::t-1", fields: ["grossAmount"] },
       ],
+      apply: { ledger: { insert: [buy("t-2")] } },
     },
   },
   {
-    name: "A reward valued from two different price histories is a conflict, not a silent pick",
+    name: "A reward valued from two different price histories sets both its rows aside, not a silent pick",
     local: local({
       instruments: [coin()],
-      ledger: [
-        buy("R2", {
-          source: "KRAKEN_CSV",
-          account: "kraken",
-          instrumentId: COIN,
-          quantity: "0.5",
-          price: "2.10",
-          grossAmount: "1.05",
-          funding: "IN_KIND",
-          valuationSource: "yahoo",
-        }),
-      ],
+      ledger: [reward("R2", "2.10", "1.05"), rewardIncome("R2", "1.05")],
     }),
     incoming: incoming({
       instruments: [coin()],
-      ledger: [
-        buy("R2", {
-          source: "KRAKEN_CSV",
-          account: "kraken",
-          instrumentId: COIN,
-          quantity: "0.5",
-          price: "2.12",
-          grossAmount: "1.06",
-          funding: "IN_KIND",
-          valuationSource: "yahoo",
-        }),
-      ],
+      ledger: [reward("R2", "2.12", "1.06"), rewardIncome("R2", "1.06")],
     }),
     expected: {
-      conflicts: [
+      setAside: [
         {
           kind: "ledger",
           key: "KRAKEN_CSV::R2",
           fields: ["price", "grossAmount"],
         },
+        { kind: "ledger", key: "KRAKEN_CSV::R2:income", fields: ["grossAmount"] },
       ],
     },
   },
@@ -368,11 +383,33 @@ const merges = [
       ],
     }),
     expected: {
-      conflicts: [
+      setAside: [
         { kind: "ledger", key: "KRAKEN_CSV::S1:sell", fields: ["grossAmount"] },
       ],
-      apply: { ledger: { insert: [] } },
-      compareApply: true,
+    },
+  },
+  {
+    name: "A row whose link itself differs sets aside the other rows of the local link too",
+    local: local({
+      instruments: [coin(), stock()],
+      ledger: [swapLeg("S1:sell", "S1", "SELL"), swapLeg("S1:buy", "S1")],
+    }),
+    incoming: incoming({
+      instruments: [coin(), stock()],
+      ledger: [
+        swapLeg("S1:sell", null, "SELL"),
+        swapLeg("S1:buy", "S1"),
+        swapLeg("S1:buy-2", "S1"),
+      ],
+    }),
+    expected: {
+      setAside: [
+        {
+          kind: "ledger",
+          key: "KRAKEN_CSV::S1:sell",
+          fields: ["linkId", "linkKind"],
+        },
+      ],
     },
   },
   {
@@ -668,9 +705,20 @@ const merges = [
     incoming: incoming({ targets: [target("v-there", "2026-11-01")] }),
     expected: {
       conflicts: [
-        { kind: "target-day", day: "2026-11-01", ids: ["v-here", "v-there"] },
+        {
+          kind: "target-day",
+          day: "2026-11-01",
+          local: "v-here",
+          incoming: "v-there",
+        },
       ],
     },
+  },
+  {
+    name: "One target version with two contents is a conflict",
+    local: local({ targets: [target("v1", "2026-11-01", "Here")] }),
+    incoming: incoming({ targets: [target("v1", "2026-11-01", "There")] }),
+    expected: { conflicts: [{ kind: "target", id: "v1" }] },
   },
   {
     name: "A composition replaced only there is taken",
@@ -841,6 +889,332 @@ const merges = [
   },
 ];
 
+const terHere = fund({ ter: "0.0025", terHlc: m(A, T + 5 * MIN) });
+const terThere = fund({ ter: "0.0030", terHlc: m(B, T + 5 * MIN) });
+const goldHere = fund({
+  exposureKind: "COMMODITY",
+  exposureLeafId: "XAU",
+  exposureHlc: m(A, T + 5 * MIN),
+});
+const silverThere = fund({
+  exposureKind: "COMMODITY",
+  exposureLeafId: "XAG",
+  exposureHlc: m(B, T + 5 * MIN),
+});
+const undatedHere = block("2026-10-28", true, m(A, T + MIN));
+const datedThere = block("2026-09-30", false, m(B, T + MIN), ["0.55", "0.45"]);
+
+const resolutions = [
+  {
+    name: "take: a field conflict adopts the value there, with its origin's mark",
+    local: local({ instruments: [terHere] }),
+    incoming: incoming({ instruments: [terThere] }),
+    resolutions: { [`instrument:${FUND}:ter`]: "take" },
+    expected: {
+      apply: {
+        instruments: {
+          update: [
+            { id: FUND, patch: { ter: "0.0030", terHlc: m(B, T + 5 * MIN) } },
+          ],
+        },
+      },
+    },
+  },
+  {
+    name: "keep: a field conflict keeps the value here and marks it afresh",
+    local: local({ instruments: [terHere] }),
+    incoming: incoming({ instruments: [terThere] }),
+    resolutions: { [`instrument:${FUND}:ter`]: "keep" },
+    expected: {
+      apply: { restamp: [{ kind: "instrument", id: FUND, field: "ter" }] },
+    },
+  },
+  {
+    name: "take: the exposure pair is resolved whole",
+    local: local({ instruments: [goldHere] }),
+    incoming: incoming({ instruments: [silverThere] }),
+    resolutions: { [`instrument:${FUND}:exposure`]: "take" },
+    expected: {
+      apply: {
+        instruments: {
+          update: [
+            {
+              id: FUND,
+              patch: {
+                exposureKind: "COMMODITY",
+                exposureLeafId: "XAG",
+                exposureHlc: m(B, T + 5 * MIN),
+              },
+            },
+          ],
+        },
+      },
+    },
+  },
+  {
+    name: "keep: the exposure pair is marked afresh as one field",
+    local: local({ instruments: [goldHere] }),
+    incoming: incoming({ instruments: [silverThere] }),
+    resolutions: { [`instrument:${FUND}:exposure`]: "keep" },
+    expected: {
+      apply: {
+        restamp: [{ kind: "instrument", id: FUND, field: "exposure" }],
+      },
+    },
+  },
+  {
+    name: "take: the residence there is adopted",
+    local: local(),
+    incoming: incoming({
+      settings: { residence: "araba", residenceHlc: null },
+    }),
+    resolutions: { "settings:residence": "take" },
+    expected: {
+      apply: { settings: { residence: "araba", residenceHlc: null } },
+    },
+  },
+  {
+    name: "keep: the residence here is marked afresh",
+    local: local(),
+    incoming: incoming({
+      settings: { residence: "araba", residenceHlc: null },
+    }),
+    resolutions: { "settings:residence": "keep" },
+    expected: { apply: { restamp: [{ kind: "settings" }] } },
+  },
+  {
+    name: "take: one target version with two contents is replaced by the one there",
+    local: local({ targets: [target("v1", "2026-11-01", "Here")] }),
+    incoming: incoming({ targets: [target("v1", "2026-11-01", "There")] }),
+    resolutions: { "target:v1": "take" },
+    expected: {
+      apply: {
+        targets: {
+          insert: [target("v1", "2026-11-01", "There")],
+          delete: ["v1"],
+        },
+      },
+    },
+  },
+  {
+    name: "keep: one target version with two contents is buried and reissued under the tombstone's mark",
+    local: local({ targets: [target("v1", "2026-11-01", "Here")] }),
+    incoming: incoming({ targets: [target("v1", "2026-11-01", "There")] }),
+    resolutions: { "target:v1": "keep" },
+    expected: {
+      apply: {
+        targets: { delete: ["v1"] },
+        restamp: [
+          {
+            kind: "reissue",
+            target: { ...target("v1", "2026-11-01", "Here"), note: null },
+          },
+        ],
+      },
+    },
+  },
+  {
+    name: "take: two versions on one day keep the one there and bury the one here",
+    local: local({ targets: [target("v-here", "2026-11-01")] }),
+    incoming: incoming({ targets: [target("v-there", "2026-11-01")] }),
+    resolutions: { "target-day:2026-11-01": "take" },
+    expected: {
+      apply: {
+        targets: {
+          insert: [target("v-there", "2026-11-01")],
+          delete: ["v-here"],
+        },
+        restamp: [{ kind: "tombstone", key: "v-here" }],
+      },
+    },
+  },
+  {
+    name: "keep: two versions on one day keep the one here and bury the one there",
+    local: local({ targets: [target("v-here", "2026-11-01")] }),
+    incoming: incoming({ targets: [target("v-there", "2026-11-01")] }),
+    resolutions: { "target-day:2026-11-01": "keep" },
+    expected: {
+      apply: { restamp: [{ kind: "tombstone", key: "v-there" }] },
+    },
+  },
+  {
+    name: "take: a composition conflict adopts the block there",
+    local: local({ instruments: [fund()], holdings: [undatedHere] }),
+    incoming: incoming({ instruments: [fund()], holdings: [datedThere] }),
+    resolutions: { [`holdings:${FUND}`]: "take" },
+    expected: { apply: { holdings: [datedThere] } },
+  },
+  {
+    name: "keep: a composition conflict marks the block here afresh",
+    local: local({ instruments: [fund()], holdings: [undatedHere] }),
+    incoming: incoming({ instruments: [fund()], holdings: [datedThere] }),
+    resolutions: { [`holdings:${FUND}`]: "keep" },
+    expected: {
+      apply: { restamp: [{ kind: "holdings", instrumentId: FUND }] },
+    },
+  },
+  {
+    name: "A resolution for one conflict leaves the other open, and nothing applies",
+    local: local({ instruments: [terHere] }),
+    incoming: incoming({
+      instruments: [terThere],
+      settings: { residence: "araba", residenceHlc: null },
+    }),
+    resolutions: { [`instrument:${FUND}:ter`]: "keep" },
+    expected: {
+      conflicts: [
+        {
+          kind: "field",
+          entity: "settings",
+          key: "settings",
+          field: "residence",
+          local: "bizkaia",
+          incoming: "araba",
+        },
+      ],
+    },
+  },
+  {
+    name: "A resolution that matches no conflict is refused",
+    local: local({ instruments: [terHere] }),
+    incoming: incoming({ instruments: [terThere] }),
+    resolutions: {
+      [`instrument:${FUND}:ter`]: "keep",
+      [`instrument:${FUND}:thesis`]: "take",
+    },
+    expected: { error: "unknown-resolution" },
+  },
+  {
+    name: "A resolution with no conflict at all is refused",
+    local: local({ instruments: [fund()] }),
+    incoming: incoming({ instruments: [fund()] }),
+    resolutions: { "settings:residence": "keep" },
+    expected: { error: "unknown-resolution" },
+  },
+];
+
+const device = (deviceId: string, other: string, state: Row) => ({
+  lastHlc: m(deviceId, T + 5 * MIN),
+  state: {
+    deviceId,
+    peers: [{ deviceId: other, seen: m(other, T) }],
+    ...state,
+  },
+});
+const at = (minutes: number) => T + minutes * MIN;
+
+const scenarios = [
+  {
+    name: "A field resolved once stays resolved: the next syncs both ways are up to date",
+    devices: {
+      [A]: device(A, B, { instruments: [terHere] }),
+      [B]: device(B, A, { instruments: [terThere] }),
+    },
+    steps: [
+      {
+        from: B,
+        to: A,
+        nowMs: at(10),
+        status: "conflicts",
+        conflicts: [`instrument:${FUND}:ter`],
+      },
+      {
+        from: B,
+        to: A,
+        nowMs: at(11),
+        resolutions: { [`instrument:${FUND}:ter`]: "keep" },
+        status: "applied",
+      },
+      { from: A, to: B, nowMs: at(12), status: "applied" },
+      { from: B, to: A, nowMs: at(13), status: "up-to-date" },
+      { from: A, to: B, nowMs: at(14), status: "up-to-date" },
+    ],
+    converged: true,
+  },
+  {
+    name: "Every kind of conflict resolved together converges",
+    devices: {
+      [A]: device(A, B, {
+        instruments: [terHere],
+        targets: [
+          target("v1", "2026-11-01", "Here"),
+          target("v-here", "2026-12-01"),
+        ],
+        holdings: [undatedHere],
+      }),
+      [B]: device(B, A, {
+        instruments: [terThere],
+        targets: [
+          target("v1", "2026-11-01", "There"),
+          target("v-there", "2026-12-01"),
+        ],
+        holdings: [datedThere],
+        settings: { residence: "araba", residenceHlc: null },
+      }),
+    },
+    steps: [
+      {
+        from: B,
+        to: A,
+        nowMs: at(10),
+        resolutions: {
+          [`instrument:${FUND}:ter`]: "take",
+          "settings:residence": "keep",
+          "target:v1": "keep",
+          "target-day:2026-12-01": "take",
+          [`holdings:${FUND}`]: "keep",
+        },
+        status: "applied",
+      },
+      { from: A, to: B, nowMs: at(11), status: "applied" },
+      { from: B, to: A, nowMs: at(12), status: "up-to-date" },
+      { from: A, to: B, nowMs: at(13), status: "up-to-date" },
+    ],
+    converged: true,
+  },
+  {
+    name: "A ledger row set aside stays apart on each side, sync after sync, while the rest converges",
+    devices: {
+      [A]: device(A, B, {
+        instruments: [coin()],
+        ledger: [reward("R2", "2.10", "1.05"), rewardIncome("R2", "1.05")],
+      }),
+      [B]: device(B, A, {
+        instruments: [coin()],
+        ledger: [
+          reward("R2", "2.12", "1.06"),
+          rewardIncome("R2", "1.06"),
+          buy("t-1", { ...kraken, instrumentId: COIN }),
+        ],
+      }),
+    },
+    steps: [
+      {
+        from: B,
+        to: A,
+        nowMs: at(10),
+        status: "applied",
+        setAside: ["KRAKEN_CSV::R2", "KRAKEN_CSV::R2:income"],
+      },
+      {
+        from: A,
+        to: B,
+        nowMs: at(11),
+        status: "up-to-date",
+        setAside: ["KRAKEN_CSV::R2", "KRAKEN_CSV::R2:income"],
+      },
+      {
+        from: B,
+        to: A,
+        nowMs: at(12),
+        status: "up-to-date",
+        setAside: ["KRAKEN_CSV::R2", "KRAKEN_CSV::R2:income"],
+      },
+    ],
+    converged: false,
+  },
+];
+
 const valid = {
   schemaVersion: 1,
   deviceId: B,
@@ -904,8 +1278,9 @@ export function syncContractJson(): string {
       contract: "sync",
       version: 1,
       description:
-        'How two devices\' user states merge, and which exchange files are refused. Shared with the mobile client: both implementations must reproduce every case. Omitted in a case: empty collections, peers [], settings { residence: bizkaia, residenceHlc: null }, schemaVersion 1 and deviceName null on the incoming file, and every optional row column (null; fees and taxWithheld "0", fxSource IDENTITY, funding CASH, hedgedToBase false, thesis CORE). An expected plan compares apply and effects only when it lists no conflicts, unless compareApply is true; apply.peers is compared only when the case lists it.',
-      merges,
+        'How two devices\' user states merge, and which exchange files are refused. Shared with the mobile client: both implementations must reproduce every case. Omitted in a case: empty collections, peers [], settings { residence: bizkaia, residenceHlc: null }, schemaVersion 1 and deviceName null on the incoming file, and every optional row column (null; fees and taxWithheld "0", fxSource IDENTITY, funding CASH, hedgedToBase false, thesis CORE). A merge may carry resolutions, keyed by conflictKey; an expected error means merge throws. An expected plan compares apply and effects only when it lists no conflicts, unless compareApply is true; apply.peers is compared only when the case lists it; setAside is always compared. A scenario replays syncs between devices: each step exports `from` at nowMs (exportDevice), merges it into `to` with the step\'s resolutions, and then: with conflicts nothing changes; with no data to change (changesData false) only the peers are written and the status is up-to-date; otherwise applyPlan at nowMs. converged: the two user states (all but deviceId and peers) end equal.',
+      merges: [...merges, ...resolutions],
+      scenarios,
       refusals,
     },
     null,

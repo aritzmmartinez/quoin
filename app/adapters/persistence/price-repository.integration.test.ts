@@ -1,7 +1,8 @@
-import { execSync } from "node:child_process";
 import { mkdirSync, rmSync } from "node:fs";
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+
+import { migratedDatabase } from "../../../test/integration/template";
 
 import type { Instrument } from "~/core/domain";
 
@@ -47,10 +48,7 @@ beforeAll(async () => {
   mkdirSync(tmpDir, { recursive: true });
   const dbUrl = `file:${dbPath}`;
   process.env.DATABASE_URL = dbUrl;
-  execSync("pnpm exec prisma migrate deploy", {
-    stdio: "ignore",
-    env: { ...process.env, DATABASE_URL: dbUrl },
-  });
+  migratedDatabase(dbPath);
 
   const persistence = await import("./index");
   prisma = persistence.prisma;
@@ -340,7 +338,10 @@ describe("PrismaPriceRepository.saveDaily (integration)", () => {
     );
     const written = await priceRepo.saveDaily(
       ID,
-      [candle("2026-10-09T07:00:00Z", "10"), candle("2026-10-13T07:00:00Z", "13")],
+      [
+        candle("2026-10-09T07:00:00Z", "10"),
+        candle("2026-10-13T07:00:00Z", "13"),
+      ],
       null,
       MADRID,
     );
@@ -405,7 +406,10 @@ describe("PrismaPriceRepository.saveDaily (integration)", () => {
         ID,
         [
           candle("2026-10-09T07:00:00Z", "10"),
-          { ...candle("2026-10-10T07:00:00Z", "11"), price: null as unknown as string },
+          {
+            ...candle("2026-10-10T07:00:00Z", "11"),
+            price: null as unknown as string,
+          },
         ],
         null,
         MADRID,
@@ -432,13 +436,21 @@ describe("PrismaPriceRepository.dailyHistoryIds (integration)", () => {
   it("counts daily candles and never live quotes alone", async () => {
     const row = (instrumentId: string, asOf: string, source: string) =>
       prisma.priceSnapshot.create({
-        data: { instrumentId, price: "10", currency: "EUR", asOf: new Date(asOf), source },
+        data: {
+          instrumentId,
+          price: "10",
+          currency: "EUR",
+          asOf: new Date(asOf),
+          source,
+        },
       });
     await row("XS00TEST0001", "2026-10-14T07:00:00Z", "YAHOO");
     await row("XS00TEST0001", "2026-10-15T14:00:00Z", "YAHOO_LIVE");
     await row("XS00TEST0002", "2026-10-14T14:00:00Z", "YAHOO_LIVE");
     await row("XS00TEST0002", "2026-10-15T14:00:00Z", "YAHOO_LIVE");
 
-    expect(await priceRepo.dailyHistoryIds()).toEqual(new Set(["XS00TEST0001"]));
+    expect(await priceRepo.dailyHistoryIds()).toEqual(
+      new Set(["XS00TEST0001"]),
+    );
   });
 });

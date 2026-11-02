@@ -1,10 +1,12 @@
-import { execSync, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { execPath } from "node:process";
 
 import Database from "better-sqlite3";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import { migratedDatabase } from "../test/integration/template";
 
 import { formatHlc } from "~/core/sync";
 
@@ -31,10 +33,7 @@ function create(
   name: string,
   seed: (db: Database.Database, mark: (ms: number) => string) => void,
 ) {
-  execSync("pnpm exec prisma migrate deploy", {
-    stdio: "ignore",
-    env: envFor(name),
-  });
+  migratedDatabase(dbFile(name));
   const db = new Database(dbFile(name));
   const { deviceId } = db
     .prepare(`SELECT "deviceId" FROM "SyncDevice"`)
@@ -201,9 +200,77 @@ describe("sync round trip (integration)", () => {
     expect(conflicted.output).toContain(
       "ledger entry TR_CSV::t-2: differs in grossAmount",
     );
-    expect(conflicted.output).toContain("nothing was written");
+    expect(conflicted.output).toContain("set aside; each side keeps its own");
 
     const exposed = run("a", "sync-export", join(tmpDir, "plain.json"));
     expect(exposed.status).toBe(1);
+  }, 120_000);
+
+  it("resolves a conflict with --keep, and the next syncs both ways are up to date", () => {
+    const setTer = (name: string, ter: string) => {
+      const db = new Database(dbFile(name));
+      db.prepare(
+        `UPDATE "LedgerEntry" SET "grossAmount" = '200' WHERE "externalId" = 't-2'`,
+      ).run();
+      const { deviceId } = db
+        .prepare(`SELECT "deviceId" FROM "SyncDevice"`)
+        .get() as { deviceId: string };
+      db.prepare(`UPDATE "Instrument" SET "ter" = ?, "terHlc" = ?`).run(
+        ter,
+        formatHlc({ ms: Date.now(), counter: 0, deviceId }),
+      );
+      db.close();
+    };
+    setTer("a", "0.0025");
+    setTer("b", "0.0030");
+
+    const step = (
+      db: string,
+      script: string,
+      file: string,
+      ...rest: string[]
+    ) => run(db, script, exchangeFile(file), ...rest);
+    expect(step("b", "sync-export", "b4").status).toBe(0);
+    const open = step("a", "sync-import", "b4");
+    expect(open.status).toBe(1);
+    expect(open.output).toContain(`[instrument:${FUND}:ter]`);
+    expect(open.output).toContain("nothing was written");
+
+    const kept = step(
+      "a",
+      "sync-import",
+      "b4",
+      "--keep",
+      `instrument:${FUND}:ter`,
+    );
+    expect(kept.status, kept.output).toBe(0);
+    expect(step("a", "sync-export", "a5").status).toBe(0);
+    const taken = step("b", "sync-import", "a5");
+    expect(taken.status, taken.output).toBe(0);
+
+    expect(step("b", "sync-export", "b5").status).toBe(0);
+    expect(step("a", "sync-import", "b5").output).toContain(
+      "Already up to date.",
+    );
+    expect(step("a", "sync-export", "a6").status).toBe(0);
+    expect(step("b", "sync-import", "a6").output).toContain(
+      "Already up to date.",
+    );
+    expect(userState("a6").instruments).toEqual(userState("b5").instruments);
+    expect(userState("a6")).toMatchObject({
+      instruments: [expect.objectContaining({ ter: "0.0025" })],
+    });
+
+    const unknown = step(
+      "a",
+      "sync-import",
+      "b5",
+      "--take",
+      "settings:residence",
+    );
+    expect(unknown.status).toBe(1);
+    expect(unknown.output).toContain(
+      "No conflict matches the resolution of settings:residence",
+    );
   }, 120_000);
 });

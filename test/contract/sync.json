@@ -1,7 +1,7 @@
 {
   "contract": "sync",
   "version": 1,
-  "description": "How two devices' user states merge, and which exchange files are refused. Shared with the mobile client: both implementations must reproduce every case. Omitted in a case: empty collections, peers [], settings { residence: bizkaia, residenceHlc: null }, schemaVersion 1 and deviceName null on the incoming file, and every optional row column (null; fees and taxWithheld \"0\", fxSource IDENTITY, funding CASH, hedgedToBase false, thesis CORE). An expected plan compares apply and effects only when it lists no conflicts, unless compareApply is true; apply.peers is compared only when the case lists it.",
+  "description": "How two devices' user states merge, and which exchange files are refused. Shared with the mobile client: both implementations must reproduce every case. Omitted in a case: empty collections, peers [], settings { residence: bizkaia, residenceHlc: null }, schemaVersion 1 and deviceName null on the incoming file, and every optional row column (null; fees and taxWithheld \"0\", fxSource IDENTITY, funding CASH, hedgedToBase false, thesis CORE). A merge may carry resolutions, keyed by conflictKey; an expected error means merge throws. An expected plan compares apply and effects only when it lists no conflicts, unless compareApply is true; apply.peers is compared only when the case lists it; setAside is always compared. A scenario replays syncs between devices: each step exports `from` at nowMs (exportDevice), merges it into `to` with the step's resolutions, and then: with conflicts nothing changes; with no data to change (changesData false) only the peers are written and the status is up-to-date; otherwise applyPlan at nowMs. converged: the two user states (all but deviceId and peers) end equal.",
   "merges": [
     {
       "name": "Two identical states: nothing to apply",
@@ -503,7 +503,7 @@
       "expected": {}
     },
     {
-      "name": "The same ledger key with another amount is a conflict",
+      "name": "The same ledger key with another amount is set aside, and the rest applies",
       "local": {
         "deviceId": "dev-a",
         "peers": [
@@ -562,21 +562,53 @@
             "grossAmount": "101",
             "currency": "EUR",
             "account": "trade-republic"
+          },
+          {
+            "source": "TR_CSV",
+            "externalId": "t-2",
+            "ts": "2026-01-05T09:00:00.000Z",
+            "type": "BUY",
+            "instrumentId": "IE00TEST0001",
+            "quantity": "1",
+            "price": "100",
+            "grossAmount": "100",
+            "currency": "EUR",
+            "account": "trade-republic"
           }
         ]
       },
       "expected": {
-        "conflicts": [
+        "setAside": [
           {
             "kind": "ledger",
             "key": "TR_CSV::t-1",
-            "fields": ["grossAmount"]
+            "fields": [
+              "grossAmount"
+            ]
           }
-        ]
+        ],
+        "apply": {
+          "ledger": {
+            "insert": [
+              {
+                "source": "TR_CSV",
+                "externalId": "t-2",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "IE00TEST0001",
+                "quantity": "1",
+                "price": "100",
+                "grossAmount": "100",
+                "currency": "EUR",
+                "account": "trade-republic"
+              }
+            ]
+          }
+        }
       }
     },
     {
-      "name": "A reward valued from two different price histories is a conflict, not a silent pick",
+      "name": "A reward valued from two different price histories sets both its rows aside, not a silent pick",
       "local": {
         "deviceId": "dev-a",
         "peers": [
@@ -601,6 +633,20 @@
             "instrumentId": "TESTCOIN",
             "quantity": "0.5",
             "price": "2.10",
+            "grossAmount": "1.05",
+            "currency": "EUR",
+            "account": "kraken",
+            "funding": "IN_KIND",
+            "valuationSource": "yahoo"
+          },
+          {
+            "source": "KRAKEN_CSV",
+            "externalId": "R2:income",
+            "ts": "2026-01-05T09:00:00.000Z",
+            "type": "DIVIDEND",
+            "instrumentId": "TESTCOIN",
+            "quantity": null,
+            "price": null,
             "grossAmount": "1.05",
             "currency": "EUR",
             "account": "kraken",
@@ -639,15 +685,39 @@
             "account": "kraken",
             "funding": "IN_KIND",
             "valuationSource": "yahoo"
+          },
+          {
+            "source": "KRAKEN_CSV",
+            "externalId": "R2:income",
+            "ts": "2026-01-05T09:00:00.000Z",
+            "type": "DIVIDEND",
+            "instrumentId": "TESTCOIN",
+            "quantity": null,
+            "price": null,
+            "grossAmount": "1.06",
+            "currency": "EUR",
+            "account": "kraken",
+            "funding": "IN_KIND",
+            "valuationSource": "yahoo"
           }
         ]
       },
       "expected": {
-        "conflicts": [
+        "setAside": [
           {
             "kind": "ledger",
             "key": "KRAKEN_CSV::R2",
-            "fields": ["price", "grossAmount"]
+            "fields": [
+              "price",
+              "grossAmount"
+            ]
+          },
+          {
+            "kind": "ledger",
+            "key": "KRAKEN_CSV::R2:income",
+            "fields": [
+              "grossAmount"
+            ]
           }
         ]
       }
@@ -719,7 +789,9 @@
       "expected": {
         "apply": {
           "ledger": {
-            "markInKind": ["TR_CSV::t-1"]
+            "markInKind": [
+              "TR_CSV::t-1"
+            ]
           }
         }
       }
@@ -994,19 +1066,147 @@
         ]
       },
       "expected": {
-        "conflicts": [
+        "setAside": [
           {
             "kind": "ledger",
             "key": "KRAKEN_CSV::S1:sell",
-            "fields": ["grossAmount"]
+            "fields": [
+              "grossAmount"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "A row whose link itself differs sets aside the other rows of the local link too",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
           }
         ],
-        "apply": {
-          "ledger": {
-            "insert": []
+        "instruments": [
+          {
+            "id": "TESTCOIN",
+            "name": "Test Coin",
+            "type": "CRYPTO"
+          },
+          {
+            "id": "US00TEST0002",
+            "name": "Test Stock",
+            "type": "STOCK"
           }
-        },
-        "compareApply": true
+        ],
+        "ledger": [
+          {
+            "source": "KRAKEN_CSV",
+            "externalId": "S1:sell",
+            "ts": "2026-01-05T09:00:00.000Z",
+            "type": "SELL",
+            "instrumentId": "TESTCOIN",
+            "quantity": "1",
+            "price": "100",
+            "grossAmount": "100",
+            "currency": "EUR",
+            "account": "kraken",
+            "linkId": "S1",
+            "linkKind": "swap"
+          },
+          {
+            "source": "KRAKEN_CSV",
+            "externalId": "S1:buy",
+            "ts": "2026-01-05T09:00:00.000Z",
+            "type": "BUY",
+            "instrumentId": "US00TEST0002",
+            "quantity": "1",
+            "price": "100",
+            "grossAmount": "100",
+            "currency": "EUR",
+            "account": "kraken",
+            "linkId": "S1",
+            "linkKind": "swap"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "TESTCOIN",
+            "name": "Test Coin",
+            "type": "CRYPTO"
+          },
+          {
+            "id": "US00TEST0002",
+            "name": "Test Stock",
+            "type": "STOCK"
+          }
+        ],
+        "ledger": [
+          {
+            "source": "KRAKEN_CSV",
+            "externalId": "S1:sell",
+            "ts": "2026-01-05T09:00:00.000Z",
+            "type": "SELL",
+            "instrumentId": "TESTCOIN",
+            "quantity": "1",
+            "price": "100",
+            "grossAmount": "100",
+            "currency": "EUR",
+            "account": "kraken",
+            "linkId": null,
+            "linkKind": null
+          },
+          {
+            "source": "KRAKEN_CSV",
+            "externalId": "S1:buy",
+            "ts": "2026-01-05T09:00:00.000Z",
+            "type": "BUY",
+            "instrumentId": "US00TEST0002",
+            "quantity": "1",
+            "price": "100",
+            "grossAmount": "100",
+            "currency": "EUR",
+            "account": "kraken",
+            "linkId": "S1",
+            "linkKind": "swap"
+          },
+          {
+            "source": "KRAKEN_CSV",
+            "externalId": "S1:buy-2",
+            "ts": "2026-01-05T09:00:00.000Z",
+            "type": "BUY",
+            "instrumentId": "US00TEST0002",
+            "quantity": "1",
+            "price": "100",
+            "grossAmount": "100",
+            "currency": "EUR",
+            "account": "kraken",
+            "linkId": "S1",
+            "linkKind": "swap"
+          }
+        ]
+      },
+      "expected": {
+        "setAside": [
+          {
+            "kind": "ledger",
+            "key": "KRAKEN_CSV::S1:sell",
+            "fields": [
+              "linkId",
+              "linkKind"
+            ]
+          }
+        ]
       }
     },
     {
@@ -1727,7 +1927,9 @@
       "expected": {
         "apply": {
           "targets": {
-            "delete": ["v1"]
+            "delete": [
+              "v1"
+            ]
           },
           "tombstones": [
             {
@@ -1837,7 +2039,66 @@
           {
             "kind": "target-day",
             "day": "2026-11-01",
-            "ids": ["v-here", "v-there"]
+            "local": "v-here",
+            "incoming": "v-there"
+          }
+        ]
+      }
+    },
+    {
+      "name": "One target version with two contents is a conflict",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "targets": [
+          {
+            "id": "v1",
+            "name": "Here",
+            "activeFrom": "2026-11-01",
+            "createdAt": "2026-10-01T10:00:00.000Z",
+            "lines": [
+              {
+                "instrumentId": "IE00TEST0001",
+                "monthlyAmount": "300"
+              }
+            ]
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "targets": [
+          {
+            "id": "v1",
+            "name": "There",
+            "activeFrom": "2026-11-01",
+            "createdAt": "2026-10-01T10:00:00.000Z",
+            "lines": [
+              {
+                "instrumentId": "IE00TEST0001",
+                "monthlyAmount": "300"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "conflicts": [
+          {
+            "kind": "target",
+            "id": "v1"
           }
         ]
       }
@@ -2500,6 +2761,1378 @@
           }
         ]
       }
+    },
+    {
+      "name": "take: a field conflict adopts the value there, with its origin's mark",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "ter": "0.0025",
+            "terHlc": "001761600300000-0000-dev-a"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "ter": "0.0030",
+            "terHlc": "001761600300000-0000-dev-b"
+          }
+        ]
+      },
+      "resolutions": {
+        "instrument:IE00TEST0001:ter": "take"
+      },
+      "expected": {
+        "apply": {
+          "instruments": {
+            "update": [
+              {
+                "id": "IE00TEST0001",
+                "patch": {
+                  "ter": "0.0030",
+                  "terHlc": "001761600300000-0000-dev-b"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "keep: a field conflict keeps the value here and marks it afresh",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "ter": "0.0025",
+            "terHlc": "001761600300000-0000-dev-a"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "ter": "0.0030",
+            "terHlc": "001761600300000-0000-dev-b"
+          }
+        ]
+      },
+      "resolutions": {
+        "instrument:IE00TEST0001:ter": "keep"
+      },
+      "expected": {
+        "apply": {
+          "restamp": [
+            {
+              "kind": "instrument",
+              "id": "IE00TEST0001",
+              "field": "ter"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "take: the exposure pair is resolved whole",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "exposureKind": "COMMODITY",
+            "exposureLeafId": "XAU",
+            "exposureHlc": "001761600300000-0000-dev-a"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "exposureKind": "COMMODITY",
+            "exposureLeafId": "XAG",
+            "exposureHlc": "001761600300000-0000-dev-b"
+          }
+        ]
+      },
+      "resolutions": {
+        "instrument:IE00TEST0001:exposure": "take"
+      },
+      "expected": {
+        "apply": {
+          "instruments": {
+            "update": [
+              {
+                "id": "IE00TEST0001",
+                "patch": {
+                  "exposureKind": "COMMODITY",
+                  "exposureLeafId": "XAG",
+                  "exposureHlc": "001761600300000-0000-dev-b"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "keep: the exposure pair is marked afresh as one field",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "exposureKind": "COMMODITY",
+            "exposureLeafId": "XAU",
+            "exposureHlc": "001761600300000-0000-dev-a"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "exposureKind": "COMMODITY",
+            "exposureLeafId": "XAG",
+            "exposureHlc": "001761600300000-0000-dev-b"
+          }
+        ]
+      },
+      "resolutions": {
+        "instrument:IE00TEST0001:exposure": "keep"
+      },
+      "expected": {
+        "apply": {
+          "restamp": [
+            {
+              "kind": "instrument",
+              "id": "IE00TEST0001",
+              "field": "exposure"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "take: the residence there is adopted",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "settings": {
+          "residence": "araba",
+          "residenceHlc": null
+        }
+      },
+      "resolutions": {
+        "settings:residence": "take"
+      },
+      "expected": {
+        "apply": {
+          "settings": {
+            "residence": "araba",
+            "residenceHlc": null
+          }
+        }
+      }
+    },
+    {
+      "name": "keep: the residence here is marked afresh",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "settings": {
+          "residence": "araba",
+          "residenceHlc": null
+        }
+      },
+      "resolutions": {
+        "settings:residence": "keep"
+      },
+      "expected": {
+        "apply": {
+          "restamp": [
+            {
+              "kind": "settings"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "take: one target version with two contents is replaced by the one there",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "targets": [
+          {
+            "id": "v1",
+            "name": "Here",
+            "activeFrom": "2026-11-01",
+            "createdAt": "2026-10-01T10:00:00.000Z",
+            "lines": [
+              {
+                "instrumentId": "IE00TEST0001",
+                "monthlyAmount": "300"
+              }
+            ]
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "targets": [
+          {
+            "id": "v1",
+            "name": "There",
+            "activeFrom": "2026-11-01",
+            "createdAt": "2026-10-01T10:00:00.000Z",
+            "lines": [
+              {
+                "instrumentId": "IE00TEST0001",
+                "monthlyAmount": "300"
+              }
+            ]
+          }
+        ]
+      },
+      "resolutions": {
+        "target:v1": "take"
+      },
+      "expected": {
+        "apply": {
+          "targets": {
+            "insert": [
+              {
+                "id": "v1",
+                "name": "There",
+                "activeFrom": "2026-11-01",
+                "createdAt": "2026-10-01T10:00:00.000Z",
+                "lines": [
+                  {
+                    "instrumentId": "IE00TEST0001",
+                    "monthlyAmount": "300"
+                  }
+                ]
+              }
+            ],
+            "delete": [
+              "v1"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "keep: one target version with two contents is buried and reissued under the tombstone's mark",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "targets": [
+          {
+            "id": "v1",
+            "name": "Here",
+            "activeFrom": "2026-11-01",
+            "createdAt": "2026-10-01T10:00:00.000Z",
+            "lines": [
+              {
+                "instrumentId": "IE00TEST0001",
+                "monthlyAmount": "300"
+              }
+            ]
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "targets": [
+          {
+            "id": "v1",
+            "name": "There",
+            "activeFrom": "2026-11-01",
+            "createdAt": "2026-10-01T10:00:00.000Z",
+            "lines": [
+              {
+                "instrumentId": "IE00TEST0001",
+                "monthlyAmount": "300"
+              }
+            ]
+          }
+        ]
+      },
+      "resolutions": {
+        "target:v1": "keep"
+      },
+      "expected": {
+        "apply": {
+          "targets": {
+            "delete": [
+              "v1"
+            ]
+          },
+          "restamp": [
+            {
+              "kind": "reissue",
+              "target": {
+                "id": "v1",
+                "name": "Here",
+                "activeFrom": "2026-11-01",
+                "createdAt": "2026-10-01T10:00:00.000Z",
+                "lines": [
+                  {
+                    "instrumentId": "IE00TEST0001",
+                    "monthlyAmount": "300"
+                  }
+                ],
+                "note": null
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "take: two versions on one day keep the one there and bury the one here",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "targets": [
+          {
+            "id": "v-here",
+            "name": "v-here",
+            "activeFrom": "2026-11-01",
+            "createdAt": "2026-10-01T10:00:00.000Z",
+            "lines": [
+              {
+                "instrumentId": "IE00TEST0001",
+                "monthlyAmount": "300"
+              }
+            ]
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "targets": [
+          {
+            "id": "v-there",
+            "name": "v-there",
+            "activeFrom": "2026-11-01",
+            "createdAt": "2026-10-01T10:00:00.000Z",
+            "lines": [
+              {
+                "instrumentId": "IE00TEST0001",
+                "monthlyAmount": "300"
+              }
+            ]
+          }
+        ]
+      },
+      "resolutions": {
+        "target-day:2026-11-01": "take"
+      },
+      "expected": {
+        "apply": {
+          "targets": {
+            "insert": [
+              {
+                "id": "v-there",
+                "name": "v-there",
+                "activeFrom": "2026-11-01",
+                "createdAt": "2026-10-01T10:00:00.000Z",
+                "lines": [
+                  {
+                    "instrumentId": "IE00TEST0001",
+                    "monthlyAmount": "300"
+                  }
+                ]
+              }
+            ],
+            "delete": [
+              "v-here"
+            ]
+          },
+          "restamp": [
+            {
+              "kind": "tombstone",
+              "key": "v-here"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "keep: two versions on one day keep the one here and bury the one there",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "targets": [
+          {
+            "id": "v-here",
+            "name": "v-here",
+            "activeFrom": "2026-11-01",
+            "createdAt": "2026-10-01T10:00:00.000Z",
+            "lines": [
+              {
+                "instrumentId": "IE00TEST0001",
+                "monthlyAmount": "300"
+              }
+            ]
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "targets": [
+          {
+            "id": "v-there",
+            "name": "v-there",
+            "activeFrom": "2026-11-01",
+            "createdAt": "2026-10-01T10:00:00.000Z",
+            "lines": [
+              {
+                "instrumentId": "IE00TEST0001",
+                "monthlyAmount": "300"
+              }
+            ]
+          }
+        ]
+      },
+      "resolutions": {
+        "target-day:2026-11-01": "keep"
+      },
+      "expected": {
+        "apply": {
+          "restamp": [
+            {
+              "kind": "tombstone",
+              "key": "v-there"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "take: a composition conflict adopts the block there",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF"
+          }
+        ],
+        "holdings": [
+          {
+            "instrumentId": "IE00TEST0001",
+            "asOf": "2026-10-28",
+            "asOfInferred": true,
+            "hlc": "001761600060000-0000-dev-a",
+            "rows": [
+              {
+                "identity": "US00TEST0101",
+                "identityKind": "ISIN",
+                "name": "Alpha Corp",
+                "weight": "0.6"
+              },
+              {
+                "identity": "BETA.US",
+                "identityKind": "TICKER",
+                "name": "Beta Inc",
+                "weight": "0.4"
+              }
+            ]
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF"
+          }
+        ],
+        "holdings": [
+          {
+            "instrumentId": "IE00TEST0001",
+            "asOf": "2026-09-30",
+            "asOfInferred": false,
+            "hlc": "001761600060000-0000-dev-b",
+            "rows": [
+              {
+                "identity": "US00TEST0101",
+                "identityKind": "ISIN",
+                "name": "Alpha Corp",
+                "weight": "0.55"
+              },
+              {
+                "identity": "BETA.US",
+                "identityKind": "TICKER",
+                "name": "Beta Inc",
+                "weight": "0.45"
+              }
+            ]
+          }
+        ]
+      },
+      "resolutions": {
+        "holdings:IE00TEST0001": "take"
+      },
+      "expected": {
+        "apply": {
+          "holdings": [
+            {
+              "instrumentId": "IE00TEST0001",
+              "asOf": "2026-09-30",
+              "asOfInferred": false,
+              "hlc": "001761600060000-0000-dev-b",
+              "rows": [
+                {
+                  "identity": "US00TEST0101",
+                  "identityKind": "ISIN",
+                  "name": "Alpha Corp",
+                  "weight": "0.55"
+                },
+                {
+                  "identity": "BETA.US",
+                  "identityKind": "TICKER",
+                  "name": "Beta Inc",
+                  "weight": "0.45"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "keep: a composition conflict marks the block here afresh",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF"
+          }
+        ],
+        "holdings": [
+          {
+            "instrumentId": "IE00TEST0001",
+            "asOf": "2026-10-28",
+            "asOfInferred": true,
+            "hlc": "001761600060000-0000-dev-a",
+            "rows": [
+              {
+                "identity": "US00TEST0101",
+                "identityKind": "ISIN",
+                "name": "Alpha Corp",
+                "weight": "0.6"
+              },
+              {
+                "identity": "BETA.US",
+                "identityKind": "TICKER",
+                "name": "Beta Inc",
+                "weight": "0.4"
+              }
+            ]
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF"
+          }
+        ],
+        "holdings": [
+          {
+            "instrumentId": "IE00TEST0001",
+            "asOf": "2026-09-30",
+            "asOfInferred": false,
+            "hlc": "001761600060000-0000-dev-b",
+            "rows": [
+              {
+                "identity": "US00TEST0101",
+                "identityKind": "ISIN",
+                "name": "Alpha Corp",
+                "weight": "0.55"
+              },
+              {
+                "identity": "BETA.US",
+                "identityKind": "TICKER",
+                "name": "Beta Inc",
+                "weight": "0.45"
+              }
+            ]
+          }
+        ]
+      },
+      "resolutions": {
+        "holdings:IE00TEST0001": "keep"
+      },
+      "expected": {
+        "apply": {
+          "restamp": [
+            {
+              "kind": "holdings",
+              "instrumentId": "IE00TEST0001"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "A resolution for one conflict leaves the other open, and nothing applies",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "ter": "0.0025",
+            "terHlc": "001761600300000-0000-dev-a"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "ter": "0.0030",
+            "terHlc": "001761600300000-0000-dev-b"
+          }
+        ],
+        "settings": {
+          "residence": "araba",
+          "residenceHlc": null
+        }
+      },
+      "resolutions": {
+        "instrument:IE00TEST0001:ter": "keep"
+      },
+      "expected": {
+        "conflicts": [
+          {
+            "kind": "field",
+            "entity": "settings",
+            "key": "settings",
+            "field": "residence",
+            "local": "bizkaia",
+            "incoming": "araba"
+          }
+        ]
+      }
+    },
+    {
+      "name": "A resolution that matches no conflict is refused",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "ter": "0.0025",
+            "terHlc": "001761600300000-0000-dev-a"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF",
+            "ter": "0.0030",
+            "terHlc": "001761600300000-0000-dev-b"
+          }
+        ]
+      },
+      "resolutions": {
+        "instrument:IE00TEST0001:ter": "keep",
+        "instrument:IE00TEST0001:thesis": "take"
+      },
+      "expected": {
+        "error": "unknown-resolution"
+      }
+    },
+    {
+      "name": "A resolution with no conflict at all is refused",
+      "local": {
+        "deviceId": "dev-a",
+        "peers": [
+          {
+            "deviceId": "dev-b",
+            "seen": "001761600000000-0000-dev-b"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF"
+          }
+        ]
+      },
+      "incoming": {
+        "deviceId": "dev-b",
+        "exportHlc": "001761603600000-0000-dev-b",
+        "peers": [
+          {
+            "deviceId": "dev-a",
+            "seen": "001761600000000-0000-dev-a"
+          }
+        ],
+        "instruments": [
+          {
+            "id": "IE00TEST0001",
+            "name": "Test World ETF",
+            "type": "ETF"
+          }
+        ]
+      },
+      "resolutions": {
+        "settings:residence": "keep"
+      },
+      "expected": {
+        "error": "unknown-resolution"
+      }
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "A field resolved once stays resolved: the next syncs both ways are up to date",
+      "devices": {
+        "dev-a": {
+          "lastHlc": "001761600300000-0000-dev-a",
+          "state": {
+            "deviceId": "dev-a",
+            "peers": [
+              {
+                "deviceId": "dev-b",
+                "seen": "001761600000000-0000-dev-b"
+              }
+            ],
+            "instruments": [
+              {
+                "id": "IE00TEST0001",
+                "name": "Test World ETF",
+                "type": "ETF",
+                "ter": "0.0025",
+                "terHlc": "001761600300000-0000-dev-a"
+              }
+            ]
+          }
+        },
+        "dev-b": {
+          "lastHlc": "001761600300000-0000-dev-b",
+          "state": {
+            "deviceId": "dev-b",
+            "peers": [
+              {
+                "deviceId": "dev-a",
+                "seen": "001761600000000-0000-dev-a"
+              }
+            ],
+            "instruments": [
+              {
+                "id": "IE00TEST0001",
+                "name": "Test World ETF",
+                "type": "ETF",
+                "ter": "0.0030",
+                "terHlc": "001761600300000-0000-dev-b"
+              }
+            ]
+          }
+        }
+      },
+      "steps": [
+        {
+          "from": "dev-b",
+          "to": "dev-a",
+          "nowMs": 1761600600000,
+          "status": "conflicts",
+          "conflicts": [
+            "instrument:IE00TEST0001:ter"
+          ]
+        },
+        {
+          "from": "dev-b",
+          "to": "dev-a",
+          "nowMs": 1761600660000,
+          "resolutions": {
+            "instrument:IE00TEST0001:ter": "keep"
+          },
+          "status": "applied"
+        },
+        {
+          "from": "dev-a",
+          "to": "dev-b",
+          "nowMs": 1761600720000,
+          "status": "applied"
+        },
+        {
+          "from": "dev-b",
+          "to": "dev-a",
+          "nowMs": 1761600780000,
+          "status": "up-to-date"
+        },
+        {
+          "from": "dev-a",
+          "to": "dev-b",
+          "nowMs": 1761600840000,
+          "status": "up-to-date"
+        }
+      ],
+      "converged": true
+    },
+    {
+      "name": "Every kind of conflict resolved together converges",
+      "devices": {
+        "dev-a": {
+          "lastHlc": "001761600300000-0000-dev-a",
+          "state": {
+            "deviceId": "dev-a",
+            "peers": [
+              {
+                "deviceId": "dev-b",
+                "seen": "001761600000000-0000-dev-b"
+              }
+            ],
+            "instruments": [
+              {
+                "id": "IE00TEST0001",
+                "name": "Test World ETF",
+                "type": "ETF",
+                "ter": "0.0025",
+                "terHlc": "001761600300000-0000-dev-a"
+              }
+            ],
+            "targets": [
+              {
+                "id": "v1",
+                "name": "Here",
+                "activeFrom": "2026-11-01",
+                "createdAt": "2026-10-01T10:00:00.000Z",
+                "lines": [
+                  {
+                    "instrumentId": "IE00TEST0001",
+                    "monthlyAmount": "300"
+                  }
+                ]
+              },
+              {
+                "id": "v-here",
+                "name": "v-here",
+                "activeFrom": "2026-12-01",
+                "createdAt": "2026-10-01T10:00:00.000Z",
+                "lines": [
+                  {
+                    "instrumentId": "IE00TEST0001",
+                    "monthlyAmount": "300"
+                  }
+                ]
+              }
+            ],
+            "holdings": [
+              {
+                "instrumentId": "IE00TEST0001",
+                "asOf": "2026-10-28",
+                "asOfInferred": true,
+                "hlc": "001761600060000-0000-dev-a",
+                "rows": [
+                  {
+                    "identity": "US00TEST0101",
+                    "identityKind": "ISIN",
+                    "name": "Alpha Corp",
+                    "weight": "0.6"
+                  },
+                  {
+                    "identity": "BETA.US",
+                    "identityKind": "TICKER",
+                    "name": "Beta Inc",
+                    "weight": "0.4"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "dev-b": {
+          "lastHlc": "001761600300000-0000-dev-b",
+          "state": {
+            "deviceId": "dev-b",
+            "peers": [
+              {
+                "deviceId": "dev-a",
+                "seen": "001761600000000-0000-dev-a"
+              }
+            ],
+            "instruments": [
+              {
+                "id": "IE00TEST0001",
+                "name": "Test World ETF",
+                "type": "ETF",
+                "ter": "0.0030",
+                "terHlc": "001761600300000-0000-dev-b"
+              }
+            ],
+            "targets": [
+              {
+                "id": "v1",
+                "name": "There",
+                "activeFrom": "2026-11-01",
+                "createdAt": "2026-10-01T10:00:00.000Z",
+                "lines": [
+                  {
+                    "instrumentId": "IE00TEST0001",
+                    "monthlyAmount": "300"
+                  }
+                ]
+              },
+              {
+                "id": "v-there",
+                "name": "v-there",
+                "activeFrom": "2026-12-01",
+                "createdAt": "2026-10-01T10:00:00.000Z",
+                "lines": [
+                  {
+                    "instrumentId": "IE00TEST0001",
+                    "monthlyAmount": "300"
+                  }
+                ]
+              }
+            ],
+            "holdings": [
+              {
+                "instrumentId": "IE00TEST0001",
+                "asOf": "2026-09-30",
+                "asOfInferred": false,
+                "hlc": "001761600060000-0000-dev-b",
+                "rows": [
+                  {
+                    "identity": "US00TEST0101",
+                    "identityKind": "ISIN",
+                    "name": "Alpha Corp",
+                    "weight": "0.55"
+                  },
+                  {
+                    "identity": "BETA.US",
+                    "identityKind": "TICKER",
+                    "name": "Beta Inc",
+                    "weight": "0.45"
+                  }
+                ]
+              }
+            ],
+            "settings": {
+              "residence": "araba",
+              "residenceHlc": null
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "from": "dev-b",
+          "to": "dev-a",
+          "nowMs": 1761600600000,
+          "resolutions": {
+            "instrument:IE00TEST0001:ter": "take",
+            "settings:residence": "keep",
+            "target:v1": "keep",
+            "target-day:2026-12-01": "take",
+            "holdings:IE00TEST0001": "keep"
+          },
+          "status": "applied"
+        },
+        {
+          "from": "dev-a",
+          "to": "dev-b",
+          "nowMs": 1761600660000,
+          "status": "applied"
+        },
+        {
+          "from": "dev-b",
+          "to": "dev-a",
+          "nowMs": 1761600720000,
+          "status": "up-to-date"
+        },
+        {
+          "from": "dev-a",
+          "to": "dev-b",
+          "nowMs": 1761600780000,
+          "status": "up-to-date"
+        }
+      ],
+      "converged": true
+    },
+    {
+      "name": "A ledger row set aside stays apart on each side, sync after sync, while the rest converges",
+      "devices": {
+        "dev-a": {
+          "lastHlc": "001761600300000-0000-dev-a",
+          "state": {
+            "deviceId": "dev-a",
+            "peers": [
+              {
+                "deviceId": "dev-b",
+                "seen": "001761600000000-0000-dev-b"
+              }
+            ],
+            "instruments": [
+              {
+                "id": "TESTCOIN",
+                "name": "Test Coin",
+                "type": "CRYPTO"
+              }
+            ],
+            "ledger": [
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "R2",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "TESTCOIN",
+                "quantity": "0.5",
+                "price": "2.10",
+                "grossAmount": "1.05",
+                "currency": "EUR",
+                "account": "kraken",
+                "funding": "IN_KIND",
+                "valuationSource": "yahoo"
+              },
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "R2:income",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "DIVIDEND",
+                "instrumentId": "TESTCOIN",
+                "quantity": null,
+                "price": null,
+                "grossAmount": "1.05",
+                "currency": "EUR",
+                "account": "kraken",
+                "funding": "IN_KIND",
+                "valuationSource": "yahoo"
+              }
+            ]
+          }
+        },
+        "dev-b": {
+          "lastHlc": "001761600300000-0000-dev-b",
+          "state": {
+            "deviceId": "dev-b",
+            "peers": [
+              {
+                "deviceId": "dev-a",
+                "seen": "001761600000000-0000-dev-a"
+              }
+            ],
+            "instruments": [
+              {
+                "id": "TESTCOIN",
+                "name": "Test Coin",
+                "type": "CRYPTO"
+              }
+            ],
+            "ledger": [
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "R2",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "TESTCOIN",
+                "quantity": "0.5",
+                "price": "2.12",
+                "grossAmount": "1.06",
+                "currency": "EUR",
+                "account": "kraken",
+                "funding": "IN_KIND",
+                "valuationSource": "yahoo"
+              },
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "R2:income",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "DIVIDEND",
+                "instrumentId": "TESTCOIN",
+                "quantity": null,
+                "price": null,
+                "grossAmount": "1.06",
+                "currency": "EUR",
+                "account": "kraken",
+                "funding": "IN_KIND",
+                "valuationSource": "yahoo"
+              },
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "t-1",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "TESTCOIN",
+                "quantity": "1",
+                "price": "100",
+                "grossAmount": "100",
+                "currency": "EUR",
+                "account": "kraken"
+              }
+            ]
+          }
+        }
+      },
+      "steps": [
+        {
+          "from": "dev-b",
+          "to": "dev-a",
+          "nowMs": 1761600600000,
+          "status": "applied",
+          "setAside": [
+            "KRAKEN_CSV::R2",
+            "KRAKEN_CSV::R2:income"
+          ]
+        },
+        {
+          "from": "dev-a",
+          "to": "dev-b",
+          "nowMs": 1761600660000,
+          "status": "up-to-date",
+          "setAside": [
+            "KRAKEN_CSV::R2",
+            "KRAKEN_CSV::R2:income"
+          ]
+        },
+        {
+          "from": "dev-b",
+          "to": "dev-a",
+          "nowMs": 1761600720000,
+          "status": "up-to-date",
+          "setAside": [
+            "KRAKEN_CSV::R2",
+            "KRAKEN_CSV::R2:income"
+          ]
+        }
+      ],
+      "converged": false
     }
   ],
   "refusals": [

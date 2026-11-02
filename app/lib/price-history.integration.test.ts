@@ -1,7 +1,8 @@
-import { execSync } from "node:child_process";
 import { mkdirSync, rmSync } from "node:fs";
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+
+import { migratedDatabase } from "../../test/integration/template";
 
 import type { Instrument } from "~/core/domain";
 import type { HistoryRange, MarketDataProvider, Quote } from "~/core/ports";
@@ -95,10 +96,7 @@ beforeAll(async () => {
   mkdirSync(tmpDir, { recursive: true });
   const dbUrl = `file:${dbPath}`;
   process.env.DATABASE_URL = dbUrl;
-  execSync("pnpm exec prisma migrate deploy", {
-    stdio: "ignore",
-    env: { ...process.env, DATABASE_URL: dbUrl },
-  });
+  migratedDatabase(dbPath);
   persistence = await import("~/adapters/persistence");
 });
 
@@ -146,7 +144,10 @@ function deps(market: MarketDataProvider) {
   };
 }
 
-const NO_RATES: EnsureRates = async () => ({ book: new Map(), unavailable: [] });
+const NO_RATES: EnsureRates = async () => ({
+  book: new Map(),
+  unavailable: [],
+});
 
 describe("replaceQuoteHistory (integration)", () => {
   it("leaves only the new symbol's daily candles plus today's quote, and the ledger as it was", async () => {

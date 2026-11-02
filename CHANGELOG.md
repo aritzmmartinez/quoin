@@ -7,7 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `pnpm sync:import` resolves conflicts: every conflict is listed with a key, and `--keep <key>` keeps the value here while `--take <key>` takes the one in the file. A value kept here travels to the other device on the next sync, so the same conflict does not come back. Instrument fields, the residence, plan versions (also two on the same day) and compositions can all be resolved.
+
+### Changed
+- `pnpm sync:import`: a ledger entry that differs on the two devices no longer stops the import. It is set aside, each device keeps its own version, the rest is applied, and the command lists it and exits with an error on every sync until the two agree. When one entry of a linked operation (a Kraken swap) differs, both are set aside.
+
 ### Fixed
+- `pnpm sync:import` reads, merges and writes in one transaction, so a change made in the app while it runs is taken into account instead of being overwritten, and a write the app is making is never mixed into the sync's.
 - Importing a file in another currency: when the ECB now publishes a different rate for a day already stored, the import window and `pnpm ingest` say so, with the currency, the day and both rates, and that the series was not updated. Before, nothing was said, and the trades of days with no stored rate appeared only as trades with no exchange rate, with advice to refresh the rates that could not help.
 
 ## [0.15.2] - 2026-11-01
