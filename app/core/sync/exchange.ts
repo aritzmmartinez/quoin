@@ -168,6 +168,12 @@ export const exchangeSchema = syncStateSchema
       if (count !== 2)
         issue(`Linked operation ${link} has ${count} legs, not 2`);
     }
+    const days = new Set<string>();
+    for (const target of file.targets) {
+      if (days.has(target.activeFrom))
+        issue(`Two plan versions take over on ${target.activeFrom}`);
+      days.add(target.activeFrom);
+    }
     const instruments = new Set(file.instruments.map((i) => i.id));
     for (const id of [
       ...file.ledger.flatMap((row) =>

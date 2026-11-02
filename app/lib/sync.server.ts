@@ -1,6 +1,6 @@
-import { PrismaSyncRepository } from "~/adapters/persistence";
+import { SqliteSyncStore } from "~/adapters/persistence";
 import { dayOf } from "~/core/calendar";
-import type { Effect, Exchange } from "~/core/sync";
+import type { Effect, Exchange, Resolutions } from "~/core/sync";
 
 import { rateSeriesOf } from "./fx-sync";
 import { ensureRatesNow } from "./fx-sync.server";
@@ -14,8 +14,13 @@ import {
   type ImportResult,
 } from "./sync";
 
-export function exportSync(): Promise<Exchange> {
-  return exportState(new PrismaSyncRepository());
+export async function exportSync(): Promise<Exchange> {
+  const store = new SqliteSyncStore();
+  try {
+    return await exportState(store, new Date());
+  } finally {
+    store.close();
+  }
 }
 
 async function runEffect(effect: Effect): Promise<EffectOutcome> {
@@ -45,18 +50,30 @@ async function runEffect(effect: Effect): Promise<EffectOutcome> {
       };
 }
 
-export function importSync(
+export async function importSync(
   raw: unknown,
-  options: { dryRun: boolean; beforeApply?: () => Promise<void> | void },
+  options: {
+    dryRun: boolean;
+    resolutions?: Resolutions;
+    beforeApply?: () => void;
+  },
 ): Promise<ImportResult> {
-  return importState(
-    {
-      repository: new PrismaSyncRepository(),
-      runEffect,
-      ...(options.beforeApply ? { beforeApply: options.beforeApply } : {}),
-      now: new Date(),
-    },
-    raw,
-    { dryRun: options.dryRun },
-  );
+  const store = new SqliteSyncStore();
+  try {
+    return await importState(
+      {
+        store,
+        runEffect,
+        ...(options.beforeApply ? { beforeApply: options.beforeApply } : {}),
+        now: new Date(),
+      },
+      raw,
+      {
+        dryRun: options.dryRun,
+        ...(options.resolutions ? { resolutions: options.resolutions } : {}),
+      },
+    );
+  } finally {
+    store.close();
+  }
 }

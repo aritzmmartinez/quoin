@@ -428,8 +428,19 @@ ledger while that rule is in force. Useful, but do not mistake it for a sandbox.
 
 Two installations (and, next, the mobile app) merge by exchanging **whole user states**,
 never operation logs. `core/sync` holds what the mobile client reproduces in Dart: the
-format (`exchange.ts`, `schemaVersion: 1`, Zod both ways) and `merge(local, incoming)`,
-pure. `app/lib/sync.ts` runs it over `PrismaSyncRepository`; the scripts only parse and print.
+format (`exchange.ts`, `schemaVersion: 1`, Zod both ways), `merge(local, incoming,
+resolutions)` and `applyPlan`, pure. `app/lib/sync.ts` runs them over `SqliteSyncStore`;
+the scripts only parse and print.
+
+- **The sync has its own better-sqlite3 connection, and nothing else of the sync goes
+  through Prisma.** Reading the state, `merge` and the write run in one synchronous
+  `BEGIN IMMEDIATE` transaction with `timeout: 0` and one retry after a sleep: SQLite's
+  busy wait would block the event loop the Prisma connection needs to finish. Never put an
+  `await` inside that transaction, and never add a second sync write path in Prisma.
+  `SYNC_COLUMNS` lists every column its SQL touches and `sync-store.integration.test.ts`
+  pins them to the migrated schema: a migration that changes one fails there.
+- **`applyPlan` is the specification of the write.** The store must leave exactly what it
+  returns (an integration test compares them); change both together.
 
 - **A mark is `<ms 15>-<counter 4>-<deviceId>`** (`core/sync/hlc`), issued by `stamp(tx)`
   inside the transaction of the write and never earlier than `SyncDevice.lastHlc`. A write
@@ -442,7 +453,15 @@ pure. `app/lib/sync.ts` runs it over `PrismaSyncRepository`; the scripts only pa
   conflict. Both new, or neither new with different values (two NULL marks), is a conflict.
 - **Copying the `.sqlite` copies `SyncDevice.deviceId`**, and an import refuses a file
   carrying its own id. Restore a backup on another machine and it is the same device.
-- **A conflict writes nothing.** Apply is one transaction, seen marks included; effects
+- **An open conflict writes nothing; a resolved one applies the whole plan.** Every
+  conflict but the ledger's has a key (`conflictKey`) and takes `keep` or `take`
+  (`sync:import --keep/--take <key>`). `take` adopts the value with its origin's mark;
+  `keep` marks the local value afresh (`restamp`), so it is news to the other side. A
+  resolution only converges because the whole plan applies with it, seen marks included:
+  a fresh mark alone leaves the other side's mark unseen and the conflict comes back. Plan
+  versions have no mark, so their resolution travels as a tombstone; `keep` on one id with
+  two contents reissues the local version under the tombstone's mark. A resolution that
+  matches no conflict throws. Apply is one transaction, seen marks included; effects
   (download a new symbol's history, sync a new currency's rates) run after it and a failed
   one is reported with exit ≠ 0, never rolled back: what it fetches is a cache. A patch that
   carries `quoteSymbol` deletes that instrument's prices in the apply transaction, so two
@@ -453,8 +472,12 @@ pure. `app/lib/sync.ts` runs it over `PrismaSyncRepository`; the scripts only pa
   value with a newer mark read as news, and the next local change becomes a false conflict.
 - **The ledger has no marks.** Union by `(source, externalId)` — which is why
   `ledgerEventWriteSchema` refuses an entry without an `externalId` and the migration gave
-  every old one `local:<id>`. `funding` only moves CASH → IN_KIND; any other difference is a
-  conflict, including a Kraken reward valued from two different price histories.
+  every old one `local:<id>`. `funding` only moves CASH → IN_KIND; any other difference
+  sets the row aside (`plan.setAside`): each side keeps its own, the rest applies, `seen`
+  still advances, and it is reported on every sync — up to date and dry run included —
+  until both rows agree. A linked operation is set aside whole, by the link on either
+  side. A row set aside has no way out yet (no row replacement exists), which is the case
+  of a Kraken reward valued from two price histories or a rate the ECB revised.
 - **A composition is one `EtfHoldingBlock`**, the only place its day lives. `asOfInferred`
   means the file stated no unambiguous date and the day is the drop's; between two blocks
   changed on both sides only a day read from a file decides.
