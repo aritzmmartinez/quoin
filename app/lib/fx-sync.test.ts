@@ -397,6 +397,35 @@ describe("ensureRates", () => {
     expect(ensured.unavailable).toEqual([]);
   });
 
+  it("names each day the source now publishes at another rate, and writes nothing for that currency", async () => {
+    const stored = rate("USD", "2026-04-02", "1.2002");
+    const { repository, rows } = withBook([stored]);
+    const { provider } = fakeProvider(() => [
+      rate("USD", "2026-04-02", "1.2003"),
+      rate("USD", "2026-04-06", "1.2006"),
+    ]);
+
+    const ensured = await ensureRates(
+      {
+        zone: MADRID,
+        repository,
+        provider,
+        now: new Date("2026-04-07T18:00:00Z"),
+      },
+      new Map([["USD", "2026-04-06"]]),
+    );
+
+    expect(rows).toEqual([stored]);
+    expect(ensured.conflicts).toEqual([
+      {
+        currency: "USD",
+        day: "2026-04-02",
+        stored: "1.2002",
+        incoming: "1.2003",
+      },
+    ]);
+  });
+
   it("asks nothing when only the base currency is needed", async () => {
     const { repository } = withBook();
     const { provider, calls } = fakeProvider(() => []);

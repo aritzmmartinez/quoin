@@ -5,6 +5,7 @@ import type {
 } from "~/adapters/ingestion";
 import type { Instrument } from "~/core/domain";
 
+import type { RateConflict } from "./fx-sync";
 import type { Copy } from "./i18n";
 
 import type { BackfillReport } from "./prices-backfill";
@@ -60,6 +61,7 @@ export function suggestedQuoteSymbol(instrument: Instrument): string | null {
 export interface IngestPreview {
   broker: Broker;
   summary: ImportSummary;
+  rateConflicts: RateConflict[];
 }
 
 export interface IngestResult extends IngestPreview {

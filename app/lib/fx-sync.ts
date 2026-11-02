@@ -131,9 +131,17 @@ export async function syncFxRates(deps: FxSyncDeps): Promise<FxSyncResult> {
   };
 }
 
+export interface RateConflict {
+  currency: string;
+  day: string;
+  stored: string;
+  incoming: string;
+}
+
 export interface EnsuredRates {
   book: RateBook;
   unavailable: string[];
+  conflicts?: RateConflict[];
 }
 
 export type EnsureRates = (
@@ -159,7 +167,7 @@ export async function ensureRates(
     .sort();
   if (currencies.length === 0) return { book: new Map(), unavailable: [] };
 
-  const { unavailable } = await syncFxRates({
+  const { unavailable, outcomes } = await syncFxRates({
     repository: deps.repository,
     provider: deps.provider,
     currencies,
@@ -170,6 +178,16 @@ export async function ensureRates(
   return {
     book: await deps.repository.book(deps.provider.source, currencies),
     unavailable,
+    conflicts: outcomes.flatMap((o) =>
+      o.status === "conflict"
+        ? o.conflicts.map(({ stored, incoming }) => ({
+            currency: o.quote,
+            day: stored.day,
+            stored: stored.rate,
+            incoming: incoming.rate,
+          }))
+        : [],
+    ),
   };
 }
 

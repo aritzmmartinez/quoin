@@ -1,5 +1,12 @@
 import { shiftDay } from "../calendar";
 
+export function sortByTime<T extends { t: number }>(items: readonly T[]): T[] {
+  return items
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => a.item.t - b.item.t || a.index - b.index)
+    .map(({ item }) => item);
+}
+
 export function lastOnOrBefore<T, K extends number | string>(
   sorted: readonly T[],
   keyOf: (item: T) => K,

@@ -2,7 +2,6 @@ import { z } from "zod";
 
 import type { Route } from "./+types/ingest";
 
-import type { Broker, ImportSummary } from "~/adapters/ingestion";
 import { MarketDataUnavailableError } from "~/core/ports";
 import { describeFailure } from "~/lib/describe-failure";
 import { isHistoryRange } from "~/lib/prices-backfill";
@@ -15,7 +14,11 @@ import {
   previewIngest,
   replaceHistory,
 } from "~/lib/ingest.server";
-import type { PendingMapping, PriceFillResult } from "~/lib/ingest";
+import type {
+  IngestPreview,
+  IngestResult,
+  PriceFillResult,
+} from "~/lib/ingest";
 import type { ReplaceOutcome } from "~/lib/price-history";
 import type { SymbolCheck } from "~/lib/symbol-check";
 
@@ -35,15 +38,8 @@ const fillForm = z.object({
 });
 
 export type IngestResponse =
-  | { ok: true; step: "preview"; broker: Broker; summary: ImportSummary }
-  | {
-      ok: true;
-      step: "commit";
-      broker: Broker;
-      summary: ImportSummary;
-      pending: PendingMapping[];
-      retryIds: string[];
-    }
+  | ({ ok: true; step: "preview" } & IngestPreview)
+  | ({ ok: true; step: "commit" } & IngestResult)
   | { ok: true; step: "check"; check: SymbolCheck }
   | { ok: true; step: "map"; instrumentId: string }
   | ({ step: "replace" } & Extract<ReplaceOutcome, { ok: true }>)
@@ -65,12 +61,11 @@ export async function action({ request }: Route.ActionArgs) {
       case "preview": {
         const parsed = csvForm.safeParse(form);
         if (!parsed.success) return fail(t.ingest.unreadable);
-        const { broker, summary } = await previewIngest(t, parsed.data.csv);
+        const preview = await previewIngest(t, parsed.data.csv);
         return Response.json({
           ok: true,
           step: "preview",
-          broker,
-          summary,
+          ...preview,
         } satisfies IngestResponse);
       }
 

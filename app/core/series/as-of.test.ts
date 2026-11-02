@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { atOrBefore, lastOnOrBefore, onOrBeforeDay } from "./as-of";
+import { atOrBefore, lastOnOrBefore, onOrBeforeDay, sortByTime } from "./as-of";
 
 const DAY_MS = 86_400_000;
 
@@ -113,5 +113,17 @@ describe("onOrBeforeDay", () => {
     expect(onOrBeforeDay(series, dayOf, "2030-01-01", null)).toEqual({
       day: "2026-02-27",
     });
+  });
+});
+
+describe("sortByTime", () => {
+  it("orders by t and keeps points sharing a t in their input order", () => {
+    const points = [
+      { t: 2, id: "a" },
+      { t: 1, id: "b" },
+      { t: 2, id: "c" },
+      { t: 1, id: "d" },
+    ];
+    expect(sortByTime(points).map((p) => p.id)).toEqual(["b", "d", "a", "c"]);
   });
 });

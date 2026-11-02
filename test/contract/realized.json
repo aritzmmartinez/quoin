@@ -1,0 +1,365 @@
+{
+  "contract": "realized",
+  "version": 1,
+  "description": "Realised gains on the portfolio's AVCO basis (not the FIFO of the tax view): one row per sale, in trade order (instant, then BUY before SELL, then externalId, then id), amounts in euros with fees inside both the cost and the proceeds. A swap is valued at the greater of its two legs, less its fee. Units received in kind (funding IN_KIND) enter the average at their value. price is gross over quantity; returnPct is realised over cost to six places, null on a zero cost; holdingDays is the sale instant minus the quantity-weighted acquisition instant of what was held, in days rounded half up, null when nothing was held. Shared with the mobile client: both implementations must reproduce every case. Events are LedgerEvents; an absent fxSource is IDENTITY and an absent funding is CASH. expect is written by running the TypeScript core; byHand.figures, where a case has it, are worked out by hand, its arithmetic says how, and each key is a dotted path into expect.",
+  "cases": [
+    {
+      "name": "AVCO sales with fees: a partial sale, then the rest, then a rebuy and a sale of part of it",
+      "residence": "bizkaia",
+      "events": [
+        {
+          "id": "e-1",
+          "ts": "2025-01-10T09:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "IE00TEST0201",
+          "quantity": "10",
+          "price": "100",
+          "grossAmount": "1000",
+          "fees": "1",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-1"
+        },
+        {
+          "id": "e-2",
+          "ts": "2025-02-10T09:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "IE00TEST0201",
+          "quantity": "5",
+          "price": "120",
+          "grossAmount": "600",
+          "fees": "1",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-2"
+        },
+        {
+          "id": "e-3",
+          "ts": "2025-03-10T09:00:00.000Z",
+          "type": "SELL",
+          "instrumentId": "IE00TEST0201",
+          "quantity": "6",
+          "price": "120",
+          "grossAmount": "720",
+          "fees": "1",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-3"
+        },
+        {
+          "id": "e-4",
+          "ts": "2025-07-10T08:00:00.000Z",
+          "type": "SELL",
+          "instrumentId": "IE00TEST0201",
+          "quantity": "9",
+          "price": "110",
+          "grossAmount": "990",
+          "fees": "1.5",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-4"
+        },
+        {
+          "id": "e-5",
+          "ts": "2025-09-01T09:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "IE00TEST0201",
+          "quantity": "3",
+          "price": "100",
+          "grossAmount": "300",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-5"
+        },
+        {
+          "id": "e-6",
+          "ts": "2025-12-31T23:30:00.000Z",
+          "type": "SELL",
+          "instrumentId": "IE00TEST0201",
+          "quantity": "1",
+          "price": "110",
+          "grossAmount": "110",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-6"
+        }
+      ],
+      "byHand": {
+        "arithmetic": "15 units cost 1000 + 1 + 600 + 1 = 1602, 106.8 each. Selling 6 for 720 − 1 takes 640.8: realised 78.2, return 78.2 / 640.8 = 0.122035 (to six places). The 9 left cost 961.2; selling them all for 990 − 1.5 = 988.5 realises 27.3 and empties the position. A rebuy of 3 for 300 starts again at 100 each; selling 1 for 110 realises 10.",
+        "figures": {
+          "0.costBasis": "640.8",
+          "0.realizedPnL": "78.2",
+          "0.returnPct": "0.122035",
+          "1.costBasis": "961.2",
+          "1.realizedPnL": "27.3",
+          "2.costBasis": "100",
+          "2.realizedPnL": "10"
+        }
+      },
+      "expect": [
+        {
+          "eventId": "e-3",
+          "ts": "2025-03-10T09:00:00.000Z",
+          "instrumentId": "IE00TEST0201",
+          "quantity": "6",
+          "price": "120",
+          "grossAmount": "720",
+          "fees": "1",
+          "costBasis": "640.8",
+          "realizedPnL": "78.2",
+          "returnPct": "0.122035",
+          "holdingDays": 49
+        },
+        {
+          "eventId": "e-4",
+          "ts": "2025-07-10T08:00:00.000Z",
+          "instrumentId": "IE00TEST0201",
+          "quantity": "9",
+          "price": "110",
+          "grossAmount": "990",
+          "fees": "1.5",
+          "costBasis": "961.2",
+          "realizedPnL": "27.3",
+          "returnPct": "0.028402",
+          "holdingDays": 171
+        },
+        {
+          "eventId": "e-6",
+          "ts": "2025-12-31T23:30:00.000Z",
+          "instrumentId": "IE00TEST0201",
+          "quantity": "1",
+          "price": "110",
+          "grossAmount": "110",
+          "fees": "0",
+          "costBasis": "100",
+          "realizedPnL": "10",
+          "returnPct": "0.100000",
+          "holdingDays": 122
+        }
+      ]
+    },
+    {
+      "name": "A crypto swap, both legs valued at the greater side, and the received asset sold",
+      "residence": "bizkaia",
+      "events": [
+        {
+          "id": "e-7",
+          "ts": "2025-03-01T12:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "TESTCOIN",
+          "quantity": "1",
+          "price": "1000",
+          "grossAmount": "1000",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-7"
+        },
+        {
+          "id": "e-8",
+          "ts": "2025-03-31T22:30:00.000Z",
+          "type": "BUY",
+          "instrumentId": "TESTTOKEN",
+          "quantity": "10",
+          "price": "58",
+          "grossAmount": "580",
+          "fees": "25",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-8",
+          "linkId": "swap-1",
+          "linkKind": "swap"
+        },
+        {
+          "id": "e-9",
+          "ts": "2025-03-31T22:30:00.000Z",
+          "type": "SELL",
+          "instrumentId": "TESTCOIN",
+          "quantity": "0.5",
+          "price": "1200",
+          "grossAmount": "600",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-9",
+          "linkId": "swap-1",
+          "linkKind": "swap"
+        },
+        {
+          "id": "e-10",
+          "ts": "2025-06-01T12:00:00.000Z",
+          "type": "SELL",
+          "instrumentId": "TESTTOKEN",
+          "quantity": "4",
+          "price": "65",
+          "grossAmount": "260",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-10"
+        }
+      ],
+      "byHand": {
+        "arithmetic": "The swap delivers 0.5 coin worth 600 and receives 10 tokens worth 580 + 25 fee = 605; the greater, 605, less the 25 fee is both the sale's proceeds and the tokens' cost: 580. Half a coin costs 500, so the swap realises 80. Four of the ten tokens cost 4 × 58 = 232; sold for 260 they realise 28.",
+        "figures": {
+          "0.realizedPnL": "80",
+          "1.costBasis": "232",
+          "1.realizedPnL": "28"
+        }
+      },
+      "expect": [
+        {
+          "eventId": "e-9",
+          "ts": "2025-03-31T22:30:00.000Z",
+          "instrumentId": "TESTCOIN",
+          "quantity": "0.5",
+          "price": "1210",
+          "grossAmount": "605",
+          "fees": "25",
+          "costBasis": "500",
+          "realizedPnL": "80",
+          "returnPct": "0.160000",
+          "holdingDays": 30
+        },
+        {
+          "eventId": "e-10",
+          "ts": "2025-06-01T12:00:00.000Z",
+          "instrumentId": "TESTTOKEN",
+          "quantity": "4",
+          "price": "65",
+          "grossAmount": "260",
+          "fees": "0",
+          "costBasis": "232",
+          "realizedPnL": "28",
+          "returnPct": "0.120690",
+          "holdingDays": 62
+        }
+      ]
+    },
+    {
+      "name": "Units received in kind enter the average at their value and are sold with the rest; a sale converted from USD",
+      "residence": "bizkaia",
+      "events": [
+        {
+          "id": "e-11",
+          "ts": "2025-04-01T09:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "IE00TEST0201",
+          "quantity": "10",
+          "price": "100",
+          "grossAmount": "1000",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-11"
+        },
+        {
+          "id": "e-12",
+          "ts": "2025-04-15T09:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "IE00TEST0201",
+          "quantity": "0.5",
+          "price": "102",
+          "grossAmount": "51",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-12",
+          "funding": "IN_KIND"
+        },
+        {
+          "id": "e-13",
+          "ts": "2025-10-01T09:00:00.000Z",
+          "type": "SELL",
+          "instrumentId": "IE00TEST0201",
+          "quantity": "10.5",
+          "price": "110",
+          "grossAmount": "1155",
+          "fees": "1",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-13"
+        },
+        {
+          "id": "e-14",
+          "ts": "2025-05-02T15:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "US00TEST0202",
+          "quantity": "2",
+          "price": "108.5",
+          "grossAmount": "217",
+          "fees": "1.085",
+          "currency": "USD",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-14",
+          "fxSource": "ECB",
+          "fxRate": "1.085",
+          "fxDirection": "QUOTE_PER_BASE",
+          "fxDate": "2025-05-02"
+        },
+        {
+          "id": "e-15",
+          "ts": "2025-11-03T15:00:00.000Z",
+          "type": "SELL",
+          "instrumentId": "US00TEST0202",
+          "quantity": "1",
+          "price": "115.5",
+          "grossAmount": "115.5",
+          "fees": "0",
+          "currency": "USD",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-15",
+          "fxSource": "ECB",
+          "fxRate": "1.155",
+          "fxDirection": "QUOTE_PER_BASE",
+          "fxDate": "2025-11-03"
+        }
+      ],
+      "expect": [
+        {
+          "eventId": "e-13",
+          "ts": "2025-10-01T09:00:00.000Z",
+          "instrumentId": "IE00TEST0201",
+          "quantity": "10.5",
+          "price": "110",
+          "grossAmount": "1155",
+          "fees": "1",
+          "costBasis": "1051",
+          "realizedPnL": "103",
+          "returnPct": "0.098002",
+          "holdingDays": 182
+        },
+        {
+          "eventId": "e-15",
+          "ts": "2025-11-03T15:00:00.000Z",
+          "instrumentId": "US00TEST0202",
+          "quantity": "1",
+          "price": "100",
+          "grossAmount": "100",
+          "fees": "0",
+          "costBasis": "100.5",
+          "realizedPnL": "-0.5",
+          "returnPct": "-0.004975",
+          "holdingDays": 185
+        }
+      ]
+    }
+  ]
+}

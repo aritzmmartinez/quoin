@@ -755,6 +755,17 @@ export const en: Copy = {
     confirmPending: "Continue to value the rewards and swaps",
     confirmCount: (count: number): string =>
       count === 1 ? "Import 1 trade" : `Import ${count} trades`,
+    rateConflict: {
+      title: (currencies: readonly string[]): string =>
+        `The ECB now publishes another rate for days already stored for ${currencies.join(", ")}, so that series was not updated. Trades in that currency on a day with no stored rate are set aside with no exchange rate, and refreshing the rates will not help while the two differ.`,
+      line: (
+        currency: string,
+        day: string,
+        stored: string,
+        incoming: string,
+      ): string =>
+        `${currency}, ${day}: stored ${stored}, the ECB gives ${incoming}`,
+    },
     appliesNow:
       "The trades are written to the ledger when you press. The following steps only add symbols and prices: closing the wizard afterwards does not undo the import.",
     closeConfirm: {

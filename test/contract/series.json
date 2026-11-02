@@ -1,0 +1,745 @@
+{
+  "contract": "series",
+  "version": 1,
+  "description": "The chart lines: an instrument's AVCO cost line (computeCostBasisTimeline), its value against what is invested (computeInvestedVsValueSeries) and the portfolio's merge of those (computePortfolioInvestedVsValueSeries), with prices brought to euros first: each close at the last rate published on or before its own Madrid day and at most 7 days old (historyInBase), today's price at today's (pricesInBase); a close with no such rate is left out and counted in unrated. Instruments come in the order of their first trade, trades by instant, then BUY before SELL, then externalId, then id. A value series has one point per trade and per close at or after the first trade, plus today when there is a price, ordered by t; a trade comes before a close at the same t, and closes sharing a t keep the order given (history, then today). Each point is the last trade's invested and quantity times the point's price. The merge has one point per distinct t across instruments, each instrument contributing its last point at or before that t and nothing before its first. Shared with the mobile client: both implementations must reproduce every case. Events are LedgerEvents; an absent fxSource is IDENTITY and an absent funding is CASH. expect is written by running the TypeScript core; byHand.figures, where a case has it, are worked out by hand, its arithmetic says how, and each key is a dotted path into expect.",
+  "cases": [
+    {
+      "name": "The cost line of one instrument through purchases and sales with fees, with a close stamped at the instant of a trade",
+      "residence": "bizkaia",
+      "now": "2025-06-30T17:00:00.000Z",
+      "events": [
+        {
+          "id": "e-1",
+          "ts": "2025-01-13T09:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "IE00TEST0401",
+          "quantity": "10",
+          "price": "100",
+          "grossAmount": "1000",
+          "fees": "1",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-1"
+        },
+        {
+          "id": "e-2",
+          "ts": "2025-02-10T09:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "IE00TEST0401",
+          "quantity": "5",
+          "price": "120",
+          "grossAmount": "600",
+          "fees": "1",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-2"
+        },
+        {
+          "id": "e-3",
+          "ts": "2025-03-10T09:00:00.000Z",
+          "type": "SELL",
+          "instrumentId": "IE00TEST0401",
+          "quantity": "6",
+          "price": "120",
+          "grossAmount": "720",
+          "fees": "1",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-3"
+        },
+        {
+          "id": "e-4",
+          "ts": "2025-04-07T09:00:00.000Z",
+          "type": "SELL",
+          "instrumentId": "IE00TEST0401",
+          "quantity": "9",
+          "price": "115",
+          "grossAmount": "1035",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-4"
+        },
+        {
+          "id": "e-5",
+          "ts": "2025-05-05T09:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "IE00TEST0401",
+          "quantity": "4",
+          "price": "115",
+          "grossAmount": "460",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-5"
+        }
+      ],
+      "histories": [
+        {
+          "instrumentId": "IE00TEST0401",
+          "price": "100",
+          "currency": "EUR",
+          "asOf": "2025-01-13T09:00:00.000Z"
+        },
+        {
+          "instrumentId": "IE00TEST0401",
+          "price": "112",
+          "currency": "EUR",
+          "asOf": "2025-02-28T16:30:00.000Z"
+        },
+        {
+          "instrumentId": "IE00TEST0401",
+          "price": "118",
+          "currency": "EUR",
+          "asOf": "2025-03-31T16:30:00.000Z"
+        },
+        {
+          "instrumentId": "IE00TEST0401",
+          "price": "116",
+          "currency": "EUR",
+          "asOf": "2025-05-30T16:30:00.000Z"
+        }
+      ],
+      "currentPrices": [
+        {
+          "instrumentId": "IE00TEST0401",
+          "price": "120",
+          "currency": "EUR",
+          "asOf": "2025-06-30T16:30:00.000Z"
+        }
+      ],
+      "rates": [],
+      "byHand": {
+        "arithmetic": "15 units cost 1602 (106.8 each); selling 6 leaves 9 costing 961.2 at the same 106.8. Selling the 9 empties the position, cost 0. Buying 4 for 460 starts again at 115. The close stamped at 09:00 on 13 January comes after that instant's purchase, so it values 10 units: 1000. Today 4 × 120 = 480 against 460 invested.",
+        "figures": {
+          "instruments.IE00TEST0401.timeline.1.avgCostAfter": "106.8",
+          "instruments.IE00TEST0401.timeline.2.investedAfter": "961.2",
+          "instruments.IE00TEST0401.timeline.3.investedAfter": "0",
+          "instruments.IE00TEST0401.timeline.4.avgCostAfter": "115",
+          "instruments.IE00TEST0401.series.1.value": "1000",
+          "portfolio.8.value": "480",
+          "portfolio.8.invested": "460"
+        }
+      },
+      "expect": {
+        "currentInBase": {
+          "prices": {
+            "IE00TEST0401": {
+              "instrumentId": "IE00TEST0401",
+              "price": "120",
+              "currency": "EUR",
+              "asOf": "2025-06-30T16:30:00.000Z"
+            }
+          },
+          "unrated": {}
+        },
+        "instruments": {
+          "IE00TEST0401": {
+            "historyInBase": {
+              "history": [
+                {
+                  "instrumentId": "IE00TEST0401",
+                  "price": "100",
+                  "currency": "EUR",
+                  "asOf": "2025-01-13T09:00:00.000Z",
+                  "source": "TEST"
+                },
+                {
+                  "instrumentId": "IE00TEST0401",
+                  "price": "112",
+                  "currency": "EUR",
+                  "asOf": "2025-02-28T16:30:00.000Z",
+                  "source": "TEST"
+                },
+                {
+                  "instrumentId": "IE00TEST0401",
+                  "price": "118",
+                  "currency": "EUR",
+                  "asOf": "2025-03-31T16:30:00.000Z",
+                  "source": "TEST"
+                },
+                {
+                  "instrumentId": "IE00TEST0401",
+                  "price": "116",
+                  "currency": "EUR",
+                  "asOf": "2025-05-30T16:30:00.000Z",
+                  "source": "TEST"
+                }
+              ],
+              "unrated": 0
+            },
+            "timeline": [
+              {
+                "ts": "2025-01-13T09:00:00.000Z",
+                "side": "BUY",
+                "tradePrice": "100",
+                "tradeQuantity": "10",
+                "quantityAfter": "10",
+                "avgCostAfter": "100.1",
+                "investedAfter": "1001"
+              },
+              {
+                "ts": "2025-02-10T09:00:00.000Z",
+                "side": "BUY",
+                "tradePrice": "120",
+                "tradeQuantity": "5",
+                "quantityAfter": "15",
+                "avgCostAfter": "106.8",
+                "investedAfter": "1602"
+              },
+              {
+                "ts": "2025-03-10T09:00:00.000Z",
+                "side": "SELL",
+                "tradePrice": "120",
+                "tradeQuantity": "6",
+                "quantityAfter": "9",
+                "avgCostAfter": "106.8",
+                "investedAfter": "961.2"
+              },
+              {
+                "ts": "2025-04-07T09:00:00.000Z",
+                "side": "SELL",
+                "tradePrice": "115",
+                "tradeQuantity": "9",
+                "quantityAfter": "0",
+                "avgCostAfter": "0",
+                "investedAfter": "0"
+              },
+              {
+                "ts": "2025-05-05T09:00:00.000Z",
+                "side": "BUY",
+                "tradePrice": "115",
+                "tradeQuantity": "4",
+                "quantityAfter": "4",
+                "avgCostAfter": "115",
+                "investedAfter": "460"
+              }
+            ],
+            "series": [
+              {
+                "t": 1736758800000,
+                "invested": "1001",
+                "value": "1000"
+              },
+              {
+                "t": 1736758800000,
+                "invested": "1001",
+                "value": "1000"
+              },
+              {
+                "t": 1739178000000,
+                "invested": "1602",
+                "value": "1800"
+              },
+              {
+                "t": 1740760200000,
+                "invested": "1602",
+                "value": "1680"
+              },
+              {
+                "t": 1741597200000,
+                "invested": "961.2",
+                "value": "1080"
+              },
+              {
+                "t": 1743438600000,
+                "invested": "961.2",
+                "value": "1062"
+              },
+              {
+                "t": 1744016400000,
+                "invested": "0",
+                "value": "0"
+              },
+              {
+                "t": 1746435600000,
+                "invested": "460",
+                "value": "460"
+              },
+              {
+                "t": 1748622600000,
+                "invested": "460",
+                "value": "464"
+              },
+              {
+                "t": 1751302800000,
+                "invested": "460",
+                "value": "480"
+              }
+            ]
+          }
+        },
+        "portfolio": [
+          {
+            "t": 1736758800000,
+            "invested": "1001",
+            "value": "1000"
+          },
+          {
+            "t": 1739178000000,
+            "invested": "1602",
+            "value": "1800"
+          },
+          {
+            "t": 1740760200000,
+            "invested": "1602",
+            "value": "1680"
+          },
+          {
+            "t": 1741597200000,
+            "invested": "961.2",
+            "value": "1080"
+          },
+          {
+            "t": 1743438600000,
+            "invested": "961.2",
+            "value": "1062"
+          },
+          {
+            "t": 1744016400000,
+            "invested": "0",
+            "value": "0"
+          },
+          {
+            "t": 1746435600000,
+            "invested": "460",
+            "value": "460"
+          },
+          {
+            "t": 1748622600000,
+            "invested": "460",
+            "value": "464"
+          },
+          {
+            "t": 1751302800000,
+            "invested": "460",
+            "value": "480"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Two instruments whose closes fall on different days: the merged line carries each one's last value across the other's gaps",
+      "residence": "bizkaia",
+      "now": "2025-04-30T17:00:00.000Z",
+      "events": [
+        {
+          "id": "e-6",
+          "ts": "2025-03-03T09:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "IE00TEST0401",
+          "quantity": "10",
+          "price": "100",
+          "grossAmount": "1000",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-6"
+        },
+        {
+          "id": "e-7",
+          "ts": "2025-03-04T09:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "IE00TEST0402",
+          "quantity": "20",
+          "price": "50",
+          "grossAmount": "1000",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-7"
+        }
+      ],
+      "histories": [
+        {
+          "instrumentId": "IE00TEST0401",
+          "price": "102",
+          "currency": "EUR",
+          "asOf": "2025-03-14T16:30:00.000Z"
+        },
+        {
+          "instrumentId": "IE00TEST0401",
+          "price": "104",
+          "currency": "EUR",
+          "asOf": "2025-03-28T16:30:00.000Z"
+        },
+        {
+          "instrumentId": "IE00TEST0402",
+          "price": "50.5",
+          "currency": "EUR",
+          "asOf": "2025-03-21T16:30:00.000Z"
+        }
+      ],
+      "currentPrices": [
+        {
+          "instrumentId": "IE00TEST0401",
+          "price": "105",
+          "currency": "EUR",
+          "asOf": "2025-04-30T16:30:00.000Z"
+        },
+        {
+          "instrumentId": "IE00TEST0402",
+          "price": "51",
+          "currency": "EUR",
+          "asOf": "2025-04-30T16:30:00.000Z"
+        }
+      ],
+      "rates": [],
+      "byHand": {
+        "arithmetic": "On 21 March only the bond has a close (20 × 50.5 = 1010); the fund carries its 14 March value, 10 × 102 = 1020: 2030. On 28 March only the fund has one (1040); the bond carries 1010: 2050. Today 1050 + 1020 = 2070 against 2000.",
+        "figures": {
+          "portfolio.3.value": "2030",
+          "portfolio.4.value": "2050",
+          "portfolio.5.value": "2070",
+          "portfolio.5.invested": "2000"
+        }
+      },
+      "expect": {
+        "currentInBase": {
+          "prices": {
+            "IE00TEST0401": {
+              "instrumentId": "IE00TEST0401",
+              "price": "105",
+              "currency": "EUR",
+              "asOf": "2025-04-30T16:30:00.000Z"
+            },
+            "IE00TEST0402": {
+              "instrumentId": "IE00TEST0402",
+              "price": "51",
+              "currency": "EUR",
+              "asOf": "2025-04-30T16:30:00.000Z"
+            }
+          },
+          "unrated": {}
+        },
+        "instruments": {
+          "IE00TEST0401": {
+            "historyInBase": {
+              "history": [
+                {
+                  "instrumentId": "IE00TEST0401",
+                  "price": "102",
+                  "currency": "EUR",
+                  "asOf": "2025-03-14T16:30:00.000Z",
+                  "source": "TEST"
+                },
+                {
+                  "instrumentId": "IE00TEST0401",
+                  "price": "104",
+                  "currency": "EUR",
+                  "asOf": "2025-03-28T16:30:00.000Z",
+                  "source": "TEST"
+                }
+              ],
+              "unrated": 0
+            },
+            "timeline": [
+              {
+                "ts": "2025-03-03T09:00:00.000Z",
+                "side": "BUY",
+                "tradePrice": "100",
+                "tradeQuantity": "10",
+                "quantityAfter": "10",
+                "avgCostAfter": "100",
+                "investedAfter": "1000"
+              }
+            ],
+            "series": [
+              {
+                "t": 1740992400000,
+                "invested": "1000",
+                "value": "1000"
+              },
+              {
+                "t": 1741969800000,
+                "invested": "1000",
+                "value": "1020"
+              },
+              {
+                "t": 1743179400000,
+                "invested": "1000",
+                "value": "1040"
+              },
+              {
+                "t": 1746032400000,
+                "invested": "1000",
+                "value": "1050"
+              }
+            ]
+          },
+          "IE00TEST0402": {
+            "historyInBase": {
+              "history": [
+                {
+                  "instrumentId": "IE00TEST0402",
+                  "price": "50.5",
+                  "currency": "EUR",
+                  "asOf": "2025-03-21T16:30:00.000Z",
+                  "source": "TEST"
+                }
+              ],
+              "unrated": 0
+            },
+            "timeline": [
+              {
+                "ts": "2025-03-04T09:00:00.000Z",
+                "side": "BUY",
+                "tradePrice": "50",
+                "tradeQuantity": "20",
+                "quantityAfter": "20",
+                "avgCostAfter": "50",
+                "investedAfter": "1000"
+              }
+            ],
+            "series": [
+              {
+                "t": 1741078800000,
+                "invested": "1000",
+                "value": "1000"
+              },
+              {
+                "t": 1742574600000,
+                "invested": "1000",
+                "value": "1010"
+              },
+              {
+                "t": 1746032400000,
+                "invested": "1000",
+                "value": "1020"
+              }
+            ]
+          }
+        },
+        "portfolio": [
+          {
+            "t": 1740992400000,
+            "invested": "1000",
+            "value": "1000"
+          },
+          {
+            "t": 1741078800000,
+            "invested": "2000",
+            "value": "2000"
+          },
+          {
+            "t": 1741969800000,
+            "invested": "2000",
+            "value": "2020"
+          },
+          {
+            "t": 1742574600000,
+            "invested": "2000",
+            "value": "2030"
+          },
+          {
+            "t": 1743179400000,
+            "invested": "2000",
+            "value": "2050"
+          },
+          {
+            "t": 1746032400000,
+            "invested": "2000",
+            "value": "2070"
+          }
+        ]
+      }
+    },
+    {
+      "name": "A line quoted in USD: each close at the rate of its own Madrid day, the last rate within a week, and a close with none left out",
+      "residence": "bizkaia",
+      "now": "2025-03-31T21:30:00.000Z",
+      "events": [
+        {
+          "id": "e-8",
+          "ts": "2025-02-03T15:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "US00TEST0403",
+          "quantity": "10",
+          "price": "104",
+          "grossAmount": "1040",
+          "fees": "1.04",
+          "currency": "USD",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-8",
+          "fxSource": "ECB",
+          "fxRate": "1.04",
+          "fxDirection": "QUOTE_PER_BASE",
+          "fxDate": "2025-02-03"
+        }
+      ],
+      "histories": [
+        {
+          "instrumentId": "US00TEST0403",
+          "price": "105",
+          "currency": "USD",
+          "asOf": "2025-02-03T21:00:00.000Z"
+        },
+        {
+          "instrumentId": "US00TEST0403",
+          "price": "110",
+          "currency": "USD",
+          "asOf": "2025-02-28T21:00:00.000Z"
+        },
+        {
+          "instrumentId": "US00TEST0403",
+          "price": "108",
+          "currency": "USD",
+          "asOf": "2025-03-03T21:00:00.000Z"
+        },
+        {
+          "instrumentId": "US00TEST0403",
+          "price": "112",
+          "currency": "USD",
+          "asOf": "2025-03-24T21:00:00.000Z"
+        }
+      ],
+      "currentPrices": [
+        {
+          "instrumentId": "US00TEST0403",
+          "price": "115.5",
+          "currency": "USD",
+          "asOf": "2025-03-31T20:00:00.000Z"
+        }
+      ],
+      "rates": [
+        {
+          "base": "EUR",
+          "quote": "USD",
+          "day": "2025-02-03",
+          "rate": "1.05",
+          "source": "ECB"
+        },
+        {
+          "base": "EUR",
+          "quote": "USD",
+          "day": "2025-02-28",
+          "rate": "1.1",
+          "source": "ECB"
+        },
+        {
+          "base": "EUR",
+          "quote": "USD",
+          "day": "2025-03-31",
+          "rate": "1.1",
+          "source": "ECB"
+        }
+      ],
+      "expect": {
+        "currentInBase": {
+          "prices": {
+            "US00TEST0403": {
+              "instrumentId": "US00TEST0403",
+              "price": "105",
+              "currency": "EUR",
+              "asOf": "2025-03-31T20:00:00.000Z"
+            }
+          },
+          "unrated": {}
+        },
+        "instruments": {
+          "US00TEST0403": {
+            "historyInBase": {
+              "history": [
+                {
+                  "instrumentId": "US00TEST0403",
+                  "price": "100",
+                  "currency": "EUR",
+                  "asOf": "2025-02-03T21:00:00.000Z",
+                  "source": "TEST"
+                },
+                {
+                  "instrumentId": "US00TEST0403",
+                  "price": "100",
+                  "currency": "EUR",
+                  "asOf": "2025-02-28T21:00:00.000Z",
+                  "source": "TEST"
+                },
+                {
+                  "instrumentId": "US00TEST0403",
+                  "price": "98.18181818181818181818181818181818181818",
+                  "currency": "EUR",
+                  "asOf": "2025-03-03T21:00:00.000Z",
+                  "source": "TEST"
+                }
+              ],
+              "unrated": 1
+            },
+            "timeline": [
+              {
+                "ts": "2025-02-03T15:00:00.000Z",
+                "side": "BUY",
+                "tradePrice": "100",
+                "tradeQuantity": "10",
+                "quantityAfter": "10",
+                "avgCostAfter": "100.1",
+                "investedAfter": "1001"
+              }
+            ],
+            "series": [
+              {
+                "t": 1738594800000,
+                "invested": "1001",
+                "value": "1000"
+              },
+              {
+                "t": 1738616400000,
+                "invested": "1001",
+                "value": "1000"
+              },
+              {
+                "t": 1740776400000,
+                "invested": "1001",
+                "value": "1000"
+              },
+              {
+                "t": 1741035600000,
+                "invested": "1001",
+                "value": "981.8181818181818181818181818181818181818"
+              },
+              {
+                "t": 1743456600000,
+                "invested": "1001",
+                "value": "1050"
+              }
+            ]
+          }
+        },
+        "portfolio": [
+          {
+            "t": 1738594800000,
+            "invested": "1001",
+            "value": "1000"
+          },
+          {
+            "t": 1738616400000,
+            "invested": "1001",
+            "value": "1000"
+          },
+          {
+            "t": 1740776400000,
+            "invested": "1001",
+            "value": "1000"
+          },
+          {
+            "t": 1741035600000,
+            "invested": "1001",
+            "value": "981.8181818181818181818181818181818181818"
+          },
+          {
+            "t": 1743456600000,
+            "invested": "1001",
+            "value": "1050"
+          }
+        ]
+      }
+    }
+  ]
+}
