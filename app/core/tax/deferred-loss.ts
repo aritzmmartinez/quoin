@@ -1,7 +1,7 @@
 import Decimal from "decimal.js";
 
 import { fiscalYearOf } from "../calendar";
-import { Money } from "../domain";
+import { Money, compareCodeUnits } from "../domain";
 
 import type { TradeEvent } from "../domain";
 
@@ -247,7 +247,11 @@ function snapshot(lots: Map<string, LotDeferral>): PendingDeferredLoss[] {
       ),
     }))
     .filter((p) => p.pieces.length > 0)
-    .sort((a, b) => a.acquiredAt.getTime() - b.acquiredAt.getTime());
+    .sort(
+      (a, b) =>
+        a.acquiredAt.getTime() - b.acquiredAt.getTime() ||
+        compareCodeUnits(a.buyEventId, b.buyEventId),
+    );
 }
 
 function nonZero(pieces: readonly DeferredLossPiece[]): DeferredLossPiece[] {

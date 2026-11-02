@@ -2,3 +2,6 @@
 # core.autocrlf=true would otherwise hand it CRLF, and `sh` reads the \r as part
 # of each command.
 *.sh text eol=lf
+# The contracts in test/contract are compared byte for byte by the mobile
+# client; a CRLF checkout would hand it different files.
+*.json text eol=lf

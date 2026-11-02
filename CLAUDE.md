@@ -148,17 +148,33 @@ piece of the contract with the mobile client, which must assign the same days.
   the process's zone and the same row is two instants in Docker and in Madrid. Kraken's
   `time` has none and is UTC by definition (`parseTime` appends `Z`).
 - **Golden cases live in `test/contract/*.json`**, read through `loadContract(name,
-  schema)`. `sync.json` is written by `test/contract/sync-contract.ts`
-  (`pnpm tsx test/contract/sync-contract.ts`), its expectations by hand, never by
-  running `merge`; a test fails while the two disagree. `decimal.json` and `portfolio.json`
-  have generators beside them too, but their results come from decimal.js and the core
-  (the random decimal cases from mulberry32 with a fixed seed); `portfolio.json` keeps a
-  `byHand` block in some cases, worked out by hand and checked against the core, which is
-  what stops a regenerated file from blessing a regression. `ingest.json` runs the real
-  adapters over invented CSVs with in-memory repositories; its results come from them, and
-  the per-adapter unit tests are the hand-checked guard. Event ids are random, so it omits
-  them. They are shared with the mobile client: change a case only together with the
-  implementation that reproduces it on both sides.
+  schema)`. All but `calendar` (written by hand) come from `test/contract/<name>-contract.ts`
+  (`pnpm tsx test/contract/<name>-contract.ts`), and a test fails while a file and its
+  generator disagree. They are shared with the mobile client, which compares amounts
+  as text: change a case only together with the implementation that reproduces it on both
+  sides, and never reformat the files (`.prettierignore`, `eol=lf`).
+  - `calendar` — days, periods and fiscal years in a zone, and when a day starts.
+  - `decimal` — decimal.js at precision 40; random cases from mulberry32, fixed seed.
+  - `portfolio` — AVCO positions, prices in euros, summary, allocation, top positions.
+  - `ingest` — the real adapters over invented CSVs with in-memory repositories; event ids
+    are random, so it omits them, and the per-adapter unit tests are the hand-checked guard.
+  - `sync` — `merge`; its expectations are written by hand, never by running it.
+  - `tax` — foral FIFO, Art. 43, deferred losses, carryforward, quota, and the figures of
+    `buildTaxYearView` (not `pendingBySale`: it breaks ties on names, by locale).
+  - `realized` — AVCO realised gains per sale.
+  - `returns` — TWR, MWR/XIRR, `periodReturns`, range and hero changes.
+  - `series` — cost line, value against invested, the portfolio merge, prices in euros.
+  - `analysis` — opportunity cost, weighted TER, rebalance.
+
+  Except `ingest` and `sync`, results come from the core, and `byHand` figures in some
+  cases (a dotted path into `expect` for the last five), worked out by hand and checked
+  against the core, are what stop a regenerated file from blessing a regression.
+  **Any sort whose ties could reach a contract states its tie-break**: Dart's `List.sort`
+  is not stable, so an order left to the engine is one the mobile client cannot reproduce
+  (`sortByTime` in `core/series` keeps points sharing a `t` in input order). A rate
+  rounded to six places from a float or a fractional `pow` agrees across runtimes only off
+  the rounding boundary, so the generators refuse a case within 1e-9 of one
+  (`assertClearOfRounding`), and the mobile XIRR is the same algorithm, not an equivalent.
 
 ## A command's logic never lives in its script
 

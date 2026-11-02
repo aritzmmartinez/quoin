@@ -521,3 +521,35 @@ describe("an instrument with a trade it cannot convert to euros", () => {
     expect(result.gains.map((g) => g.instrumentId)).toEqual(["IE00TEST0001"]);
   });
 });
+
+describe("deferred losses on lots acquired at the same instant", () => {
+  it("are listed by buy id, not by the order the ledger settled them in", () => {
+    const sameInstant = "2025-02-10T10:00:00Z";
+    const events: TradeEvent[] = [
+      {
+        ...trade("BUY", "TIE", "10", "1000", { ts: "2025-01-10T10:00:00Z" }),
+        id: "b-0",
+      },
+      {
+        ...trade("SELL", "TIE", "10", "800", { ts: "2025-02-01T10:00:00Z" }),
+        id: "s-0",
+      },
+      {
+        ...trade("BUY", "TIE", "5", "400", { ts: sameInstant }),
+        id: "b-2",
+        externalId: "x-1",
+      },
+      {
+        ...trade("BUY", "TIE", "5", "400", { ts: sameInstant }),
+        id: "b-1",
+        externalId: "x-2",
+      },
+    ];
+    const pending =
+      computeTaxHistory(events, options(events)).pendingByYear.get(2025) ?? [];
+    expect(pending.map((p) => [p.buyEventId, p.pieces[0]?.amount])).toEqual([
+      ["b-1", "-100"],
+      ["b-2", "-100"],
+    ]);
+  });
+});

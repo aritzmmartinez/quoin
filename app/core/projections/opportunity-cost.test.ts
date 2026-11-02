@@ -316,3 +316,19 @@ describe("swap legs", () => {
     expect(swapped.realValue).toBe("1400");
   });
 });
+
+describe("lines with the same difference", () => {
+  it("are ordered by instrument id, whatever order they were bought in", () => {
+    const result = run(
+      [
+        trade("BUY", "B", "2025-01-15T10:00:00Z", "1", "100", "0"),
+        trade("BUY", "A", "2025-01-15T11:00:00Z", "1", "100", "0"),
+      ],
+      prices({ A: "150", B: "150" }),
+    );
+    expect(result.lines.map((l) => [l.instrumentId, l.difference])).toEqual([
+      ["A", "0"],
+      ["B", "0"],
+    ]);
+  });
+});

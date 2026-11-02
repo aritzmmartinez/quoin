@@ -1,0 +1,669 @@
+{
+  "contract": "returns",
+  "version": 1,
+  "description": "Returns: TWR (how the asset did, from price marks, fees excluded) and MWR/XIRR (how the money did, fees included), on one instrument (computeReturns) and on the portfolio (computePortfolioReturns, with explainPortfolioTwr link by link), plus total contributed, periodReturns, and the range and hero changes of the Summary chart. Each case has a kind: instrument, portfolio, xirr or period. Units received in kind (funding IN_KIND) are not contributions and stay out of MWR, but are a flow for portfolio TWR. Swap legs are not portfolio flows. A portfolio link is (endValue − flow) / startValue, flow being the gross amounts of trades after its start and up to its end, purchases positive; a link starting at zero or below has a null ratio and is skipped. Value points are ordered by t, and points sharing a t keep the order given; trades by instant, then BUY before SELL, then externalId, then id. The range keeps the points no older than 30, 182 or 365 days of 24 hours before now, or all of them. A rate is stated to six places, rounded half up. Years are 365-day years of 86400000 ms. periodReturns raises 1 + rate to a fractional power: the annual TWR is (1 + twr)^(1 / years) − 1, the cumulative MWR (1 + mwr)^years − 1, both null for null or for a period of zero length, annualized from a full year on. The mobile client's XIRR must be the same algorithm, not an equivalent one: double-precision flows with years counted from the earliest flow; Newton-Raphson from a guess of 0.1, at most 50 steps, stopping when |NPV| ≤ 1e-9 × the largest |amount| or when a step moves the rate by less than 1e-10 (then accepted only if |NPV| at the new rate is within that tolerance), giving up on a non-finite value, a zero slope or a rate at or below −0.999999 or above 1e6; then bisection between −0.999999 and an upper bound that starts at 0.1 and doubles until the NPV changes sign (giving up at 1e6), at most 200 halvings, stopping on the same NPV tolerance or a bracket narrower than 1e-10. Null for fewer than two flows or flows that do not include both signs. The generator refuses any case whose unrounded rate or fractional power lies within 1e-9 of a six-place rounding boundary, so two correct pow implementations agree on every figure here. Shared with the mobile client: both implementations must reproduce every case. Events are LedgerEvents; an absent fxSource is IDENTITY and an absent funding is CASH. expect is written by running the TypeScript core; byHand.figures, where a case has it, are worked out by hand, its arithmetic says how, and each key is a dotted path into expect.",
+  "cases": [
+    {
+      "name": "One instrument over more than a year: monthly buys with fees, a sale and units received in kind",
+      "kind": "instrument",
+      "events": [
+        {
+          "id": "e-1",
+          "ts": "2024-03-01T09:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "IE00TEST0301",
+          "quantity": "10",
+          "price": "100",
+          "grossAmount": "1000",
+          "fees": "1",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-1"
+        },
+        {
+          "id": "e-2",
+          "ts": "2024-04-02T09:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "IE00TEST0301",
+          "quantity": "8",
+          "price": "110",
+          "grossAmount": "880",
+          "fees": "1",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-2"
+        },
+        {
+          "id": "e-3",
+          "ts": "2024-05-02T09:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "IE00TEST0301",
+          "quantity": "0.25",
+          "price": "110",
+          "grossAmount": "27.5",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-3",
+          "funding": "IN_KIND"
+        },
+        {
+          "id": "e-4",
+          "ts": "2024-11-04T09:00:00.000Z",
+          "type": "SELL",
+          "instrumentId": "IE00TEST0301",
+          "quantity": "4",
+          "price": "105",
+          "grossAmount": "420",
+          "fees": "1",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-4"
+        },
+        {
+          "id": "e-5",
+          "ts": "2025-01-02T09:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "IE00TEST0301",
+          "quantity": "5",
+          "price": "100",
+          "grossAmount": "500",
+          "fees": "1",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-5"
+        }
+      ],
+      "instrumentId": "IE00TEST0301",
+      "currentPrice": "112",
+      "now": "2025-07-15T15:00:00.000Z",
+      "byHand": {
+        "arithmetic": "Contributed: the three cash buys with their fees, 1001 + 881 + 501 = 2383; the in-kind units are not a contribution. TWR chains the trade prices while something is held, 100 → 110 → 110 → 105 → 100, then today's 112; the links telescope to 112 / 100, so 0.12.",
+        "figures": {
+          "returns.totalInvested": "2383",
+          "returns.twr": "0.120000",
+          "totalContributed": "2383"
+        }
+      },
+      "expect": {
+        "returns": {
+          "twr": "0.120000",
+          "mwr": "0.076393",
+          "period": {
+            "since": 1709283600000,
+            "annualized": true,
+            "twr": {
+              "cumulative": "0.120000",
+              "annual": "0.086024"
+            },
+            "mwr": {
+              "annual": "0.076393",
+              "cumulative": "0.106382"
+            }
+          },
+          "totalInvested": "2383",
+          "buyCount": 3,
+          "avgBuyAmount": "794.3333333333333333333333333333333333333"
+        },
+        "totalContributed": "2383"
+      }
+    },
+    {
+      "name": "One instrument for less than a year, closed: no price needed, and the period return is the cumulative one",
+      "kind": "instrument",
+      "events": [
+        {
+          "id": "e-6",
+          "ts": "2025-02-03T15:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "US00TEST0302",
+          "quantity": "4",
+          "price": "100",
+          "grossAmount": "400",
+          "fees": "2",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-6"
+        },
+        {
+          "id": "e-7",
+          "ts": "2025-06-02T15:00:00.000Z",
+          "type": "SELL",
+          "instrumentId": "US00TEST0302",
+          "quantity": "4",
+          "price": "115",
+          "grossAmount": "460",
+          "fees": "2",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-7"
+        }
+      ],
+      "instrumentId": "US00TEST0302",
+      "currentPrice": null,
+      "now": "2025-08-01T10:00:00.000Z",
+      "expect": {
+        "returns": {
+          "twr": "0.150000",
+          "mwr": "0.491853",
+          "period": {
+            "since": 1738594800000,
+            "annualized": false,
+            "twr": {
+              "cumulative": "0.150000",
+              "annual": "0.330190"
+            },
+            "mwr": {
+              "annual": "0.491853",
+              "cumulative": "0.216460"
+            }
+          },
+          "totalInvested": "402",
+          "buyCount": 1,
+          "avgBuyAmount": "402"
+        },
+        "totalContributed": "402"
+      }
+    },
+    {
+      "name": "The portfolio over more than a year: a link that starts on cents, units received in kind inside TWR and outside MWR, and the change over the last six months",
+      "kind": "portfolio",
+      "events": [
+        {
+          "id": "e-8",
+          "ts": "2024-01-10T09:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "IE00TEST0301",
+          "quantity": "0.001",
+          "price": "100",
+          "grossAmount": "0.1",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-8"
+        },
+        {
+          "id": "e-9",
+          "ts": "2024-02-01T09:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "IE00TEST0301",
+          "quantity": "10",
+          "price": "100",
+          "grossAmount": "1000",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-9"
+        },
+        {
+          "id": "e-10",
+          "ts": "2024-06-03T09:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "IE00TEST0301",
+          "quantity": "0.5",
+          "price": "104",
+          "grossAmount": "52",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-10",
+          "funding": "IN_KIND"
+        },
+        {
+          "id": "e-11",
+          "ts": "2024-09-02T09:00:00.000Z",
+          "type": "SELL",
+          "instrumentId": "IE00TEST0301",
+          "quantity": "2",
+          "price": "115",
+          "grossAmount": "230",
+          "fees": "1",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-11"
+        },
+        {
+          "id": "e-12",
+          "ts": "2025-03-03T15:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "US00TEST0302",
+          "quantity": "5",
+          "price": "100",
+          "grossAmount": "500",
+          "fees": "1",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-12"
+        }
+      ],
+      "valueSeries": [
+        {
+          "t": 1704877200000,
+          "invested": "0.1",
+          "value": "0.1"
+        },
+        {
+          "t": 1706718600000,
+          "invested": "0.1",
+          "value": "0.13"
+        },
+        {
+          "t": 1706778000000,
+          "invested": "1000.1",
+          "value": "1000.13"
+        },
+        {
+          "t": 1717173000000,
+          "invested": "1000.1",
+          "value": "1080"
+        },
+        {
+          "t": 1717405200000,
+          "invested": "1052.1",
+          "value": "1134"
+        },
+        {
+          "t": 1725267600000,
+          "invested": "852.39",
+          "value": "943"
+        },
+        {
+          "t": 1735662600000,
+          "invested": "852.39",
+          "value": "990"
+        },
+        {
+          "t": 1741014000000,
+          "invested": "1353.39",
+          "value": "1512"
+        },
+        {
+          "t": 1751301000000,
+          "invested": "1353.39",
+          "value": "1580"
+        }
+      ],
+      "now": "2025-06-30T17:00:00.000Z",
+      "range": "6m",
+      "summary": {
+        "unrealizedPnL": "226.61",
+        "returnPct": "0.167439"
+      },
+      "byHand": {
+        "arithmetic": "The first link runs on 10 cents: 0.13 / 0.1 = 1.3, thirty per cent on three cents, which then multiplies every later link. The next link carries the 1000 bought: (1000.13 − 1000) / 0.13 = 1. The in-kind 52 is a flow for TWR: (1134 − 52) / 1080. Six months back from 30 June 2025 at 17:00 is 30 December 2024 at 17:00, so the range starts at 31 December: P&L there 990 − 852.39 = 137.61, at the end 1580 − 1353.39 = 226.61, a change of 89 over the 1353.39 invested at the end.",
+        "figures": {
+          "twr.0.ratio": "1.3",
+          "twr.1.flow": "1000",
+          "twr.1.ratio": "1",
+          "twr.3.flow": "52",
+          "rangeChange.abs": "89",
+          "heroChange.abs": "89"
+        }
+      },
+      "expect": {
+        "twr": [
+          {
+            "from": 1704877200000,
+            "to": 1706718600000,
+            "startValue": "0.1",
+            "flow": "0",
+            "endValue": "0.13",
+            "ratio": "1.3"
+          },
+          {
+            "from": 1706718600000,
+            "to": 1706778000000,
+            "startValue": "0.13",
+            "flow": "1000",
+            "endValue": "1000.13",
+            "ratio": "1"
+          },
+          {
+            "from": 1706778000000,
+            "to": 1717173000000,
+            "startValue": "1000.13",
+            "flow": "0",
+            "endValue": "1080",
+            "ratio": "1.079859618249627548418705568276124103866"
+          },
+          {
+            "from": 1717173000000,
+            "to": 1717405200000,
+            "startValue": "1080",
+            "flow": "52",
+            "endValue": "1134",
+            "ratio": "1.001851851851851851851851851851851851852"
+          },
+          {
+            "from": 1717405200000,
+            "to": 1725267600000,
+            "startValue": "1134",
+            "flow": "-230",
+            "endValue": "943",
+            "ratio": "1.034391534391534391534391534391534391534"
+          },
+          {
+            "from": 1725267600000,
+            "to": 1735662600000,
+            "startValue": "943",
+            "flow": "0",
+            "endValue": "990",
+            "ratio": "1.049840933191940615058324496288441145281"
+          },
+          {
+            "from": 1735662600000,
+            "to": 1741014000000,
+            "startValue": "990",
+            "flow": "500",
+            "endValue": "1512",
+            "ratio": "1.022222222222222222222222222222222222222"
+          },
+          {
+            "from": 1741014000000,
+            "to": 1751301000000,
+            "startValue": "1512",
+            "flow": "0",
+            "endValue": "1580",
+            "ratio": "1.044973544973544973544973544973544973545"
+          }
+        ],
+        "returns": {
+          "twr": "0.631448",
+          "mwr": "0.213988",
+          "period": {
+            "since": 1704877200000,
+            "annualized": true,
+            "twr": {
+              "cumulative": "0.631448",
+              "annual": "0.394448"
+            },
+            "mwr": {
+              "annual": "0.213988",
+              "cumulative": "0.330366"
+            }
+          }
+        },
+        "totalContributed": "1501.1",
+        "rangeSeries": [
+          {
+            "t": 1735662600000,
+            "invested": "852.39",
+            "value": "990"
+          },
+          {
+            "t": 1741014000000,
+            "invested": "1353.39",
+            "value": "1512"
+          },
+          {
+            "t": 1751301000000,
+            "invested": "1353.39",
+            "value": "1580"
+          }
+        ],
+        "rangeChange": {
+          "abs": "89",
+          "pct": "0.065761"
+        },
+        "heroChange": {
+          "abs": "89",
+          "pct": "0.065761"
+        }
+      }
+    },
+    {
+      "name": "The portfolio for less than a year, with a sale and a purchase at one instant and two value points sharing an instant, kept in the order given",
+      "kind": "portfolio",
+      "events": [
+        {
+          "id": "e-13",
+          "ts": "2025-01-13T09:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "IE00TEST0301",
+          "quantity": "10",
+          "price": "100",
+          "grossAmount": "1000",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-13"
+        },
+        {
+          "id": "e-14",
+          "ts": "2025-03-03T15:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "US00TEST0302",
+          "quantity": "2",
+          "price": "100",
+          "grossAmount": "200",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-14"
+        },
+        {
+          "id": "e-15",
+          "ts": "2025-03-03T15:00:00.000Z",
+          "type": "SELL",
+          "instrumentId": "IE00TEST0301",
+          "quantity": "2",
+          "price": "105",
+          "grossAmount": "210",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-15"
+        }
+      ],
+      "valueSeries": [
+        {
+          "t": 1736758800000,
+          "invested": "1000",
+          "value": "1000"
+        },
+        {
+          "t": 1741014000000,
+          "invested": "1000",
+          "value": "1050"
+        },
+        {
+          "t": 1741014000000,
+          "invested": "1000",
+          "value": "1040"
+        },
+        {
+          "t": 1748622600000,
+          "invested": "1000",
+          "value": "1100"
+        }
+      ],
+      "now": "2025-05-30T17:00:00.000Z",
+      "range": "all",
+      "summary": {
+        "unrealizedPnL": "100",
+        "returnPct": "0.100000"
+      },
+      "expect": {
+        "twr": [
+          {
+            "from": 1736758800000,
+            "to": 1741014000000,
+            "startValue": "1000",
+            "flow": "-10",
+            "endValue": "1050",
+            "ratio": "1.06"
+          },
+          {
+            "from": 1741014000000,
+            "to": 1741014000000,
+            "startValue": "1050",
+            "flow": "0",
+            "endValue": "1040",
+            "ratio": "0.9904761904761904761904761904761904761905"
+          },
+          {
+            "from": 1741014000000,
+            "to": 1748622600000,
+            "startValue": "1040",
+            "flow": "0",
+            "endValue": "1100",
+            "ratio": "1.057692307692307692307692307692307692308"
+          }
+        ],
+        "returns": {
+          "twr": "0.110476",
+          "mwr": "0.321905",
+          "period": {
+            "since": 1736758800000,
+            "annualized": false,
+            "twr": {
+              "cumulative": "0.110476",
+              "annual": "0.321208"
+            },
+            "mwr": {
+              "annual": "0.321905",
+              "cumulative": "0.110696"
+            }
+          }
+        },
+        "totalContributed": "1200",
+        "rangeSeries": [
+          {
+            "t": 1736758800000,
+            "invested": "1000",
+            "value": "1000"
+          },
+          {
+            "t": 1741014000000,
+            "invested": "1000",
+            "value": "1050"
+          },
+          {
+            "t": 1741014000000,
+            "invested": "1000",
+            "value": "1040"
+          },
+          {
+            "t": 1748622600000,
+            "invested": "1000",
+            "value": "1100"
+          }
+        ],
+        "rangeChange": {
+          "abs": "100",
+          "pct": "0.100000"
+        },
+        "heroChange": {
+          "abs": "100",
+          "pct": "0.100000"
+        }
+      }
+    },
+    {
+      "name": "XIRR of flows that all carry the same sign is null",
+      "kind": "xirr",
+      "flows": [
+        {
+          "t": 1704067200000,
+          "amount": -1000
+        },
+        {
+          "t": 1719792000000,
+          "amount": -500
+        }
+      ],
+      "expect": {
+        "rate": null
+      }
+    },
+    {
+      "name": "XIRR of a single flow is null",
+      "kind": "xirr",
+      "flows": [
+        {
+          "t": 1704067200000,
+          "amount": -1000
+        }
+      ],
+      "expect": {
+        "rate": null
+      }
+    },
+    {
+      "name": "XIRR of three flows that converges",
+      "kind": "xirr",
+      "flows": [
+        {
+          "t": 1704186000000,
+          "amount": -1000
+        },
+        {
+          "t": 1717405200000,
+          "amount": -500.5
+        },
+        {
+          "t": 1743523200000,
+          "amount": 1712.34
+        }
+      ],
+      "expect": {
+        "rate": "0.126358"
+      }
+    },
+    {
+      "name": "Period returns: under a year the MWR is restated as the period's, over a year the TWR as an annual figure, and null stays null",
+      "kind": "period",
+      "twr": "0.25",
+      "mwr": "0.1",
+      "since": 1735689600000,
+      "to": 1751457600000,
+      "expect": {
+        "since": 1735689600000,
+        "annualized": false,
+        "twr": {
+          "cumulative": "0.25",
+          "annual": "0.562500"
+        },
+        "mwr": {
+          "annual": "0.1",
+          "cumulative": "0.048809"
+        }
+      }
+    },
+    {
+      "name": "Period returns over three years, with no MWR",
+      "kind": "period",
+      "twr": "0.5",
+      "mwr": null,
+      "since": 1646092800000,
+      "to": 1740787200000,
+      "expect": {
+        "since": 1646092800000,
+        "annualized": true,
+        "twr": {
+          "cumulative": "0.5",
+          "annual": "0.144573"
+        },
+        "mwr": {
+          "annual": null,
+          "cumulative": null
+        }
+      }
+    }
+  ]
+}

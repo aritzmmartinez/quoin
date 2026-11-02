@@ -134,7 +134,7 @@ describe("computeReturns", () => {
   });
 });
 
-const T =(date: string): number => new Date(date).getTime();
+const T = (date: string): number => new Date(date).getTime();
 
 function point(date: string, value: string, invested = "0") {
   return { t: T(date), invested, value };
@@ -366,8 +366,25 @@ describe("in-kind acquisitions", () => {
 
     expect(inKind.twr).toBe(asCash.twr);
     expect(Number(inKind.mwr)).toBeGreaterThan(Number(asCash.mwr));
-    expect(
-      computePortfolioReturns([early, cash], series).period.since,
-    ).toBe(new Date("2025-12-01").getTime());
+    expect(computePortfolioReturns([early, cash], series).period.since).toBe(
+      new Date("2025-12-01").getTime(),
+    );
+  });
+});
+
+describe("value points sharing an instant", () => {
+  it("keep the order they arrived in", () => {
+    const rows = explainPortfolioTwr(
+      [trade({ ts: new Date(1), quantity: "1", grossAmount: "100" })],
+      [
+        { t: 3, invested: "100", value: "120" },
+        { t: 1, invested: "100", value: "100" },
+        { t: 3, invested: "100", value: "110" },
+      ],
+    );
+    expect(rows.map((r) => [r.from, r.to, r.endValue])).toEqual([
+      [1, 3, "120"],
+      [3, 3, "110"],
+    ]);
   });
 });
