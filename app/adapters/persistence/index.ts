@@ -11,3 +11,4 @@ export * from "./mappers";
 export { prisma } from "./db.server";
 export * from "./settings-repository";
 export * from "./sync-repository";
+export * from "./paired-device-repository";

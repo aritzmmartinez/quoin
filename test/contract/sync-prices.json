@@ -1,0 +1,763 @@
+{
+  "contract": "sync-prices",
+  "version": 1,
+  "description": "What the computer answers to POST /v1/prices for one instrument the phone reports, given what it stores. Shared with the mobile client, which applies the answers: pending changes nothing and asks again later; full replaces every row of the instrument; tail deletes the rows at or after `from` and writes `rows`. Instants are compared as instants, whatever offset they are written in.",
+  "cases": [
+    {
+      "name": "a phone up to date to a day: the last week again, so a replaced live row heals",
+      "stored": {
+        "quoteSymbol": "TEST.DE",
+        "rows": [
+          {
+            "asOf": "2026-10-01T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-02T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-09T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-12T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-13T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-14T15:30:00.000Z",
+            "price": "11",
+            "currency": "EUR",
+            "source": "YAHOO_LIVE"
+          }
+        ]
+      },
+      "holding": {
+        "instrumentId": "IE00TEST0301",
+        "quoteSymbol": "TEST.DE",
+        "first": "2026-10-01T07:00:00.000Z",
+        "last": "2026-10-13T07:00:00.000Z",
+        "count": 5
+      },
+      "pending": false,
+      "byHand": {
+        "arithmetic": "last 2026-10-13T07:00Z minus 7 days is 2026-10-06T07:00Z. Two rows lie before it, and the phone's 5 is within 2 and 2 + 16, so a tail of the 4 rows from 10-09 on.",
+        "figures": {
+          "kind": "tail",
+          "from": "2026-10-06T07:00:00.000Z"
+        }
+      },
+      "expect": {
+        "instrumentId": "IE00TEST0301",
+        "kind": "tail",
+        "from": "2026-10-06T07:00:00.000Z",
+        "rows": [
+          {
+            "asOf": "2026-10-09T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-12T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-13T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-14T15:30:00.000Z",
+            "price": "11",
+            "currency": "EUR",
+            "source": "YAHOO_LIVE"
+          }
+        ]
+      }
+    },
+    {
+      "name": "a window boundary is inclusive",
+      "stored": {
+        "quoteSymbol": "TEST.DE",
+        "rows": [
+          {
+            "asOf": "2026-10-01T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-02T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-09T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          }
+        ]
+      },
+      "holding": {
+        "instrumentId": "IE00TEST0301",
+        "quoteSymbol": "TEST.DE",
+        "first": "2026-10-01T07:00:00.000Z",
+        "last": "2026-10-16T07:00:00.000Z",
+        "count": 3
+      },
+      "pending": false,
+      "byHand": {
+        "arithmetic": "2026-10-16T07:00Z minus 7 days is exactly 10-09T07:00Z, the third row, which belongs to the tail.",
+        "figures": {
+          "kind": "tail",
+          "from": "2026-10-09T07:00:00.000Z"
+        }
+      },
+      "expect": {
+        "instrumentId": "IE00TEST0301",
+        "kind": "tail",
+        "from": "2026-10-09T07:00:00.000Z",
+        "rows": [
+          {
+            "asOf": "2026-10-09T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          }
+        ]
+      }
+    },
+    {
+      "name": "a phone with nothing gets everything",
+      "stored": {
+        "quoteSymbol": "TEST.DE",
+        "rows": [
+          {
+            "asOf": "2026-10-01T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-02T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-09T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-12T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-13T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-14T15:30:00.000Z",
+            "price": "11",
+            "currency": "EUR",
+            "source": "YAHOO_LIVE"
+          }
+        ]
+      },
+      "holding": {
+        "instrumentId": "IE00TEST0301",
+        "quoteSymbol": "TEST.DE",
+        "first": null,
+        "last": null,
+        "count": 0
+      },
+      "pending": false,
+      "expect": {
+        "instrumentId": "IE00TEST0301",
+        "kind": "full",
+        "rows": [
+          {
+            "asOf": "2026-10-01T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-02T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-09T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-12T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-13T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-14T15:30:00.000Z",
+            "price": "11",
+            "currency": "EUR",
+            "source": "YAHOO_LIVE"
+          }
+        ]
+      }
+    },
+    {
+      "name": "another symbol is another series",
+      "stored": {
+        "quoteSymbol": "TEST.DE",
+        "rows": [
+          {
+            "asOf": "2026-10-01T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-02T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-09T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-12T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-13T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-14T15:30:00.000Z",
+            "price": "11",
+            "currency": "EUR",
+            "source": "YAHOO_LIVE"
+          }
+        ]
+      },
+      "holding": {
+        "instrumentId": "IE00TEST0301",
+        "quoteSymbol": "OTHER.DE",
+        "first": "2026-10-01T07:00:00.000Z",
+        "last": "2026-10-13T07:00:00.000Z",
+        "count": 5
+      },
+      "pending": false,
+      "expect": {
+        "instrumentId": "IE00TEST0301",
+        "kind": "full",
+        "rows": [
+          {
+            "asOf": "2026-10-01T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-02T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-09T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-12T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-13T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-14T15:30:00.000Z",
+            "price": "11",
+            "currency": "EUR",
+            "source": "YAHOO_LIVE"
+          }
+        ]
+      }
+    },
+    {
+      "name": "a history that starts elsewhere was rebuilt",
+      "stored": {
+        "quoteSymbol": "TEST.DE",
+        "rows": [
+          {
+            "asOf": "2026-10-01T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-02T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-09T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-12T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-13T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-14T15:30:00.000Z",
+            "price": "11",
+            "currency": "EUR",
+            "source": "YAHOO_LIVE"
+          }
+        ]
+      },
+      "holding": {
+        "instrumentId": "IE00TEST0301",
+        "quoteSymbol": "TEST.DE",
+        "first": "2026-09-01T07:00:00.000Z",
+        "last": "2026-10-13T07:00:00.000Z",
+        "count": 5
+      },
+      "pending": false,
+      "expect": {
+        "instrumentId": "IE00TEST0301",
+        "kind": "full",
+        "rows": [
+          {
+            "asOf": "2026-10-01T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-02T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-09T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-12T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-13T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-14T15:30:00.000Z",
+            "price": "11",
+            "currency": "EUR",
+            "source": "YAHOO_LIVE"
+          }
+        ]
+      }
+    },
+    {
+      "name": "the same start written in another offset is the same instant",
+      "stored": {
+        "quoteSymbol": "TEST.DE",
+        "rows": [
+          {
+            "asOf": "2026-10-01T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-02T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-09T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-12T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-13T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-14T15:30:00.000Z",
+            "price": "11",
+            "currency": "EUR",
+            "source": "YAHOO_LIVE"
+          }
+        ]
+      },
+      "holding": {
+        "instrumentId": "IE00TEST0301",
+        "quoteSymbol": "TEST.DE",
+        "first": "2026-10-01T09:00:00+02:00",
+        "last": "2026-10-13T07:00:00.000Z",
+        "count": 5
+      },
+      "pending": false,
+      "expect": {
+        "instrumentId": "IE00TEST0301",
+        "kind": "tail",
+        "from": "2026-10-06T07:00:00.000Z",
+        "rows": [
+          {
+            "asOf": "2026-10-09T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-12T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-13T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-14T15:30:00.000Z",
+            "price": "11",
+            "currency": "EUR",
+            "source": "YAHOO_LIVE"
+          }
+        ]
+      }
+    },
+    {
+      "name": "a phone short of older rows gets everything",
+      "stored": {
+        "quoteSymbol": "TEST.DE",
+        "rows": [
+          {
+            "asOf": "2026-10-01T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-02T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-09T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-12T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-13T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-14T15:30:00.000Z",
+            "price": "11",
+            "currency": "EUR",
+            "source": "YAHOO_LIVE"
+          }
+        ]
+      },
+      "holding": {
+        "instrumentId": "IE00TEST0301",
+        "quoteSymbol": "TEST.DE",
+        "first": "2026-10-01T07:00:00.000Z",
+        "last": "2026-10-13T07:00:00.000Z",
+        "count": 1
+      },
+      "pending": false,
+      "expect": {
+        "instrumentId": "IE00TEST0301",
+        "kind": "full",
+        "rows": [
+          {
+            "asOf": "2026-10-01T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-02T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-09T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-12T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-13T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-14T15:30:00.000Z",
+            "price": "11",
+            "currency": "EUR",
+            "source": "YAHOO_LIVE"
+          }
+        ]
+      }
+    },
+    {
+      "name": "a phone with far more rows than the window can explain gets everything",
+      "stored": {
+        "quoteSymbol": "TEST.DE",
+        "rows": [
+          {
+            "asOf": "2026-10-01T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-02T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-09T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-12T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-13T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-14T15:30:00.000Z",
+            "price": "11",
+            "currency": "EUR",
+            "source": "YAHOO_LIVE"
+          }
+        ]
+      },
+      "holding": {
+        "instrumentId": "IE00TEST0301",
+        "quoteSymbol": "TEST.DE",
+        "first": "2026-10-01T07:00:00.000Z",
+        "last": "2026-10-13T07:00:00.000Z",
+        "count": 19
+      },
+      "pending": false,
+      "expect": {
+        "instrumentId": "IE00TEST0301",
+        "kind": "full",
+        "rows": [
+          {
+            "asOf": "2026-10-01T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-02T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-09T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-12T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-13T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-14T15:30:00.000Z",
+            "price": "11",
+            "currency": "EUR",
+            "source": "YAHOO_LIVE"
+          }
+        ]
+      }
+    },
+    {
+      "name": "a download still under way answers pending, whatever the phone holds",
+      "stored": {
+        "quoteSymbol": "TEST.DE",
+        "rows": []
+      },
+      "holding": {
+        "instrumentId": "IE00TEST0301",
+        "quoteSymbol": "TEST.DE",
+        "first": "2026-10-01T07:00:00.000Z",
+        "last": "2026-10-13T07:00:00.000Z",
+        "count": 5
+      },
+      "pending": true,
+      "expect": {
+        "instrumentId": "IE00TEST0301",
+        "kind": "pending"
+      }
+    },
+    {
+      "name": "no rows and nothing under way is an empty full answer, never pending",
+      "stored": {
+        "quoteSymbol": "TEST.DE",
+        "rows": []
+      },
+      "holding": {
+        "instrumentId": "IE00TEST0301",
+        "quoteSymbol": "TEST.DE",
+        "first": "2026-10-01T07:00:00.000Z",
+        "last": "2026-10-13T07:00:00.000Z",
+        "count": 5
+      },
+      "pending": false,
+      "expect": {
+        "instrumentId": "IE00TEST0301",
+        "kind": "full",
+        "rows": []
+      }
+    },
+    {
+      "name": "an instrument the computer does not know",
+      "stored": {
+        "quoteSymbol": null,
+        "rows": []
+      },
+      "holding": {
+        "instrumentId": "IE00TEST0301",
+        "quoteSymbol": "TEST.DE",
+        "first": null,
+        "last": null,
+        "count": 0
+      },
+      "pending": false,
+      "expect": {
+        "instrumentId": "IE00TEST0301",
+        "kind": "full",
+        "rows": []
+      }
+    }
+  ]
+}
