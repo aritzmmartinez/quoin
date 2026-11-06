@@ -99,7 +99,7 @@ class FakePriceRepository implements PriceRepository {
   async saveDaily(): Promise<DailyWriteCount> {
     return { inserted: 0, corrected: 0, live: false };
   }
-  async lastAsOf(): Promise<Date | null> {
+  async lastCandleAsOf(): Promise<Date | null> {
     return null;
   }
   async historyFor(instrumentId: string): Promise<PriceSnapshot[]> {

@@ -420,17 +420,27 @@ describe("PrismaPriceRepository.saveDaily (integration)", () => {
     expect(await stored()).toEqual(["2026-10-09T15:35:00.000Z 9 YAHOO_LIVE"]);
   });
 
-  it("lastAsOf is the newest row whatever its source", async () => {
+  it("lastCandleAsOf is the newest row that is not a live quote", async () => {
     await priceRepo.saveDaily(
       ID,
       [candle("2026-10-13T07:00:00Z", "13")],
       live("2026-10-14T15:35:00Z", "14"),
       MADRID,
     );
-    expect((await priceRepo.lastAsOf(ID))?.toISOString()).toBe(
-      "2026-10-14T15:35:00.000Z",
+    expect((await priceRepo.lastCandleAsOf(ID))?.toISOString()).toBe(
+      "2026-10-13T07:00:00.000Z",
     );
-    expect(await priceRepo.lastAsOf("XS00TEST0003")).toBeNull();
+    expect(await priceRepo.lastCandleAsOf("XS00TEST0003")).toBeNull();
+  });
+
+  it("lastCandleAsOf is null for an instrument with only live quotes", async () => {
+    await priceRepo.saveDaily(
+      ID,
+      [],
+      live("2026-10-14T15:35:00Z", "14"),
+      MADRID,
+    );
+    expect(await priceRepo.lastCandleAsOf(ID)).toBeNull();
   });
 });
 

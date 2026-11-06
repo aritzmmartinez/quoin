@@ -25,7 +25,7 @@ export interface PriceRepository {
     live: PriceSnapshot | null,
     zone: string,
   ): Promise<DailyWriteCount>;
-  lastAsOf(instrumentId: string): Promise<Date | null>;
+  lastCandleAsOf(instrumentId: string): Promise<Date | null>;
   latest(): Promise<Map<string, PriceSnapshot>>;
   replaceHistory(
     instrumentId: string,

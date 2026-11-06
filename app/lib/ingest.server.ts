@@ -287,7 +287,14 @@ export async function fillPrices(
     ),
     (target) =>
       syncInstrumentPrices(
-        { prices, provider, checks, zone: calendarZone },
+        {
+          instruments,
+          prices,
+          provider,
+          rates: ensureRatesNow,
+          checks,
+          zone: calendarZone,
+        },
         target,
       ),
     {

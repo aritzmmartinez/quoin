@@ -83,9 +83,9 @@ export class PrismaPriceRepository implements PriceRepository {
     });
   }
 
-  async lastAsOf(instrumentId: string): Promise<Date | null> {
+  async lastCandleAsOf(instrumentId: string): Promise<Date | null> {
     const row = await prisma.priceSnapshot.findFirst({
-      where: { instrumentId },
+      where: { instrumentId, NOT: { source: { endsWith: liveSource("") } } },
       orderBy: { asOf: "desc" },
       select: { asOf: true },
     });

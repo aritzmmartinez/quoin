@@ -3,6 +3,7 @@ import { dayOf, shiftDay } from "~/core/calendar";
 import type { Instrument } from "~/core/domain";
 import {
   MarketDataUnavailableError,
+  type InstrumentRepository,
   type MarketDataProvider,
   type PriceRepository,
   type PriceSnapshot,
@@ -12,8 +13,11 @@ import {
 import { liveSource } from "~/core/prices";
 
 import { describeFailure } from "./describe-failure";
+import type { EnsureRates } from "./fx-sync";
 import type { Copy } from "./i18n";
 import { inTurn } from "./in-turn";
+import { replaceQuoteHistory } from "./price-history";
+import { DEFAULT_HISTORY_RANGE } from "./prices-backfill";
 
 export const SYNC_OVERLAP_DAYS = 7;
 
@@ -54,8 +58,10 @@ export interface InstrumentSync {
 }
 
 export interface SyncDeps {
+  instruments: InstrumentRepository;
   prices: PriceRepository;
   provider: MarketDataProvider;
+  rates: EnsureRates;
   checks?: PriceSyncRepository;
   now?: Date;
   zone: string;
@@ -78,10 +84,9 @@ function toSnapshot(
 async function gapCandles(
   deps: SyncDeps,
   target: SyncTarget,
+  last: Date,
   now: Date,
 ): Promise<Quote[]> {
-  const last = await deps.prices.lastAsOf(target.id);
-  if (!last) return [];
   const from = shiftDay(dayOf(last, deps.zone), -SYNC_OVERLAP_DAYS);
   const yesterday = shiftDay(dayOf(now, deps.zone), -1);
   if (from > yesterday) return [];
@@ -111,7 +116,27 @@ export async function syncInstrumentPrices(
     problem,
   });
 
-  const candles = await gapCandles(deps, target, now);
+  const last = await deps.prices.lastCandleAsOf(target.id);
+  if (!last) {
+    const history = await replaceQuoteHistory(deps, {
+      instrumentId: target.id,
+      symbol: target.quoteSymbol,
+      range: DEFAULT_HISTORY_RANGE,
+    });
+    if (history.ok) {
+      await deps.checks?.markChecked(target.id);
+      return result(
+        {
+          inserted: history.written - (history.live ? 1 : 0),
+          corrected: 0,
+          live: history.live,
+        },
+        null,
+      );
+    }
+  }
+
+  const candles = last ? await gapCandles(deps, target, last, now) : [];
   const quote = await provider.getQuote(target.quoteSymbol);
   await deps.checks?.markChecked(target.id);
 
@@ -153,7 +178,10 @@ export interface SyncRun {
 export async function syncInTurn<T extends Pick<SyncTarget, "id" | "name">>(
   targets: readonly T[],
   step: (target: T) => Promise<InstrumentSync>,
-  options: { onStart?: (target: T, index: number) => void; stopped?: () => boolean } = {},
+  options: {
+    onStart?: (target: T, index: number) => void;
+    stopped?: () => boolean;
+  } = {},
 ): Promise<SyncRun> {
   let halted: string | null = null;
   let index = 0;

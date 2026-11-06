@@ -128,7 +128,9 @@ describe("a write while another transaction is open (integration)", () => {
       true,
     );
     expect(
-      await new persistence.PrismaPriceRepository().lastAsOf("XS00TEST0001"),
+      await new persistence.PrismaPriceRepository().lastCandleAsOf(
+        "XS00TEST0001",
+      ),
     ).toBeNull();
     expect(settledWhileOpen).toBe(false);
   });
@@ -231,7 +233,7 @@ describe("a write while another transaction is open (integration)", () => {
           },
         ]),
       survived: async () =>
-        (await new persistence.PrismaPriceRepository().lastAsOf(
+        (await new persistence.PrismaPriceRepository().lastCandleAsOf(
           "XS00TEST0005",
         )) !== null,
     },
