@@ -33,16 +33,18 @@ const snapshot = (
   createdAt: string,
   currency = "EUR",
 ) =>
-  prisma.priceSnapshot.create({
-    data: {
-      instrumentId,
-      price,
-      currency,
-      asOf: new Date(asOf),
-      source: "TEST",
-      createdAt: new Date(createdAt),
-    },
-  });
+  prisma.$transaction((tx) =>
+    tx.priceSnapshot.create({
+      data: {
+        instrumentId,
+        price,
+        currency,
+        asOf: new Date(asOf),
+        source: "TEST",
+        createdAt: new Date(createdAt),
+      },
+    }),
+  );
 
 beforeAll(async () => {
   mkdirSync(tmpDir, { recursive: true });
@@ -61,7 +63,7 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  await prisma.priceSnapshot.deleteMany();
+  await prisma.$transaction((tx) => tx.priceSnapshot.deleteMany());
 });
 
 afterAll(async () => {
@@ -435,15 +437,17 @@ describe("PrismaPriceRepository.saveDaily (integration)", () => {
 describe("PrismaPriceRepository.dailyHistoryIds (integration)", () => {
   it("counts daily candles and never live quotes alone", async () => {
     const row = (instrumentId: string, asOf: string, source: string) =>
-      prisma.priceSnapshot.create({
-        data: {
-          instrumentId,
-          price: "10",
-          currency: "EUR",
-          asOf: new Date(asOf),
-          source,
-        },
-      });
+      prisma.$transaction((tx) =>
+        tx.priceSnapshot.create({
+          data: {
+            instrumentId,
+            price: "10",
+            currency: "EUR",
+            asOf: new Date(asOf),
+            source,
+          },
+        }),
+      );
     await row("XS00TEST0001", "2026-10-14T07:00:00Z", "YAHOO");
     await row("XS00TEST0001", "2026-10-15T14:00:00Z", "YAHOO_LIVE");
     await row("XS00TEST0002", "2026-10-14T14:00:00Z", "YAHOO_LIVE");

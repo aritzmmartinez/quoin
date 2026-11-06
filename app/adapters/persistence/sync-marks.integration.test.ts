@@ -50,8 +50,10 @@ describe("sync marks (integration)", () => {
     );
     expect(row.lastHlc).toBeNull();
     await expect(
-      persistence.prisma.$executeRawUnsafe(
-        `INSERT INTO "SyncDevice" ("id", "deviceId") VALUES (2, 'other')`,
+      persistence.prisma.$transaction((tx) =>
+        tx.$executeRawUnsafe(
+          `INSERT INTO "SyncDevice" ("id", "deviceId") VALUES (2, 'other')`,
+        ),
       ),
     ).rejects.toThrow();
   });

@@ -39,21 +39,27 @@ describe("PrismaSettingsRepository (integration)", () => {
 
   it("keeps a single row: the CHECK refuses a second one", async () => {
     await expect(
-      persistence.prisma.$executeRawUnsafe(
-        `INSERT INTO "Settings" ("id", "residence") VALUES (2, 'bizkaia')`,
+      persistence.prisma.$transaction((tx) =>
+        tx.$executeRawUnsafe(
+          `INSERT INTO "Settings" ("id", "residence") VALUES (2, 'bizkaia')`,
+        ),
       ),
     ).rejects.toThrow();
   });
 
   it("refuses to read a residence written past the domain, instead of guessing one", async () => {
-    await persistence.prisma.$executeRawUnsafe(
-      `UPDATE "Settings" SET "residence" = 'atlantis' WHERE "id" = 1`,
+    await persistence.prisma.$transaction((tx) =>
+      tx.$executeRawUnsafe(
+        `UPDATE "Settings" SET "residence" = 'atlantis' WHERE "id" = 1`,
+      ),
     );
     await expect(
       new persistence.PrismaSettingsRepository().residence(),
     ).rejects.toThrow();
-    await persistence.prisma.$executeRawUnsafe(
-      `UPDATE "Settings" SET "residence" = 'bizkaia' WHERE "id" = 1`,
+    await persistence.prisma.$transaction((tx) =>
+      tx.$executeRawUnsafe(
+        `UPDATE "Settings" SET "residence" = 'bizkaia' WHERE "id" = 1`,
+      ),
     );
   });
 });
