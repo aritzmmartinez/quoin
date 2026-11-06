@@ -54,8 +54,8 @@ export class PrismaSecurityIdentityRepository implements SecurityIdentityReposit
   ): Promise<number> {
     if (entries.length === 0) return 0;
 
-    await prisma.$transaction(
-      entries.map((entry) => {
+    await prisma.$transaction(async (tx) => {
+      for (const entry of entries) {
         const data = {
           identityKind: entry.kind,
           canonicalId:
@@ -70,13 +70,13 @@ export class PrismaSecurityIdentityRepository implements SecurityIdentityReposit
           source: entry.source,
           resolvedAt: new Date(),
         };
-        return prisma.securityIdentity.upsert({
+        await tx.securityIdentity.upsert({
           where: { identity: entry.value },
           create: { identity: entry.value, ...data },
           update: data,
         });
-      }),
-    );
+      }
+    });
 
     return entries.length;
   }

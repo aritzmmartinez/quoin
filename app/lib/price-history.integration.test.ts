@@ -59,7 +59,6 @@ function provider(history: Quote[], live: Quote[] = []): MarketDataProvider {
 }
 
 async function seedCoarse() {
-  const { prisma } = persistence;
   const weekly = Array.from({ length: 12 }, (_, i) => ({
     instrumentId: ID,
     price: String(90 + i),
@@ -67,18 +66,20 @@ async function seedCoarse() {
     asOf: new Date(Date.UTC(2026, 3, 5 + i * 7, 22)),
     source: "YAHOO",
   }));
-  await prisma.priceSnapshot.createMany({
-    data: [
-      ...weekly,
-      {
-        instrumentId: ID,
-        price: "150",
-        currency: "EUR",
-        asOf: new Date("2026-10-08T09:30:00.000Z"),
-        source: "YAHOO",
-      },
-    ],
-  });
+  await persistence.prisma.$transaction((tx) =>
+    tx.priceSnapshot.createMany({
+      data: [
+        ...weekly,
+        {
+          instrumentId: ID,
+          price: "150",
+          currency: "EUR",
+          asOf: new Date("2026-10-08T09:30:00.000Z"),
+          source: "YAHOO",
+        },
+      ],
+    }),
+  );
 }
 
 async function storedSymbol() {
@@ -101,29 +102,32 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  const { prisma } = persistence;
-  await prisma.ledgerEntry.deleteMany();
-  await prisma.priceSnapshot.deleteMany();
-  await prisma.instrument.deleteMany();
-  await new persistence.PrismaInstrumentRepository().upsert([instrument]);
-  await prisma.instrument.update({
-    where: { id: ID },
-    data: { quoteSymbol: "OLD.DE" },
+  await persistence.prisma.$transaction(async (tx) => {
+    await tx.ledgerEntry.deleteMany();
+    await tx.priceSnapshot.deleteMany();
+    await tx.instrument.deleteMany();
   });
-  await prisma.ledgerEntry.create({
-    data: {
-      id: "synthetic-buy-1",
-      ts: new Date("2026-05-04T10:00:00.000Z"),
-      type: "BUY",
-      instrumentId: ID,
-      quantity: "3",
-      price: "95.5",
-      grossAmount: "286.5",
-      fees: "1",
-      currency: "EUR",
-      source: "TEST",
-      externalId: "T-1",
-    },
+  await new persistence.PrismaInstrumentRepository().upsert([instrument]);
+  await persistence.prisma.$transaction(async (tx) => {
+    await tx.instrument.update({
+      where: { id: ID },
+      data: { quoteSymbol: "OLD.DE" },
+    });
+    await tx.ledgerEntry.create({
+      data: {
+        id: "synthetic-buy-1",
+        ts: new Date("2026-05-04T10:00:00.000Z"),
+        type: "BUY",
+        instrumentId: ID,
+        quantity: "3",
+        price: "95.5",
+        grossAmount: "286.5",
+        fees: "1",
+        currency: "EUR",
+        source: "TEST",
+        externalId: "T-1",
+      },
+    });
   });
   await seedCoarse();
 });

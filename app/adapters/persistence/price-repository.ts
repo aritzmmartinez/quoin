@@ -14,9 +14,9 @@ const DAY_MS = 86_400_000;
 export class PrismaPriceRepository implements PriceRepository {
   async saveMany(snapshots: readonly PriceSnapshot[]): Promise<number> {
     if (snapshots.length === 0) return 0;
-    await prisma.$transaction(
-      snapshots.map((s) =>
-        prisma.priceSnapshot.upsert({
+    await prisma.$transaction(async (tx) => {
+      for (const s of snapshots) {
+        await tx.priceSnapshot.upsert({
           where: {
             instrumentId_asOf: { instrumentId: s.instrumentId, asOf: s.asOf },
           },
@@ -28,9 +28,9 @@ export class PrismaPriceRepository implements PriceRepository {
             source: s.source,
           },
           update: { price: s.price, currency: s.currency, source: s.source },
-        }),
-      ),
-    );
+        });
+      }
+    });
     return snapshots.length;
   }
 

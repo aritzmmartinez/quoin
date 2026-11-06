@@ -222,6 +222,15 @@ This has caused misdirected generation more than once:
 - generator `output` resolves relative to **`schema.prisma`** →
   `../app/adapters/persistence/generated`
 
+## Prisma writes
+
+- **Every Prisma write goes through `prisma.$transaction(fn)` and, inside `fn`, only
+  through `tx`.** In the app, the scripts and the tests. Never `$transaction([...])`.
+- **`GuardedBetterSqlite3` (`write-guard.ts`) refuses anything else at runtime.** Never
+  construct a client on the plain adapter. Why it exists is in that file.
+- **The one write outside `fn` is `PrismaTargetRepository.create`**, whose nested
+  `create` opens its own transaction. A test pins it.
+
 ## Market data invariants
 
 - `latest()` resolves by `asOf` (market time), **not** `createdAt` (sync time).

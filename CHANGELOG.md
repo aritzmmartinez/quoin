@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `pnpm sync:import`: a ledger entry that differs on the two devices no longer stops the import. It is set aside, each device keeps its own version, the rest is applied, and the command lists it and exits with an error on every sync until the two agree. When one entry of a linked operation (a Kraken swap) differs, both are set aside.
 
 ### Fixed
+- A write made while another one was failing could be lost after the screen had already confirmed it: an import running beside a price refresh that failed halfway lost its instruments and entries, and the same could happen to a check time, a price, a CPI month or a resolved identity. Each write now waits for the one in front of it and keeps its own result.
 - `pnpm sync:import` reads, merges and writes in one transaction, so a change made in the app while it runs is taken into account instead of being overwritten, and a write the app is making is never mixed into the sync's.
 - Importing a file in another currency: when the ECB now publishes a different rate for a day already stored, the import window and `pnpm ingest` say so, with the currency, the day and both rates, and that the series was not updated. Before, nothing was said, and the trades of days with no stored rate appeared only as trades with no exchange rate, with advice to refresh the rates that could not help.
 

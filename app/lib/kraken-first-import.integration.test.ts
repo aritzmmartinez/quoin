@@ -167,10 +167,11 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  const { prisma } = persistence;
-  await prisma.ledgerEntry.deleteMany();
-  await prisma.priceSnapshot.deleteMany();
-  await prisma.instrument.deleteMany();
+  await persistence.prisma.$transaction(async (tx) => {
+    await tx.ledgerEntry.deleteMany();
+    await tx.priceSnapshot.deleteMany();
+    await tx.instrument.deleteMany();
+  });
 });
 
 afterAll(async () => {

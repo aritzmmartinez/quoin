@@ -329,14 +329,16 @@ describe("the sync's own SQL (integration)", () => {
   });
 
   it("writes exactly what applyPlan says, resolutions and set-aside rows included", async () => {
-    await persistence.prisma.portfolioTarget.create({
-      data: {
-        id: "v-here",
-        name: "here",
-        activeFrom: "2026-12-01",
-        createdAt: new Date(T),
-      },
-    });
+    await persistence.prisma.$transaction((tx) =>
+      tx.portfolioTarget.create({
+        data: {
+          id: "v-here",
+          name: "here",
+          activeFrom: "2026-12-01",
+          createdAt: new Date(T),
+        },
+      }),
+    );
     const before: LocalDevice = await read();
     const file = exchangeSchema.parse(
       await phoneFile(T + 4000, {
