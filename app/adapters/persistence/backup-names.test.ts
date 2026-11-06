@@ -4,6 +4,7 @@ import {
   backupFileName,
   backupsToRemove,
   BACKUP_NAME,
+  freeBackupFileName,
   KEEP,
   stamp,
 } from "./backup-names";
@@ -38,15 +39,58 @@ describe("backupFileName", () => {
     );
   });
 
-  it("matches it with the seconds suffix too", () => {
+  it("matches it with the sequence suffix too", () => {
     expect(
       BACKUP_NAME.test(backupFileName(new Date(2026, 7, 9, 22, 33), 7)),
     ).toBe(true);
   });
 
-  it("pads the seconds suffix", () => {
+  it("pads the sequence suffix", () => {
     expect(backupFileName(new Date(2026, 7, 9, 22, 33), 7)).toBe(
       "quoin-20260809-2233-07.sqlite",
+    );
+  });
+});
+
+describe("freeBackupFileName", () => {
+  const when = new Date(2026, 7, 9, 22, 33);
+  const base = "quoin-20260809-2233.sqlite";
+  const takenFrom =
+    (...names: string[]) =>
+    (name: string) =>
+      names.includes(name);
+
+  it("takes the plain name when it is free", () => {
+    expect(freeBackupFileName(when, takenFrom())).toBe(base);
+  });
+
+  it("moves to the first suffix when the plain name is taken", () => {
+    expect(freeBackupFileName(when, takenFrom(base))).toBe(
+      "quoin-20260809-2233-01.sqlite",
+    );
+  });
+
+  it("moves past every suffix already taken", () => {
+    expect(
+      freeBackupFileName(
+        when,
+        takenFrom(base, "quoin-20260809-2233-01.sqlite"),
+      ),
+    ).toBe("quoin-20260809-2233-02.sqlite");
+  });
+
+  it("gives a name rotation recognises, up to the last suffix", () => {
+    const name = freeBackupFileName(
+      when,
+      (candidate) => candidate !== "quoin-20260809-2233-99.sqlite",
+    );
+    expect(name).toBe("quoin-20260809-2233-99.sqlite");
+    expect(BACKUP_NAME.test(name)).toBe(true);
+  });
+
+  it("refuses rather than write a name rotation would never remove", () => {
+    expect(() => freeBackupFileName(when, () => true)).toThrow(
+      /No free backup name/,
     );
   });
 });

@@ -63,7 +63,8 @@ ENV NODE_ENV=production \
     DATABASE_URL=file:./data/quoin.sqlite \
     CHECKPOINT_DISABLE=1 \
     PRISMA_HIDE_UPDATE_MESSAGE=1 \
-    DOTENV_QUIET=true
+    DOTENV_QUIET=true \
+    QUOIN_RUNTIME=docker
 
 WORKDIR /app
 COPY --from=prod-deps /app/node_modules ./node_modules
@@ -73,14 +74,15 @@ COPY --from=build /app/build ./build
 COPY package.json prisma.config.ts ./
 COPY prisma ./prisma
 COPY scripts/db-backup.ts ./scripts/
-COPY scripts/lib/db-target.ts scripts/lib/backup.ts scripts/lib/backup-names.ts scripts/lib/backup-verify.ts ./scripts/lib/
+COPY scripts/lib/db-target.ts ./scripts/lib/
+COPY app/adapters/persistence/backup.ts app/adapters/persistence/backup-names.ts app/adapters/persistence/backup-verify.ts ./app/adapters/persistence/
 COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/
 COPY --chmod=755 db-backup.sh /usr/local/bin/db-backup
 
 RUN mkdir -p data && chown node:node data
 USER node
 VOLUME /app/data
-EXPOSE 3000
+EXPOSE 3000 3443
 
 ENTRYPOINT ["tini", "--", "docker-entrypoint.sh"]
 CMD ["node_modules/.bin/react-router-serve", "build/server/index.js"]
