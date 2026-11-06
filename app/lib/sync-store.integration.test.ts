@@ -42,6 +42,7 @@ const PINNED: Record<string, Record<string, string>> = {
     hedgedToBaseHlc: "TEXT",
     thesis: "TEXT!",
     thesisHlc: "TEXT",
+    priceSeriesVersion: "TEXT",
     createdAt: "DATETIME!",
   },
   LedgerEntry: {
@@ -223,6 +224,50 @@ function holdWriteLock(write: (tx: unknown) => Promise<unknown>) {
   });
   return { isLocked, release, done };
 }
+
+describe("a symbol that arrives in a merge (integration)", () => {
+  it("empties the series and gives it a new version, in one transaction", async () => {
+    const id = "IE00TEST0099";
+    await new persistence.PrismaInstrumentRepository().upsert([
+      { id, name: "Other Fund", type: "ETF", thesis: "CORE" },
+    ]);
+    await new persistence.PrismaPriceRepository().saveMany([
+      {
+        instrumentId: id,
+        price: "10",
+        currency: "EUR",
+        asOf: new Date(T),
+        source: "YAHOO",
+      },
+    ]);
+    const { state } = await read();
+    const file = await phoneFile(T, {
+      instruments: state.instruments.map((i) =>
+        i.id === id
+          ? { ...i, quoteSymbol: "TEST.DE", quoteSymbolHlc: mark(PHONE, T) }
+          : i,
+      ),
+    });
+
+    const result = await importState(
+      {
+        store,
+        runEffect: async (effect) => ({ effect, ok: true }),
+        now: new Date(T + 1),
+      },
+      file,
+      { dryRun: false },
+    );
+
+    expect(result.status).toBe("applied");
+    const stored = await persistence.prisma.instrument.findUniqueOrThrow({
+      where: { id },
+      include: { prices: true },
+    });
+    expect(stored.prices).toEqual([]);
+    expect(stored.priceSeriesVersion).toEqual(expect.any(String));
+  });
+});
 
 describe("the sync's own SQL (integration)", () => {
   it("reads and writes only columns the migrations still have, with the types it expects", () => {

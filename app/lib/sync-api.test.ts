@@ -39,6 +39,7 @@ function fixture() {
       let working = device;
       const value = fn({
         read: () => ({ device: working, name: "PC" }),
+        all: () => [],
         setLastHlc: (lastHlc) => {
           working = { ...working, lastHlc };
         },
@@ -82,7 +83,7 @@ function fixture() {
     saveDevice,
     recordSync,
     prices: {
-      read: (ids) =>
+      read: (_tx, ids) =>
         new Map(
           ids.flatMap((id) => {
             const hit = stored.get(id);
@@ -311,6 +312,7 @@ describe("POST /v1/sync", () => {
           },
           savePeers: () => {},
           run: () => {},
+          all: () => [],
         }),
     };
 
@@ -386,10 +388,8 @@ describe("POST /v1/sync", () => {
 describe("POST /v1/prices", () => {
   const holding = {
     instrumentId: "A",
-    quoteSymbol: "A.DE",
-    first: null,
+    seriesVersion: null,
     last: null,
-    count: 0,
   };
   const post = (instruments: unknown) =>
     authed({ method: "POST", path: "/v1/prices", body: { instruments } });
@@ -401,7 +401,7 @@ describe("POST /v1/prices", () => {
   };
 
   it("answers each instrument on its own", async () => {
-    f.stored.set("A", { quoteSymbol: "A.DE", rows: [row] });
+    f.stored.set("A", { seriesVersion: "v1", rows: [row] });
     f.pending.add("B");
 
     const answer = await handleSyncRequest(
@@ -417,9 +417,14 @@ describe("POST /v1/prices", () => {
       status: 200,
       body: {
         instruments: [
-          { instrumentId: "A", kind: "full", rows: [row] },
+          { instrumentId: "A", kind: "full", seriesVersion: "v1", rows: [row] },
           { instrumentId: "B", kind: "pending" },
-          { instrumentId: "C", kind: "full", rows: [] },
+          {
+            instrumentId: "C",
+            kind: "full",
+            seriesVersion: expect.any(String),
+            rows: [],
+          },
         ],
       },
     });

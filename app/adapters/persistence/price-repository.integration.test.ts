@@ -314,6 +314,89 @@ describe("PrismaPriceRepository.saveDaily (integration)", () => {
       })
     ).map((r) => `${r.asOf.toISOString()} ${r.price} ${r.source}`);
 
+  describe("series version", () => {
+    const version = async () =>
+      (
+        await prisma.instrument.findUniqueOrThrow({
+          where: { id: ID },
+          select: { priceSeriesVersion: true },
+        })
+      ).priceSeriesVersion;
+
+    it("stays while a tail can heal the phone, a live row replaced included", async () => {
+      await priceRepo.saveDaily(
+        ID,
+        [candle("2026-10-12T07:00:00Z", "12")],
+        live("2026-10-13T15:35:00Z", "13"),
+        MADRID,
+      );
+      const before = await version();
+
+      await priceRepo.saveDaily(
+        ID,
+        [candle("2026-10-13T07:00:00Z", "13")],
+        live("2026-10-14T15:35:00Z", "14"),
+        MADRID,
+      );
+      await priceRepo.saveMany([candle("2026-10-14T07:00:00Z", "14")]);
+
+      expect(await version()).toBe(before);
+    });
+
+    it("changes when a sync writes behind the tail, as a repair does", async () => {
+      await priceRepo.saveDaily(
+        ID,
+        [],
+        live("2026-10-14T15:35:00Z", "14"),
+        MADRID,
+      );
+      const before = await version();
+
+      await priceRepo.saveDaily(
+        ID,
+        [candle("2026-10-01T07:00:00Z", "1")],
+        null,
+        MADRID,
+      );
+
+      expect(await version()).not.toBe(before);
+    });
+
+    it("changes when a backfill brings older rows", async () => {
+      await priceRepo.saveMany([candle("2026-10-14T07:00:00Z", "14")]);
+      const before = await version();
+
+      await priceRepo.saveMany([candle("2026-10-01T07:00:00Z", "1")]);
+
+      expect(await version()).not.toBe(before);
+    });
+
+    it("changes on every replacement, even to the same symbol or to nothing", async () => {
+      await priceRepo.replaceHistory(ID, []);
+      const first = await version();
+      await priceRepo.replaceHistory(ID, []);
+
+      expect(first).toEqual(expect.any(String));
+      expect(await version()).not.toBe(first);
+    });
+
+    it("rolls back with the write that failed", async () => {
+      await priceRepo.saveMany([candle("2026-10-14T07:00:00Z", "14")]);
+      const before = await version();
+
+      await expect(
+        priceRepo.saveMany([
+          {
+            ...candle("2026-10-01T07:00:00Z", "1"),
+            price: null as unknown as string,
+          },
+        ]),
+      ).rejects.toThrow();
+
+      expect(await version()).toBe(before);
+    });
+  });
+
   it("replaces the day's live row with a newer one", async () => {
     await priceRepo.saveDaily(
       ID,

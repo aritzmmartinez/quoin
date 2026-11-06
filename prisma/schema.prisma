@@ -39,6 +39,11 @@ model Instrument {
   hedgedToBaseHlc String?
   thesisHlc       String?
 
+  /// Changes whenever a phone's copy of this instrument's prices can no longer be
+  /// healed by a tail. Compared for equality only. Null until a phone first asks
+  /// for these prices. Local to this database: it never travels in an exchange.
+  priceSeriesVersion String?
+
   entries       LedgerEntry[]
   prices        PriceSnapshot[]
   holdings      EtfHolding[]

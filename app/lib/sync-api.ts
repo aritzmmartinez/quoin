@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 
 import { ZodError, z } from "zod";
 
@@ -62,7 +62,9 @@ export interface SyncApiDeps {
     deviceId: string,
     sync: { at: Date; address: string; counts: string },
   ) => void;
-  prices: { read(ids: readonly string[]): Map<string, StoredPrices> };
+  prices: {
+    read(tx: SyncTx, ids: readonly string[]): Map<string, StoredPrices>;
+  };
   pairing: PairingRegistry;
   throttle: AuthThrottle;
   beforeApply: () => void;
@@ -230,19 +232,28 @@ async function postSync(
   };
 }
 
-function postPrices(deps: SyncApiDeps, request: SyncRequest): SyncResponse {
+async function postPrices(
+  deps: SyncApiDeps,
+  request: SyncRequest,
+): Promise<SyncResponse> {
   const parsed = pricesRequestSchema.safeParse(request.body);
   if (!parsed.success) return failure(400, "invalid-request");
 
   const { instruments } = parsed.data;
-  const stored = deps.prices.read(instruments.map((i) => i.instrumentId));
+  const ids = instruments.map((i) => i.instrumentId);
+  const stored = await deps.store.transaction((tx) =>
+    deps.prices.read(tx, ids),
+  );
   const pending = deps.effects.pending();
   return {
     status: 200,
     body: {
       instruments: instruments.map((holding) =>
         answerPrices(
-          stored.get(holding.instrumentId) ?? { quoteSymbol: null, rows: [] },
+          stored.get(holding.instrumentId) ?? {
+            seriesVersion: randomUUID(),
+            rows: [],
+          },
           holding,
           pending.has(holding.instrumentId),
         ),

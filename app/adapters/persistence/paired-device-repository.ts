@@ -1,6 +1,8 @@
+import { randomUUID } from "node:crypto";
+
 import Database from "better-sqlite3";
 
-import type { PriceRow, StoredPrices } from "~/core/sync";
+import type { StoredPrices } from "~/core/sync";
 
 import { prisma } from "./db.server";
 import { fromDbInstant, toDbInstant, type SyncTx } from "./sync-repository";
@@ -146,45 +148,42 @@ export function recordDeviceSync(
   );
 }
 
-export class SqlitePriceReader {
-  constructor(private readonly path: string) {}
+export function readStoredPrices(
+  tx: SyncTx,
+  instrumentIds: readonly string[],
+): Map<string, StoredPrices> {
+  const found = new Map<string, StoredPrices>();
+  for (const id of instrumentIds) {
+    const [instrument] = tx.all(
+      `SELECT "priceSeriesVersion" FROM "Instrument" WHERE "id" = ?`,
+      id,
+    );
+    if (!instrument) continue;
 
-  read(instrumentIds: readonly string[]): Map<string, StoredPrices> {
-    const db = new Database(this.path, {
-      readonly: true,
-      fileMustExist: true,
-      timeout: READ_TIMEOUT_MS,
-    });
-    try {
-      const symbol = db.prepare(
-        `SELECT "quoteSymbol" FROM "Instrument" WHERE "id" = ?`,
+    let seriesVersion = instrument.priceSeriesVersion as string | null;
+    if (seriesVersion === null) {
+      seriesVersion = randomUUID();
+      tx.run(
+        `UPDATE "Instrument" SET "priceSeriesVersion" = ? WHERE "id" = ?`,
+        seriesVersion,
+        id,
       );
-      const rows = db.prepare(
-        `SELECT "asOf", "price", "currency", "source" FROM "PriceSnapshot"
-          WHERE "instrumentId" = ? ORDER BY "asOf" ASC`,
-      );
-      return new Map(
-        instrumentIds.map((id) => {
-          const instrument = symbol.get(id) as
-            | { quoteSymbol: string | null }
-            | undefined;
-          const stored = rows.all(id) as (Omit<PriceRow, "asOf"> & {
-            asOf: unknown;
-          })[];
-          return [
-            id,
-            {
-              quoteSymbol: instrument?.quoteSymbol ?? null,
-              rows: stored.map((row) => ({
-                ...row,
-                asOf: fromDbInstant(row.asOf),
-              })),
-            },
-          ];
-        }),
-      );
-    } finally {
-      db.close();
     }
+
+    const rows = tx.all(
+      `SELECT "asOf", "price", "currency", "source" FROM "PriceSnapshot"
+        WHERE "instrumentId" = ? ORDER BY "asOf" ASC`,
+      id,
+    );
+    found.set(id, {
+      seriesVersion,
+      rows: rows.map((row) => ({
+        asOf: fromDbInstant(row.asOf),
+        price: String(row.price),
+        currency: String(row.currency),
+        source: String(row.source),
+      })),
+    });
   }
+  return found;
 }

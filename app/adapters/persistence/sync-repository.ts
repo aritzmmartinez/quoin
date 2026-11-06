@@ -30,6 +30,7 @@ export interface SyncTx {
   apply(plan: MergePlan["apply"], sender: SyncSender, nowMs: number): void;
   savePeers(peers: readonly Peer[], sender: SyncSender, nowMs: number): void;
   run(sql: string, ...params: unknown[]): void;
+  all(sql: string, ...params: unknown[]): Record<string, unknown>[];
 }
 
 export class SyncBusyError extends Error {
@@ -65,6 +66,7 @@ export const SYNC_COLUMNS = {
     "hedgedToBaseHlc",
     "thesis",
     "thesisHlc",
+    "priceSeriesVersion",
     "createdAt",
   ],
   LedgerEntry: [
@@ -200,7 +202,7 @@ function isBusy(error: unknown): boolean {
 class SqliteSyncTx implements SyncTx {
   constructor(private readonly db: Database.Database) {}
 
-  private all(sql: string, ...params: unknown[]): SqlRow[] {
+  all(sql: string, ...params: unknown[]): SqlRow[] {
     return this.db.prepare(sql).all(...params) as SqlRow[];
   }
 
@@ -417,6 +419,11 @@ class SqliteSyncTx implements SyncTx {
       );
       if ("quoteSymbol" in patch) {
         this.run(`DELETE FROM "PriceSnapshot" WHERE "instrumentId" = ?`, id);
+        this.run(
+          `UPDATE "Instrument" SET "priceSeriesVersion" = ? WHERE "id" = ?`,
+          randomUUID(),
+          id,
+        );
       }
     }
 

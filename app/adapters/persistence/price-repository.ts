@@ -1,4 +1,7 @@
+import { randomUUID } from "node:crypto";
+
 import { liveSource, planDailyWrite } from "~/core/prices";
+import { reachesBehindTail } from "~/core/sync";
 import type {
   DailyWriteCount,
   PriceRepository,
@@ -7,14 +10,34 @@ import type {
 } from "~/core/ports";
 
 import { prisma } from "./db.server";
+import type { Prisma } from "./generated/client";
 import { stamp } from "./hlc";
 
 const DAY_MS = 86_400_000;
+
+const newSeriesVersion = (tx: Prisma.TransactionClient, id: string) =>
+  tx.instrument.updateMany({
+    where: { id },
+    data: { priceSeriesVersion: randomUUID() },
+  });
 
 export class PrismaPriceRepository implements PriceRepository {
   async saveMany(snapshots: readonly PriceSnapshot[]): Promise<number> {
     if (snapshots.length === 0) return 0;
     await prisma.$transaction(async (tx) => {
+      for (const id of new Set(snapshots.map((s) => s.instrumentId))) {
+        const newest = await tx.priceSnapshot.findFirst({
+          where: { instrumentId: id },
+          orderBy: { asOf: "desc" },
+          select: { asOf: true },
+        });
+        const touched = snapshots
+          .filter((s) => s.instrumentId === id)
+          .map((s) => s.asOf.getTime());
+        if (reachesBehindTail(newest?.asOf.getTime() ?? null, touched)) {
+          await newSeriesVersion(tx, id);
+        }
+      }
       for (const s of snapshots) {
         await tx.priceSnapshot.upsert({
           where: {
@@ -57,6 +80,17 @@ export class PrismaPriceRepository implements PriceRepository {
         },
       });
       const plan = planDailyWrite(stored, candles, live, zone);
+      const removed = new Set(plan.remove);
+      const touched = [
+        ...stored.filter((row) => removed.has(row.id)),
+        ...plan.write,
+      ].map((row) => row.asOf.getTime());
+      const newest = stored.length
+        ? Math.max(...stored.map((row) => row.asOf.getTime()))
+        : null;
+      if (reachesBehindTail(newest, touched)) {
+        await newSeriesVersion(tx, instrumentId);
+      }
       if (plan.remove.length > 0) {
         await tx.priceSnapshot.deleteMany({
           where: { id: { in: plan.remove } },
@@ -126,6 +160,7 @@ export class PrismaPriceRepository implements PriceRepository {
   ): Promise<number> {
     const { quoteSymbol, keepAfter } = options;
     return prisma.$transaction(async (tx) => {
+      await newSeriesVersion(tx, instrumentId);
       const { count } = await tx.priceSnapshot.deleteMany({
         where: keepAfter
           ? { instrumentId, asOf: { lte: keepAfter } }

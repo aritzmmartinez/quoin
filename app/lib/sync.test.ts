@@ -48,6 +48,7 @@ function fakeRepository(state: Record<string, unknown> & { deviceId: string }) {
           };
         },
         run: () => {},
+        all: () => [],
       });
       device = working;
       return value;

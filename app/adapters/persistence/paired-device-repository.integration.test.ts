@@ -132,15 +132,18 @@ describe("the sync server's address (integration)", () => {
   });
 });
 
-describe("SqlitePriceReader (integration)", () => {
-  it("reads rows oldest first as instants, and the instrument's symbol", async () => {
+describe("readStoredPrices (integration)", () => {
+  it("reads rows oldest first as instants, and gives a series its version once", async () => {
     await new persistence.PrismaInstrumentRepository().upsert([
       { id: "IE00TEST0001", name: "Fund", type: "ETF", thesis: "CORE" },
     ]);
-    await new persistence.PrismaInstrumentRepository().setQuoteSymbol(
-      "IE00TEST0001",
-      "TEST.DE",
-    );
+    const version = async () =>
+      (
+        await persistence.prisma.instrument.findUniqueOrThrow({
+          where: { id: "IE00TEST0001" },
+        })
+      ).priceSeriesVersion;
+    expect(await version()).toBeNull();
     const row = (asOf: string, price: string) => ({
       instrumentId: "IE00TEST0001",
       price,
@@ -153,13 +156,23 @@ describe("SqlitePriceReader (integration)", () => {
       row("2026-10-13T07:00:00Z", "10"),
     ]);
 
-    const read = new persistence.SqlitePriceReader(dbPath).read([
-      "IE00TEST0001",
-      "UNKNOWN",
-    ]);
+    const state = async () =>
+      store.transaction((tx) => JSON.stringify(tx.read().device.state));
+    const before = await state();
+    const readBoth = () =>
+      store.transaction((tx) =>
+        persistence.readStoredPrices(tx, ["IE00TEST0001", "UNKNOWN"]),
+      );
+    const read = await readBoth();
+    const assigned = await version();
 
+    expect(assigned).toEqual(expect.any(String));
+    expect((await readBoth()).get("IE00TEST0001")?.seriesVersion).toBe(
+      assigned,
+    );
+    expect(await state()).toBe(before);
     expect(read.get("IE00TEST0001")).toEqual({
-      quoteSymbol: "TEST.DE",
+      seriesVersion: assigned,
       rows: [
         {
           asOf: "2026-10-13T07:00:00.000Z",
@@ -175,6 +188,6 @@ describe("SqlitePriceReader (integration)", () => {
         },
       ],
     });
-    expect(read.get("UNKNOWN")).toEqual({ quoteSymbol: null, rows: [] });
+    expect(read.has("UNKNOWN")).toBe(false);
   });
 });
