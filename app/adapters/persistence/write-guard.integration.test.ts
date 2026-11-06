@@ -1,9 +1,12 @@
 import { mkdirSync, rmSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import Database from "better-sqlite3";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { migratedDatabase } from "../../../test/integration/template";
+import { PrismaClient } from "./generated/client";
+import { GuardedBetterSqlite3 } from "./write-guard";
 
 type Persistence = typeof import("./index");
 
@@ -158,5 +161,46 @@ describe("a write outside a transaction (integration)", () => {
     await holder;
 
     expect(await stored("waiter")).toBe(1);
+  });
+});
+
+describe("a transaction takes the write lock when it opens (integration)", () => {
+  it("makes a sync collide before it starts, not at its commit", async () => {
+    const store = new persistence.SqliteSyncStore(dbPath);
+    const merge = vi.fn();
+
+    await persistence.prisma.$transaction(async (tx) => {
+      await tx.priceSync.count();
+      await expect(store.transaction(merge)).rejects.toThrow(/busy/);
+      await tx.priceSync.upsert(check("read-first"));
+    });
+
+    expect(merge).not.toHaveBeenCalled();
+    expect(await stored("read-first")).toBe(1);
+
+    await store.transaction(merge);
+    store.close();
+    expect(merge).toHaveBeenCalledOnce();
+  });
+
+  it("releases the connection when the lock cannot be taken", async () => {
+    const other = new Database(dbPath);
+    const client = new PrismaClient({
+      adapter: new GuardedBetterSqlite3({ url: `file:${dbPath}`, timeout: 50 }),
+    });
+    const write = () =>
+      client.$transaction((tx) => tx.priceSync.upsert(check("unlocked")));
+
+    try {
+      other.exec("BEGIN IMMEDIATE");
+      await expect(write()).rejects.toThrow();
+      other.exec("ROLLBACK");
+
+      await write();
+      expect(await stored("unlocked")).toBe(1);
+    } finally {
+      other.close();
+      await client.$disconnect();
+    }
   });
 });
