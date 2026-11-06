@@ -18,6 +18,7 @@ import { ErrorState } from "~/components/ui/ErrorState";
 import { parseBasis } from "~/lib/basis";
 import { useCopy } from "~/lib/i18n";
 import { parseLocale } from "~/lib/locale";
+import { isUnsupportedResidence } from "~/lib/residence";
 import { loadResidence } from "~/lib/residence.server";
 import { parseTheme, resolveTheme, THEME_SCRIPT } from "~/lib/theme";
 import "./app.css";
@@ -76,8 +77,13 @@ export default function App() {
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   const notFound = isRouteErrorResponse(error) && error.status === 404;
+  const unsupported = isUnsupportedResidence(error);
   const t = useCopy();
-  const copy = notFound ? t.notFound : t.portfolio.error;
+  const copy = unsupported
+    ? t.unsupportedResidence
+    : notFound
+      ? t.notFound
+      : t.portfolio.error;
 
   return (
     <main>
@@ -88,9 +94,11 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
         title={copy.title}
         body={copy.body}
       >
-        <Link to="/" className={buttonClass()}>
-          {t.notFound.home}
-        </Link>
+        {unsupported ? null : (
+          <Link to="/" className={buttonClass()}>
+            {t.notFound.home}
+          </Link>
+        )}
       </ErrorState>
     </main>
   );

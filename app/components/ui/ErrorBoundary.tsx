@@ -1,14 +1,24 @@
 import { RotateCw, TriangleAlert } from "lucide-react";
 import { Link } from "react-router";
 
-import { useCopy, useFormat } from "~/lib";
+import { isUnsupportedResidence, useCopy, useFormat } from "~/lib";
 import { Button, buttonClass } from "./Button";
 import { ErrorState } from "./ErrorState";
 
-export function ErrorBoundary() {
+export function ErrorBoundary({ error }: { error: unknown }) {
   const { formatClock } = useFormat();
   const t = useCopy();
   const copy = t.portfolio.error;
+
+  if (isUnsupportedResidence(error)) {
+    return (
+      <ErrorState
+        icon={TriangleAlert}
+        title={t.unsupportedResidence.title}
+        body={t.unsupportedResidence.body}
+      />
+    );
+  }
 
   return (
     <ErrorState

@@ -199,7 +199,7 @@ export default function Instrument({ loaderData }: Route.ComponentProps) {
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   const t = useCopy();
   if (!isRouteErrorResponse(error) || error.status !== 404) {
-    return <SharedErrorBoundary />;
+    return <SharedErrorBoundary error={error} />;
   }
 
   return (

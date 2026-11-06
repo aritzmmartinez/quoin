@@ -8,7 +8,13 @@ import {
   type LocalDevice,
 } from "~/core/sync";
 
-import { exportState, importState, type SyncStore } from "./sync";
+import {
+  applyState,
+  exportState,
+  importState,
+  runEffects,
+  type SyncStore,
+} from "./sync";
 
 const T = Date.UTC(2026, 9, 28, 10);
 const markOf = (deviceId: string, ms: number) =>
@@ -41,6 +47,7 @@ function fakeRepository(state: Record<string, unknown> & { deviceId: string }) {
             state: { ...working.state, peers: [...peers] },
           };
         },
+        run: () => {},
       });
       device = working;
       return value;
@@ -77,6 +84,76 @@ describe("exportState", () => {
       exportHlc: markOf("dev-a", T),
       instruments: [expect.objectContaining({ id: fund.id })],
     });
+  });
+});
+
+describe("applyState", () => {
+  it("applies and leaves the effects to whoever asked", async () => {
+    const { repository, applied } = fakeRepository({ deviceId: "dev-a" });
+
+    const result = await applyState(
+      { store: repository, now: new Date(T) },
+      symbolChange,
+      { dryRun: false },
+    );
+
+    expect(result.status).toBe("applied");
+    expect(applied).toHaveLength(1);
+    expect(result.plan.effects).toHaveLength(1);
+  });
+
+  it("reports an applied exchange and one that brought nothing, inside the transaction", async () => {
+    const { repository } = fakeRepository({ deviceId: "dev-a" });
+    const settled = vi.fn();
+    const deps = { store: repository, settled, now: new Date(T) };
+
+    await applyState(deps, symbolChange, { dryRun: false });
+    await applyState(deps, symbolChange, { dryRun: false });
+
+    expect(settled.mock.calls.map(([, outcome]) => outcome.status)).toEqual([
+      "applied",
+      "up-to-date",
+    ]);
+    expect(settled.mock.calls[0]?.[1].counts.newInstruments).toBe(1);
+  });
+
+  it("reports nothing for a dry run or a conflict", async () => {
+    const { repository } = fakeRepository({
+      deviceId: "dev-a",
+      settings: { residence: "bizkaia", residenceHlc: markOf("dev-a", T - 1) },
+    });
+    const settled = vi.fn();
+    const deps = { store: repository, settled, now: new Date(T) };
+
+    await applyState(deps, symbolChange, { dryRun: true });
+    await applyState(
+      deps,
+      file({
+        settings: { residence: "araba", residenceHlc: markOf("dev-b", T) },
+      }),
+      { dryRun: false },
+    );
+
+    expect(settled).not.toHaveBeenCalled();
+  });
+});
+
+describe("runEffects", () => {
+  const effect = { kind: "rates", currency: "USD", since: "x" } as const;
+
+  it("reports a provider's failure and carries on", async () => {
+    const outcomes = await runEffects([effect], async () => {
+      throw new MarketDataUnavailableError("USD", 503);
+    });
+    expect(outcomes[0]).toMatchObject({ ok: false });
+  });
+
+  it("stops on a failure that is not the provider's", async () => {
+    await expect(
+      runEffects([effect], async () => {
+        throw new Error("boom");
+      }),
+    ).rejects.toThrow("boom");
   });
 });
 

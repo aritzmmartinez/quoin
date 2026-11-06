@@ -122,7 +122,13 @@ const PINNED: Record<string, Record<string, string>> = {
     seen: "TEXT!",
     lastSyncedAt: "DATETIME",
   },
-  PriceSnapshot: { instrumentId: "TEXT!" },
+  PriceSnapshot: {
+    instrumentId: "TEXT!",
+    asOf: "DATETIME!",
+    price: "TEXT!",
+    currency: "TEXT!",
+    source: "TEXT!",
+  },
 };
 
 beforeAll(async () => {
@@ -147,6 +153,20 @@ const read = () => store.transaction((tx) => tx.read().device);
 const noEffects = async () => {
   throw new Error("no effect expected");
 };
+
+describe("a database busy with another write (integration)", () => {
+  it("says so with a type of its own, after one retry", async () => {
+    const other = new Database(dbPath);
+    other.exec("BEGIN IMMEDIATE");
+    try {
+      await expect(read()).rejects.toBeInstanceOf(persistence.SyncBusyError);
+    } finally {
+      other.exec("ROLLBACK");
+      other.close();
+    }
+    await expect(read()).resolves.toBeDefined();
+  });
+});
 
 function buy(externalId: string, grossAmount = "100") {
   return {

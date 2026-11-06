@@ -1,9 +1,14 @@
 import { z } from "zod";
 
-/**
- * Where the owner is tax resident. Not a territory and not a zone: the régimen
- * común will be one territory spanning two zones (Canarias runs an hour behind).
- */
 export const RESIDENCES = ["bizkaia"] as const;
 export const residenceSchema = z.enum(RESIDENCES);
 export type Residence = z.infer<typeof residenceSchema>;
+
+export class UnsupportedResidenceError extends Error {
+  constructor(readonly residence: string) {
+    super(
+      `This database holds the residence "${residence}", which this version of Quoin does not know. Update Quoin.`,
+    );
+    this.name = "UnsupportedResidenceError";
+  }
+}
