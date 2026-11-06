@@ -5,9 +5,9 @@ import { prisma } from "./db.server";
 export class PrismaInflationRepository implements InflationRepository {
   async saveMany(points: readonly InflationPoint[]): Promise<number> {
     if (points.length === 0) return 0;
-    await prisma.$transaction(
-      points.map((p) =>
-        prisma.inflationIndex.upsert({
+    await prisma.$transaction(async (tx) => {
+      for (const p of points) {
+        await tx.inflationIndex.upsert({
           where: { series_period: { series: p.series, period: p.period } },
           create: {
             series: p.series,
@@ -17,9 +17,9 @@ export class PrismaInflationRepository implements InflationRepository {
             source: p.source,
           },
           update: { indexValue: p.indexValue, base: p.base, source: p.source },
-        }),
-      ),
-    );
+        });
+      }
+    });
     return points.length;
   }
 
@@ -47,17 +47,19 @@ export class PrismaInflationRepository implements InflationRepository {
 
   async markChecked(series: string): Promise<void> {
     const now = new Date();
-    await prisma.inflationSync.upsert({
-      where: { series },
-      create: { series, checkedAt: now },
-      update: { checkedAt: now },
-    });
+    await prisma.$transaction((tx) =>
+      tx.inflationSync.upsert({
+        where: { series },
+        create: { series, checkedAt: now },
+        update: { checkedAt: now },
+      }),
+    );
   }
 
   async deleteSeries(series: string): Promise<number> {
-    const { count } = await prisma.inflationIndex.deleteMany({
-      where: { series },
-    });
+    const { count } = await prisma.$transaction((tx) =>
+      tx.inflationIndex.deleteMany({ where: { series } }),
+    );
     return count;
   }
 }
