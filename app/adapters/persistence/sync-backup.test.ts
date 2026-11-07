@@ -127,6 +127,20 @@ describe("backupBeforeSync", () => {
     expect(readdirSync(directory)).toEqual([syncBackupFileName(DAY)]);
   });
 
+  it("removes what a dead process left from any day, and nothing else", () => {
+    backupBeforeSync(source, directory, DAY);
+    const orphan = join(directory, "quoin-sync-2026-01-01.sqlite.tmp");
+    const unrelated = join(directory, "notes.tmp");
+    writeFileSync(orphan, "half a copy");
+    writeFileSync(unrelated, "");
+
+    expect(backupBeforeSync(source, directory, DAY)).toBeNull();
+
+    expect(existsSync(orphan)).toBe(false);
+    expect(existsSync(unrelated)).toBe(true);
+    expect(existsSync(join(directory, syncBackupFileName(DAY)))).toBe(true);
+  });
+
   it("throws and leaves nothing named for the day when the copy fails", () => {
     const missing = join(root, "missing.sqlite");
 

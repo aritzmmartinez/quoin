@@ -152,7 +152,7 @@ const text = (value: unknown): string | null =>
   value === null || value === undefined ? null : String(value);
 const flag = (value: unknown): boolean => Number(value) === 1;
 
-function databasePath(): string {
+export function databasePath(): string {
   const url = process.env.DATABASE_URL;
   if (!url?.startsWith("file:")) {
     throw new Error("DATABASE_URL is not a file: URL");

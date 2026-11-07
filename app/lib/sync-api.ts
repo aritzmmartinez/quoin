@@ -7,6 +7,10 @@ import {
   SyncBusyError,
   type SyncTx,
 } from "~/adapters/persistence/sync-repository";
+import type {
+  SyncRequest,
+  SyncResponse,
+} from "~/adapters/sync-server/listener";
 import {
   answerPrices,
   exportDevice,
@@ -32,21 +36,7 @@ const FREE_FAILURES = 5;
 const MAX_BACKOFF_MS = 60_000;
 const RETRY_AFTER_BUSY_SECONDS = "1";
 
-export interface SyncRequest {
-  method: string;
-  path: string;
-  authorization?: string | undefined;
-  deviceId?: string | undefined;
-  ifMatch?: string | undefined;
-  body?: unknown;
-  address: string;
-}
-
-export interface SyncResponse {
-  status: number;
-  body: unknown;
-  headers?: Record<string, string>;
-}
+export type { SyncRequest, SyncResponse };
 
 export interface SyncApiDeps {
   serverName: () => string;

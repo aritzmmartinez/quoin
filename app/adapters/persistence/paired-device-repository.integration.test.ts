@@ -97,6 +97,30 @@ describe("paired devices (integration)", () => {
     });
   });
 
+  it("adds what the effects failed to the counts of the last sync", async () => {
+    const failed = () =>
+      store.transaction((tx) =>
+        persistence.recordEffectFailures(tx, device.deviceId, {
+          failedPrices: 1,
+          failedRates: 0,
+        }),
+      );
+    await store.transaction((tx) =>
+      persistence.recordDeviceSync(tx, device.deviceId, {
+        at: T,
+        address: "192.168.1.30",
+        counts: '{"ledger":3}',
+      }),
+    );
+
+    await failed();
+    await failed();
+
+    expect(
+      JSON.parse(devices.find(device.deviceId)?.lastCounts ?? "null"),
+    ).toEqual({ ledger: 3, failedPrices: 2, failedRates: 0 });
+  });
+
   it("stays out of the exchange", async () => {
     const state = await store.transaction((tx) => tx.read().device.state);
     expect(JSON.stringify(state)).not.toContain("dev-phone");
@@ -108,6 +132,7 @@ describe("paired devices (integration)", () => {
 describe("the sync server's address (integration)", () => {
   it("has the default port and no host until one is saved", async () => {
     await expect(repo.address()).resolves.toEqual({ host: null, port: 3443 });
+    expect(devices.port()).toBe(3443);
   });
 
   it("keeps one row however many times it is saved", async () => {
@@ -118,6 +143,7 @@ describe("the sync server's address (integration)", () => {
       host: "192.168.1.21",
       port: 4443,
     });
+    expect(devices.port()).toBe(4443);
   });
 
   it("refuses a second row at the database", () => {

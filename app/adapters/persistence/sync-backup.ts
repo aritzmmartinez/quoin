@@ -3,7 +3,6 @@ import {
   mkdirSync,
   readdirSync,
   renameSync,
-  rmSync,
   unlinkSync,
 } from "node:fs";
 import { join } from "node:path";
@@ -12,6 +11,7 @@ import { snapshotDatabase, type Snapshot } from "./backup";
 
 export const SYNC_BACKUP_KEEP = 14;
 const SYNC_BACKUP_NAME = /^quoin-sync-\d{4}-\d{2}-\d{2}\.sqlite$/;
+const SYNC_BACKUP_PARTIAL = /^quoin-sync-.*\.tmp$/;
 
 export function syncBackupFileName(day: string): string {
   return `quoin-sync-${day}.sqlite`;
@@ -33,12 +33,15 @@ export function backupBeforeSync(
   directory: string,
   day: string,
 ): Snapshot | null {
+  mkdirSync(directory, { recursive: true });
+  for (const file of readdirSync(directory)) {
+    if (SYNC_BACKUP_PARTIAL.test(file)) unlinkSync(join(directory, file));
+  }
+
   const destination = join(directory, syncBackupFileName(day));
   if (existsSync(destination)) return null;
 
-  mkdirSync(directory, { recursive: true });
   const partial = `${destination}.tmp`;
-  rmSync(partial, { force: true });
   const snapshot = snapshotDatabase(source, partial);
   renameSync(partial, destination);
 

@@ -38,6 +38,7 @@
     "verify:full": "pnpm run verify && pnpm run test:integration"
   },
   "dependencies": {
+    "@peculiar/x509": "3.1.0",
     "@prisma/adapter-better-sqlite3": "^7.10.1",
     "@prisma/client": "^7.10.1",
     "@react-router/node": "8.4.0",
@@ -53,8 +54,10 @@
     "react-dom": "^19.3.1",
     "react-router": "8.4.0",
     "recharts": "^3.10.1",
+    "reflect-metadata": "0.2.2",
     "sonner": "^2.0.8",
     "tsx": "^4.23.15",
+    "uqr": "0.1.3",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^4.6.7"
   },

@@ -108,6 +108,16 @@ export class SqlitePairedDevices {
           .get() !== undefined,
     );
   }
+
+  port(): number {
+    const row = this.read(
+      (db) =>
+        db
+          .prepare(`SELECT "port" FROM "SyncServer" WHERE "id" = ?`)
+          .get(SERVER_ID) as { port: number } | undefined,
+    );
+    return row?.port ?? DEFAULT_SYNC_PORT;
+  }
 }
 
 export function savePairedDevice(
@@ -144,6 +154,31 @@ export function recordDeviceSync(
     toDbInstant(sync.at),
     sync.address,
     sync.counts,
+    deviceId,
+  );
+}
+
+export function recordEffectFailures(
+  tx: SyncTx,
+  deviceId: string,
+  failures: { failedPrices: number; failedRates: number },
+): void {
+  const [row] = tx.all(
+    `SELECT "lastCounts" FROM "PairedDevice" WHERE "deviceId" = ?`,
+    deviceId,
+  );
+  if (!row) return;
+  const counts = JSON.parse(String(row.lastCounts ?? "{}")) as Record<
+    string,
+    unknown
+  > & { failedPrices?: number; failedRates?: number };
+  tx.run(
+    `UPDATE "PairedDevice" SET "lastCounts" = ? WHERE "deviceId" = ?`,
+    JSON.stringify({
+      ...counts,
+      failedPrices: (counts.failedPrices ?? 0) + failures.failedPrices,
+      failedRates: (counts.failedRates ?? 0) + failures.failedRates,
+    }),
     deviceId,
   );
 }
