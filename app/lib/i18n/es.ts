@@ -247,6 +247,18 @@ export const es = {
     devices: {
       title: "Dispositivos",
       desc: "Los móviles vinculados sincronizan con este equipo por la red local.",
+      refused: "Esta acción solo se puede hacer desde Quoin.",
+      saved: {
+        name: "Nombre guardado",
+        host: "Dirección guardada",
+        port: "Puerto guardado",
+        revoked: (name: string): string => `«${name}» revocado`,
+      },
+      name: {
+        label: "Nombre de este equipo",
+        hint: "El que verá el móvil al vincularse",
+        invalid: "El nombre no puede pasar de 100 caracteres.",
+      },
       address: {
         host: {
           label: "Dirección de este equipo",

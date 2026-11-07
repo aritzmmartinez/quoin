@@ -48,13 +48,26 @@ export class PrismaPairedDeviceRepository {
     return { host: row?.host ?? null, port: row?.port ?? DEFAULT_SYNC_PORT };
   }
 
-  async setAddress(address: SyncServerAddress): Promise<void> {
+  async setAddress(address: Partial<SyncServerAddress>): Promise<void> {
     await prisma.$transaction((tx) =>
       tx.syncServer.upsert({
         where: { id: SERVER_ID },
         create: { id: SERVER_ID, ...address },
         update: address,
       }),
+    );
+  }
+
+  async serverName(): Promise<string | null> {
+    const row = await prisma.syncDevice.findUnique({
+      where: { id: SERVER_ID },
+    });
+    return row?.name ?? null;
+  }
+
+  async setServerName(name: string | null): Promise<void> {
+    await prisma.$transaction((tx) =>
+      tx.syncDevice.update({ where: { id: SERVER_ID }, data: { name } }),
     );
   }
 }
@@ -117,6 +130,16 @@ export class SqlitePairedDevices {
           .get(SERVER_ID) as { port: number } | undefined,
     );
     return row?.port ?? DEFAULT_SYNC_PORT;
+  }
+
+  serverName(): string | null {
+    const row = this.read(
+      (db) =>
+        db
+          .prepare(`SELECT "name" FROM "SyncDevice" WHERE "id" = ?`)
+          .get(SERVER_ID) as { name: string | null } | undefined,
+    );
+    return row?.name ?? null;
   }
 }
 

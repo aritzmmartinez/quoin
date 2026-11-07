@@ -86,6 +86,17 @@ describe("exportState", () => {
       instruments: [expect.objectContaining({ id: fund.id })],
     });
   });
+
+  it("names the device by the name it was given, or else by the default", async () => {
+    const { repository } = fakeRepository({ deviceId: "dev-a" });
+
+    await expect(
+      exportState(repository, new Date(T), "computer"),
+    ).resolves.toMatchObject({ deviceName: "computer" });
+    await expect(exportState(repository, new Date(T))).resolves.toMatchObject({
+      deviceName: null,
+    });
+  });
 });
 
 describe("applyState", () => {

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  CONFIRM_TTL_MS,
   MAX_TOKEN_ATTEMPTS,
   PAIRING_TTL_MS,
   pairingCode,
@@ -65,16 +66,59 @@ describe("PairingRegistry", () => {
     expect(registry.state()).toEqual({ status: "rejected" });
   });
 
-  it("expires a token nobody used, and one left waiting for an answer", async () => {
+  it("expires a token nobody used", () => {
     const registry = new PairingRegistry();
     registry.start(NOW);
     vi.advanceTimersByTime(PAIRING_TTL_MS);
     expect(registry.state()).toEqual({ status: "expired" });
+  });
 
-    const answer = registry.request(registry.start(NOW).token, "d", "P");
-    vi.advanceTimersByTime(PAIRING_TTL_MS);
+  it("gives the confirmation its own time, counted from the scan", async () => {
+    const registry = new PairingRegistry();
+    const { token } = registry.start(NOW);
+    vi.advanceTimersByTime(PAIRING_TTL_MS - 1_000);
+
+    const answer = registry.request(token, "d", "P");
+    vi.advanceTimersByTime(CONFIRM_TTL_MS - 1);
+    expect(registry.state().status).toBe("confirming");
+
+    vi.advanceTimersByTime(1);
     await expect(answer).resolves.toEqual({ kind: "expired" });
     expect(registry.state()).toEqual({ status: "expired" });
+  });
+
+  it("expires when the phone hangs up, so it cannot be confirmed later", async () => {
+    const registry = new PairingRegistry();
+    const phone = new AbortController();
+    const answer = registry.request(
+      registry.start(NOW).token,
+      "d",
+      "P",
+      phone.signal,
+    );
+
+    phone.abort();
+    registry.confirm();
+
+    await expect(answer).resolves.toEqual({ kind: "expired" });
+    expect(registry.state()).toEqual({ status: "expired" });
+  });
+
+  it("ignores a hang-up once the session is over", async () => {
+    const registry = new PairingRegistry();
+    const phone = new AbortController();
+    const answer = registry.request(
+      registry.start(NOW).token,
+      "d",
+      "P",
+      phone.signal,
+    );
+    registry.confirm();
+    await answer;
+
+    phone.abort();
+
+    expect(registry.state()).toEqual({ status: "paired", name: "P" });
   });
 
   it("refuses a token used twice", async () => {

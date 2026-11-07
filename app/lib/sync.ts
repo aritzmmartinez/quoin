@@ -29,10 +29,14 @@ export type EffectOutcome = { effect: Effect } & (
 
 export type RunEffect = (effect: Effect) => Promise<EffectOutcome>;
 
-export function exportState(store: SyncStore, now: Date): Promise<Exchange> {
+export function exportState(
+  store: SyncStore,
+  now: Date,
+  defaultName: string | null = null,
+): Promise<Exchange> {
   return store.transaction((tx) => {
     const { device, name } = tx.read();
-    const exported = exportDevice(device, now.getTime(), name);
+    const exported = exportDevice(device, now.getTime(), name ?? defaultName);
     if (exported.device.lastHlc) tx.setLastHlc(exported.device.lastHlc);
     return exported.exchange;
   });

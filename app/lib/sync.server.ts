@@ -1,3 +1,5 @@
+import { hostname } from "node:os";
+
 import { SqliteSyncStore } from "~/adapters/persistence";
 import { dayOf } from "~/core/calendar";
 import type { Effect, Exchange, Resolutions } from "~/core/sync";
@@ -15,10 +17,14 @@ import {
   type ImportResult,
 } from "./sync";
 
+export const inDocker = () => process.env.QUOIN_RUNTIME === "docker";
+
+export const defaultServerName = () => (inDocker() ? "Quoin" : hostname());
+
 export async function exportSync(): Promise<Exchange> {
   const store = new SqliteSyncStore();
   try {
-    return await exportState(store, new Date());
+    return await exportState(store, new Date(), defaultServerName());
   } finally {
     store.close();
   }

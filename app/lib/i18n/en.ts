@@ -239,6 +239,18 @@ export const en: Copy = {
     devices: {
       title: "Devices",
       desc: "Paired phones sync with this computer over the local network.",
+      refused: "This can only be done from within Quoin.",
+      saved: {
+        name: "Name saved",
+        host: "Address saved",
+        port: "Port saved",
+        revoked: (name: string): string => `“${name}” revoked`,
+      },
+      name: {
+        label: "Name of this computer",
+        hint: "The one the phone will show when pairing",
+        invalid: "The name cannot be longer than 100 characters.",
+      },
       address: {
         host: {
           label: "Address of this computer",

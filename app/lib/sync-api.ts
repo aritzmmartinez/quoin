@@ -128,7 +128,12 @@ async function pair(
   const { token, deviceId, name } = parsed.data;
 
   const nowMs = deps.now().getTime();
-  const answer = await deps.pairing.request(token, deviceId, name);
+  const answer = await deps.pairing.request(
+    token,
+    deviceId,
+    name,
+    request.signal,
+  );
   switch (answer.kind) {
     case "invalid-token":
       deps.throttle.failed(nowMs);
@@ -189,7 +194,12 @@ async function postSync(
 
   const current = await deps.store.transaction((tx) => {
     const { device: local, name } = tx.read();
-    return stateEtag(exportDevice(local, deps.now().getTime(), name).exchange);
+    const exported = exportDevice(
+      local,
+      deps.now().getTime(),
+      name ?? deps.serverName(),
+    );
+    return stateEtag(exported.exchange);
   });
   if (request.ifMatch !== current) return failure(409, "state-changed");
 
@@ -290,7 +300,11 @@ async function route(
   if (key === "POST /v1/prices") return postPrices(deps, request);
   if (key === "POST /v1/sync") return postSync(deps, request, auth.device);
 
-  const exchange = await exportState(deps.store, deps.now());
+  const exchange = await exportState(
+    deps.store,
+    deps.now(),
+    deps.serverName(),
+  );
   return {
     status: 200,
     body: exchange,

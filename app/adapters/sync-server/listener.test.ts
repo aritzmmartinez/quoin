@@ -242,6 +242,59 @@ describe("the sync listener", () => {
     release();
   });
 
+  it("tells the handler when the client hangs up, and only then", async () => {
+    let hungUp: (aborted: boolean) => void = () => {};
+    const told = new Promise<boolean>((resolve) => {
+      hungUp = resolve;
+    });
+    const signals: (AbortSignal | undefined)[] = [];
+    const other = await listen({
+      key: identity.key,
+      cert: identity.cert,
+      port: 0,
+      onError: () => {},
+      handle: async ({ path, signal }) => {
+        signals.push(signal);
+        if (path === "/v1/hello") return { status: 200, body: {} };
+        await new Promise((resolve) =>
+          signal?.addEventListener("abort", resolve, { once: true }),
+        );
+        hungUp(signal?.aborted ?? false);
+        return { status: 410, body: {} };
+      },
+    });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const req = httpsRequest(
+          {
+            port: other.port,
+            method: "GET",
+            path: "/v1/hello",
+            rejectUnauthorized: false,
+          },
+          (res) => res.resume().on("end", resolve),
+        );
+        req.on("error", reject);
+        req.end();
+      });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(signals[0]?.aborted).toBe(false);
+
+      const req = httpsRequest({
+        port: other.port,
+        method: "POST",
+        path: "/v1/pair",
+        rejectUnauthorized: false,
+      });
+      req.on("error", () => {});
+      req.end("{}", () => setTimeout(() => req.destroy(), 50));
+
+      await expect(told).resolves.toBe(true);
+    } finally {
+      await other.close();
+    }
+  });
+
   it("fails to start on a port already taken, instead of hanging", async () => {
     await expect(
       listen({

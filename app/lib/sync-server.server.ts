@@ -1,4 +1,3 @@
-import { hostname } from "node:os";
 import { dirname, join } from "node:path";
 
 import Database from "better-sqlite3";
@@ -20,14 +19,12 @@ import { today } from "~/core/calendar";
 
 import { describeFailure } from "./describe-failure";
 import type { RunEffect } from "./sync";
-import { runEffect } from "./sync.server";
+import { defaultServerName, inDocker, runEffect } from "./sync.server";
 import { AuthThrottle, handleSyncRequest } from "./sync-api";
 import { EffectQueue } from "./sync-effects";
 import { PairingRegistry } from "./sync-pairing";
 
 const BACKUP_ZONE = "Europe/Madrid";
-
-const inDocker = () => process.env.QUOIN_RUNTIME === "docker";
 
 const report = (error: unknown) => {
   console.error(`quoin sync: ${describeFailure(error)}`);
@@ -59,6 +56,7 @@ export async function startSyncServer(
     now(),
   );
   const store = new SqliteSyncStore(databaseFile);
+  const devices = new SqlitePairedDevices(databaseFile);
   const effects = new EffectQueue({
     run: options.runEffect,
     record: (deviceId, failures) =>
@@ -75,9 +73,9 @@ export async function startSyncServer(
       handle: (request) =>
         handleSyncRequest(
           {
-            serverName: () => (inDocker() ? "Quoin" : hostname()),
+            serverName: () => devices.serverName() ?? defaultServerName(),
             store,
-            devices: new SqlitePairedDevices(databaseFile),
+            devices,
             saveDevice: savePairedDevice,
             recordSync: recordDeviceSync,
             prices: { read: readStoredPrices },

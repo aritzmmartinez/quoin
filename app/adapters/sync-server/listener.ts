@@ -18,6 +18,7 @@ export interface SyncRequest {
   ifMatch?: string | undefined;
   body?: unknown;
   address: string;
+  signal?: AbortSignal;
 }
 
 export interface SyncResponse {
@@ -113,6 +114,7 @@ async function readJson(
 async function answer(
   req: IncomingMessage,
   options: ListenerOptions,
+  signal: AbortSignal,
 ): Promise<SyncResponse> {
   try {
     return await options.handle({
@@ -123,6 +125,7 @@ async function answer(
       ifMatch: req.headers["if-match"],
       body: req.method === "POST" ? await readJson(req, options) : undefined,
       address: (req.socket.remoteAddress ?? "").replace(/^::ffff:/, ""),
+      signal,
     });
   } catch (error) {
     if (error instanceof BadBody) {
@@ -142,7 +145,11 @@ async function respond(
   res: ServerResponse,
   options: ListenerOptions,
 ): Promise<void> {
-  const { status, body, headers } = await answer(req, options);
+  const hangUp = new AbortController();
+  res.once("close", () => {
+    if (!res.writableEnded) hangUp.abort();
+  });
+  const { status, body, headers } = await answer(req, options, hangUp.signal);
   const json = Buffer.from(JSON.stringify(body));
   const compress = /\bgzip\b/.test(req.headers["accept-encoding"] ?? "");
   const payload = compress ? await gzipAsync(json) : json;

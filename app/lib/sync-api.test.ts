@@ -29,6 +29,7 @@ const mark = (deviceId: string, ms: number) =>
 const SETTINGS = { residence: "bizkaia", residenceHlc: null };
 
 function fixture() {
+  const named: { name: string | null } = { name: "PC" };
   let device: LocalDevice = {
     state: syncStateSchema.parse({ deviceId: "dev-pc", settings: SETTINGS }),
     lastHlc: mark("dev-pc", T - 1),
@@ -38,7 +39,7 @@ function fixture() {
     transaction: async (fn) => {
       let working = device;
       const value = fn({
-        read: () => ({ device: working, name: "PC" }),
+        read: () => ({ device: working, name: named.name }),
         all: () => [],
         setLastHlc: (lastHlc) => {
           working = { ...working, lastHlc };
@@ -99,6 +100,7 @@ function fixture() {
   };
   return {
     deps,
+    named,
     devices,
     paired,
     stored,
@@ -214,6 +216,24 @@ describe("GET /v1/sync", () => {
     expect(first.headers?.ETag).toMatch(/^"[0-9a-f]{64}"$/);
     expect(second.headers?.ETag).toBe(first.headers?.ETag);
     expect(stateEtag(second.body as never)).toBe(first.headers?.ETag);
+  });
+
+  it("with no name stored, carries the one hello gives, and POST agrees on the ETag", async () => {
+    f.named.name = null;
+    f.deps.serverName = () => "host-pc";
+
+    const got = await handleSyncRequest(f.deps, authed({}));
+    expect(got.body).toMatchObject({ deviceName: "host-pc" });
+
+    const posted = await handleSyncRequest(
+      f.deps,
+      authed({
+        method: "POST",
+        body: { ...exchange(), deviceId: PHONE },
+        ifMatch: got.headers?.ETag,
+      }),
+    );
+    expect(posted.status).toBe(200);
   });
 
   it("answers 503 with a retry when the database is busy", async () => {

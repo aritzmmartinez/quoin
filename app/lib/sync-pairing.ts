@@ -1,6 +1,7 @@
 import { createHmac, randomBytes } from "node:crypto";
 
 export const PAIRING_TTL_MS = 2 * 60_000;
+export const CONFIRM_TTL_MS = 60_000;
 export const MAX_TOKEN_ATTEMPTS = 10;
 
 export function pairingCode(token: string, deviceId: string): string {
@@ -13,7 +14,7 @@ export const newSyncToken = (): string => randomBytes(32).toString("base64url");
 export type PairingState =
   | { status: "idle" }
   | { status: "waiting"; expiresAt: number }
-  | { status: "confirming"; name: string; code: string; expiresAt: number }
+  | { status: "confirming"; name: string; code: string }
   | { status: "paired"; name: string }
   | { status: "rejected" }
   | { status: "expired" };
@@ -44,20 +45,18 @@ export class PairingRegistry {
     this.close({ kind: "expired" }, { status: "idle" });
     const expiresAt = now + PAIRING_TTL_MS;
     const token = newSyncToken();
-    const timer = setTimeout(
-      () => this.close({ kind: "expired" }, { status: "expired" }),
-      PAIRING_TTL_MS,
-    );
-    timer.unref();
-    this.session = { token, attempts: 0, timer };
+    this.session = { token, attempts: 0, timer: this.expireIn(PAIRING_TTL_MS) };
     this.current = { status: "waiting", expiresAt };
     return { token, expiresAt };
   }
 
+  // The scan and the confirmation have a deadline each; a phone that hangs up
+  // ends the session, so nothing is confirmed for a phone that will never hear it.
   request(
     token: string,
     deviceId: string,
     name: string,
+    signal?: AbortSignal,
   ): Promise<PairingAnswer> {
     const session = this.session;
     if (
@@ -72,15 +71,24 @@ export class PairingRegistry {
     }
 
     session.deviceId = deviceId;
+    clearTimeout(session.timer);
+    session.timer = this.expireIn(CONFIRM_TTL_MS);
     this.current = {
       status: "confirming",
       name,
       code: pairingCode(token, deviceId),
-      expiresAt: this.current.expiresAt,
     };
-    return new Promise((resolve) => {
+    const answer = new Promise<PairingAnswer>((resolve) => {
       session.answer = resolve;
     });
+    const hangUp = () => {
+      if (this.session === session) {
+        this.close({ kind: "expired" }, { status: "expired" });
+      }
+    };
+    if (signal?.aborted) hangUp();
+    else signal?.addEventListener("abort", hangUp, { once: true });
+    return answer;
   }
 
   confirm(): void {
@@ -103,6 +111,15 @@ export class PairingRegistry {
 
   failed(): void {
     this.current = { status: "expired" };
+  }
+
+  private expireIn(ms: number): ReturnType<typeof setTimeout> {
+    const timer = setTimeout(
+      () => this.close({ kind: "expired" }, { status: "expired" }),
+      ms,
+    );
+    timer.unref();
+    return timer;
   }
 
   private close(answer: PairingAnswer, next: PairingState): void {
