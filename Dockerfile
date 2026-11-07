@@ -24,7 +24,7 @@
 # wrong engine; `migrate deploy` then tries to fetch the right one into a
 # node_modules it cannot write to, and the container never starts.
 # Node 24, Debian 13 (trixie)
-FROM node:24-trixie-slim@sha256:7f486cabe892bff8fef04c0f7da8dba84a560be3e4e2740b7a86afc57ebec315 AS toolchain
+FROM node:24-trixie-slim@sha256:43b9ba1142b8dcf33fa8f922ca1be85714adc444e0586c7cf7726daaeabc1bea AS toolchain
 RUN apt-get update \
  && apt-get install -y --no-install-recommends python3 make g++ openssl \
  && rm -rf /var/lib/apt/lists/*
@@ -45,7 +45,7 @@ FROM toolchain AS prod-deps
 RUN pnpm install --frozen-lockfile --prod
 
 # Node 24, Debian 13 (trixie)
-FROM node:24-trixie-slim@sha256:7f486cabe892bff8fef04c0f7da8dba84a560be3e4e2740b7a86afc57ebec315 AS runtime
+FROM node:24-trixie-slim@sha256:43b9ba1142b8dcf33fa8f922ca1be85714adc444e0586c7cf7726daaeabc1bea AS runtime
 # tini as PID 1: forwards SIGTERM to node and reaps zombies, so `docker stop`
 # shuts the server down instead of waiting out the 10s timeout and killing it.
 RUN apt-get update \
