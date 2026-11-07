@@ -28,6 +28,10 @@ export function realDatabasePath(): string {
   return resolve(PROJECT_ROOT, REAL_DATABASE_FILE);
 }
 
+export function backupsDirectory(): string {
+  return resolve(PROJECT_ROOT, "data/backups");
+}
+
 export function scratchDatabasePath(): string {
   return resolve(PROJECT_ROOT, SCRATCH_DATABASE_FILE);
 }

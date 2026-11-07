@@ -6,6 +6,7 @@ import { argv, exit } from "node:process";
 import { ZodError } from "zod";
 
 import { prisma } from "~/adapters/persistence";
+import { backupDatabase, describeBackup } from "~/adapters/persistence/backup";
 import {
   conflictKey,
   SameDeviceError,
@@ -20,8 +21,12 @@ import { describeFailure } from "~/lib/describe-failure";
 import type { ImportResult } from "~/lib/sync";
 import { importSync } from "~/lib/sync.server";
 
-import { backupDatabase, describeBackup } from "./lib/backup";
-import { announceDatabase, realDatabasePath } from "./lib/db-target";
+import {
+  announceDatabase,
+  backupsDirectory,
+  PROJECT_ROOT,
+  realDatabasePath,
+} from "./lib/db-target";
 
 const USAGE = `Usage: pnpm sync:import <file> [--dry-run] [--keep <key>]... [--take <key>]...
 
@@ -165,7 +170,12 @@ async function main(): Promise<void> {
       ? {
           beforeApply: () => {
             try {
-              console.error(describeBackup(backupDatabase(realDatabasePath())));
+              console.error(
+                describeBackup(
+                  backupDatabase(realDatabasePath(), backupsDirectory()),
+                  PROJECT_ROOT,
+                ),
+              );
             } catch (error) {
               throw new Error(
                 `Backup failed, nothing was imported: ${describeFailure(error)}`,

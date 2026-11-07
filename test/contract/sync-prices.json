@@ -1,0 +1,624 @@
+{
+  "contract": "sync-prices",
+  "version": 1,
+  "description": "What the computer answers to POST /v1/prices for one instrument the phone reports, given what it stores. Shared with the mobile client, which applies the answers: pending changes nothing and asks again later; full replaces every row of the instrument; tail deletes the rows at or after `from` and writes `rows`. Full and tail always carry a seriesVersion, never null, which the phone keeps and sends back with its newest row as `last`; a phone with nothing sends null for both. A version is compared for equality only. Instants are compared as instants, whatever offset they are written in.",
+  "cases": [
+    {
+      "name": "the same version: the last week again, so a replaced live row heals",
+      "stored": {
+        "seriesVersion": "series-a",
+        "rows": [
+          {
+            "asOf": "2026-10-01T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-02T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-09T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-12T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-13T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-14T15:30:00.000Z",
+            "price": "11",
+            "currency": "EUR",
+            "source": "YAHOO_LIVE"
+          }
+        ]
+      },
+      "holding": {
+        "instrumentId": "IE00TEST0301",
+        "seriesVersion": "series-a",
+        "last": "2026-10-13T07:00:00.000Z"
+      },
+      "pending": false,
+      "byHand": {
+        "arithmetic": "last 2026-10-13T07:00Z minus 7 days is 2026-10-06T07:00Z, so a tail of the 4 rows from 10-09 on.",
+        "figures": {
+          "kind": "tail",
+          "from": "2026-10-06T07:00:00.000Z",
+          "seriesVersion": "series-a"
+        }
+      },
+      "expect": {
+        "instrumentId": "IE00TEST0301",
+        "kind": "tail",
+        "seriesVersion": "series-a",
+        "from": "2026-10-06T07:00:00.000Z",
+        "rows": [
+          {
+            "asOf": "2026-10-09T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-12T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-13T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-14T15:30:00.000Z",
+            "price": "11",
+            "currency": "EUR",
+            "source": "YAHOO_LIVE"
+          }
+        ]
+      }
+    },
+    {
+      "name": "a window boundary is inclusive",
+      "stored": {
+        "seriesVersion": "series-a",
+        "rows": [
+          {
+            "asOf": "2026-10-01T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-02T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-09T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          }
+        ]
+      },
+      "holding": {
+        "instrumentId": "IE00TEST0301",
+        "seriesVersion": "series-a",
+        "last": "2026-10-16T07:00:00.000Z"
+      },
+      "pending": false,
+      "byHand": {
+        "arithmetic": "2026-10-16T07:00Z minus 7 days is exactly 10-09T07:00Z, the third row, which belongs to the tail.",
+        "figures": {
+          "kind": "tail",
+          "from": "2026-10-09T07:00:00.000Z",
+          "rows.0.asOf": "2026-10-09T07:00:00.000Z"
+        }
+      },
+      "expect": {
+        "instrumentId": "IE00TEST0301",
+        "kind": "tail",
+        "seriesVersion": "series-a",
+        "from": "2026-10-09T07:00:00.000Z",
+        "rows": [
+          {
+            "asOf": "2026-10-09T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          }
+        ]
+      }
+    },
+    {
+      "name": "the same last written in another offset is the same instant",
+      "stored": {
+        "seriesVersion": "series-a",
+        "rows": [
+          {
+            "asOf": "2026-10-01T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-02T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-09T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-12T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-13T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-14T15:30:00.000Z",
+            "price": "11",
+            "currency": "EUR",
+            "source": "YAHOO_LIVE"
+          }
+        ]
+      },
+      "holding": {
+        "instrumentId": "IE00TEST0301",
+        "seriesVersion": "series-a",
+        "last": "2026-10-13T09:00:00+02:00"
+      },
+      "pending": false,
+      "expect": {
+        "instrumentId": "IE00TEST0301",
+        "kind": "tail",
+        "seriesVersion": "series-a",
+        "from": "2026-10-06T07:00:00.000Z",
+        "rows": [
+          {
+            "asOf": "2026-10-09T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-12T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-13T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-14T15:30:00.000Z",
+            "price": "11",
+            "currency": "EUR",
+            "source": "YAHOO_LIVE"
+          }
+        ]
+      }
+    },
+    {
+      "name": "a phone newer than every row gets an empty tail",
+      "stored": {
+        "seriesVersion": "series-a",
+        "rows": [
+          {
+            "asOf": "2026-10-01T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-02T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-09T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-12T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-13T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-14T15:30:00.000Z",
+            "price": "11",
+            "currency": "EUR",
+            "source": "YAHOO_LIVE"
+          }
+        ]
+      },
+      "holding": {
+        "instrumentId": "IE00TEST0301",
+        "seriesVersion": "series-a",
+        "last": "2026-11-01T07:00:00.000Z"
+      },
+      "pending": false,
+      "expect": {
+        "instrumentId": "IE00TEST0301",
+        "kind": "tail",
+        "seriesVersion": "series-a",
+        "from": "2026-10-25T07:00:00.000Z",
+        "rows": []
+      }
+    },
+    {
+      "name": "a phone with nothing gets everything",
+      "stored": {
+        "seriesVersion": "series-a",
+        "rows": [
+          {
+            "asOf": "2026-10-01T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-02T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-09T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-12T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-13T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-14T15:30:00.000Z",
+            "price": "11",
+            "currency": "EUR",
+            "source": "YAHOO_LIVE"
+          }
+        ]
+      },
+      "holding": {
+        "instrumentId": "IE00TEST0301",
+        "seriesVersion": null,
+        "last": null
+      },
+      "pending": false,
+      "expect": {
+        "instrumentId": "IE00TEST0301",
+        "kind": "full",
+        "seriesVersion": "series-a",
+        "rows": [
+          {
+            "asOf": "2026-10-01T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-02T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-09T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-12T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-13T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-14T15:30:00.000Z",
+            "price": "11",
+            "currency": "EUR",
+            "source": "YAHOO_LIVE"
+          }
+        ]
+      }
+    },
+    {
+      "name": "another version is another series",
+      "stored": {
+        "seriesVersion": "series-a",
+        "rows": [
+          {
+            "asOf": "2026-10-01T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-02T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-09T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-12T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-13T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-14T15:30:00.000Z",
+            "price": "11",
+            "currency": "EUR",
+            "source": "YAHOO_LIVE"
+          }
+        ]
+      },
+      "holding": {
+        "instrumentId": "IE00TEST0301",
+        "seriesVersion": "series-b",
+        "last": "2026-10-13T07:00:00.000Z"
+      },
+      "pending": false,
+      "expect": {
+        "instrumentId": "IE00TEST0301",
+        "kind": "full",
+        "seriesVersion": "series-a",
+        "rows": [
+          {
+            "asOf": "2026-10-01T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-02T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-09T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-12T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-13T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-14T15:30:00.000Z",
+            "price": "11",
+            "currency": "EUR",
+            "source": "YAHOO_LIVE"
+          }
+        ]
+      }
+    },
+    {
+      "name": "rows reported with no version are never taken for this series",
+      "stored": {
+        "seriesVersion": "series-a",
+        "rows": [
+          {
+            "asOf": "2026-10-01T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-02T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-09T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-12T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-13T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-14T15:30:00.000Z",
+            "price": "11",
+            "currency": "EUR",
+            "source": "YAHOO_LIVE"
+          }
+        ]
+      },
+      "holding": {
+        "instrumentId": "IE00TEST0301",
+        "seriesVersion": null,
+        "last": "2026-10-13T07:00:00.000Z"
+      },
+      "pending": false,
+      "expect": {
+        "instrumentId": "IE00TEST0301",
+        "kind": "full",
+        "seriesVersion": "series-a",
+        "rows": [
+          {
+            "asOf": "2026-10-01T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-02T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-09T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-12T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-13T07:00:00.000Z",
+            "price": "10",
+            "currency": "EUR",
+            "source": "YAHOO"
+          },
+          {
+            "asOf": "2026-10-14T15:30:00.000Z",
+            "price": "11",
+            "currency": "EUR",
+            "source": "YAHOO_LIVE"
+          }
+        ]
+      }
+    },
+    {
+      "name": "a download still under way answers pending, whatever the phone holds",
+      "stored": {
+        "seriesVersion": "series-a",
+        "rows": []
+      },
+      "holding": {
+        "instrumentId": "IE00TEST0301",
+        "seriesVersion": "series-a",
+        "last": "2026-10-13T07:00:00.000Z"
+      },
+      "pending": true,
+      "expect": {
+        "instrumentId": "IE00TEST0301",
+        "kind": "pending"
+      }
+    },
+    {
+      "name": "no rows and nothing under way is an empty full answer, never pending",
+      "stored": {
+        "seriesVersion": "series-a",
+        "rows": []
+      },
+      "holding": {
+        "instrumentId": "IE00TEST0301",
+        "seriesVersion": "series-a",
+        "last": "2026-10-13T07:00:00.000Z"
+      },
+      "pending": false,
+      "expect": {
+        "instrumentId": "IE00TEST0301",
+        "kind": "full",
+        "seriesVersion": "series-a",
+        "rows": []
+      }
+    },
+    {
+      "name": "an instrument the computer does not know",
+      "stored": {
+        "seriesVersion": "series-unsaved",
+        "rows": []
+      },
+      "holding": {
+        "instrumentId": "IE00TEST0301",
+        "seriesVersion": null,
+        "last": null
+      },
+      "pending": false,
+      "expect": {
+        "instrumentId": "IE00TEST0301",
+        "kind": "full",
+        "seriesVersion": "series-unsaved",
+        "rows": []
+      }
+    }
+  ]
+}

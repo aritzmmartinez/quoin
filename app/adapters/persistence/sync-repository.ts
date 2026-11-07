@@ -3,7 +3,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 import Database from "better-sqlite3";
 
-import { portfolioTargetSchema, residenceSchema } from "~/core/domain";
+import { portfolioTargetSchema } from "~/core/domain";
 import {
   INSTRUMENT_FIELDS,
   TARGET_ENTITY,
@@ -29,6 +29,18 @@ export interface SyncTx {
   setLastHlc(mark: string): void;
   apply(plan: MergePlan["apply"], sender: SyncSender, nowMs: number): void;
   savePeers(peers: readonly Peer[], sender: SyncSender, nowMs: number): void;
+  run(sql: string, ...params: unknown[]): void;
+  all(sql: string, ...params: unknown[]): Record<string, unknown>[];
+}
+
+export class SyncBusyError extends Error {
+  constructor(cause: unknown) {
+    super(
+      "The database is busy with another write; nothing was synced. Try again.",
+      { cause },
+    );
+    this.name = "SyncBusyError";
+  }
 }
 
 export interface SyncStore {
@@ -54,6 +66,7 @@ export const SYNC_COLUMNS = {
     "hedgedToBaseHlc",
     "thesis",
     "thesisHlc",
+    "priceSeriesVersion",
     "createdAt",
   ],
   LedgerEntry: [
@@ -108,7 +121,7 @@ export const SYNC_COLUMNS = {
   Settings: ["id", "residence", "residenceHlc"],
   SyncDevice: ["id", "deviceId", "name", "lastHlc"],
   SyncPeer: ["deviceId", "name", "seen", "lastSyncedAt"],
-  PriceSnapshot: ["instrumentId"],
+  PriceSnapshot: ["instrumentId", "asOf", "price", "currency", "source"],
 } as const;
 
 type Table = keyof typeof SYNC_COLUMNS;
@@ -139,7 +152,7 @@ const text = (value: unknown): string | null =>
   value === null || value === undefined ? null : String(value);
 const flag = (value: unknown): boolean => Number(value) === 1;
 
-function databasePath(): string {
+export function databasePath(): string {
   const url = process.env.DATABASE_URL;
   if (!url?.startsWith("file:")) {
     throw new Error("DATABASE_URL is not a file: URL");
@@ -162,10 +175,7 @@ export class SqliteSyncStore implements SyncStore {
         return this.run(fn);
       } catch (again) {
         if (!isBusy(again)) throw again;
-        throw new Error(
-          "The database is busy with another write; nothing was synced. Try again.",
-          { cause: again },
-        );
+        throw new SyncBusyError(again);
       }
     }
   }
@@ -192,7 +202,7 @@ function isBusy(error: unknown): boolean {
 class SqliteSyncTx implements SyncTx {
   constructor(private readonly db: Database.Database) {}
 
-  private all(sql: string, ...params: unknown[]): SqlRow[] {
+  all(sql: string, ...params: unknown[]): SqlRow[] {
     return this.db.prepare(sql).all(...params) as SqlRow[];
   }
 
@@ -202,7 +212,7 @@ class SqliteSyncTx implements SyncTx {
     return row;
   }
 
-  private run(sql: string, ...params: unknown[]): void {
+  run(sql: string, ...params: unknown[]): void {
     this.db.prepare(sql).run(...params);
   }
 
@@ -409,6 +419,11 @@ class SqliteSyncTx implements SyncTx {
       );
       if ("quoteSymbol" in patch) {
         this.run(`DELETE FROM "PriceSnapshot" WHERE "instrumentId" = ?`, id);
+        this.run(
+          `UPDATE "Instrument" SET "priceSeriesVersion" = ? WHERE "id" = ?`,
+          randomUUID(),
+          id,
+        );
       }
     }
 
@@ -463,7 +478,7 @@ class SqliteSyncTx implements SyncTx {
       if (residence !== undefined) {
         this.run(
           `UPDATE "Settings" SET "residence" = ? WHERE "id" = ?`,
-          residenceSchema.parse(residence),
+          residence,
           ONE,
         );
       }

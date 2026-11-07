@@ -221,6 +221,62 @@ pnpm test               # Vitest (pure domain / projection / mapper tests)
 pnpm run test:integration   # migrations against a temporary SQLite database
 ```
 
+### Syncing with the phone
+
+The mobile app keeps a copy of the portfolio and syncs it with this computer over the
+local network, never through a server of anyone else's. Pair it from **Settings →
+Devices**: scan the QR from the phone, check that the six digit code is the same on both
+screens, and confirm. From then on each sync goes both ways: the phone brings what was
+recorded on it, and takes everything else, prices included.
+
+The sync has its own port, 3443 by default, served over HTTPS. The phone trusts the
+computer's certificate by the fingerprint in the QR, so it needs no certificate
+authority and no domain. Devices proposes this computer's address on the local network;
+in Docker, which cannot see it, write it there once. The API the phone speaks is in
+[`docs/sync-api.md`](docs/sync-api.md).
+
+With Docker, publish the sync port on the computer's address on the local network, next
+to the web port:
+
+```powershell
+docker run -d --name quoin -p 127.0.0.1:3000:3000 -p 192.168.1.20:3443:3443 -v quoin-data:/app/data --restart unless-stopped aritzmmartinez/quoin:latest
+```
+
+With Docker Compose, add the line to `ports`:
+
+```yaml
+    ports:
+      - "127.0.0.1:3000:3000"
+      - "192.168.1.20:3443:3443"
+```
+
+- **Write the address in `-p`.** Without it, Docker publishes the port on every
+  interface, a VPN or a public one included. On Linux it also adds its own firewall
+  rules, which skip ufw: a port ufw denies is open anyway. If the computer's address
+  changes, the container needs the new one.
+- **On Windows, allow access on private networks when Windows asks**, the first time the
+  port opens. If it never asked, or the phone cannot connect, open the port yourself
+  from PowerShell as administrator:
+
+```powershell
+New-NetFirewallRule -DisplayName "Quoin sync" -Direction Inbound -Protocol TCP -LocalPort 3443 -Profile Private -Action Allow
+```
+- **Only the web port still has no login.** The sync port answers only phones that were
+  paired, and a pairing needs the owner to confirm the code on the computer's screen.
+
+**Nothing asks on the computer once a phone is paired.** Its syncs apply as they arrive,
+so a lost phone can write to the ledger until it is revoked. What stands in for a
+confirmation:
+
+- **Revoke** a phone in Devices. From then on every request it makes is refused, and to
+  sync again it has to be paired as a new device.
+- **A daily snapshot.** The first sync of each day that brings changes copies the
+  database first into `data/backups/sync/`, keeping the last 14 days. It restores like
+  any other backup (see *Updating*).
+- **The counts in Devices.** Each phone shows when it last synced, from which address,
+  what that sync brought (entries, instruments, plans, compositions) and any download
+  that failed after it.
+
 ### Updating
 
 With Docker Compose:
@@ -241,7 +297,8 @@ docker pull aritzmmartinez/quoin:latest
 docker rm -f quoin
 ```
 
-Then the same `docker run` as above. Either way:
+Then the same `docker run` as above, with the sync port if a phone is paired (see
+*Syncing with the phone*). Either way:
 
 - **Your data is in the volume, not the container.** Removing the container keeps it;
   the new one opens the same ledger.
@@ -249,12 +306,18 @@ Then the same `docker run` as above. Either way:
   exists, it takes the same snapshot as `db-backup` into `data/backups/` first, and does
   not start if that backup fails.
 - **From 0.13.0 on, going back needs that backup.** An older image cannot open a database
-  migrated by a newer one. To go back, stop the container, copy the snapshot taken before
-  the update over the ledger with the older image, and start the older image:
+  migrated by a newer one. To go back, stop the container, delete the ledger's
+  `quoin.sqlite-*` files and copy the snapshot taken before the update over the ledger
+  with the older image, then start the older image:
 
 ```bash
-docker run --rm -v quoin-data:/app/data --entrypoint cp aritzmmartinez/quoin:0.12.1 /app/data/backups/quoin-YYYYMMDD-HHMM.sqlite /app/data/quoin.sqlite
+docker stop quoin
+docker run --rm -v quoin-data:/app/data --entrypoint sh aritzmmartinez/quoin:0.12.1 -c "rm -f /app/data/quoin.sqlite-* && cp /app/data/backups/quoin-YYYYMMDD-HHMM.sqlite /app/data/quoin.sqlite"
 ```
+
+A `quoin.sqlite-journal` (or `-wal`) left beside the ledger belongs to the old file, and
+SQLite would replay it over the restored copy. Any snapshot restores this way, a sync's
+from `data/backups/sync/` included. From source, stop the app and do the same in `data/`.
 
 From source, pull the new version, then migrate:
 
@@ -317,6 +380,7 @@ on with decimal.js; data and secrets are never committed.
 - [ ] DCF valuation module
 - [x] Kraken: every asset against fiat, and swaps between crypto assets (0.14.0)
 - [x] Sync-ready: one calendar zone everywhere, and a merge engine between installations (0.15.0)
+- [x] Sync server: pair a phone by QR and sync over the local network (0.16.0)
 - [ ] Mobile app
 
 ## License

@@ -1,4 +1,8 @@
-import { residenceSchema, type Residence } from "~/core/domain";
+import {
+  residenceSchema,
+  UnsupportedResidenceError,
+  type Residence,
+} from "~/core/domain";
 import type { SettingsRepository } from "~/core/ports";
 
 import { prisma } from "./db.server";
@@ -12,7 +16,9 @@ export class PrismaSettingsRepository implements SettingsRepository {
       where: { id: SETTINGS_ID },
     });
     if (!row) throw new Error("The Settings row is missing");
-    return residenceSchema.parse(row.residence);
+    const parsed = residenceSchema.safeParse(row.residence);
+    if (!parsed.success) throw new UnsupportedResidenceError(row.residence);
+    return parsed.data;
   }
 
   async setResidence(residence: Residence): Promise<void> {

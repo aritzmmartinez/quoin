@@ -24,7 +24,7 @@
 # wrong engine; `migrate deploy` then tries to fetch the right one into a
 # node_modules it cannot write to, and the container never starts.
 # Node 24, Debian 13 (trixie)
-FROM node:24-trixie-slim@sha256:7f486cabe892bff8fef04c0f7da8dba84a560be3e4e2740b7a86afc57ebec315 AS toolchain
+FROM node:24-trixie-slim@sha256:0820eaa85e07d0490446dd01d14707e17e6108a36988cf374899cd057eb3812d AS toolchain
 RUN apt-get update \
  && apt-get install -y --no-install-recommends python3 make g++ openssl \
  && rm -rf /var/lib/apt/lists/*
@@ -45,7 +45,7 @@ FROM toolchain AS prod-deps
 RUN pnpm install --frozen-lockfile --prod
 
 # Node 24, Debian 13 (trixie)
-FROM node:24-trixie-slim@sha256:7f486cabe892bff8fef04c0f7da8dba84a560be3e4e2740b7a86afc57ebec315 AS runtime
+FROM node:24-trixie-slim@sha256:0820eaa85e07d0490446dd01d14707e17e6108a36988cf374899cd057eb3812d AS runtime
 # tini as PID 1: forwards SIGTERM to node and reaps zombies, so `docker stop`
 # shuts the server down instead of waiting out the 10s timeout and killing it.
 RUN apt-get update \
@@ -63,7 +63,8 @@ ENV NODE_ENV=production \
     DATABASE_URL=file:./data/quoin.sqlite \
     CHECKPOINT_DISABLE=1 \
     PRISMA_HIDE_UPDATE_MESSAGE=1 \
-    DOTENV_QUIET=true
+    DOTENV_QUIET=true \
+    QUOIN_RUNTIME=docker
 
 WORKDIR /app
 COPY --from=prod-deps /app/node_modules ./node_modules
@@ -73,14 +74,15 @@ COPY --from=build /app/build ./build
 COPY package.json prisma.config.ts ./
 COPY prisma ./prisma
 COPY scripts/db-backup.ts ./scripts/
-COPY scripts/lib/db-target.ts scripts/lib/backup.ts scripts/lib/backup-names.ts scripts/lib/backup-verify.ts ./scripts/lib/
+COPY scripts/lib/db-target.ts ./scripts/lib/
+COPY app/adapters/persistence/backup.ts app/adapters/persistence/backup-names.ts app/adapters/persistence/backup-verify.ts ./app/adapters/persistence/
 COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/
 COPY --chmod=755 db-backup.sh /usr/local/bin/db-backup
 
 RUN mkdir -p data && chown node:node data
 USER node
 VOLUME /app/data
-EXPOSE 3000
+EXPOSE 3000 3443
 
 ENTRYPOINT ["tini", "--", "docker-entrypoint.sh"]
 CMD ["node_modules/.bin/react-router-serve", "build/server/index.js"]

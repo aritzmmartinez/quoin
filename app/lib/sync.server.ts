@@ -1,3 +1,5 @@
+import { hostname } from "node:os";
+
 import { SqliteSyncStore } from "~/adapters/persistence";
 import { dayOf } from "~/core/calendar";
 import type { Effect, Exchange, Resolutions } from "~/core/sync";
@@ -6,6 +8,7 @@ import { rateSeriesOf } from "./fx-sync";
 import { ensureRatesNow } from "./fx-sync.server";
 import { replaceHistory } from "./ingest.server";
 import { DEFAULT_HISTORY_RANGE } from "./prices-backfill";
+import { isUnsupportedResidence, UNSUPPORTED_RESIDENCE } from "./residence";
 import { loadResidence } from "./residence.server";
 import {
   exportState,
@@ -14,16 +17,29 @@ import {
   type ImportResult,
 } from "./sync";
 
+export const inDocker = () => process.env.QUOIN_RUNTIME === "docker";
+
+export const defaultServerName = () => (inDocker() ? "Quoin" : hostname());
+
 export async function exportSync(): Promise<Exchange> {
   const store = new SqliteSyncStore();
   try {
-    return await exportState(store, new Date());
+    return await exportState(store, new Date(), defaultServerName());
   } finally {
     store.close();
   }
 }
 
-async function runEffect(effect: Effect): Promise<EffectOutcome> {
+export async function runEffect(effect: Effect): Promise<EffectOutcome> {
+  try {
+    return await attemptEffect(effect);
+  } catch (error) {
+    if (!isUnsupportedResidence(error)) throw error;
+    return { effect, ok: false, reason: UNSUPPORTED_RESIDENCE };
+  }
+}
+
+async function attemptEffect(effect: Effect): Promise<EffectOutcome> {
   if (effect.kind === "prices") {
     const outcome = await replaceHistory(
       effect.instrumentId,

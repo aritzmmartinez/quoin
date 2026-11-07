@@ -131,6 +131,10 @@ export const en: Copy = {
     body: "That address does not match any Quoin screen.",
     home: "Go to the summary",
   },
+  unsupportedResidence: {
+    title: "Update Quoin",
+    body: "Another device has saved a tax residence this version of Quoin does not know. Your data is untouched: update Quoin on this computer to continue.",
+  },
   select: {
     empty: "No results",
   },
@@ -231,6 +235,89 @@ export const en: Copy = {
         label: "Exchange rates",
         hint: "European Central Bank: currencies in use",
       },
+    },
+    devices: {
+      title: "Devices",
+      desc: "Paired phones sync with this computer over the local network.",
+      refused: "This can only be done from within Quoin.",
+      saved: {
+        name: "Name saved",
+        host: "Address saved",
+        port: "Port saved",
+        revoked: (name: string): string => `“${name}” revoked`,
+      },
+      name: {
+        label: "Name of this computer",
+        hint: "The one the phone will show when pairing",
+        invalid: "The name cannot be longer than 100 characters.",
+      },
+      address: {
+        host: {
+          label: "Address of this computer",
+          hint: "The local network IP the phone will use to reach it",
+          hintManual:
+            "Quoin cannot see this computer's IP from here. Enter it once and it will be remembered",
+          placeholder: "192.168.1.20",
+        },
+        port: {
+          label: "Sync port",
+          hint: "The one published to the local network",
+        },
+        save: "Save",
+        invalidHost: "Enter a valid IP address or computer name.",
+        invalidPort: "The port must be a number between 1 and 65535.",
+      },
+      pair: {
+        start: "Pair a phone",
+        scan: "Scan this code from Quoin on the phone.",
+        expiresIn: (time: string): string => `Expires in ${time}`,
+        qrLabel: "QR code to pair a phone",
+        confirmTitle: (name: string): string => `Pair “${name}”?`,
+        confirmBody: "Check that the code is the same on both devices.",
+        code: "Code",
+        confirm: "Pair",
+        reject: "Reject",
+        cancel: "Cancel",
+        again: "Generate another code",
+        expired: "The code has expired.",
+        rejected: "Pairing rejected.",
+        done: (name: string): string => `“${name}” is now paired.`,
+        needAddress: "Enter the address of this computer first.",
+        portUnavailable: (port: number): string =>
+          `Port ${port} could not be opened. Check that no other program is using it.`,
+      },
+      list: {
+        empty: "No phones paired.",
+        pairedAt: (when: string): string => `Paired ${when}`,
+        lastSync: (when: string, address: string): string =>
+          `Last sync: ${when}, from ${address}`,
+        neverSynced: "Not synced yet",
+        revoke: "Revoke",
+        confirmRevoke: (name: string): string =>
+          `“${name}” will no longer be able to sync. Using it again will need a new pairing.`,
+        revoked: (when: string): string => `Revoked ${when}`,
+      },
+      counts: {
+        none: "No changes",
+        ledger: (n: number): string =>
+          n === 1 ? "1 transaction" : `${n} transactions`,
+        instruments: (n: number): string =>
+          n === 1 ? "1 instrument" : `${n} instruments`,
+        targets: (n: number): string => (n === 1 ? "1 plan" : `${n} plans`),
+        holdings: (n: number): string =>
+          n === 1 ? "1 composition" : `${n} compositions`,
+        identities: (n: number): string =>
+          n === 1 ? "1 identity" : `${n} identities`,
+        settings: "the residence",
+        setAside: (n: number): string =>
+          n === 1 ? "1 transaction set aside" : `${n} transactions set aside`,
+      },
+      failedPrices: (n: number): string =>
+        n === 1
+          ? "A download failed after the last sync. It will be tried again at the next price update."
+          : `${n} downloads failed after the last sync. They will be tried again at the next price update.`,
+      failedRates: (n: number): string =>
+        `${n === 1 ? "An exchange rate download failed" : `${n} exchange rate downloads failed`} after the last sync. To try again, ${REFRESH_RATES}.`,
     },
   },
   fx: {

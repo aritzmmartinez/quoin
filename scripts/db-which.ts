@@ -5,9 +5,11 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { argv, execPath, exit } from "node:process";
 
-import { backupDatabase, describeBackup } from "./lib/backup";
+import { backupDatabase, describeBackup } from "~/adapters/persistence/backup";
+
 import {
   announceDatabase,
+  backupsDirectory,
   PROJECT_ROOT,
   realDatabasePath,
 } from "./lib/db-target";
@@ -46,7 +48,12 @@ function main(): void {
     if (!shouldBackupBeforeDeploy(target, exists, status)) return;
 
     console.error("Pending migrations: backing up the ledger first.");
-    console.error(describeBackup(backupDatabase(realDatabasePath())));
+    console.error(
+      describeBackup(
+        backupDatabase(realDatabasePath(), backupsDirectory()),
+        PROJECT_ROOT,
+      ),
+    );
   }
 }
 

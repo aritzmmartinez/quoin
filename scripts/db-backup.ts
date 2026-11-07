@@ -4,8 +4,16 @@ import { existsSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import { argv, exit } from "node:process";
 
-import { backupDatabase, describeBackup } from "./lib/backup";
-import { PROJECT_ROOT, realDatabasePath } from "./lib/db-target";
+// Relative, not `~/`: the image runs this through tsx with no tsconfig.
+import {
+  backupDatabase,
+  describeBackup,
+} from "../app/adapters/persistence/backup";
+import {
+  backupsDirectory,
+  PROJECT_ROOT,
+  realDatabasePath,
+} from "./lib/db-target";
 
 /**
  * Snapshot the ledger with `VACUUM INTO`, which asks SQLite for a consistent copy
@@ -38,7 +46,9 @@ function main(): void {
     exit(1);
   }
 
-  console.log(describeBackup(backupDatabase(source)));
+  console.log(
+    describeBackup(backupDatabase(source, backupsDirectory()), PROJECT_ROOT),
+  );
 }
 
 try {

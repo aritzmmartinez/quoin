@@ -5,6 +5,7 @@ import {
   PrismaPriceSyncRepository,
 } from "~/adapters/persistence";
 
+import { ensureRatesNow } from "./fx-sync.server";
 import {
   syncInstrumentPrices,
   toSyncTargets,
@@ -16,8 +17,10 @@ import { loadResidence } from "./residence.server";
 export async function defaultDeps(): Promise<SyncDeps> {
   const { calendarZone } = await loadResidence();
   return {
+    instruments: new PrismaInstrumentRepository(),
     prices: new PrismaPriceRepository(),
     provider: new YahooMarketDataProvider(),
+    rates: ensureRatesNow,
     checks: new PrismaPriceSyncRepository(),
     zone: calendarZone,
   };

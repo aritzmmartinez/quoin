@@ -1,6 +1,7 @@
 import type {
   SyncSender,
   SyncStore,
+  SyncTx,
 } from "~/adapters/persistence/sync-repository";
 import {
   changesData,
@@ -28,25 +29,42 @@ export type EffectOutcome = { effect: Effect } & (
 
 export type RunEffect = (effect: Effect) => Promise<EffectOutcome>;
 
-export function exportState(store: SyncStore, now: Date): Promise<Exchange> {
+export function exportState(
+  store: SyncStore,
+  now: Date,
+  defaultName: string | null = null,
+): Promise<Exchange> {
   return store.transaction((tx) => {
     const { device, name } = tx.read();
-    const exported = exportDevice(device, now.getTime(), name);
+    const exported = exportDevice(device, now.getTime(), name ?? defaultName);
     if (exported.device.lastHlc) tx.setLastHlc(exported.device.lastHlc);
     return exported.exchange;
   });
 }
 
-export interface ImportDeps {
+export interface ApplyDeps {
   store: SyncStore;
-  runEffect: RunEffect;
   beforeApply?: () => void;
+  settled?: (
+    tx: SyncTx,
+    outcome: { status: "up-to-date" | "applied"; counts: PlanCounts },
+  ) => void;
   now: Date;
+}
+
+export interface ImportDeps extends ApplyDeps {
+  runEffect: RunEffect;
 }
 
 export interface ImportOptions {
   dryRun: boolean;
   resolutions?: Resolutions;
+}
+
+export interface ApplyResult {
+  status: "conflicts" | "up-to-date" | "dry-run" | "applied";
+  plan: MergePlan;
+  counts: PlanCounts;
 }
 
 export type ImportResult = { plan: MergePlan; counts: PlanCounts } & (
@@ -56,11 +74,11 @@ export type ImportResult = { plan: MergePlan; counts: PlanCounts } & (
   | { status: "applied"; effects: EffectOutcome[] }
 );
 
-export async function importState(
-  deps: ImportDeps,
+export async function applyState(
+  deps: ApplyDeps,
   raw: unknown,
   options: ImportOptions,
-): Promise<ImportResult> {
+): Promise<ApplyResult> {
   const incoming = parseExchange(raw);
   const sender: SyncSender = {
     deviceId: incoming.deviceId,
@@ -68,7 +86,7 @@ export async function importState(
   };
   const nowMs = deps.now.getTime();
 
-  const result = await deps.store.transaction((tx) => {
+  return deps.store.transaction((tx) => {
     const { state } = tx.read().device;
     const plan = merge(state, incoming, options.resolutions);
     const counts = planCounts(plan, state);
@@ -79,23 +97,44 @@ export async function importState(
       if (!options.dryRun && !samePeers(state.peers, plan.apply.peers)) {
         tx.savePeers(plan.apply.peers, sender, nowMs);
       }
+      if (!options.dryRun) deps.settled?.(tx, { status: "up-to-date", counts });
       return { status: "up-to-date" as const, plan, counts };
     }
     if (options.dryRun) return { status: "dry-run" as const, plan, counts };
 
     deps.beforeApply?.();
     tx.apply(plan.apply, sender, nowMs);
+    deps.settled?.(tx, { status: "applied", counts });
     return { status: "applied" as const, plan, counts };
   });
-  if (result.status !== "applied") return result;
+}
 
-  const effects = await inTurn(result.plan.effects, deps.runEffect, {
+export function runEffects(
+  effects: readonly Effect[],
+  runEffect: RunEffect,
+): Promise<EffectOutcome[]> {
+  return inTurn(effects, runEffect, {
     onError: (error, effect): EffectOutcome => {
       if (haltsSync(error)) throw error;
       return { effect, ok: false, reason: describeFailure(error) };
     },
   });
-  return { ...result, effects };
+}
+
+export async function importState(
+  deps: ImportDeps,
+  raw: unknown,
+  options: ImportOptions,
+): Promise<ImportResult> {
+  const result = await applyState(deps, raw, options);
+  if (result.status !== "applied") {
+    return { ...result, status: result.status };
+  }
+  return {
+    ...result,
+    status: "applied",
+    effects: await runEffects(result.plan.effects, deps.runEffect),
+  };
 }
 
 export interface PlanCounts {

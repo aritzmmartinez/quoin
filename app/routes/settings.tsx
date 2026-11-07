@@ -23,6 +23,7 @@ import {
   ThemeSetting,
   ThresholdSetting,
 } from "~/components";
+import { DevicesSection } from "~/components/settings/DevicesSection";
 import { ExternalDataSource } from "~/components/settings/ExternalDataSource";
 import { SettingRow as Row } from "~/components/settings/SettingRow";
 import { useFxRefresh } from "~/components/settings/use-fx-refresh";
@@ -43,6 +44,7 @@ import {
 import { loadExternalData } from "~/lib/external-data.server";
 import { loadRateBook } from "~/lib/rate-book.server";
 import { loadResidence } from "~/lib/residence.server";
+import { loadDevices } from "~/lib/sync-devices.server";
 
 export function meta({ matches }: Route.MetaArgs) {
   const t = copyFromMatches(matches);
@@ -85,6 +87,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       intlTag(parseLocale(cookie)),
     ),
     external: await loadExternalData(instruments, events, latest, benchmark),
+    devices: await loadDevices(request),
   };
 }
 
@@ -96,7 +99,7 @@ const CURRENCIES = [
 ] as const;
 
 export default function Settings({ loaderData }: Route.ComponentProps) {
-  const { threshold, benchmark, candidates, external } = loaderData;
+  const { threshold, benchmark, candidates, external, devices } = loaderData;
   const t = useCopy();
   const s = t.settings;
   const d = s.externalData;
@@ -179,6 +182,10 @@ export default function Settings({ loaderData }: Route.ComponentProps) {
           refresh={rates.refresh}
           busy={rates.busy}
         />
+      </Section>
+
+      <Section title={s.devices.title} desc={s.devices.desc}>
+        <DevicesSection view={devices} />
       </Section>
     </div>
   );

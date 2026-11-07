@@ -126,7 +126,12 @@ piece of the contract with the mobile client, which must assign the same days.
 
 - **The zone comes from the residence setting, resolved in one place.** `Settings` has
   one row (`CHECK id = 1`); `residence` (today only `bizkaia`) has no CHECK — the
-  vocabulary grows, `residenceSchema` validates at write and at read. Core maps it two
+  vocabulary grows, `residenceSchema` validates at write. A value this version does not
+  know can still arrive from a newer device through a sync, which stores it untouched so
+  nothing is lost; its read throws `UnsupportedResidenceError`, and `loadResidence()`
+  turns that into a 409 carrying `unsupported-residence`, because an `Error` reaches the
+  browser sanitised and a code does not. Both boundaries then ask to update Quoin and
+  never offer to reset to Bizkaia: the reset would sync back to that device. Core maps it two
   ways, `territoryOfResidence` and `zoneOfResidence`, and they are separate because the
   régimen común will be one territory in two zones (Canarias). `loadResidence()` is the
   server's only reader: it yields the `Jurisdiction` (territory + zone, what AVCO, FIFO
@@ -159,6 +164,8 @@ piece of the contract with the mobile client, which must assign the same days.
   - `ingest` — the real adapters over invented CSVs with in-memory repositories; event ids
     are random, so it omits them, and the per-adapter unit tests are the hand-checked guard.
   - `sync` — `merge`; its expectations are written by hand, never by running it.
+  - `sync-prices` — what `POST /v1/prices` answers for one instrument (`answerPrices`).
+  - `sync-pairing` — the six digit pairing code; its cases were worked out with openssl.
   - `tax` — foral FIFO, Art. 43, deferred losses, carryforward, quota, and the figures of
     `buildTaxYearView` (not `pendingBySale`: it breaks ties on names, by locale).
   - `realized` — AVCO realised gains per sale.
@@ -166,7 +173,7 @@ piece of the contract with the mobile client, which must assign the same days.
   - `series` — cost line, value against invested, the portfolio merge, prices in euros.
   - `analysis` — opportunity cost, weighted TER, rebalance.
 
-  Except `ingest` and `sync`, results come from the core, and `byHand` figures in some
+  Except `ingest`, `sync` and `sync-pairing`, results come from the core, and `byHand` figures in some
   cases (a dotted path into `expect` for the last five), worked out by hand and checked
   against the core, are what stop a regenerated file from blessing a regression.
   **Any sort whose ties could reach a contract states its tie-break**: Dart's `List.sort`
@@ -230,6 +237,16 @@ This has caused misdirected generation more than once:
   construct a client on the plain adapter. Why it exists is in that file.
 - **The one write outside `fn` is `PrismaTargetRepository.create`**, whose nested
   `create` opens its own transaction. A test pins it.
+- **A transaction takes the write lock when it opens.** The adapter hardcodes a deferred
+  `BEGIN`, so a transaction that read first held only a shared lock: the sync's
+  `BEGIN IMMEDIATE` got through, merged, and failed at `COMMIT`. `startTransaction` now
+  runs an `UPDATE` that matches nothing first, so the sync collides before it starts. If
+  the lock cannot be taken, the transaction is rolled back and the connection stays usable.
+- **A transaction body that awaits only Prisma never yields the event loop**, measured up
+  to 6 894 upserts in 1.1 s: nothing else in the process runs inside it, so the collision
+  above is across processes only, and the cost of a long transaction is latency for the
+  whole server, sync port included. Never `await` the network or anything slow inside
+  `fn`: with the lock taken at open, every sync would answer 503 while it lasted.
 
 ## Market data invariants
 
@@ -290,8 +307,12 @@ This has caused misdirected generation more than once:
 - **A sync fills gaps, then writes at most one live row per Madrid day.** `prices:sync` and
   "Refresh prices" share `syncInstrumentPrices`, one instrument at a time (`inTurn` on the
   client, as "Rebuild all"). It asks Yahoo for daily candles from the Madrid day of the
-  instrument's newest row, **whatever its source**, minus `SYNC_OVERLAP_DAYS` (7), through
-  yesterday; today's candle is dropped because it has not closed. Then the live quote,
+  instrument's last **daily candle** (`lastCandleAsOf`; a live row would hide the missing
+  candles behind it), minus `SYNC_OVERLAP_DAYS` (7), through yesterday; today's candle is
+  dropped because it has not closed. An instrument with no candle at all goes through
+  `replaceQuoteHistory` over the default range, as the sync's effect does, so a history
+  whose download failed comes back by itself; if that finds none, the live quote is
+  written as before and the next sync tries again. Then the live quote,
   stored as `YAHOO_LIVE` (`liveSource`) and dated by **its own** `regularMarketTime`, never
   by the clock — on a Saturday it is Friday's close and belongs to Friday. The overlap is
   what heals rows written before `YAHOO_LIVE` existed: they cannot be told apart from
@@ -409,6 +430,14 @@ ledger while that rule is in force. Useful, but do not mistake it for a sandbox.
   says the statement ran, not that the result opens — and a bad snapshot that still
   counted as one would push the oldest good backup out of the 30-file window, so a single
   corrupt copy would cost two. A failed verification deletes the copy and exits non-zero.
+- **Every snapshot goes through `snapshotDatabase` in `app/adapters/persistence/backup.ts`**,
+  which takes its directory as a parameter: `db:backup`, the entrypoint, `db:deploy`,
+  `sync:import` and the sync server. A row-count mismatch is taken again once, because a
+  write between `VACUUM INTO` and the count is not corruption; a failed
+  `integrity_check` never is. Two snapshots in the same minute get `-01`…`-99`. The sync
+  server's go to `data/backups/sync/quoin-sync-YYYY-MM-DD.sqlite`, one per Madrid day,
+  before the first apply that brings changes, keeping 14 in a window of their own so a
+  phone's syncs never rotate out the 30 in `data/backups/`.
 - **Every script that opens the database calls `announceDatabase()` first**, on stderr:
   the file, and whether it is the ledger, scratch or neither. It is information, not a
   fourth defence — `pnpm db:deploy` once went to the ledger while it was believed to go to
@@ -492,6 +521,53 @@ the scripts only parse and print.
   changed on both sides only a day read from a file decides.
 - **`schemaVersion` is bumped for anything a v1 reader would misread**, e.g. deleting a
   composition, which today has no caller and so no tombstone.
+
+## Sync server
+
+The phone syncs through an HTTPS API on its own port. `docs/sync-api.md` is its contract
+with the mobile client: change it together with `app/lib/sync-api.ts`, which is pure, with
+every dependency injected.
+
+- **The listener lives in the app's process.** `app/entry.server.tsx`, a copy of React
+  Router's default, starts it when a device is paired, and the pairing action starts it
+  through `ensureListener`. With no database or tables yet it starts nothing and says
+  nothing. Its state sits on `globalThis`, so a dev reload finds the socket it holds.
+  In production SIGTERM and SIGINT close it and the sync's connection: react-router-serve
+  closes only its own server, and an open socket would keep the container alive until
+  Docker kills it.
+- **No cryptography of our own**: TLS, SHA-256, HMAC and random bytes come from
+  `node:crypto`. The identity is a self-signed certificate with no address in it, in
+  `data/sync/` (`key.pem` 0600, `cert.pem` written last, so a crash never leaves a key
+  beside another key's certificate). The phone pins the SHA-256 of its DER, carried in
+  the QR. A device token is stored as its SHA-256 and compared with `timingSafeEqual`.
+- **In Docker the listener always binds 3443** (`QUOIN_RUNTIME=docker`), what the image
+  exposes. The configured port is the published one, and it is what the QR carries.
+- **A pairing has two deadlines**: two minutes for the scan, then 60 s from a valid
+  token for the confirmation, while `POST /v1/pair` is held open. A hang-up ends it as
+  expired, through the `AbortSignal` the listener hands over, so a late confirmation
+  stores nothing for a phone that will never hear it.
+- **A sync answers after its commit, and its effects run afterwards**, one at a time, in
+  `EffectQueue`. An instrument is `pending` only while its download is queued or running,
+  so a failed one is never pending for good. Failures add up in the device's `lastCounts`
+  as `failedPrices` and `failedRates`, apart: the next Refresh prices retries a price
+  history, while rates need Refresh in External data. A failure that is not the
+  provider's stops the queue, is logged once, and counts the rest as failed.
+- **`POST /v1/sync` checks `If-Match` against the ETag `GET` would give now**: SHA-256 of
+  the state without `exportHlc`, with the same `deviceName` (stored, or
+  `defaultServerName()`). Compute both through the same path or every POST is a 409.
+- **`Instrument.priceSeriesVersion` tells the phone whether its rows still belong to the
+  series.** A random id, never a counter: after restoring a backup a counter climbs back
+  to a number a phone already holds, for other rows. It changes when the series is
+  emptied or replaced (`replaceHistory`, a symbol change in the merge) and when a write
+  reaches behind the week a tail covers (`reachesBehindTail`: a repair, a backfill); a
+  live row replaced by its candle stays inside that week and leaves it alone, or every
+  phone would download everything every day. Anything new that deletes or rewrites old
+  `PriceSnapshot` rows changes it too. The first request assigns one in the sync's
+  transaction; it never travels in an exchange.
+- **`/api/devices` refuses `Sec-Fetch-Site: cross-site`**: approving a phone is not
+  something another site may do. It is a resource route, polled while a pairing is open
+  and every 15 s for the list, because revalidating Settings reloads its prices and
+  ledger. Its lists are built field by field, so a token's hash never reaches the browser.
 
 ## Privacy and the no-clobber rule
 
@@ -1303,8 +1379,9 @@ shareable. A route opts into the header's range selector with `handle = { range:
   Route.ErrorBoundaryProps` is the Framework Mode signature; the hook is Data Mode's and
   works here only by compatibility. The shared component cannot use that type at all —
   `params` and `loaderData` are generated per route, so a component with no route has no
-  `Route` namespace to import. It takes **no props**: it renders nothing from the error,
-  and an unused `error: unknown` would be decoration.
+  `Route` namespace to import. It takes `{ error }: { error: unknown }` and reads one
+  thing from it, `isUnsupportedResidence`, to ask for an update instead of the generic
+  card; nothing else of the error is rendered.
 
 ## Tailwind v4 — a nonexistent class is silent
 
