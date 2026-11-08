@@ -270,6 +270,8 @@ export const es = {
         port: {
           label: "Puerto de sincronización",
           hint: "El que se publica hacia la red local",
+          database: (path: string, kind: "ledger" | "scratch" | "other") =>
+            `Base de datos: ${path} (${{ ledger: "ledger real", scratch: "base de pruebas", other: "ni el ledger ni la de pruebas" }[kind]})`,
         },
         save: "Guardar",
         invalidHost: "Escribe una dirección IP o un nombre de equipo válidos.",

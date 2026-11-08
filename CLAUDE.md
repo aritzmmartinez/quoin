@@ -535,6 +535,11 @@ every dependency injected.
   In production SIGTERM and SIGINT close it and the sync's connection: react-router-serve
   closes only its own server, and an open socket would keep the container alive until
   Docker kills it.
+- **The listener says which database it serves**, on start and when its port is taken
+  (`describeListener`), classified by `classifyDatabaseIn` against `process.cwd()` —
+  what better-sqlite3 opens, never `PROJECT_ROOT`, which in the bundle is `build/server`.
+  Development also shows it under the port in Devices. Two `pnpm dev` once paired a phone
+  with the ledger and nothing said so.
 - **No cryptography of our own**: TLS, SHA-256, HMAC and random bytes come from
   `node:crypto`. The identity is a self-signed certificate with no address in it, in
   `data/sync/` (`key.pem` 0600, `cert.pem` written last, so a crash never leaves a key

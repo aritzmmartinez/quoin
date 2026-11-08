@@ -12,12 +12,17 @@ import {
   SqlitePairedDevices,
   SqliteSyncStore,
 } from "~/adapters/persistence";
+import {
+  classifyDatabaseIn,
+  type DatabaseTarget,
+} from "~/adapters/persistence/database-target";
 import { backupBeforeSync } from "~/adapters/persistence/sync-backup";
 import { loadTlsIdentity } from "~/adapters/sync-server/identity";
 import { listen } from "~/adapters/sync-server/listener";
 import { today } from "~/core/calendar";
 
 import { describeFailure } from "./describe-failure";
+import { describeListener, isPortInUse } from "./sync-notice";
 import type { RunEffect } from "./sync";
 import { defaultServerName, inDocker, runEffect } from "./sync.server";
 import { AuthThrottle, handleSyncRequest } from "./sync-api";
@@ -29,6 +34,9 @@ const BACKUP_ZONE = "Europe/Madrid";
 const report = (error: unknown) => {
   console.error(`quoin sync: ${describeFailure(error)}`);
 };
+
+export const servedDatabase = (): DatabaseTarget =>
+  classifyDatabaseIn(process.env.DATABASE_URL, process.cwd());
 
 export interface SyncServerOptions {
   databaseFile: string;
@@ -154,15 +162,24 @@ export function ensureListener(): Promise<RunningSyncServer> {
       if (current?.port === port) return current;
       await current?.close();
       closeOnSignals(state);
-      return startSyncServer({
-        databaseFile: file,
-        dataDirectory: dirname(file),
-        port,
-        pairing: state.pairing,
-        throttle: state.throttle,
-        runEffect,
-        now: () => new Date(),
-      });
+      const announce = (event: "listening" | "port-in-use") =>
+        describeListener(event, port, servedDatabase(), import.meta.env.DEV);
+      try {
+        const server = await startSyncServer({
+          databaseFile: file,
+          dataDirectory: dirname(file),
+          port,
+          pairing: state.pairing,
+          throttle: state.throttle,
+          runEffect,
+          now: () => new Date(),
+        });
+        console.info(announce("listening"));
+        return server;
+      } catch (error) {
+        if (isPortInUse(error)) console.error(announce("port-in-use"));
+        throw error;
+      }
     });
   state.server = next;
   return next;
@@ -181,6 +198,6 @@ export async function startListenerIfPaired(): Promise<void> {
       await ensureListener();
     }
   } catch (error) {
-    if (!noDatabaseYet(error)) report(error);
+    if (!noDatabaseYet(error) && !isPortInUse(error)) report(error);
   }
 }

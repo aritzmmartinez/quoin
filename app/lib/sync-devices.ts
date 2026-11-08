@@ -22,6 +22,7 @@ export interface DevicesView {
   port: number;
   name: string | null;
   defaultName: string;
+  database: { path: string; kind: "ledger" | "scratch" | "other" } | null;
 }
 
 export type DevicesError =
