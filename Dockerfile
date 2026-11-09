@@ -78,7 +78,7 @@ COPY package.json prisma.config.ts ./
 COPY prisma ./prisma
 COPY scripts/db-backup.ts ./scripts/
 COPY scripts/lib/db-target.ts ./scripts/lib/
-COPY app/adapters/persistence/backup.ts app/adapters/persistence/backup-names.ts app/adapters/persistence/backup-verify.ts ./app/adapters/persistence/
+COPY app/adapters/persistence/backup.ts app/adapters/persistence/backup-names.ts app/adapters/persistence/backup-verify.ts app/adapters/persistence/database-target.ts ./app/adapters/persistence/
 COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/
 COPY --chmod=755 db-backup.sh /usr/local/bin/db-backup
 

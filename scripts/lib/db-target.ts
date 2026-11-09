@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+// Relative, not `~/`: the image runs this through tsx with no tsconfig.
 import {
   classifyDatabaseIn,
   describeDatabase,
@@ -10,7 +11,7 @@ import {
   samePath,
   SCRATCH_DATABASE_FILE,
   type DatabaseTarget,
-} from "~/adapters/persistence/database-target";
+} from "../../app/adapters/persistence/database-target";
 
 export { describeDatabase, REAL_DATABASE_FILE, SCRATCH_DATABASE_FILE };
 export type { DatabaseTarget };

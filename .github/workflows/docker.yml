@@ -34,6 +34,7 @@ on:
       - app/adapters/persistence/backup.ts
       - app/adapters/persistence/backup-names.ts
       - app/adapters/persistence/backup-verify.ts
+      - app/adapters/persistence/database-target.ts
       - package.json
       - pnpm-lock.yaml
       - pnpm-workspace.yaml
@@ -92,6 +93,20 @@ jobs:
           provenance: false
           cache-from: type=gha,scope=${{ env.PLATFORM_PAIR }}
           cache-to: type=gha,mode=max,scope=${{ env.PLATFORM_PAIR }}
+
+      # A build proves nothing about what the image imports at run time: tsx runs
+      # scripts/ with no tsconfig, so a `~/` import fails only when db-backup runs.
+      - name: Start on a fresh volume and back up
+        run: |
+          docker run -d --name quoin-smoke -v quoin-smoke:/app/data quoin:scan
+          for _ in $(seq 180); do
+            docker logs quoin-smoke 2>&1 | grep -q '\[react-router-serve\]' && break
+            [ "$(docker inspect -f '{{.State.Running}}' quoin-smoke)" = true ] || break
+            sleep 1
+          done
+          docker logs quoin-smoke
+          docker logs quoin-smoke 2>&1 | grep -q '\[react-router-serve\]'
+          docker exec quoin-smoke db-backup
 
       - name: Scan
         uses: docker/scout-action@v1
