@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `pnpm sync:import`: a ledger entry that differs on the two devices no longer stops the import. It is set aside, each device keeps its own version, the rest is applied, and the command lists it and exits with an error on every sync until the two agree. When one entry of a linked operation (a Kraken swap) differs, both are set aside.
 - When another device saves a tax residence this version does not know, the sync keeps working and the value is kept as it arrived. Every screen asks to update Quoin instead of failing with a generic error.
+- The sync server logs its port and database when it starts, and says when its port is already taken by another process.
 
 ### Fixed
 - Refresh prices: an instrument with no daily price downloads its whole history again, instead of only a live price from then on. Gaps are counted from the last daily price, so a live price no longer hides the missing days before it.

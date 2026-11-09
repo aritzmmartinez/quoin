@@ -1,4 +1,5 @@
 import { networkInterfaces } from "node:os";
+import { relative } from "node:path";
 
 import { renderSVG } from "uqr";
 
@@ -20,7 +21,12 @@ import {
   type DevicesView,
 } from "./sync-devices";
 import { defaultServerName, inDocker } from "./sync.server";
-import { ensureListener, syncPairing } from "./sync-server.server";
+import { isPortInUse } from "./sync-notice";
+import {
+  ensureListener,
+  servedDatabase,
+  syncPairing,
+} from "./sync-server.server";
 
 const proposalsFor = (request: Request): string[] =>
   proposeHosts({
@@ -57,7 +63,14 @@ export async function loadDevices(request: Request): Promise<DevicesView> {
     port: address.port,
     name,
     defaultName: defaultServerName(),
+    database: import.meta.env.DEV ? databaseView() : null,
   };
+}
+
+function databaseView(): DevicesView["database"] {
+  const target = servedDatabase();
+  if (target.kind === "unresolved") return null;
+  return { path: relative(process.cwd(), target.path), kind: target.kind };
 }
 
 const field = (form: FormData, name: string): string =>
@@ -82,7 +95,9 @@ async function savePort(form: FormData): Promise<DevicesResponse> {
     await ensureListener();
     return { ok: true };
   } catch (error) {
-    console.error("quoin sync: the listener could not start", error);
+    if (!isPortInUse(error)) {
+      console.error("quoin sync: the listener could not start", error);
+    }
     return { ok: false, error: "port-unavailable", port };
   }
 }
@@ -100,7 +115,9 @@ async function startPairing(request: Request): Promise<DevicesResponse> {
   try {
     ({ sha256 } = await ensureListener());
   } catch (error) {
-    console.error("quoin sync: the listener could not start", error);
+    if (!isPortInUse(error)) {
+      console.error("quoin sync: the listener could not start", error);
+    }
     return { ok: false, error: "port-unavailable", port: address.port };
   }
 

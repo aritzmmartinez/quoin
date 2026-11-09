@@ -48,7 +48,10 @@ RUN pnpm install --frozen-lockfile --prod
 FROM node:24-trixie-slim@sha256:0820eaa85e07d0490446dd01d14707e17e6108a36988cf374899cd057eb3812d AS runtime
 # tini as PID 1: forwards SIGTERM to node and reaps zombies, so `docker stop`
 # shuts the server down instead of waiting out the 10s timeout and killing it.
+# The upgrade brings in Debian security fixes published after the pinned digest
+# was built, which the official image picks up only on its next rebuild.
 RUN apt-get update \
+ && apt-get upgrade -y --no-install-recommends \
  && apt-get install -y --no-install-recommends tini openssl \
  && rm -rf /var/lib/apt/lists/*
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \

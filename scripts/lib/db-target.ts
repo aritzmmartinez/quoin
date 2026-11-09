@@ -2,6 +2,19 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import {
+  classifyDatabaseIn,
+  describeDatabase,
+  REAL_DATABASE_FILE,
+  resolveDatabasePath,
+  samePath,
+  SCRATCH_DATABASE_FILE,
+  type DatabaseTarget,
+} from "~/adapters/persistence/database-target";
+
+export { describeDatabase, REAL_DATABASE_FILE, SCRATCH_DATABASE_FILE };
+export type { DatabaseTarget };
+
 /**
  * Which SQLite file a command is about to open, and whether it is the live ledger.
  *
@@ -11,16 +24,6 @@ import { fileURLToPath } from "node:url";
  * hand. So every destructive path asks here first, and this module answers
  * conservatively — see `assertScratchDatabase`.
  */
-
-/** The live ledger, relative to the project root. */
-export const REAL_DATABASE_FILE = "data/quoin.sqlite";
-
-/**
- * The one database a destructive command may open. An allow-list of exactly one entry,
- * deliberately: "not the ledger" would let a typo through to any other path, and the
- * whole point is that the set of safe targets is known, not merely constrained.
- */
-export const SCRATCH_DATABASE_FILE = "data/dev.sqlite";
 
 export const PROJECT_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 
@@ -37,19 +40,7 @@ export function scratchDatabasePath(): string {
 }
 
 export function databasePath(url = process.env.DATABASE_URL): string | null {
-  if (!url) return null;
-  if (!url.startsWith("file:")) return null;
-
-  const target = url.slice("file:".length);
-  if (target === "" || target === ":memory:") return null;
-
-  return resolve(PROJECT_ROOT, target);
-}
-
-function samePath(a: string, b: string): boolean {
-  return process.platform === "win32"
-    ? a.toLowerCase() === b.toLowerCase()
-    : a === b;
+  return resolveDatabasePath(url, PROJECT_ROOT);
 }
 
 export function isRealDatabase(path: string): boolean {
@@ -94,42 +85,10 @@ export function assertScratchDatabase(action: string): string {
   return target;
 }
 
-export type DatabaseTarget =
-  | { kind: "ledger" | "scratch" | "other"; path: string }
-  | { kind: "unresolved"; url: string | undefined };
-
 export function classifyDatabase(
   url = process.env.DATABASE_URL,
 ): DatabaseTarget {
-  const path = databasePath(url);
-  if (path === null) return { kind: "unresolved", url };
-  if (isRealDatabase(path)) return { kind: "ledger", path };
-  if (isScratchDatabase(path)) return { kind: "scratch", path };
-  return { kind: "other", path };
-}
-
-const KIND_LABEL = {
-  ledger: "LIVE LEDGER, real trades",
-  scratch: "scratch database",
-} as const;
-
-export function describeDatabase(
-  target: DatabaseTarget,
-  exists: boolean,
-): string {
-  if (target.kind === "unresolved") {
-    const url = target.url ? `"${target.url}"` : "not set";
-    return `Database: DATABASE_URL is ${url}, which does not resolve to a local SQLite file`;
-  }
-
-  const missing = exists ? "" : ", does not exist yet";
-  if (target.kind === "other") {
-    return (
-      `Database: ${target.path} — not the live ledger (${REAL_DATABASE_FILE}) ` +
-      `nor the scratch database (${SCRATCH_DATABASE_FILE})${missing}`
-    );
-  }
-  return `Database: ${target.path} (${KIND_LABEL[target.kind]}${missing})`;
+  return classifyDatabaseIn(url, PROJECT_ROOT);
 }
 
 export function announceDatabase(

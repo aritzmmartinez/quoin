@@ -212,7 +212,11 @@ function PortForm({ copy, view }: { copy: DevicesCopy; view: DevicesView }) {
       saved={copy.saved.port}
       icon={Unplug}
       label={text.label}
-      hint={text.hint}
+      hint={
+        view.database
+          ? `${text.hint} · ${text.database(view.database.path, view.database.kind)}`
+          : text.hint
+      }
       copy={copy}
     >
       <input

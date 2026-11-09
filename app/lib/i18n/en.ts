@@ -262,6 +262,8 @@ export const en: Copy = {
         port: {
           label: "Sync port",
           hint: "The one published to the local network",
+          database: (path: string, kind: "ledger" | "scratch" | "other") =>
+            `Database: ${path} (${{ ledger: "live ledger", scratch: "scratch", other: "neither the ledger nor scratch" }[kind]})`,
         },
         save: "Save",
         invalidHost: "Enter a valid IP address or computer name.",
