@@ -1,7 +1,7 @@
 {
   "contract": "ingest",
   "version": 1,
-  "description": "What a broker CSV becomes before anything is written: the broker detected, then instruments, ledger events, discards with their detail, notices, named row errors, the currencies whose ECB rates are missing, and how many operations are new against the keys already stored — or the whole file refused with a named reason. Shared with the mobile client: both implementations must reproduce every case. Input: the csv text is encoded as `encoding` and decoded as strict UTF-8 (a BOM is dropped); `rates` is the ECB rate book, a row booked at the rate of its own day in `zone`; `prices` is the price history Kraken rewards and swaps fall back to; `stored.names` are instrument names already stored (they win over the file's), `stored.rewardRefids` are Kraken refids an earlier import booked as rewards, and `stored.existing` are ledger keys `source::externalId`. Output: events omit `id`, which is random; ts is ISO; operationOf gives each event's operation; a row error names the row by externalId, date and type as written, and by its 1-based position among the file's non-empty records only when it has no id. Detection splits the first non-empty line on , ; tab or |; parsing reads commas only. expect is written by running the TypeScript adapters.",
+  "description": "What a broker CSV becomes before anything is written: the broker detected, then instruments, ledger events, discards with their detail, notices, named row errors, the currencies whose ECB rates are missing, and how many operations are new (imported: none of its events is stored), completed (some are stored and some are not, as a saveback purchase stored before its saveback row was read) and duplicates (all are) against the keys already stored — or the whole file refused with a named reason. Shared with the mobile client: both implementations must reproduce every case. Input: the csv text is encoded as `encoding` and decoded as strict UTF-8 (a BOM is dropped); `rates` is the ECB rate book, a row booked at the rate of its own day in `zone`; `prices` is the price history Kraken rewards and swaps fall back to; `stored.names` are instrument names already stored (they win over the file's), `stored.rewardRefids` are Kraken refids an earlier import booked as rewards, and `stored.existing` are ledger keys `source::externalId`. Output: events omit `id`, which is random; ts is ISO; operationOf gives each event's operation; a row error names the row by externalId, date and type as written, and by its 1-based position among the file's non-empty records only when it has no id. Detection splits the first non-empty line on , ; tab or |; parsing reads commas only. expect is written by running the TypeScript adapters.",
   "cases": [
     {
       "name": "Neither broker's signature column: unknown broker",
@@ -109,6 +109,7 @@
         "errors": [],
         "ratesNeeded": {},
         "imported": 1,
+        "completed": 0,
         "duplicates": 0
       }
     },
@@ -246,6 +247,7 @@
         "errors": [],
         "ratesNeeded": {},
         "imported": 7,
+        "completed": 0,
         "duplicates": 0
       }
     },
@@ -315,6 +317,7 @@
         "errors": [],
         "ratesNeeded": {},
         "imported": 1,
+        "completed": 0,
         "duplicates": 1
       }
     },
@@ -423,7 +426,109 @@
         "errors": [],
         "ratesNeeded": {},
         "imported": 2,
+        "completed": 0,
         "duplicates": 0
+      }
+    },
+    {
+      "name": "Trade Republic saveback whose purchase is already stored: the operation is completed, not new",
+      "zone": "Europe/Madrid",
+      "encoding": "utf-8",
+      "csv": "datetime,category,type,asset_class,name,symbol,shares,price,amount,fee,tax,currency,transaction_id\n2025-10-01T08:00:00Z,CASH,BENEFITS_SAVEBACK,,Test Fund,XS00TEST0001,,,15,,,EUR,s1\n2025-10-03T09:00:00Z,TRADING,BUY,FUND,Test Fund,XS00TEST0001,0.15,100,-15,,-2.85,EUR,b1\n2025-10-04T09:00:00Z,TRADING,BUY,FUND,Test Fund,XS00TEST0001,1,100,-100,,,EUR,t1\n2025-10-05T09:00:00Z,TRADING,BUY,FUND,Test Fund,XS00TEST0001,1,101,-101,,,EUR,t2",
+      "rates": [],
+      "prices": [],
+      "stored": {
+        "names": {},
+        "rewardRefids": [],
+        "existing": [
+          "TR_CSV::b1",
+          "TR_CSV::t1"
+        ]
+      },
+      "expect": {
+        "broker": "trade-republic",
+        "total": 4,
+        "instruments": [
+          {
+            "id": "XS00TEST0001",
+            "name": "Test Fund",
+            "type": "ETF",
+            "assetClass": "FUND",
+            "thesis": "CORE"
+          }
+        ],
+        "events": [
+          {
+            "ts": "2025-10-03T09:00:00.000Z",
+            "currency": "EUR",
+            "account": "trade-republic",
+            "source": "TR_CSV",
+            "externalId": "b1",
+            "note": null,
+            "type": "BUY",
+            "instrumentId": "XS00TEST0001",
+            "quantity": "0.15",
+            "price": "100",
+            "grossAmount": "15",
+            "fees": "0",
+            "funding": "IN_KIND"
+          },
+          {
+            "ts": "2025-10-01T08:00:00.000Z",
+            "currency": "EUR",
+            "account": "trade-republic",
+            "source": "TR_CSV",
+            "externalId": "s1",
+            "note": null,
+            "type": "DIVIDEND",
+            "instrumentId": "XS00TEST0001",
+            "grossAmount": "15",
+            "taxWithheld": "2.85",
+            "funding": "IN_KIND"
+          },
+          {
+            "ts": "2025-10-04T09:00:00.000Z",
+            "currency": "EUR",
+            "account": "trade-republic",
+            "source": "TR_CSV",
+            "externalId": "t1",
+            "note": null,
+            "type": "BUY",
+            "instrumentId": "XS00TEST0001",
+            "quantity": "1",
+            "price": "100",
+            "grossAmount": "100",
+            "fees": "0"
+          },
+          {
+            "ts": "2025-10-05T09:00:00.000Z",
+            "currency": "EUR",
+            "account": "trade-republic",
+            "source": "TR_CSV",
+            "externalId": "t2",
+            "note": null,
+            "type": "BUY",
+            "instrumentId": "XS00TEST0001",
+            "quantity": "1",
+            "price": "101",
+            "grossAmount": "101",
+            "fees": "0"
+          }
+        ],
+        "operationOf": [
+          0,
+          0,
+          1,
+          2
+        ],
+        "discarded": {},
+        "discardedDetails": {},
+        "noticed": {},
+        "errors": [],
+        "ratesNeeded": {},
+        "imported": 1,
+        "completed": 1,
+        "duplicates": 1
       }
     },
     {
@@ -500,6 +605,7 @@
           "USD": "2025-03-04"
         },
         "imported": 1,
+        "completed": 0,
         "duplicates": 0
       }
     },
@@ -553,6 +659,7 @@
         "errors": [],
         "ratesNeeded": {},
         "imported": 0,
+        "completed": 0,
         "duplicates": 0
       }
     },
@@ -634,6 +741,7 @@
         ],
         "ratesNeeded": {},
         "imported": 1,
+        "completed": 0,
         "duplicates": 0
       }
     },
@@ -762,6 +870,7 @@
         "errors": [],
         "ratesNeeded": {},
         "imported": 4,
+        "completed": 0,
         "duplicates": 0
       }
     },
@@ -905,6 +1014,7 @@
         "errors": [],
         "ratesNeeded": {},
         "imported": 2,
+        "completed": 0,
         "duplicates": 0
       }
     },
@@ -1001,6 +1111,7 @@
         "errors": [],
         "ratesNeeded": {},
         "imported": 1,
+        "completed": 0,
         "duplicates": 0
       }
     },
@@ -1045,6 +1156,7 @@
         "errors": [],
         "ratesNeeded": {},
         "imported": 0,
+        "completed": 0,
         "duplicates": 0
       }
     },
@@ -1104,6 +1216,7 @@
         ],
         "ratesNeeded": {},
         "imported": 0,
+        "completed": 0,
         "duplicates": 0
       }
     },

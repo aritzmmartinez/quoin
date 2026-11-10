@@ -816,6 +816,8 @@ export const en: Copy = {
     summary: {
       total: "Trades in the file",
       imported: "New",
+      completed: "Completed",
+      completedHelp: "Already imported; the missing part was added",
       duplicates: "Duplicates",
       instruments: "Instruments",
       discarded: "Discarded",

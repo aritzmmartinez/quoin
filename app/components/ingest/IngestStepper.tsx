@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 
 import type { ImportSummary } from "~/adapters/ingestion";
 import { CsvFileError, decodeCsv } from "~/adapters/ingestion/decode";
+import { operationsToWrite } from "~/adapters/ingestion/ingest";
 import type {
   IngestPreview,
   PendingMapping,
@@ -69,7 +70,7 @@ export function IngestStepper({
     onStatusChange?.({
       imported: summary !== null,
       atDone: stage === "done",
-      importedCount: summary?.imported ?? 0,
+      importedCount: summary ? operationsToWrite(summary) : 0,
     });
   }, [summary, stage, onStatusChange]);
 

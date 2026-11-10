@@ -17,10 +17,21 @@ import {
   useFormat,
 } from "~/lib";
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({
+  label,
+  help,
+  value,
+}: {
+  label: string;
+  help?: string;
+  value: string;
+}) {
   return (
     <div className="flex items-baseline justify-between gap-4 py-row">
-      <dt className="text-[12px] text-muted">{label}</dt>
+      <dt className="text-[12px] text-muted">
+        {label}
+        {help && <span className="block text-[11px] text-faint">{help}</span>}
+      </dt>
       <dd className="text-right text-[13px] tabular-nums">{value}</dd>
     </div>
   );
@@ -164,6 +175,13 @@ export function SummaryList({
       <dl className="divide-y divide-border">
         <Row label={copy.total} value={String(summary.total)} />
         <Row label={copy.imported} value={String(summary.imported)} />
+        {summary.completed > 0 && (
+          <Row
+            label={copy.completed}
+            help={copy.completedHelp}
+            value={String(summary.completed)}
+          />
+        )}
         <Row label={copy.duplicates} value={String(summary.duplicates)} />
         <Row label={copy.instruments} value={String(summary.instruments)} />
         <Row

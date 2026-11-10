@@ -15,6 +15,7 @@ import {
   previewBatch,
   BROKERS,
   type Broker,
+  writesLedger,
   type ImportSummary,
 } from "~/adapters/ingestion";
 import {
@@ -72,6 +73,9 @@ function printSummary(title: string, summary: ImportSummary): void {
   console.log(`\n${title}`);
   console.log(`  total transactions : ${summary.total}`);
   console.log(`  to import (new)    : ${summary.imported}`);
+  if (summary.completed > 0) {
+    console.log(`  completed          : ${summary.completed}`);
+  }
   console.log(`  duplicates (skip)  : ${summary.duplicates}`);
   console.log(`  discarded          : ${discarded || "none"}`);
   for (const group of groups) {
@@ -215,7 +219,7 @@ async function main(): Promise<void> {
   printSummary(`Preview (${broker})`, preview);
   printRateConflicts(rateConflicts);
 
-  if (preview.imported === 0 && unpricedEntries(preview) === 0) {
+  if (!writesLedger(preview) && unpricedEntries(preview) === 0) {
     console.log("\nNothing new to import.");
     return;
   }

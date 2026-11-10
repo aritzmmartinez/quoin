@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Import: a purchase already in the ledger that only gains its missing saveback row is no longer counted as new. It is counted apart, as Completed, in a row the summary shows only when there is one.
+
 ## [0.16.0] - 2026-11-10
 
 ### Upgrading

@@ -828,6 +828,9 @@ export const es = {
     summary: {
       total: "Operaciones en el fichero",
       imported: "Nuevas",
+      completed: "Completadas",
+      completedHelp:
+        "Ya estaban importadas; se ha añadido la parte que faltaba",
       duplicates: "Duplicadas",
       instruments: "Instrumentos",
       discarded: "Descartadas",

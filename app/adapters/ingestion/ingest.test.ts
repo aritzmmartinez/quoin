@@ -8,8 +8,11 @@ import { rateLookupFrom } from "./fx";
 
 import {
   BatchBuilder,
+  countOperations,
   InvalidLedgerEventError,
+  operationsToWrite,
   previewBatch,
+  writesLedger,
   type MappedBatch,
 } from "./ingest";
 
@@ -84,13 +87,56 @@ describe("counting by operation", () => {
     expect(summary.duplicates).toBe(0);
   });
 
-  it("counts an operation as new when any of its rows is, and as a duplicate only when all are", async () => {
+  it("counts an operation as new only when none of its rows is stored, as a duplicate when all are, and as completed in between", async () => {
     const summary = await previewBatch(
-      ledgerWith(["R1", "R1:income", "R2", "D1"]),
+      ledgerWith(["R1", "R1:income", "R2"]),
       rewardBatch(),
     );
     expect(summary.imported).toBe(1);
-    expect(summary.duplicates).toBe(2);
+    expect(summary.completed).toBe(1);
+    expect(summary.duplicates).toBe(1);
+  });
+
+  it("counts every operation exactly once, whatever is stored", () => {
+    const stored = [
+      [],
+      ["R1"],
+      ["R1:income", "R2"],
+      ["R1", "R1:income", "R2", "D1"],
+      ["R1", "R1:income", "R2", "R2:income", "D1"],
+    ];
+    const expected = [
+      { imported: 3, completed: 0, duplicates: 0 },
+      { imported: 2, completed: 1, duplicates: 0 },
+      { imported: 1, completed: 2, duplicates: 0 },
+      { imported: 0, completed: 1, duplicates: 2 },
+      { imported: 0, completed: 0, duplicates: 3 },
+    ];
+    const b = rewardBatch();
+    const operations = new Set(b.operationOf).size;
+    expect(operations).toBe(3);
+    stored.forEach((keys, i) => {
+      const counts = countOperations(
+        b,
+        new Set(keys.map((k) => ledgerDedupKey("TEST", k))),
+      );
+      expect(counts).toEqual(expected[i]);
+      expect(counts.imported + counts.completed + counts.duplicates).toBe(
+        operations,
+      );
+    });
+  });
+
+  it("counts what the import button writes: new and completed, never duplicates", () => {
+    expect(operationsToWrite({ imported: 0, completed: 1 })).toBe(1);
+    expect(operationsToWrite({ imported: 2, completed: 1 })).toBe(3);
+    expect(operationsToWrite({ imported: 0, completed: 0 })).toBe(0);
+  });
+
+  it("writes when an operation is new or completed, and not for duplicates alone", () => {
+    expect(writesLedger({ imported: 1, completed: 0 })).toBe(true);
+    expect(writesLedger({ imported: 0, completed: 1 })).toBe(true);
+    expect(writesLedger({ imported: 0, completed: 0 })).toBe(false);
   });
 
   it("adds up to the operations in the file", async () => {
@@ -114,7 +160,11 @@ describe("counting by operation", () => {
       0,
     );
     expect(
-      summary.imported + summary.duplicates + discarded + summary.errors.length,
+      summary.imported +
+        summary.completed +
+        summary.duplicates +
+        discarded +
+        summary.errors.length,
     ).toBe(summary.total);
   });
 });

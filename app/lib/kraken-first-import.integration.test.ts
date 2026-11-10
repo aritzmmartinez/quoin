@@ -497,11 +497,13 @@ describe("candle spacing and the 7-day lookup (integration)", () => {
 describe("the summary counts operations, like the file and the discards (integration)", () => {
   const accounted = (summary: {
     imported: number;
+    completed: number;
     duplicates: number;
     errors: readonly unknown[];
     discarded: Partial<Record<string, number>>;
   }) =>
     summary.imported +
+    summary.completed +
     summary.duplicates +
     summary.errors.length +
     Object.values(summary.discarded).reduce(

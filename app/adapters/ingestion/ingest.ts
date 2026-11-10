@@ -60,6 +60,7 @@ export interface MappedBatch {
 export interface ImportSummary {
   total: number;
   imported: number;
+  completed: number;
   duplicates: number;
   discarded: DiscardCounts;
   discardedDetails: DiscardDetails;
@@ -228,32 +229,53 @@ function unratedDiscard(
   };
 }
 
+export interface OperationCounts {
+  imported: number;
+  completed: number;
+  duplicates: number;
+}
+
 export function countOperations(
   batch: MappedBatch,
   existing: ReadonlySet<string>,
-): { imported: number; duplicates: number } {
-  const writes = new Map<number, boolean>();
+): OperationCounts {
+  const operations = new Map<number, { stored: boolean; fresh: boolean }>();
   batch.events.forEach((event, index) => {
     const operation = batch.operationOf[index] ?? index;
     const isNew =
       !event.externalId ||
       !existing.has(ledgerDedupKey(event.source, event.externalId));
-    writes.set(operation, (writes.get(operation) ?? false) || isNew);
+    const seen = operations.get(operation) ?? { stored: false, fresh: false };
+    if (isNew) seen.fresh = true;
+    else seen.stored = true;
+    operations.set(operation, seen);
   });
-  let imported = 0;
-  for (const writesSomething of writes.values()) {
-    if (writesSomething) imported += 1;
+  const counts = { imported: 0, completed: 0, duplicates: 0 };
+  for (const { stored, fresh } of operations.values()) {
+    if (!fresh) counts.duplicates += 1;
+    else if (stored) counts.completed += 1;
+    else counts.imported += 1;
   }
-  return { imported, duplicates: writes.size - imported };
+  return counts;
 }
 
-function summarize(
-  batch: MappedBatch,
-  counts: { imported: number; duplicates: number },
-): ImportSummary {
+export function operationsToWrite(
+  counts: Pick<OperationCounts, "imported" | "completed">,
+): number {
+  return counts.imported + counts.completed;
+}
+
+export function writesLedger(
+  counts: Pick<OperationCounts, "imported" | "completed">,
+): boolean {
+  return operationsToWrite(counts) > 0;
+}
+
+function summarize(batch: MappedBatch, counts: OperationCounts): ImportSummary {
   return {
     total: batch.total,
     imported: counts.imported,
+    completed: counts.completed,
     duplicates: counts.duplicates,
     discarded: batch.discarded,
     discardedDetails: batch.discardedDetails,

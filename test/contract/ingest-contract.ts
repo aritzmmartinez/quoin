@@ -129,6 +129,16 @@ const cases: Case[] = [
     ),
   },
   {
+    name: "Trade Republic saveback whose purchase is already stored: the operation is completed, not new",
+    csv: tr(
+      `2025-10-01T08:00:00Z,CASH,BENEFITS_SAVEBACK,,Test Fund,${FUND},,,15,,,EUR,s1`,
+      `2025-10-03T09:00:00Z,TRADING,BUY,FUND,Test Fund,${FUND},0.15,100,-15,,-2.85,EUR,b1`,
+      `2025-10-04T09:00:00Z,TRADING,BUY,FUND,Test Fund,${FUND},1,100,-100,,,EUR,t1`,
+      `2025-10-05T09:00:00Z,TRADING,BUY,FUND,Test Fund,${FUND},1,101,-101,,,EUR,t2`,
+    ),
+    stored: { existing: ["TR_CSV::b1", "TR_CSV::t1"] },
+  },
+  {
     name: "Trade Republic rows in another currency, one day with an ECB rate and one without",
     csv: tr(
       `2025-03-03T15:00:00Z,TRADING,BUY,STOCK,Test US Stock,${USD_STOCK},2,100,-200,-1,,USD,u1`,
@@ -544,7 +554,7 @@ export async function ingestContractJson(): Promise<string> {
       contract: "ingest",
       version: 1,
       description:
-        "What a broker CSV becomes before anything is written: the broker detected, then instruments, ledger events, discards with their detail, notices, named row errors, the currencies whose ECB rates are missing, and how many operations are new against the keys already stored — or the whole file refused with a named reason. Shared with the mobile client: both implementations must reproduce every case. Input: the csv text is encoded as `encoding` and decoded as strict UTF-8 (a BOM is dropped); `rates` is the ECB rate book, a row booked at the rate of its own day in `zone`; `prices` is the price history Kraken rewards and swaps fall back to; `stored.names` are instrument names already stored (they win over the file's), `stored.rewardRefids` are Kraken refids an earlier import booked as rewards, and `stored.existing` are ledger keys `source::externalId`. Output: events omit `id`, which is random; ts is ISO; operationOf gives each event's operation; a row error names the row by externalId, date and type as written, and by its 1-based position among the file's non-empty records only when it has no id. Detection splits the first non-empty line on , ; tab or |; parsing reads commas only. expect is written by running the TypeScript adapters.",
+        "What a broker CSV becomes before anything is written: the broker detected, then instruments, ledger events, discards with their detail, notices, named row errors, the currencies whose ECB rates are missing, and how many operations are new (imported: none of its events is stored), completed (some are stored and some are not, as a saveback purchase stored before its saveback row was read) and duplicates (all are) against the keys already stored — or the whole file refused with a named reason. Shared with the mobile client: both implementations must reproduce every case. Input: the csv text is encoded as `encoding` and decoded as strict UTF-8 (a BOM is dropped); `rates` is the ECB rate book, a row booked at the rate of its own day in `zone`; `prices` is the price history Kraken rewards and swaps fall back to; `stored.names` are instrument names already stored (they win over the file's), `stored.rewardRefids` are Kraken refids an earlier import booked as rewards, and `stored.existing` are ledger keys `source::externalId`. Output: events omit `id`, which is random; ts is ISO; operationOf gives each event's operation; a row error names the row by externalId, date and type as written, and by its 1-based position among the file's non-empty records only when it has no id. Detection splits the first non-empty line on , ; tab or |; parsing reads commas only. expect is written by running the TypeScript adapters.",
       cases: evaluated,
     },
     null,
