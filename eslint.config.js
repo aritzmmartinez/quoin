@@ -77,7 +77,10 @@ export default tseslint.config(
   {
     // A backup's file name is read by a person restoring it, on their own
     // clock; it is a label, not a date anything is assigned to.
-    files: ["scripts/lib/backup-names.ts", "scripts/lib/backup-names.test.ts"],
+    files: [
+      "app/adapters/persistence/backup-names.ts",
+      "app/adapters/persistence/backup-names.test.ts",
+    ],
     rules: { "no-restricted-syntax": "off" },
   },
 

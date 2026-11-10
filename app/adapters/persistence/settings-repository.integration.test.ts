@@ -1,7 +1,8 @@
-import { execSync } from "node:child_process";
 import { mkdirSync, rmSync } from "node:fs";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import { migratedDatabase } from "../../../test/integration/template";
 
 import type { Residence } from "~/core/domain";
 
@@ -14,10 +15,7 @@ beforeAll(async () => {
   mkdirSync(tmpDir, { recursive: true });
   const dbUrl = `file:${dbPath}`;
   process.env.DATABASE_URL = dbUrl;
-  execSync("pnpm exec prisma migrate deploy", {
-    stdio: "ignore",
-    env: { ...process.env, DATABASE_URL: dbUrl },
-  });
+  migratedDatabase(dbPath);
   persistence = await import("./index");
 });
 
@@ -41,21 +39,27 @@ describe("PrismaSettingsRepository (integration)", () => {
 
   it("keeps a single row: the CHECK refuses a second one", async () => {
     await expect(
-      persistence.prisma.$executeRawUnsafe(
-        `INSERT INTO "Settings" ("id", "residence") VALUES (2, 'bizkaia')`,
+      persistence.prisma.$transaction((tx) =>
+        tx.$executeRawUnsafe(
+          `INSERT INTO "Settings" ("id", "residence") VALUES (2, 'bizkaia')`,
+        ),
       ),
     ).rejects.toThrow();
   });
 
   it("refuses to read a residence written past the domain, instead of guessing one", async () => {
-    await persistence.prisma.$executeRawUnsafe(
-      `UPDATE "Settings" SET "residence" = 'atlantis' WHERE "id" = 1`,
+    await persistence.prisma.$transaction((tx) =>
+      tx.$executeRawUnsafe(
+        `UPDATE "Settings" SET "residence" = 'atlantis' WHERE "id" = 1`,
+      ),
     );
     await expect(
       new persistence.PrismaSettingsRepository().residence(),
     ).rejects.toThrow();
-    await persistence.prisma.$executeRawUnsafe(
-      `UPDATE "Settings" SET "residence" = 'bizkaia' WHERE "id" = 1`,
+    await persistence.prisma.$transaction((tx) =>
+      tx.$executeRawUnsafe(
+        `UPDATE "Settings" SET "residence" = 'bizkaia' WHERE "id" = 1`,
+      ),
     );
   });
 });

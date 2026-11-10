@@ -1,7 +1,8 @@
-import { execSync } from "node:child_process";
 import { mkdirSync, rmSync } from "node:fs";
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+
+import { migratedDatabase } from "../../../test/integration/template";
 
 import type { Instrument } from "~/core/domain";
 
@@ -32,25 +33,24 @@ const snapshot = (
   createdAt: string,
   currency = "EUR",
 ) =>
-  prisma.priceSnapshot.create({
-    data: {
-      instrumentId,
-      price,
-      currency,
-      asOf: new Date(asOf),
-      source: "TEST",
-      createdAt: new Date(createdAt),
-    },
-  });
+  prisma.$transaction((tx) =>
+    tx.priceSnapshot.create({
+      data: {
+        instrumentId,
+        price,
+        currency,
+        asOf: new Date(asOf),
+        source: "TEST",
+        createdAt: new Date(createdAt),
+      },
+    }),
+  );
 
 beforeAll(async () => {
   mkdirSync(tmpDir, { recursive: true });
   const dbUrl = `file:${dbPath}`;
   process.env.DATABASE_URL = dbUrl;
-  execSync("pnpm exec prisma migrate deploy", {
-    stdio: "ignore",
-    env: { ...process.env, DATABASE_URL: dbUrl },
-  });
+  migratedDatabase(dbPath);
 
   const persistence = await import("./index");
   prisma = persistence.prisma;
@@ -63,7 +63,7 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  await prisma.priceSnapshot.deleteMany();
+  await prisma.$transaction((tx) => tx.priceSnapshot.deleteMany());
 });
 
 afterAll(async () => {
@@ -314,6 +314,89 @@ describe("PrismaPriceRepository.saveDaily (integration)", () => {
       })
     ).map((r) => `${r.asOf.toISOString()} ${r.price} ${r.source}`);
 
+  describe("series version", () => {
+    const version = async () =>
+      (
+        await prisma.instrument.findUniqueOrThrow({
+          where: { id: ID },
+          select: { priceSeriesVersion: true },
+        })
+      ).priceSeriesVersion;
+
+    it("stays while a tail can heal the phone, a live row replaced included", async () => {
+      await priceRepo.saveDaily(
+        ID,
+        [candle("2026-10-12T07:00:00Z", "12")],
+        live("2026-10-13T15:35:00Z", "13"),
+        MADRID,
+      );
+      const before = await version();
+
+      await priceRepo.saveDaily(
+        ID,
+        [candle("2026-10-13T07:00:00Z", "13")],
+        live("2026-10-14T15:35:00Z", "14"),
+        MADRID,
+      );
+      await priceRepo.saveMany([candle("2026-10-14T07:00:00Z", "14")]);
+
+      expect(await version()).toBe(before);
+    });
+
+    it("changes when a sync writes behind the tail, as a repair does", async () => {
+      await priceRepo.saveDaily(
+        ID,
+        [],
+        live("2026-10-14T15:35:00Z", "14"),
+        MADRID,
+      );
+      const before = await version();
+
+      await priceRepo.saveDaily(
+        ID,
+        [candle("2026-10-01T07:00:00Z", "1")],
+        null,
+        MADRID,
+      );
+
+      expect(await version()).not.toBe(before);
+    });
+
+    it("changes when a backfill brings older rows", async () => {
+      await priceRepo.saveMany([candle("2026-10-14T07:00:00Z", "14")]);
+      const before = await version();
+
+      await priceRepo.saveMany([candle("2026-10-01T07:00:00Z", "1")]);
+
+      expect(await version()).not.toBe(before);
+    });
+
+    it("changes on every replacement, even to the same symbol or to nothing", async () => {
+      await priceRepo.replaceHistory(ID, []);
+      const first = await version();
+      await priceRepo.replaceHistory(ID, []);
+
+      expect(first).toEqual(expect.any(String));
+      expect(await version()).not.toBe(first);
+    });
+
+    it("rolls back with the write that failed", async () => {
+      await priceRepo.saveMany([candle("2026-10-14T07:00:00Z", "14")]);
+      const before = await version();
+
+      await expect(
+        priceRepo.saveMany([
+          {
+            ...candle("2026-10-01T07:00:00Z", "1"),
+            price: null as unknown as string,
+          },
+        ]),
+      ).rejects.toThrow();
+
+      expect(await version()).toBe(before);
+    });
+  });
+
   it("replaces the day's live row with a newer one", async () => {
     await priceRepo.saveDaily(
       ID,
@@ -340,7 +423,10 @@ describe("PrismaPriceRepository.saveDaily (integration)", () => {
     );
     const written = await priceRepo.saveDaily(
       ID,
-      [candle("2026-10-09T07:00:00Z", "10"), candle("2026-10-13T07:00:00Z", "13")],
+      [
+        candle("2026-10-09T07:00:00Z", "10"),
+        candle("2026-10-13T07:00:00Z", "13"),
+      ],
       null,
       MADRID,
     );
@@ -405,7 +491,10 @@ describe("PrismaPriceRepository.saveDaily (integration)", () => {
         ID,
         [
           candle("2026-10-09T07:00:00Z", "10"),
-          { ...candle("2026-10-10T07:00:00Z", "11"), price: null as unknown as string },
+          {
+            ...candle("2026-10-10T07:00:00Z", "11"),
+            price: null as unknown as string,
+          },
         ],
         null,
         MADRID,
@@ -414,31 +503,51 @@ describe("PrismaPriceRepository.saveDaily (integration)", () => {
     expect(await stored()).toEqual(["2026-10-09T15:35:00.000Z 9 YAHOO_LIVE"]);
   });
 
-  it("lastAsOf is the newest row whatever its source", async () => {
+  it("lastCandleAsOf is the newest row that is not a live quote", async () => {
     await priceRepo.saveDaily(
       ID,
       [candle("2026-10-13T07:00:00Z", "13")],
       live("2026-10-14T15:35:00Z", "14"),
       MADRID,
     );
-    expect((await priceRepo.lastAsOf(ID))?.toISOString()).toBe(
-      "2026-10-14T15:35:00.000Z",
+    expect((await priceRepo.lastCandleAsOf(ID))?.toISOString()).toBe(
+      "2026-10-13T07:00:00.000Z",
     );
-    expect(await priceRepo.lastAsOf("XS00TEST0003")).toBeNull();
+    expect(await priceRepo.lastCandleAsOf("XS00TEST0003")).toBeNull();
+  });
+
+  it("lastCandleAsOf is null for an instrument with only live quotes", async () => {
+    await priceRepo.saveDaily(
+      ID,
+      [],
+      live("2026-10-14T15:35:00Z", "14"),
+      MADRID,
+    );
+    expect(await priceRepo.lastCandleAsOf(ID)).toBeNull();
   });
 });
 
 describe("PrismaPriceRepository.dailyHistoryIds (integration)", () => {
   it("counts daily candles and never live quotes alone", async () => {
     const row = (instrumentId: string, asOf: string, source: string) =>
-      prisma.priceSnapshot.create({
-        data: { instrumentId, price: "10", currency: "EUR", asOf: new Date(asOf), source },
-      });
+      prisma.$transaction((tx) =>
+        tx.priceSnapshot.create({
+          data: {
+            instrumentId,
+            price: "10",
+            currency: "EUR",
+            asOf: new Date(asOf),
+            source,
+          },
+        }),
+      );
     await row("XS00TEST0001", "2026-10-14T07:00:00Z", "YAHOO");
     await row("XS00TEST0001", "2026-10-15T14:00:00Z", "YAHOO_LIVE");
     await row("XS00TEST0002", "2026-10-14T14:00:00Z", "YAHOO_LIVE");
     await row("XS00TEST0002", "2026-10-15T14:00:00Z", "YAHOO_LIVE");
 
-    expect(await priceRepo.dailyHistoryIds()).toEqual(new Set(["XS00TEST0001"]));
+    expect(await priceRepo.dailyHistoryIds()).toEqual(
+      new Set(["XS00TEST0001"]),
+    );
   });
 });

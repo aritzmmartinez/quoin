@@ -1,7 +1,8 @@
-import { execSync } from "node:child_process";
 import { mkdirSync, readFileSync, rmSync } from "node:fs";
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+
+import { migratedDatabase } from "../../../test/integration/template";
 
 import type { Instrument, LedgerEvent } from "~/core/domain";
 
@@ -44,10 +45,7 @@ beforeAll(async () => {
   mkdirSync(tmpDir, { recursive: true });
   const dbUrl = `file:${dbPath}`;
   process.env.DATABASE_URL = dbUrl;
-  execSync("pnpm exec prisma migrate deploy", {
-    stdio: "ignore",
-    env: { ...process.env, DATABASE_URL: dbUrl },
-  });
+  migratedDatabase(dbPath);
 
   const { PrismaLedgerRepository, PrismaInstrumentRepository, prisma } =
     await import("./index");
@@ -82,16 +80,18 @@ describe("PrismaLedgerRepository (integration)", () => {
     const { prisma } = await import("./index");
 
     await expect(
-      prisma.ledgerEntry.create({
-        data: {
-          id: crypto.randomUUID(),
-          ts: new Date("2025-01-01"),
-          type: "FEE",
-          grossAmount: "2.50",
-          currency: "EUR",
-          source: "MANUAL",
-        },
-      }),
+      prisma.$transaction((tx) =>
+        tx.ledgerEntry.create({
+          data: {
+            id: crypto.randomUUID(),
+            ts: new Date("2025-01-01"),
+            type: "FEE",
+            grossAmount: "2.50",
+            currency: "EUR",
+            source: "MANUAL",
+          },
+        }),
+      ),
     ).rejects.toThrow(/CHECK constraint failed/);
   });
 
@@ -99,17 +99,19 @@ describe("PrismaLedgerRepository (integration)", () => {
     const { prisma } = await import("./index");
 
     await expect(
-      prisma.ledgerEntry.create({
-        data: {
-          id: crypto.randomUUID(),
-          ts: new Date("2025-01-01"),
-          type: "BUY",
-          grossAmount: "2.50",
-          currency: "EUR",
-          source: "MANUAL",
-          funding: "GIFT",
-        },
-      }),
+      prisma.$transaction((tx) =>
+        tx.ledgerEntry.create({
+          data: {
+            id: crypto.randomUUID(),
+            ts: new Date("2025-01-01"),
+            type: "BUY",
+            grossAmount: "2.50",
+            currency: "EUR",
+            source: "MANUAL",
+            funding: "GIFT",
+          },
+        }),
+      ),
     ).rejects.toThrow(/CHECK constraint failed/);
   });
 
@@ -117,14 +119,16 @@ describe("PrismaLedgerRepository (integration)", () => {
     const { prisma } = await import("./index");
 
     await expect(
-      prisma.instrument.create({
-        data: {
-          id: "XS00TEST0099",
-          name: "Synthetic Fund",
-          type: "ETF",
-          thesis: "SPECULATIVE",
-        },
-      }),
+      prisma.$transaction((tx) =>
+        tx.instrument.create({
+          data: {
+            id: "XS00TEST0099",
+            name: "Synthetic Fund",
+            type: "ETF",
+            thesis: "SPECULATIVE",
+          },
+        }),
+      ),
     ).rejects.toThrow(/CHECK constraint failed/);
   });
 
@@ -190,7 +194,9 @@ describe("PrismaLedgerRepository (integration)", () => {
     ])("refuses a row with an unknown %s", async (_case, over) => {
       const { prisma } = await import("./index");
       await expect(
-        prisma.ledgerEntry.create({ data: entry(over) }),
+        prisma.$transaction((tx) =>
+          tx.ledgerEntry.create({ data: entry(over) }),
+        ),
       ).rejects.toThrow(/CHECK constraint failed/);
     });
 
@@ -209,10 +215,13 @@ describe("PrismaLedgerRepository (integration)", () => {
       const backfill = /UPDATE "LedgerEntry"[\s\S]*?;/.exec(sql)?.[0];
       expect(backfill).toBeDefined();
 
-      const legacy = await prisma.ledgerEntry.create({
-        data: entry({ grossAmount: "42.10", originalAmount: null }),
+      const legacy = await prisma.$transaction(async (tx) => {
+        const row = await tx.ledgerEntry.create({
+          data: entry({ grossAmount: "42.10", originalAmount: null }),
+        });
+        await tx.$executeRawUnsafe(backfill!);
+        return row;
       });
-      await prisma.$executeRawUnsafe(backfill!);
 
       expect(
         await prisma.ledgerEntry.findUnique({

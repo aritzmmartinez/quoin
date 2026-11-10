@@ -39,6 +39,11 @@ model Instrument {
   hedgedToBaseHlc String?
   thesisHlc       String?
 
+  /// Changes whenever a phone's copy of this instrument's prices can no longer be
+  /// healed by a tail. Compared for equality only. Null until a phone first asks
+  /// for these prices. Local to this database: it never travels in an exchange.
+  priceSeriesVersion String?
+
   entries       LedgerEntry[]
   prices        PriceSnapshot[]
   holdings      EtfHolding[]
@@ -361,6 +366,28 @@ model SyncPeer {
   name         String?
   seen         String
   lastSyncedAt DateTime?
+}
+
+/// A phone allowed to sync with this computer. Local to this database: it does not
+/// travel in the exchange. `tokenHash` is the SHA-256 of the device token, and
+/// `lastCounts` the JSON of what the last sync brought.
+model PairedDevice {
+  deviceId    String    @id
+  name        String
+  tokenHash   String
+  pairedAt    DateTime
+  lastSyncAt  DateTime?
+  lastAddress String?
+  lastCounts  String?
+  revokedAt   DateTime?
+}
+
+/// The address a phone reaches this computer at: at most one row, id 1 (a CHECK in
+/// the migration keeps it so). Local to this database, like PairedDevice.
+model SyncServer {
+  id   Int     @id @default(1)
+  host String?
+  port Int     @default(3443)
 }
 
 /// What was deleted, so a merge does not bring it back. Never purged.

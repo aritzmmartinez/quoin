@@ -139,6 +139,10 @@ export const es = {
     body: "Esa dirección no corresponde a ninguna pantalla de Quoin.",
     home: "Ir al resumen",
   },
+  unsupportedResidence: {
+    title: "Actualiza Quoin",
+    body: "Otro dispositivo ha guardado una residencia fiscal que esta versión de Quoin no conoce. Tus datos están intactos: actualiza Quoin en este equipo para seguir.",
+  },
   select: {
     empty: "Sin resultados",
   },
@@ -239,6 +243,92 @@ export const es = {
         label: "Tipos de cambio",
         hint: "Banco Central Europeo: divisas en uso",
       },
+    },
+    devices: {
+      title: "Dispositivos",
+      desc: "Los móviles vinculados sincronizan con este equipo por la red local.",
+      refused: "Esta acción solo se puede hacer desde Quoin.",
+      saved: {
+        name: "Nombre guardado",
+        host: "Dirección guardada",
+        port: "Puerto guardado",
+        revoked: (name: string): string => `«${name}» revocado`,
+      },
+      name: {
+        label: "Nombre de este equipo",
+        hint: "El que verá el móvil al vincularse",
+        invalid: "El nombre no puede pasar de 100 caracteres.",
+      },
+      address: {
+        host: {
+          label: "Dirección de este equipo",
+          hint: "La IP de la red local con la que el móvil llegará hasta aquí",
+          hintManual:
+            "Quoin no puede ver la IP de este equipo desde aquí. Escríbela una vez y se recordará",
+          placeholder: "192.168.1.20",
+        },
+        port: {
+          label: "Puerto de sincronización",
+          hint: "El que se publica hacia la red local",
+          database: (path: string, kind: "ledger" | "scratch" | "other") =>
+            `Base de datos: ${path} (${{ ledger: "ledger real", scratch: "base de pruebas", other: "ni el ledger ni la de pruebas" }[kind]})`,
+        },
+        save: "Guardar",
+        invalidHost: "Escribe una dirección IP o un nombre de equipo válidos.",
+        invalidPort: "El puerto debe ser un número entre 1 y 65535.",
+      },
+      pair: {
+        start: "Vincular un móvil",
+        scan: "Escanea este código desde Quoin en el móvil.",
+        expiresIn: (time: string): string => `Caduca en ${time}`,
+        qrLabel: "Código QR para vincular un móvil",
+        confirmTitle: (name: string): string => `¿Vincular «${name}»?`,
+        confirmBody:
+          "Comprueba que el código es el mismo en los dos dispositivos.",
+        code: "Código",
+        confirm: "Vincular",
+        reject: "Rechazar",
+        cancel: "Cancelar",
+        again: "Generar otro código",
+        expired: "El código ha caducado.",
+        rejected: "Vinculación rechazada.",
+        done: (name: string): string => `«${name}» ya está vinculado.`,
+        needAddress: "Indica antes la dirección de este equipo.",
+        portUnavailable: (port: number): string =>
+          `No se ha podido abrir el puerto ${port}. Comprueba que no lo esté usando otro programa.`,
+      },
+      list: {
+        empty: "Ningún móvil vinculado.",
+        pairedAt: (when: string): string => `Vinculado ${when}`,
+        lastSync: (when: string, address: string): string =>
+          `Última sincronización: ${when}, desde ${address}`,
+        neverSynced: "Aún no ha sincronizado",
+        revoke: "Revocar",
+        confirmRevoke: (name: string): string =>
+          `«${name}» dejará de poder sincronizar. Para volver a usarlo habrá que vincularlo de nuevo.`,
+        revoked: (when: string): string => `Revocado ${when}`,
+      },
+      counts: {
+        none: "Sin cambios",
+        ledger: (n: number): string =>
+          n === 1 ? "1 movimiento" : `${n} movimientos`,
+        instruments: (n: number): string =>
+          n === 1 ? "1 instrumento" : `${n} instrumentos`,
+        targets: (n: number): string => (n === 1 ? "1 plan" : `${n} planes`),
+        holdings: (n: number): string =>
+          n === 1 ? "1 composición" : `${n} composiciones`,
+        identities: (n: number): string =>
+          n === 1 ? "1 identidad" : `${n} identidades`,
+        settings: "la residencia",
+        setAside: (n: number): string =>
+          n === 1 ? "1 movimiento apartado" : `${n} movimientos apartados`,
+      },
+      failedPrices: (n: number): string =>
+        n === 1
+          ? "Una descarga ha fallado tras la última sincronización. Se volverá a intentar en la próxima actualización de precios."
+          : `${n} descargas han fallado tras la última sincronización. Se volverán a intentar en la próxima actualización de precios.`,
+      failedRates: (n: number): string =>
+        `${n === 1 ? "Una descarga de tipos de cambio ha fallado" : `${n} descargas de tipos de cambio han fallado`} tras la última sincronización. Para reintentarlo, ${REFRESH_RATES}.`,
     },
   },
   fx: {
@@ -766,6 +856,17 @@ export const es = {
     confirmPending: "Continuar para valorar las recompensas y los intercambios",
     confirmCount: (count: number): string =>
       count === 1 ? "Importar 1 operación" : `Importar ${count} operaciones`,
+    rateConflict: {
+      title: (currencies: readonly string[]): string =>
+        `El BCE publica ahora otro tipo para días ya guardados de ${currencies.join(", ")}, así que esa serie no se ha actualizado. Las operaciones en esa divisa de un día sin tipo guardado quedan aparte, sin tipo de cambio, y actualizar los tipos no lo resuelve mientras no coincidan.`,
+      line: (
+        currency: string,
+        day: string,
+        stored: string,
+        incoming: string,
+      ): string =>
+        `${currency}, ${day}: guardado ${stored}, el BCE da ${incoming}`,
+    },
     appliesNow:
       "Las operaciones se guardan en el registro al pulsar. Los pasos siguientes solo añaden símbolos y precios: cerrar el asistente después no revierte la importación.",
     closeConfirm: {

@@ -24,4 +24,5 @@ export default [
   route("api/ipc/sync", "routes/ipc-sync.ts"),
   route("api/fx/sync", "routes/fx-sync.ts"),
   route("api/ingest", "routes/ingest.ts"),
+  route("api/devices", "routes/devices.ts"),
 ] satisfies RouteConfig;

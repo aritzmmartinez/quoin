@@ -93,10 +93,12 @@ export class PrismaFxRepository implements FxRepository {
 
   async markChecked(series: FxSeries): Promise<void> {
     const now = new Date();
-    await prisma.fxSync.upsert({
-      where: { series: fxSeriesKey(series) },
-      create: { series: fxSeriesKey(series), checkedAt: now },
-      update: { checkedAt: now },
-    });
+    await prisma.$transaction((tx) =>
+      tx.fxSync.upsert({
+        where: { series: fxSeriesKey(series) },
+        create: { series: fxSeriesKey(series), checkedAt: now },
+        update: { checkedAt: now },
+      }),
+    );
   }
 }

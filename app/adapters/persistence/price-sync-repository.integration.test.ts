@@ -1,7 +1,8 @@
-import { execSync } from "node:child_process";
 import { mkdirSync, rmSync } from "node:fs";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import { migratedDatabase } from "../../../test/integration/template";
 
 let repo: InstanceType<
   typeof import("./price-sync-repository").PrismaPriceSyncRepository
@@ -15,10 +16,7 @@ beforeAll(async () => {
   mkdirSync(tmpDir, { recursive: true });
   const dbUrl = `file:${dbPath}`;
   process.env.DATABASE_URL = dbUrl;
-  execSync("pnpm exec prisma migrate deploy", {
-    stdio: "ignore",
-    env: { ...process.env, DATABASE_URL: dbUrl },
-  });
+  migratedDatabase(dbPath);
 
   const persistence = await import("./index");
   repo = new persistence.PrismaPriceSyncRepository();
@@ -52,6 +50,8 @@ describe("PrismaPriceSyncRepository (integration)", () => {
   });
 
   it("records a check for an instrument with no row, which it does not require", async () => {
-    await expect(repo.markChecked("NOT-AN-INSTRUMENT")).resolves.toBeUndefined();
+    await expect(
+      repo.markChecked("NOT-AN-INSTRUMENT"),
+    ).resolves.toBeUndefined();
   });
 });

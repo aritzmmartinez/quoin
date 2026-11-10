@@ -3,6 +3,7 @@ import Decimal from "decimal.js";
 import {
   BASE_CURRENCY,
   Money,
+  compareCodeUnits,
   compareTrades,
   isInKind,
   isSwapLeg,
@@ -254,7 +255,11 @@ export function computeOpportunityCost(
     benchmarkFlows.push(...bucket.benchmarkFlows);
   }
 
-  lines.sort((a, b) => new Decimal(b.difference).comparedTo(a.difference));
+  lines.sort(
+    (a, b) =>
+      new Decimal(b.difference).comparedTo(a.difference) ||
+      compareCodeUnits(a.instrumentId, b.instrumentId),
+  );
 
   const realMwr = rateOf(realFlows, realValue, now);
   const benchmarkMwr = rateOf(benchmarkFlows, benchmarkValue, now);

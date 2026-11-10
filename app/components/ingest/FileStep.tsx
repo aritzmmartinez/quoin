@@ -1,8 +1,6 @@
 import { FileText } from "lucide-react";
 
-import type { Broker, ImportSummary } from "~/adapters/ingestion";
-
-import { importAction, useCopy } from "~/lib";
+import { importAction, useCopy, useFormat, type IngestPreview } from "~/lib";
 import { Button } from "../ui/Button";
 import { FileDropzone } from "../ui/FileDropzone";
 import { SummaryList } from "./SummaryList";
@@ -17,7 +15,7 @@ export function FileStep({
   onReset,
 }: {
   fileName: string | null;
-  preview: { broker: Broker; summary: ImportSummary } | null;
+  preview: IngestPreview | null;
   imported: boolean;
   busy: boolean;
   onFile: (file: File) => void;
@@ -67,6 +65,8 @@ export function FileStep({
 
       <SummaryList summary={preview.summary} pendingPrice />
 
+      <RateConflicts conflicts={preview.rateConflicts} />
+
       {!canImport ? (
         <p className="mt-3 text-[12px] text-muted">{copy.nothingNew}</p>
       ) : (
@@ -87,5 +87,33 @@ export function FileStep({
         </Button>
       </div>
     </>
+  );
+}
+
+function RateConflicts({
+  conflicts,
+}: {
+  conflicts: IngestPreview["rateConflicts"];
+}) {
+  const copy = useCopy().ingest.rateConflict;
+  const { formatCalendarDate, formatQuantity } = useFormat();
+  if (conflicts.length === 0) return null;
+
+  return (
+    <div className="mt-3 border-t border-border pt-3 text-[12px] text-negative">
+      <p>{copy.title([...new Set(conflicts.map((c) => c.currency))])}</p>
+      <ul className="mt-2 font-mono">
+        {conflicts.map((c) => (
+          <li key={`${c.currency}-${c.day}`}>
+            {copy.line(
+              c.currency,
+              formatCalendarDate(c.day),
+              formatQuantity(c.stored),
+              formatQuantity(c.incoming),
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

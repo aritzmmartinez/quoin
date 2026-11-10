@@ -35,7 +35,7 @@ import {
 } from "./ingest";
 import { fileErrorMessage } from "./discards";
 import { ensureRatesNow } from "./fx-sync.server";
-import { planWithRates } from "./ingest-rates";
+import { planWithRates, type PlannedBatch } from "./ingest-rates";
 import { backfillInstruments } from "./prices-backfill";
 import { loadRateBook } from "./rate-book.server";
 import { inTurn } from "./in-turn";
@@ -62,7 +62,7 @@ export class IngestError extends Error {}
 async function plan(
   t: Copy,
   csv: string,
-): Promise<{ broker: Broker; batch: MappedBatch }> {
+): Promise<{ broker: Broker } & PlannedBatch> {
   const broker = detectBroker(csv);
   if (!broker) throw new IngestError(t.ingest.unknownBroker);
 
@@ -86,8 +86,10 @@ async function plan(
         );
 
   try {
-    const batch = await planWithRates(() => adapter.plan(csv), ensureRatesNow);
-    return { broker, batch };
+    return {
+      broker,
+      ...(await planWithRates(() => adapter.plan(csv), ensureRatesNow)),
+    };
   } catch (error) {
     if (error instanceof InvalidLedgerEventError) {
       throw new IngestError(
@@ -113,16 +115,16 @@ export async function previewIngest(
   t: Copy,
   csv: string,
 ): Promise<IngestPreview> {
-  const { broker, batch } = await plan(t, csv);
+  const { broker, batch, rateConflicts } = await plan(t, csv);
   const summary = await previewBatch(new PrismaLedgerRepository(), batch);
-  return { broker, summary };
+  return { broker, summary, rateConflicts };
 }
 
 export async function commitIngest(
   t: Copy,
   csv: string,
 ): Promise<IngestResult> {
-  const { broker, batch } = await plan(t, csv);
+  const { broker, batch, rateConflicts } = await plan(t, csv);
   const instruments = new PrismaInstrumentRepository();
   const ledger = new PrismaLedgerRepository();
 
@@ -131,6 +133,7 @@ export async function commitIngest(
   return {
     broker,
     summary,
+    rateConflicts,
     pending: await pendingMappings(batch),
     retryIds: unpricedAssetIds(summary),
   };
@@ -284,7 +287,14 @@ export async function fillPrices(
     ),
     (target) =>
       syncInstrumentPrices(
-        { prices, provider, checks, zone: calendarZone },
+        {
+          instruments,
+          prices,
+          provider,
+          rates: ensureRatesNow,
+          checks,
+          zone: calendarZone,
+        },
         target,
       ),
     {

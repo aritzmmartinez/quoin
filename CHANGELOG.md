@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-11-10
+
+### Upgrading
+- This version adds two migrations: the tables for paired phones, and a column that versions each instrument's price history. The Docker image backs up the ledger before migrating, as usual, and does not start if that backup fails.
+- Going back to 0.15.x needs that backup: an older image cannot open the migrated database. See *Restoring a backup* in the README.
+- The image now also exposes the sync port, 3443. Nothing listens on it until a phone is paired, and it is reachable only if you publish it. Publish it on the computer's address on the local network, `-p 192.168.1.20:3443:3443`, never on every interface: on Linux, Docker's own firewall rules skip ufw. On Windows, allow the port on private networks. See *Syncing with the phone* in the README.
+- Without a phone, there is nothing to change: the same `docker run` keeps working.
+
+### Added
+- Settings has a Devices section to pair the mobile app: scan a QR, check that the six digit code is the same on both screens, and confirm. Phones sync with this computer over the local network, through HTTPS on a port of their own, trusting its certificate by the fingerprint in the QR. The section also sets this computer's name, address and port, and lists each phone with its last sync, what it brought and any download that failed after it, with a button to revoke it.
+- Before the first sync of each day that brings changes, the database is copied into `data/backups/sync/`, keeping the last 14 days.
+- The API the phone speaks is described in `docs/sync-api.md`.
+- `pnpm sync:import` resolves conflicts: every conflict is listed with a key, and `--keep <key>` keeps the value here while `--take <key>` takes the one in the file. A value kept here travels to the other device on the next sync, so the same conflict does not come back. Instrument fields, the residence, plan versions (also two on the same day) and compositions can all be resolved.
+
+### Changed
+- `pnpm sync:import`: a ledger entry that differs on the two devices no longer stops the import. It is set aside, each device keeps its own version, the rest is applied, and the command lists it and exits with an error on every sync until the two agree. When one entry of a linked operation (a Kraken swap) differs, both are set aside.
+- When another device saves a tax residence this version does not know, the sync keeps working and the value is kept as it arrived. Every screen asks to update Quoin instead of failing with a generic error.
+- The sync server logs its port and database when it starts, and says when its port is already taken by another process.
+- The Docker image applies the Debian security updates published after its base image was built.
+
+### Fixed
+- Refresh prices: an instrument with no daily price downloads its whole history again, instead of only a live price from then on. Gaps are counted from the last daily price, so a live price no longer hides the missing days before it.
+- Two backups taken in the same minute no longer fail because the second one finds the first one's name taken: it gets a numbered name.
+- A backup whose row counts did not match the database is taken again once before it fails, since a write that lands while it is being taken changes the counts.
+- A write in the app that reads first now takes the database's write lock from its start, so a sync running beside it is turned away before it starts, and tries again, instead of merging and then being undone at the end.
+- A write made while another one was failing could be lost after the screen had already confirmed it: an import running beside a price refresh that failed halfway lost its instruments and entries, and the same could happen to a check time, a price, a CPI month or a resolved identity. Each write now waits for the one in front of it and keeps its own result.
+- `pnpm sync:import` reads, merges and writes in one transaction, so a change made in the app while it runs is taken into account instead of being overwritten, and a write the app is making is never mixed into the sync's.
+- Importing a file in another currency: when the ECB now publishes a different rate for a day already stored, the import window and `pnpm ingest` say so, with the currency, the day and both rates, and that the series was not updated. Before, nothing was said, and the trades of days with no stored rate appeared only as trades with no exchange rate, with advice to refresh the rates that could not help.
+
 ## [0.15.2] - 2026-11-01
 
 ### Added
@@ -500,7 +529,8 @@ fund holdings must be supplied as CSV rather than the Excel most issuers publish
 Design rationale lives beside the code it explains, in `docs/ARCHITECTURE.md` and in the
 commit history — not here.
 
-[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.15.2...HEAD
+[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.16.0...HEAD
+[0.16.0]: https://github.com/aritzmmartinez/quoin/compare/v0.15.2...v0.16.0
 [0.15.2]: https://github.com/aritzmmartinez/quoin/compare/v0.15.1...v0.15.2
 [0.15.1]: https://github.com/aritzmmartinez/quoin/compare/v0.15.0...v0.15.1
 [0.15.0]: https://github.com/aritzmmartinez/quoin/compare/v0.14.0...v0.15.0

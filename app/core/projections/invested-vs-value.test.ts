@@ -74,3 +74,21 @@ describe("computeInvestedVsValueSeries", () => {
     ).toEqual([]);
   });
 });
+
+describe("a price stamped at the instant of a trade", () => {
+  it("comes after the trade and is valued at the quantity the trade left", () => {
+    const at = new Date("2026-01-01T09:00:00Z");
+    const s = computeInvestedVsValueSeries(
+      [trade({ ts: at, quantity: "10", grossAmount: "1000" })],
+      "VWCE",
+      [{ asOf: at, price: "105" }],
+      null,
+      now,
+      BIZKAIA,
+    );
+    expect(s).toEqual([
+      { t: at.getTime(), invested: "1000", value: "1000" },
+      { t: at.getTime(), invested: "1000", value: "1050" },
+    ]);
+  });
+});

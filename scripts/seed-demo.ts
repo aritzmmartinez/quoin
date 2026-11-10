@@ -480,26 +480,6 @@ async function main(): Promise<void> {
     `Seeding ${target}\n  anchor: ${anchor.toISOString().slice(0, 10)}`,
   );
 
-  await prisma.etfHolding.deleteMany();
-  await prisma.etfHoldingBlock.deleteMany();
-  await prisma.syncTombstone.deleteMany();
-  await prisma.syncPeer.deleteMany();
-  await prisma.priceSnapshot.deleteMany();
-  await prisma.ledgerEntry.deleteMany();
-  await prisma.securityIdentity.deleteMany();
-  await prisma.instrument.deleteMany();
-
-  await prisma.instrument.createMany({
-    data: INSTRUMENTS.map(
-      ({
-        seedPrice: _seedPrice,
-        drift: _drift,
-        volatility: _volatility,
-        ...row
-      }) => row,
-    ),
-  });
-
   const from = new Date(
     Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth() - MONTHS, 1),
   );
@@ -508,29 +488,6 @@ async function main(): Promise<void> {
   );
 
   const ledger = buildLedger(anchor, seriesById);
-  await prisma.ledgerEntry.createMany({
-    data: ledger.map((row) => ({
-      ...row,
-      originalAmount: row.grossAmount,
-      originalCurrency: row.currency,
-    })),
-  });
-
-  let snapshots = 0;
-  for (const [instrumentId, series] of seriesById) {
-    if (series.length === 0) continue;
-    await prisma.priceSnapshot.createMany({
-      data: series.map((point) => ({
-        instrumentId,
-        price: point.price.toFixed(instrumentId === "BTC" ? 2 : 4),
-        currency: "EUR",
-        asOf: point.asOf,
-        source: "DEMO",
-      })),
-    });
-    snapshots += series.length;
-  }
-
   const holdingsAsOf = new Date(
     Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth() - 1, 28),
   )
@@ -541,38 +498,90 @@ async function main(): Promise<void> {
     ...holdingsFor("IE00DEMO0001", 120),
     ...holdingsFor("IE00DEMO0005", 40),
   ];
-  await prisma.etfHolding.createMany({ data: holdings });
-  await prisma.etfHoldingBlock.createMany({
-    data: funds.map((instrumentId) => ({ instrumentId, asOf: holdingsAsOf })),
-  });
 
-  await prisma.securityIdentity.createMany({
-    data: [
-      {
-        identity: "US00DEMO0101",
-        identityKind: "ISIN",
-        canonicalId: "DEMOFIGI000001",
-        exchCode: "US",
-        status: "resolved",
-        source: "DEMO",
-      },
-      {
-        identity: "DEMOP.DE",
-        identityKind: "TICKER",
-        canonicalId: "DEMOFIGI000002",
-        exchCode: null,
-        status: "resolved",
-        source: "DEMO",
-      },
-      {
-        identity: "0001.XX",
-        identityKind: "TICKER",
-        canonicalId: null,
-        status: "not-found",
-        source: "DEMO",
-      },
-    ],
-  });
+  let snapshots = 0;
+  await prisma.$transaction(
+    async (tx) => {
+      await tx.etfHolding.deleteMany();
+      await tx.etfHoldingBlock.deleteMany();
+      await tx.syncTombstone.deleteMany();
+      await tx.syncPeer.deleteMany();
+      await tx.priceSnapshot.deleteMany();
+      await tx.ledgerEntry.deleteMany();
+      await tx.securityIdentity.deleteMany();
+      await tx.instrument.deleteMany();
+
+      await tx.instrument.createMany({
+        data: INSTRUMENTS.map(
+          ({
+            seedPrice: _seedPrice,
+            drift: _drift,
+            volatility: _volatility,
+            ...row
+          }) => row,
+        ),
+      });
+
+      await tx.ledgerEntry.createMany({
+        data: ledger.map((row) => ({
+          ...row,
+          originalAmount: row.grossAmount,
+          originalCurrency: row.currency,
+        })),
+      });
+
+      for (const [instrumentId, series] of seriesById) {
+        if (series.length === 0) continue;
+        await tx.priceSnapshot.createMany({
+          data: series.map((point) => ({
+            instrumentId,
+            price: point.price.toFixed(instrumentId === "BTC" ? 2 : 4),
+            currency: "EUR",
+            asOf: point.asOf,
+            source: "DEMO",
+          })),
+        });
+        snapshots += series.length;
+      }
+
+      await tx.etfHolding.createMany({ data: holdings });
+      await tx.etfHoldingBlock.createMany({
+        data: funds.map((instrumentId) => ({
+          instrumentId,
+          asOf: holdingsAsOf,
+        })),
+      });
+
+      await tx.securityIdentity.createMany({
+        data: [
+          {
+            identity: "US00DEMO0101",
+            identityKind: "ISIN",
+            canonicalId: "DEMOFIGI000001",
+            exchCode: "US",
+            status: "resolved",
+            source: "DEMO",
+          },
+          {
+            identity: "DEMOP.DE",
+            identityKind: "TICKER",
+            canonicalId: "DEMOFIGI000002",
+            exchCode: null,
+            status: "resolved",
+            source: "DEMO",
+          },
+          {
+            identity: "0001.XX",
+            identityKind: "TICKER",
+            canonicalId: null,
+            status: "not-found",
+            source: "DEMO",
+          },
+        ],
+      });
+    },
+    { timeout: 60_000 },
+  );
 
   console.log(
     `  ${INSTRUMENTS.length} instruments, ${ledger.length} ledger entries, ` +

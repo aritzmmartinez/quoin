@@ -61,13 +61,24 @@ export function computeInvestedVsValueSeries(
     marks.push({ t: now.getTime(), kind: "price", price: currentPrice });
   }
 
-  marks.sort((a, b) => a.t - b.t);
+  const ordered = marks
+    .map((mark, index) => ({ mark, index }))
+    .sort(
+      (a, b) =>
+        a.mark.t - b.mark.t ||
+        (a.mark.kind === b.mark.kind
+          ? a.index - b.index
+          : a.mark.kind === "trade"
+            ? -1
+            : 1),
+    )
+    .map(({ mark }) => mark);
 
   let quantity = new Decimal(0);
   let invested = "0";
   const series: InvestedVsValuePoint[] = [];
 
-  for (const mark of marks) {
+  for (const mark of ordered) {
     if (mark.kind === "trade") {
       quantity = new Decimal(mark.quantity);
       invested = mark.invested;

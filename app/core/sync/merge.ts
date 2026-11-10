@@ -15,6 +15,18 @@ import {
 } from "./exchange";
 import { originOf } from "./hlc";
 
+export const INSTRUMENT_FIELDS = {
+  quoteSymbol: { mark: "quoteSymbolHlc", values: ["quoteSymbol"] },
+  exposure: { mark: "exposureHlc", values: ["exposureKind", "exposureLeafId"] },
+  ter: { mark: "terHlc", values: ["ter"] },
+  hedgedToBase: { mark: "hedgedToBaseHlc", values: ["hedgedToBase"] },
+  thesis: { mark: "thesisHlc", values: ["thesis"] },
+} as const satisfies Record<
+  string,
+  { mark: keyof InstrumentRow; values: readonly (keyof InstrumentRow)[] }
+>;
+export type InstrumentField = keyof typeof INSTRUMENT_FIELDS;
+
 export type Conflict =
   | {
       kind: "field";
@@ -24,10 +36,30 @@ export type Conflict =
       local: unknown;
       incoming: unknown;
     }
-  | { kind: "ledger"; key: string; fields: string[] }
   | { kind: "target"; id: string }
-  | { kind: "target-day"; day: string; ids: string[] }
+  | { kind: "target-day"; day: string; local: string; incoming: string }
   | { kind: "holdings"; instrumentId: string };
+
+export interface LedgerConflict {
+  kind: "ledger";
+  key: string;
+  fields: string[];
+}
+
+export type Resolution = "keep" | "take";
+export type Resolutions = ReadonlyMap<string, Resolution>;
+
+/**
+ * What the applying side marks with fresh marks of its own, in this order.
+ * `keep` is a claim that the local value is the newer one, so the next exchange
+ * carries it across; the value itself does not change.
+ */
+export type Restamp =
+  | { kind: "instrument"; id: string; field: InstrumentField }
+  | { kind: "settings" }
+  | { kind: "holdings"; instrumentId: string }
+  | { kind: "tombstone"; key: string }
+  | { kind: "reissue"; target: TargetRow };
 
 export type Effect =
   | { kind: "prices"; instrumentId: string; symbol: string }
@@ -45,9 +77,11 @@ export interface MergePlan {
     holdings: HoldingsBlockRow[];
     identities: IdentityRow[];
     settings: Partial<SettingsRow> | null;
+    restamp: Restamp[];
     peers: Peer[];
   };
   conflicts: Conflict[];
+  setAside: LedgerConflict[];
   effects: Effect[];
 }
 
@@ -58,6 +92,59 @@ export class SameDeviceError extends Error {
     );
     this.name = "SameDeviceError";
   }
+}
+
+export class UnknownResolutionError extends Error {
+  constructor(readonly keys: string[]) {
+    super(`No conflict matches the resolution of ${keys.join(", ")}`);
+    this.name = "UnknownResolutionError";
+  }
+}
+
+export function conflictKey(conflict: Conflict): string {
+  switch (conflict.kind) {
+    case "field":
+      return conflict.entity === "settings"
+        ? `settings:${conflict.field}`
+        : `instrument:${conflict.key}:${conflict.field}`;
+    case "target":
+      return `target:${conflict.id}`;
+    case "target-day":
+      return `target-day:${conflict.day}`;
+    case "holdings":
+      return `holdings:${conflict.instrumentId}`;
+  }
+}
+
+export function restampKey(restamp: Restamp): string {
+  switch (restamp.kind) {
+    case "instrument":
+      return `instrument:${restamp.id}:${restamp.field}`;
+    case "settings":
+      return "settings";
+    case "holdings":
+      return `holdings:${restamp.instrumentId}`;
+    case "tombstone":
+      return `tombstone:${restamp.key}`;
+    case "reissue":
+      return `reissue:${restamp.target.id}`;
+  }
+}
+
+export function changesData({ apply }: MergePlan): boolean {
+  return (
+    apply.ledger.insert.length > 0 ||
+    apply.ledger.markInKind.length > 0 ||
+    apply.instruments.insert.length > 0 ||
+    apply.instruments.update.length > 0 ||
+    apply.targets.insert.length > 0 ||
+    apply.targets.delete.length > 0 ||
+    apply.tombstones.length > 0 ||
+    apply.holdings.length > 0 ||
+    apply.identities.length > 0 ||
+    apply.settings !== null ||
+    apply.restamp.length > 0
+  );
 }
 
 const BASE_CURRENCY = "EUR";
@@ -90,6 +177,32 @@ function decide(
   return "conflict";
 }
 
+/** A conflict the caller resolved, or `null` after recording it as open. */
+class Conflicts {
+  readonly open: Conflict[] = [];
+  private readonly used = new Set<string>();
+
+  constructor(private readonly resolutions: Resolutions) {}
+
+  resolve(conflict: Conflict): Resolution | null {
+    const key = conflictKey(conflict);
+    const resolution = this.resolutions.get(key);
+    if (resolution === undefined) {
+      this.open.push(conflict);
+      return null;
+    }
+    this.used.add(key);
+    return resolution;
+  }
+
+  assertAllUsed(): void {
+    const unused = [...this.resolutions.keys()]
+      .filter((key) => !this.used.has(key))
+      .sort(compareCodeUnits);
+    if (unused.length > 0) throw new UnknownResolutionError(unused);
+  }
+}
+
 const effectKey = (effect: Effect) =>
   effect.kind === "prices"
     ? `prices:${effect.instrumentId}`
@@ -99,18 +212,11 @@ const same = (a: unknown, b: unknown) =>
 const byKey = <T>(rows: readonly T[], key: (row: T) => string) =>
   new Map(rows.map((row) => [key(row), row] as const));
 
-const INSTRUMENT_FIELDS = {
-  quoteSymbol: { mark: "quoteSymbolHlc", values: ["quoteSymbol"] },
-  exposure: { mark: "exposureHlc", values: ["exposureKind", "exposureLeafId"] },
-  ter: { mark: "terHlc", values: ["ter"] },
-  hedgedToBase: { mark: "hedgedToBaseHlc", values: ["hedgedToBase"] },
-  thesis: { mark: "thesisHlc", values: ["thesis"] },
-} as const satisfies Record<
-  string,
-  { mark: keyof InstrumentRow; values: readonly (keyof InstrumentRow)[] }
->;
-
-export function merge(local: SyncState, incoming: Exchange): MergePlan {
+export function merge(
+  local: SyncState,
+  incoming: Exchange,
+  resolutions: Resolutions = new Map(),
+): MergePlan {
   if (incoming.deviceId === local.deviceId) {
     throw new SameDeviceError(local.deviceId);
   }
@@ -123,48 +229,64 @@ export function merge(local: SyncState, incoming: Exchange): MergePlan {
     seen: new Map(incoming.peers.map((p) => [p.deviceId, p.seen])),
   };
 
-  const conflicts: Conflict[] = [];
+  const conflicts = new Conflicts(resolutions);
+  const restamp: Restamp[] = [];
   const effects: Effect[] = [];
 
-  const ledger = mergeLedger(local.ledger, incoming.ledger, conflicts, effects);
+  const { ledger, setAside } = mergeLedger(
+    local.ledger,
+    incoming.ledger,
+    effects,
+  );
   const instruments = mergeInstruments(
     local.instruments,
     incoming.instruments,
     me,
     them,
     conflicts,
+    restamp,
     effects,
   );
-  const { targets, tombstones } = mergeTargets(local, incoming, conflicts);
+  const { targets, tombstones } = mergeTargets(
+    local,
+    incoming,
+    conflicts,
+    restamp,
+  );
   const holdings = mergeHoldings(
     local.holdings,
     incoming.holdings,
     me,
     them,
     conflicts,
+    restamp,
   );
   const identities = mergeIdentities(local.identities, incoming.identities);
 
   let settings: Partial<SettingsRow> | null = null;
   if (local.settings.residence !== incoming.settings.residence) {
-    const decision = decide(
+    let decision = decide(
       me,
       them,
       local.settings.residenceHlc,
       incoming.settings.residenceHlc,
     );
-    if (decision === "take") settings = incoming.settings;
     if (decision === "conflict") {
-      conflicts.push({
-        kind: "field",
-        entity: "settings",
-        key: "settings",
-        field: "residence",
-        local: local.settings.residence,
-        incoming: incoming.settings.residence,
-      });
+      decision =
+        conflicts.resolve({
+          kind: "field",
+          entity: "settings",
+          key: "settings",
+          field: "residence",
+          local: local.settings.residence,
+          incoming: incoming.settings.residence,
+        }) ?? "conflict";
+      if (decision === "keep") restamp.push({ kind: "settings" });
     }
+    if (decision === "take") settings = incoming.settings;
   }
+
+  conflicts.assertAllUsed();
 
   return {
     apply: {
@@ -175,9 +297,13 @@ export function merge(local: SyncState, incoming: Exchange): MergePlan {
       holdings,
       identities,
       settings,
+      restamp: restamp.sort((a, b) =>
+        compareCodeUnits(restampKey(a), restampKey(b)),
+      ),
       peers: mergeSeen(me, them, incoming.exportHlc),
     },
-    conflicts,
+    conflicts: conflicts.open,
+    setAside,
     effects: effects.sort((a, b) =>
       compareCodeUnits(effectKey(a), effectKey(b)),
     ),
@@ -206,15 +332,26 @@ const LEDGER_COMPARED = [
   "note",
 ] as const;
 
+/**
+ * A ledger row has no mark, so a difference cannot be resolved by a newer
+ * change: the row is set aside, each side keeps its own version, and the rest
+ * applies. Leaving it out loses nothing — a conflict needs the row on both
+ * sides — and `seen` may still advance, because no mark covers the ledger.
+ * A linked operation is set aside whole, by the link on either side.
+ *
+ * A Kraken reward is two unlinked rows (`refid` and `refid:income`) carrying one
+ * value: a revaluation differs in both, and both are already stored, so both
+ * are set aside without a link to join them.
+ */
 function mergeLedger(
   local: readonly LedgerRow[],
   incoming: readonly LedgerRow[],
-  conflicts: Conflict[],
   effects: Effect[],
-): MergePlan["apply"]["ledger"] {
+): { ledger: MergePlan["apply"]["ledger"]; setAside: LedgerConflict[] } {
   const stored = byKey(local, ledgerKey);
   const insert: LedgerRow[] = [];
   const markInKind: string[] = [];
+  const setAside: LedgerConflict[] = [];
   const blockedLinks = new Set<string>();
 
   for (const row of incoming) {
@@ -224,8 +361,11 @@ function mergeLedger(
     const fields: string[] = LEDGER_COMPARED.filter((f) => mine[f] !== row[f]);
     if (Date.parse(mine.ts) !== Date.parse(row.ts)) fields.unshift("ts");
     if (fields.length > 0) {
-      conflicts.push({ kind: "ledger", key, fields });
-      if (row.linkId != null) blockedLinks.add(`${row.source}::${row.linkId}`);
+      setAside.push({ kind: "ledger", key, fields });
+      for (const side of [row, mine]) {
+        if (side.linkId != null)
+          blockedLinks.add(`${side.source}::${side.linkId}`);
+      }
     } else if (mine.funding === "CASH" && row.funding === "IN_KIND") {
       markInKind.push(key);
     }
@@ -253,8 +393,13 @@ function mergeLedger(
   }
 
   return {
-    insert: insert.sort((a, b) => compareCodeUnits(ledgerKey(a), ledgerKey(b))),
-    markInKind: markInKind.sort(),
+    ledger: {
+      insert: insert.sort((a, b) =>
+        compareCodeUnits(ledgerKey(a), ledgerKey(b)),
+      ),
+      markInKind: markInKind.sort(compareCodeUnits),
+    },
+    setAside: setAside.sort((a, b) => compareCodeUnits(a.key, b.key)),
   };
 }
 
@@ -263,7 +408,8 @@ function mergeInstruments(
   incoming: readonly InstrumentRow[],
   me: Side,
   them: Side,
-  conflicts: Conflict[],
+  conflicts: Conflicts,
+  restamp: Restamp[],
   effects: Effect[],
 ): MergePlan["apply"]["instruments"] {
   const stored = byKey(local, (row) => row.id);
@@ -288,23 +434,30 @@ function mergeInstruments(
     if (mine.assetClass === null && row.assetClass !== null) {
       patch.assetClass = row.assetClass;
     }
-    for (const [field, { mark, values }] of Object.entries(INSTRUMENT_FIELDS)) {
+    for (const [name, { mark, values }] of Object.entries(INSTRUMENT_FIELDS)) {
+      const field = name as InstrumentField;
       if (values.every((v) => mine[v] === row[v])) continue;
-      const decision = decide(me, them, mine[mark], row[mark]);
+      let decision = decide(me, them, mine[mark], row[mark]);
+      if (decision === "conflict") {
+        decision =
+          conflicts.resolve({
+            kind: "field",
+            entity: "instrument",
+            key: row.id,
+            field,
+            local:
+              values.length === 1
+                ? mine[values[0]!]
+                : values.map((v) => mine[v]),
+            incoming:
+              values.length === 1 ? row[values[0]!] : values.map((v) => row[v]),
+          }) ?? "conflict";
+        if (decision === "keep")
+          restamp.push({ kind: "instrument", id: row.id, field });
+      }
       if (decision === "take") {
         for (const v of values) patch[v] = row[v];
         patch[mark] = row[mark];
-      } else if (decision === "conflict") {
-        conflicts.push({
-          kind: "field",
-          entity: "instrument",
-          key: row.id,
-          field,
-          local:
-            values.length === 1 ? mine[values[0]!] : values.map((v) => mine[v]),
-          incoming:
-            values.length === 1 ? row[values[0]!] : values.map((v) => row[v]),
-        });
       }
     }
     if (Object.keys(patch).length > 0) {
@@ -325,10 +478,18 @@ function mergeInstruments(
   };
 }
 
+/**
+ * Plan versions carry no mark and are never edited, so a resolution travels as
+ * a tombstone, which does. Two versions on one day: the losing one is
+ * tombstoned. One id with two contents: `take` replaces the local one and both
+ * sides then agree; `keep` cannot win with the same id, so the local content is
+ * reissued under a new id (the mark of the tombstone that buries the old one).
+ */
 function mergeTargets(
   local: SyncState,
   incoming: Exchange,
-  conflicts: Conflict[],
+  conflicts: Conflicts,
+  restamp: Restamp[],
 ): { targets: MergePlan["apply"]["targets"]; tombstones: Tombstone[] } {
   const buried = new Set(local.tombstones.map((t) => t.key));
   const tombstones = incoming.tombstones
@@ -338,39 +499,58 @@ function mergeTargets(
 
   const stored = byKey(local.targets, (t) => t.id);
   const insert: TargetRow[] = [];
+  const remove = new Set(
+    local.targets.filter((t) => dead.has(t.id)).map((t) => t.id),
+  );
+  const replaced = new Set<string>();
   for (const target of incoming.targets) {
     if (dead.has(target.id)) continue;
     const mine = stored.get(target.id);
-    if (!mine) insert.push(target);
-    else if (!same(mine, target))
-      conflicts.push({ kind: "target", id: target.id });
+    if (!mine) {
+      insert.push(target);
+      continue;
+    }
+    if (same(mine, target)) continue;
+    const resolution = conflicts.resolve({ kind: "target", id: target.id });
+    if (resolution === null) continue;
+    remove.add(target.id);
+    if (resolution === "take") {
+      replaced.add(target.id);
+      insert.push(target);
+    } else {
+      restamp.push({ kind: "reissue", target: mine });
+    }
   }
-  const remove = local.targets
-    .filter((t) => dead.has(t.id))
-    .map((t) => t.id)
-    .sort();
 
-  const byDay = new Map<string, string[]>();
-  for (const target of [
-    ...local.targets.filter((t) => !dead.has(t.id)),
-    ...insert,
-  ]) {
-    byDay.set(target.activeFrom, [
-      ...(byDay.get(target.activeFrom) ?? []),
-      target.id,
-    ]);
-  }
-  for (const [day, ids] of [...byDay].sort(([a], [b]) =>
-    compareCodeUnits(a, b),
+  const localByDay = new Map(
+    local.targets
+      .filter((t) => !dead.has(t.id) && !replaced.has(t.id))
+      .map((t) => [t.activeFrom, t.id] as const),
+  );
+  for (const target of [...insert].sort((a, b) =>
+    compareCodeUnits(a.activeFrom, b.activeFrom),
   )) {
-    if (ids.length > 1)
-      conflicts.push({ kind: "target-day", day, ids: ids.sort() });
+    const mine = localByDay.get(target.activeFrom);
+    if (mine === undefined || mine === target.id) continue;
+    const resolution = conflicts.resolve({
+      kind: "target-day",
+      day: target.activeFrom,
+      local: mine,
+      incoming: target.id,
+    });
+    if (resolution === "take") {
+      remove.add(mine);
+      restamp.push({ kind: "tombstone", key: mine });
+    } else if (resolution === "keep") {
+      insert.splice(insert.indexOf(target), 1);
+      restamp.push({ kind: "tombstone", key: target.id });
+    }
   }
 
   return {
     targets: {
       insert: insert.sort((a, b) => compareCodeUnits(a.id, b.id)),
-      delete: remove,
+      delete: [...remove].sort(compareCodeUnits),
     },
     tombstones,
   };
@@ -381,7 +561,8 @@ function mergeHoldings(
   incoming: readonly HoldingsBlockRow[],
   me: Side,
   them: Side,
-  conflicts: Conflict[],
+  conflicts: Conflicts,
+  restamp: Restamp[],
 ): HoldingsBlockRow[] {
   const stored = byKey(local, (b) => b.instrumentId);
   const replace: HoldingsBlockRow[] = [];
@@ -412,7 +593,13 @@ function mergeHoldings(
     } else if (sameRows) {
       if (mine.asOfInferred && !block.asOfInferred) replace.push(block);
     } else {
-      conflicts.push({ kind: "holdings", instrumentId: block.instrumentId });
+      const resolution = conflicts.resolve({
+        kind: "holdings",
+        instrumentId: block.instrumentId,
+      });
+      if (resolution === "take") replace.push(block);
+      if (resolution === "keep")
+        restamp.push({ kind: "holdings", instrumentId: block.instrumentId });
     }
   }
   return replace.sort((a, b) =>

@@ -1,13 +1,6 @@
-/**
- * Naming and rotation for ledger snapshots, kept pure and away from the filesystem.
- *
- * Same split as the parsers: deciding *which* backups to delete is arithmetic and gets
- * tested; deleting them is I/O. Rotation is the one part of the backup script that
- * destroys data, so it is the part that least deserves to be untested.
- */
-
 export const KEEP = 30;
 export const BACKUP_NAME = /^quoin-\d{8}-\d{4}(-\d{2})?\.sqlite$/;
+const MAX_SEQUENCE = 99;
 
 function pad(value: number, width = 2): string {
   return String(value).padStart(width, "0");
@@ -20,9 +13,22 @@ export function stamp(now: Date): string {
   );
 }
 
-export function backupFileName(now: Date, seconds?: number): string {
-  const suffix = seconds === undefined ? "" : `-${pad(seconds)}`;
+export function backupFileName(now: Date, sequence?: number): string {
+  const suffix = sequence === undefined ? "" : `-${pad(sequence)}`;
   return `quoin-${stamp(now)}${suffix}.sqlite`;
+}
+
+export function freeBackupFileName(
+  now: Date,
+  taken: (name: string) => boolean,
+): string {
+  const base = backupFileName(now);
+  if (!taken(base)) return base;
+  for (let sequence = 1; sequence <= MAX_SEQUENCE; sequence++) {
+    const name = backupFileName(now, sequence);
+    if (!taken(name)) return name;
+  }
+  throw new Error(`No free backup name left for ${base}`);
 }
 
 export function backupsToRemove(

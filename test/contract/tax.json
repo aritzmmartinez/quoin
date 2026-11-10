@@ -1,0 +1,3039 @@
+{
+  "contract": "tax",
+  "version": 1,
+  "description": "The Bizkaia foral tax view: FIFO, the Art. 43 repurchase rule (letter g for listed securities, letter i for crypto from 2025-01-01, a notice for a crypto loss before), deferred losses and where they integrate, four-year carryforward (Art. 66) and the savings-base quota. Shared with the mobile client: both implementations must reproduce every case. Events are LedgerEvents; an absent fxSource is IDENTITY and an absent funding is CASH. assetClasses comes from each instrument's type (ETF, STOCK listed-security; CRYPTO fungible-crypto; BOND, COMMODITY, CASH unclassified). history is computeTaxHistory over the whole ledger; years holds, per requested year, taxYearOf, carryforwardFrom, and the figures of buildTaxYearView (sums to two places, the scale in force and the quota: null when no scale is on file for that territory and year, never the nearest year's). The repurchase rules, the swap valuation and the scales are tables both sides carry. Fiscal years and repurchase windows are Madrid calendar days. Instants are ISO strings; a calendar day is {year, month, day}. Pending deferrals list oldest acquisition first, then by buy id. expect is written by running the TypeScript core; byHand.figures, where a case has it, are worked out by hand, its arithmetic says how, and each key is a dotted path into expect.",
+  "cases": [
+    {
+      "name": "FIFO over two lots with fees on every trade, a partial sale, in a year with a scale",
+      "residence": "bizkaia",
+      "instruments": [
+        {
+          "id": "IE00TEST0101",
+          "type": "ETF"
+        }
+      ],
+      "events": [
+        {
+          "id": "e-1",
+          "ts": "2026-01-12T09:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "IE00TEST0101",
+          "quantity": "10",
+          "price": "100",
+          "grossAmount": "1000",
+          "fees": "1",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-1"
+        },
+        {
+          "id": "e-2",
+          "ts": "2026-03-10T09:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "IE00TEST0101",
+          "quantity": "10",
+          "price": "120",
+          "grossAmount": "1200",
+          "fees": "2",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-2"
+        },
+        {
+          "id": "e-3",
+          "ts": "2026-06-10T09:00:00.000Z",
+          "type": "SELL",
+          "instrumentId": "IE00TEST0101",
+          "quantity": "15",
+          "price": "110",
+          "grossAmount": "1650",
+          "fees": "3",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-3"
+        }
+      ],
+      "years": [
+        2026
+      ],
+      "byHand": {
+        "arithmetic": "Lot one: 10 for 1000 + 1 = 1001, 100.1 each. Lot two: 10 for 1200 + 2 = 1202, 120.2 each. Selling 15 takes all of lot one (1001) and 5 of lot two (5 × 120.2 = 601): cost 1602. Proceeds 1650 − 3 = 1647, gain 45. A gain carrying nothing is not assessed, so all 45 computes. 2026 has a scale: 45 × 0.19 = 8.55.",
+        "figures": {
+          "history.gains.0.costBasis": "1602",
+          "history.gains.0.realizedPnL": "45",
+          "years.2026.view.netSavingsBase": "45",
+          "years.2026.view.quota": "8.55"
+        }
+      },
+      "expect": {
+        "assetClasses": {
+          "IE00TEST0101": "listed-security"
+        },
+        "history": {
+          "gains": [
+            {
+              "eventId": "e-3",
+              "ts": "2026-06-10T09:00:00.000Z",
+              "instrumentId": "IE00TEST0101",
+              "quantity": "15",
+              "grossAmount": "1650",
+              "fees": "3",
+              "costBasis": "1602",
+              "realizedPnL": "45",
+              "lots": [
+                {
+                  "buyEventId": "e-1",
+                  "acquiredAt": "2026-01-12T09:00:00.000Z",
+                  "quantity": "10",
+                  "unitCost": "100.1"
+                },
+                {
+                  "buyEventId": "e-2",
+                  "acquiredAt": "2026-03-10T09:00:00.000Z",
+                  "quantity": "5",
+                  "unitCost": "120.2"
+                }
+              ],
+              "computablePnL": "45",
+              "nonComputable": "0",
+              "carriedOver": "0",
+              "washSale": null,
+              "repurchaseWindow": null,
+              "unlistedNotice": null
+            }
+          ],
+          "integrations": [],
+          "pendingByYear": {
+            "2026": []
+          }
+        },
+        "years": {
+          "2026": {
+            "taxYear": {
+              "year": 2026,
+              "territory": "bizkaia",
+              "gains": [
+                {
+                  "eventId": "e-3",
+                  "ts": "2026-06-10T09:00:00.000Z",
+                  "instrumentId": "IE00TEST0101",
+                  "quantity": "15",
+                  "grossAmount": "1650",
+                  "fees": "3",
+                  "costBasis": "1602",
+                  "realizedPnL": "45",
+                  "lots": [
+                    {
+                      "buyEventId": "e-1",
+                      "acquiredAt": "2026-01-12T09:00:00.000Z",
+                      "quantity": "10",
+                      "unitCost": "100.1"
+                    },
+                    {
+                      "buyEventId": "e-2",
+                      "acquiredAt": "2026-03-10T09:00:00.000Z",
+                      "quantity": "5",
+                      "unitCost": "120.2"
+                    }
+                  ],
+                  "computablePnL": "45",
+                  "nonComputable": "0",
+                  "carriedOver": "0",
+                  "washSale": null,
+                  "repurchaseWindow": null,
+                  "unlistedNotice": null
+                }
+              ],
+              "integrations": [],
+              "pending": [],
+              "computableNet": "45"
+            },
+            "carryforward": {
+              "targetYear": 2026,
+              "steps": [
+                {
+                  "year": 2022,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2023,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2024,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2025,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2026,
+                  "ownNet": "45",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "45",
+                  "pendingLossRemaining": "0"
+                }
+              ],
+              "netSavingsBase": "45"
+            },
+            "view": {
+              "affectedCount": 0,
+              "ownNet": "45.00",
+              "nonComputableSum": "0.00",
+              "integratedSum": "0.00",
+              "computableNet": "45",
+              "pendingSum": "0.00",
+              "netSavingsBase": "45",
+              "scale": {
+                "source": "Art. 76 NF 13/2013 de Bizkaia, redacción NF 2/2025, efectos 1-1-2026",
+                "brackets": [
+                  {
+                    "from": "0",
+                    "to": "7500",
+                    "rate": "0.19"
+                  },
+                  {
+                    "from": "7500",
+                    "to": "15000",
+                    "rate": "0.20"
+                  },
+                  {
+                    "from": "15000",
+                    "to": "30000",
+                    "rate": "0.22"
+                  },
+                  {
+                    "from": "30000",
+                    "to": "50000",
+                    "rate": "0.24"
+                  },
+                  {
+                    "from": "50000",
+                    "to": "90000",
+                    "rate": "0.255"
+                  },
+                  {
+                    "from": "90000",
+                    "to": "120000",
+                    "rate": "0.26"
+                  },
+                  {
+                    "from": "120000",
+                    "to": "240000",
+                    "rate": "0.265"
+                  },
+                  {
+                    "from": "240000",
+                    "to": "300000",
+                    "rate": "0.27"
+                  },
+                  {
+                    "from": "300000",
+                    "to": null,
+                    "rate": "0.28"
+                  }
+                ]
+              },
+              "quota": "8.55",
+              "inKindIncome": {
+                "count": 0,
+                "gross": "0.00",
+                "withheld": "0.00"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Art. 43: a loss repurchased before the sale, deferred onto the units still held, integrated the next year by a sale at a gain",
+      "residence": "bizkaia",
+      "instruments": [
+        {
+          "id": "US00TEST0102",
+          "type": "STOCK"
+        }
+      ],
+      "events": [
+        {
+          "id": "e-4",
+          "ts": "2025-01-10T10:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "US00TEST0102",
+          "quantity": "10",
+          "price": "100",
+          "grossAmount": "1000",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-4"
+        },
+        {
+          "id": "e-5",
+          "ts": "2025-03-03T10:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "US00TEST0102",
+          "quantity": "4",
+          "price": "80",
+          "grossAmount": "320",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-5"
+        },
+        {
+          "id": "e-6",
+          "ts": "2025-03-20T10:00:00.000Z",
+          "type": "SELL",
+          "instrumentId": "US00TEST0102",
+          "quantity": "10",
+          "price": "85",
+          "grossAmount": "850",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-6"
+        },
+        {
+          "id": "e-7",
+          "ts": "2026-06-01T10:00:00.000Z",
+          "type": "SELL",
+          "instrumentId": "US00TEST0102",
+          "quantity": "4",
+          "price": "90",
+          "grossAmount": "360",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-7"
+        }
+      ],
+      "years": [
+        2025,
+        2026
+      ],
+      "byHand": {
+        "arithmetic": "The March sale takes the January lot whole: 850 − 1000 = −150. Its window runs from 20 January to 20 May 2025; the 4 bought on 3 March are inside it, earlier, and still held after the sale, so before = 4 and the repurchase is min(4, 4) = 4 of 10: 0.4 of the loss, −60, is not computable and stays on those 4 units; −90 computes in 2025. The 2026 sale of those 4 for 360 gains 360 − 320 = 40; it carries −60, nothing is bought in its window, so the −60 integrates in 2026 as its own line: 40 − 60 = −20 computable. 2025 has no scale; 2026 does, but the base is negative, so the quota is 0.",
+        "figures": {
+          "history.gains.0.realizedPnL": "-150",
+          "history.gains.0.nonComputable": "-60",
+          "history.gains.0.computablePnL": "-90",
+          "years.2025.view.quota": null,
+          "years.2026.taxYear.computableNet": "-20",
+          "years.2026.view.integratedSum": "-60.00",
+          "years.2026.view.quota": "0"
+        }
+      },
+      "expect": {
+        "assetClasses": {
+          "US00TEST0102": "listed-security"
+        },
+        "history": {
+          "gains": [
+            {
+              "eventId": "e-6",
+              "ts": "2025-03-20T10:00:00.000Z",
+              "instrumentId": "US00TEST0102",
+              "quantity": "10",
+              "grossAmount": "850",
+              "fees": "0",
+              "costBasis": "1000",
+              "realizedPnL": "-150",
+              "lots": [
+                {
+                  "buyEventId": "e-4",
+                  "acquiredAt": "2025-01-10T10:00:00.000Z",
+                  "quantity": "10",
+                  "unitCost": "100"
+                }
+              ],
+              "computablePnL": "-90",
+              "nonComputable": "-60",
+              "carriedOver": "0",
+              "washSale": {
+                "letter": "g",
+                "windowMonths": 2,
+                "window": {
+                  "start": {
+                    "year": 2025,
+                    "month": 1,
+                    "day": 20
+                  },
+                  "end": {
+                    "year": 2025,
+                    "month": 5,
+                    "day": 20
+                  }
+                },
+                "before": "4",
+                "remainingAfter": "4",
+                "repurchaseBefore": "4",
+                "repurchaseAfter": "0",
+                "repurchased": "4",
+                "fraction": "0.4",
+                "recipients": [
+                  {
+                    "buyEventId": "e-5",
+                    "acquiredAt": "2025-03-03T10:00:00.000Z",
+                    "quantity": "4",
+                    "deferredLoss": "-60"
+                  }
+                ]
+              },
+              "repurchaseWindow": {
+                "letter": "g",
+                "window": {
+                  "start": {
+                    "year": 2025,
+                    "month": 1,
+                    "day": 20
+                  },
+                  "end": {
+                    "year": 2025,
+                    "month": 5,
+                    "day": 20
+                  }
+                }
+              },
+              "unlistedNotice": null
+            },
+            {
+              "eventId": "e-7",
+              "ts": "2026-06-01T10:00:00.000Z",
+              "instrumentId": "US00TEST0102",
+              "quantity": "4",
+              "grossAmount": "360",
+              "fees": "0",
+              "costBasis": "320",
+              "realizedPnL": "40",
+              "lots": [
+                {
+                  "buyEventId": "e-5",
+                  "acquiredAt": "2025-03-03T10:00:00.000Z",
+                  "quantity": "4",
+                  "unitCost": "80"
+                }
+              ],
+              "computablePnL": "40",
+              "nonComputable": "0",
+              "carriedOver": "0",
+              "washSale": null,
+              "repurchaseWindow": {
+                "letter": "g",
+                "window": {
+                  "start": {
+                    "year": 2026,
+                    "month": 4,
+                    "day": 1
+                  },
+                  "end": {
+                    "year": 2026,
+                    "month": 8,
+                    "day": 1
+                  }
+                }
+              },
+              "unlistedNotice": null
+            }
+          ],
+          "integrations": [
+            {
+              "originEventId": "e-6",
+              "originTs": "2025-03-20T10:00:00.000Z",
+              "integratedByEventId": "e-7",
+              "ts": "2026-06-01T10:00:00.000Z",
+              "instrumentId": "US00TEST0102",
+              "amount": "-60"
+            }
+          ],
+          "pendingByYear": {
+            "2025": [
+              {
+                "buyEventId": "e-5",
+                "acquiredAt": "2025-03-03T10:00:00.000Z",
+                "instrumentId": "US00TEST0102",
+                "pieces": [
+                  {
+                    "originEventId": "e-6",
+                    "amount": "-60"
+                  }
+                ]
+              }
+            ],
+            "2026": []
+          }
+        },
+        "years": {
+          "2025": {
+            "taxYear": {
+              "year": 2025,
+              "territory": "bizkaia",
+              "gains": [
+                {
+                  "eventId": "e-6",
+                  "ts": "2025-03-20T10:00:00.000Z",
+                  "instrumentId": "US00TEST0102",
+                  "quantity": "10",
+                  "grossAmount": "850",
+                  "fees": "0",
+                  "costBasis": "1000",
+                  "realizedPnL": "-150",
+                  "lots": [
+                    {
+                      "buyEventId": "e-4",
+                      "acquiredAt": "2025-01-10T10:00:00.000Z",
+                      "quantity": "10",
+                      "unitCost": "100"
+                    }
+                  ],
+                  "computablePnL": "-90",
+                  "nonComputable": "-60",
+                  "carriedOver": "0",
+                  "washSale": {
+                    "letter": "g",
+                    "windowMonths": 2,
+                    "window": {
+                      "start": {
+                        "year": 2025,
+                        "month": 1,
+                        "day": 20
+                      },
+                      "end": {
+                        "year": 2025,
+                        "month": 5,
+                        "day": 20
+                      }
+                    },
+                    "before": "4",
+                    "remainingAfter": "4",
+                    "repurchaseBefore": "4",
+                    "repurchaseAfter": "0",
+                    "repurchased": "4",
+                    "fraction": "0.4",
+                    "recipients": [
+                      {
+                        "buyEventId": "e-5",
+                        "acquiredAt": "2025-03-03T10:00:00.000Z",
+                        "quantity": "4",
+                        "deferredLoss": "-60"
+                      }
+                    ]
+                  },
+                  "repurchaseWindow": {
+                    "letter": "g",
+                    "window": {
+                      "start": {
+                        "year": 2025,
+                        "month": 1,
+                        "day": 20
+                      },
+                      "end": {
+                        "year": 2025,
+                        "month": 5,
+                        "day": 20
+                      }
+                    }
+                  },
+                  "unlistedNotice": null
+                }
+              ],
+              "integrations": [],
+              "pending": [
+                {
+                  "buyEventId": "e-5",
+                  "acquiredAt": "2025-03-03T10:00:00.000Z",
+                  "instrumentId": "US00TEST0102",
+                  "pieces": [
+                    {
+                      "originEventId": "e-6",
+                      "amount": "-60"
+                    }
+                  ]
+                }
+              ],
+              "computableNet": "-90"
+            },
+            "carryforward": {
+              "targetYear": 2025,
+              "steps": [
+                {
+                  "year": 2021,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2022,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2023,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2024,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2025,
+                  "ownNet": "-90",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "-90",
+                  "pendingLossRemaining": "90"
+                }
+              ],
+              "netSavingsBase": "-90"
+            },
+            "view": {
+              "affectedCount": 1,
+              "ownNet": "-150.00",
+              "nonComputableSum": "-60.00",
+              "integratedSum": "0.00",
+              "computableNet": "-90",
+              "pendingSum": "-60.00",
+              "netSavingsBase": "-90",
+              "scale": null,
+              "quota": null,
+              "inKindIncome": {
+                "count": 0,
+                "gross": "0.00",
+                "withheld": "0.00"
+              }
+            }
+          },
+          "2026": {
+            "taxYear": {
+              "year": 2026,
+              "territory": "bizkaia",
+              "gains": [
+                {
+                  "eventId": "e-7",
+                  "ts": "2026-06-01T10:00:00.000Z",
+                  "instrumentId": "US00TEST0102",
+                  "quantity": "4",
+                  "grossAmount": "360",
+                  "fees": "0",
+                  "costBasis": "320",
+                  "realizedPnL": "40",
+                  "lots": [
+                    {
+                      "buyEventId": "e-5",
+                      "acquiredAt": "2025-03-03T10:00:00.000Z",
+                      "quantity": "4",
+                      "unitCost": "80"
+                    }
+                  ],
+                  "computablePnL": "40",
+                  "nonComputable": "0",
+                  "carriedOver": "0",
+                  "washSale": null,
+                  "repurchaseWindow": {
+                    "letter": "g",
+                    "window": {
+                      "start": {
+                        "year": 2026,
+                        "month": 4,
+                        "day": 1
+                      },
+                      "end": {
+                        "year": 2026,
+                        "month": 8,
+                        "day": 1
+                      }
+                    }
+                  },
+                  "unlistedNotice": null
+                }
+              ],
+              "integrations": [
+                {
+                  "originEventId": "e-6",
+                  "originTs": "2025-03-20T10:00:00.000Z",
+                  "integratedByEventId": "e-7",
+                  "ts": "2026-06-01T10:00:00.000Z",
+                  "instrumentId": "US00TEST0102",
+                  "amount": "-60"
+                }
+              ],
+              "pending": [],
+              "computableNet": "-20"
+            },
+            "carryforward": {
+              "targetYear": 2026,
+              "steps": [
+                {
+                  "year": 2022,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2023,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2024,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2025,
+                  "ownNet": "-90",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "-90",
+                  "pendingLossRemaining": "90"
+                },
+                {
+                  "year": 2026,
+                  "ownNet": "-20",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "-20",
+                  "pendingLossRemaining": "110"
+                }
+              ],
+              "netSavingsBase": "-20"
+            },
+            "view": {
+              "affectedCount": 0,
+              "ownNet": "40.00",
+              "nonComputableSum": "0.00",
+              "integratedSum": "-60.00",
+              "computableNet": "-20",
+              "pendingSum": "0.00",
+              "netSavingsBase": "-20",
+              "scale": {
+                "source": "Art. 76 NF 13/2013 de Bizkaia, redacción NF 2/2025, efectos 1-1-2026",
+                "brackets": [
+                  {
+                    "from": "0",
+                    "to": "7500",
+                    "rate": "0.19"
+                  },
+                  {
+                    "from": "7500",
+                    "to": "15000",
+                    "rate": "0.20"
+                  },
+                  {
+                    "from": "15000",
+                    "to": "30000",
+                    "rate": "0.22"
+                  },
+                  {
+                    "from": "30000",
+                    "to": "50000",
+                    "rate": "0.24"
+                  },
+                  {
+                    "from": "50000",
+                    "to": "90000",
+                    "rate": "0.255"
+                  },
+                  {
+                    "from": "90000",
+                    "to": "120000",
+                    "rate": "0.26"
+                  },
+                  {
+                    "from": "120000",
+                    "to": "240000",
+                    "rate": "0.265"
+                  },
+                  {
+                    "from": "240000",
+                    "to": "300000",
+                    "rate": "0.27"
+                  },
+                  {
+                    "from": "300000",
+                    "to": null,
+                    "rate": "0.28"
+                  }
+                ]
+              },
+              "quota": "0",
+              "inKindIncome": {
+                "count": 0,
+                "gross": "0.00",
+                "withheld": "0.00"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Art. 43: a loss repurchased after the sale, in proportion, then a chain that moves the deferral on before it integrates in another year",
+      "residence": "bizkaia",
+      "instruments": [
+        {
+          "id": "US00TEST0103",
+          "type": "STOCK"
+        }
+      ],
+      "events": [
+        {
+          "id": "e-8",
+          "ts": "2025-01-10T10:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "US00TEST0103",
+          "quantity": "10",
+          "price": "100",
+          "grossAmount": "1000",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-8"
+        },
+        {
+          "id": "e-9",
+          "ts": "2025-04-01T10:00:00.000Z",
+          "type": "SELL",
+          "instrumentId": "US00TEST0103",
+          "quantity": "10",
+          "price": "80",
+          "grossAmount": "800",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-9"
+        },
+        {
+          "id": "e-10",
+          "ts": "2025-04-15T10:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "US00TEST0103",
+          "quantity": "5",
+          "price": "75",
+          "grossAmount": "375",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-10"
+        },
+        {
+          "id": "e-11",
+          "ts": "2025-05-02T10:00:00.000Z",
+          "type": "SELL",
+          "instrumentId": "US00TEST0103",
+          "quantity": "5",
+          "price": "70",
+          "grossAmount": "350",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-11"
+        },
+        {
+          "id": "e-12",
+          "ts": "2025-06-10T10:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "US00TEST0103",
+          "quantity": "5",
+          "price": "72",
+          "grossAmount": "360",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-12"
+        },
+        {
+          "id": "e-13",
+          "ts": "2026-02-02T10:00:00.000Z",
+          "type": "SELL",
+          "instrumentId": "US00TEST0103",
+          "quantity": "5",
+          "price": "80",
+          "grossAmount": "400",
+          "fees": "1",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-13"
+        }
+      ],
+      "years": [
+        2025,
+        2026
+      ],
+      "expect": {
+        "assetClasses": {
+          "US00TEST0103": "listed-security"
+        },
+        "history": {
+          "gains": [
+            {
+              "eventId": "e-9",
+              "ts": "2025-04-01T10:00:00.000Z",
+              "instrumentId": "US00TEST0103",
+              "quantity": "10",
+              "grossAmount": "800",
+              "fees": "0",
+              "costBasis": "1000",
+              "realizedPnL": "-200",
+              "lots": [
+                {
+                  "buyEventId": "e-8",
+                  "acquiredAt": "2025-01-10T10:00:00.000Z",
+                  "quantity": "10",
+                  "unitCost": "100"
+                }
+              ],
+              "computablePnL": "-100",
+              "nonComputable": "-100",
+              "carriedOver": "0",
+              "washSale": {
+                "letter": "g",
+                "windowMonths": 2,
+                "window": {
+                  "start": {
+                    "year": 2025,
+                    "month": 2,
+                    "day": 1
+                  },
+                  "end": {
+                    "year": 2025,
+                    "month": 6,
+                    "day": 1
+                  }
+                },
+                "before": "0",
+                "remainingAfter": "0",
+                "repurchaseBefore": "0",
+                "repurchaseAfter": "5",
+                "repurchased": "5",
+                "fraction": "0.5",
+                "recipients": [
+                  {
+                    "buyEventId": "e-10",
+                    "acquiredAt": "2025-04-15T10:00:00.000Z",
+                    "quantity": "5",
+                    "deferredLoss": "-100"
+                  }
+                ]
+              },
+              "repurchaseWindow": {
+                "letter": "g",
+                "window": {
+                  "start": {
+                    "year": 2025,
+                    "month": 2,
+                    "day": 1
+                  },
+                  "end": {
+                    "year": 2025,
+                    "month": 6,
+                    "day": 1
+                  }
+                }
+              },
+              "unlistedNotice": null
+            },
+            {
+              "eventId": "e-11",
+              "ts": "2025-05-02T10:00:00.000Z",
+              "instrumentId": "US00TEST0103",
+              "quantity": "5",
+              "grossAmount": "350",
+              "fees": "0",
+              "costBasis": "375",
+              "realizedPnL": "-25",
+              "lots": [
+                {
+                  "buyEventId": "e-10",
+                  "acquiredAt": "2025-04-15T10:00:00.000Z",
+                  "quantity": "5",
+                  "unitCost": "75"
+                }
+              ],
+              "computablePnL": "0",
+              "nonComputable": "-25",
+              "carriedOver": "-100",
+              "washSale": {
+                "letter": "g",
+                "windowMonths": 2,
+                "window": {
+                  "start": {
+                    "year": 2025,
+                    "month": 3,
+                    "day": 2
+                  },
+                  "end": {
+                    "year": 2025,
+                    "month": 7,
+                    "day": 2
+                  }
+                },
+                "before": "0",
+                "remainingAfter": "0",
+                "repurchaseBefore": "0",
+                "repurchaseAfter": "5",
+                "repurchased": "5",
+                "fraction": "1",
+                "recipients": [
+                  {
+                    "buyEventId": "e-12",
+                    "acquiredAt": "2025-06-10T10:00:00.000Z",
+                    "quantity": "5",
+                    "deferredLoss": "-125"
+                  }
+                ]
+              },
+              "repurchaseWindow": {
+                "letter": "g",
+                "window": {
+                  "start": {
+                    "year": 2025,
+                    "month": 3,
+                    "day": 2
+                  },
+                  "end": {
+                    "year": 2025,
+                    "month": 7,
+                    "day": 2
+                  }
+                }
+              },
+              "unlistedNotice": null
+            },
+            {
+              "eventId": "e-13",
+              "ts": "2026-02-02T10:00:00.000Z",
+              "instrumentId": "US00TEST0103",
+              "quantity": "5",
+              "grossAmount": "400",
+              "fees": "1",
+              "costBasis": "360",
+              "realizedPnL": "39",
+              "lots": [
+                {
+                  "buyEventId": "e-12",
+                  "acquiredAt": "2025-06-10T10:00:00.000Z",
+                  "quantity": "5",
+                  "unitCost": "72"
+                }
+              ],
+              "computablePnL": "39",
+              "nonComputable": "0",
+              "carriedOver": "0",
+              "washSale": null,
+              "repurchaseWindow": {
+                "letter": "g",
+                "window": {
+                  "start": {
+                    "year": 2025,
+                    "month": 12,
+                    "day": 2
+                  },
+                  "end": {
+                    "year": 2026,
+                    "month": 4,
+                    "day": 2
+                  }
+                }
+              },
+              "unlistedNotice": null
+            }
+          ],
+          "integrations": [
+            {
+              "originEventId": "e-9",
+              "originTs": "2025-04-01T10:00:00.000Z",
+              "integratedByEventId": "e-13",
+              "ts": "2026-02-02T10:00:00.000Z",
+              "instrumentId": "US00TEST0103",
+              "amount": "-100"
+            },
+            {
+              "originEventId": "e-11",
+              "originTs": "2025-05-02T10:00:00.000Z",
+              "integratedByEventId": "e-13",
+              "ts": "2026-02-02T10:00:00.000Z",
+              "instrumentId": "US00TEST0103",
+              "amount": "-25"
+            }
+          ],
+          "pendingByYear": {
+            "2025": [
+              {
+                "buyEventId": "e-12",
+                "acquiredAt": "2025-06-10T10:00:00.000Z",
+                "instrumentId": "US00TEST0103",
+                "pieces": [
+                  {
+                    "originEventId": "e-9",
+                    "amount": "-100"
+                  },
+                  {
+                    "originEventId": "e-11",
+                    "amount": "-25"
+                  }
+                ]
+              }
+            ],
+            "2026": []
+          }
+        },
+        "years": {
+          "2025": {
+            "taxYear": {
+              "year": 2025,
+              "territory": "bizkaia",
+              "gains": [
+                {
+                  "eventId": "e-9",
+                  "ts": "2025-04-01T10:00:00.000Z",
+                  "instrumentId": "US00TEST0103",
+                  "quantity": "10",
+                  "grossAmount": "800",
+                  "fees": "0",
+                  "costBasis": "1000",
+                  "realizedPnL": "-200",
+                  "lots": [
+                    {
+                      "buyEventId": "e-8",
+                      "acquiredAt": "2025-01-10T10:00:00.000Z",
+                      "quantity": "10",
+                      "unitCost": "100"
+                    }
+                  ],
+                  "computablePnL": "-100",
+                  "nonComputable": "-100",
+                  "carriedOver": "0",
+                  "washSale": {
+                    "letter": "g",
+                    "windowMonths": 2,
+                    "window": {
+                      "start": {
+                        "year": 2025,
+                        "month": 2,
+                        "day": 1
+                      },
+                      "end": {
+                        "year": 2025,
+                        "month": 6,
+                        "day": 1
+                      }
+                    },
+                    "before": "0",
+                    "remainingAfter": "0",
+                    "repurchaseBefore": "0",
+                    "repurchaseAfter": "5",
+                    "repurchased": "5",
+                    "fraction": "0.5",
+                    "recipients": [
+                      {
+                        "buyEventId": "e-10",
+                        "acquiredAt": "2025-04-15T10:00:00.000Z",
+                        "quantity": "5",
+                        "deferredLoss": "-100"
+                      }
+                    ]
+                  },
+                  "repurchaseWindow": {
+                    "letter": "g",
+                    "window": {
+                      "start": {
+                        "year": 2025,
+                        "month": 2,
+                        "day": 1
+                      },
+                      "end": {
+                        "year": 2025,
+                        "month": 6,
+                        "day": 1
+                      }
+                    }
+                  },
+                  "unlistedNotice": null
+                },
+                {
+                  "eventId": "e-11",
+                  "ts": "2025-05-02T10:00:00.000Z",
+                  "instrumentId": "US00TEST0103",
+                  "quantity": "5",
+                  "grossAmount": "350",
+                  "fees": "0",
+                  "costBasis": "375",
+                  "realizedPnL": "-25",
+                  "lots": [
+                    {
+                      "buyEventId": "e-10",
+                      "acquiredAt": "2025-04-15T10:00:00.000Z",
+                      "quantity": "5",
+                      "unitCost": "75"
+                    }
+                  ],
+                  "computablePnL": "0",
+                  "nonComputable": "-25",
+                  "carriedOver": "-100",
+                  "washSale": {
+                    "letter": "g",
+                    "windowMonths": 2,
+                    "window": {
+                      "start": {
+                        "year": 2025,
+                        "month": 3,
+                        "day": 2
+                      },
+                      "end": {
+                        "year": 2025,
+                        "month": 7,
+                        "day": 2
+                      }
+                    },
+                    "before": "0",
+                    "remainingAfter": "0",
+                    "repurchaseBefore": "0",
+                    "repurchaseAfter": "5",
+                    "repurchased": "5",
+                    "fraction": "1",
+                    "recipients": [
+                      {
+                        "buyEventId": "e-12",
+                        "acquiredAt": "2025-06-10T10:00:00.000Z",
+                        "quantity": "5",
+                        "deferredLoss": "-125"
+                      }
+                    ]
+                  },
+                  "repurchaseWindow": {
+                    "letter": "g",
+                    "window": {
+                      "start": {
+                        "year": 2025,
+                        "month": 3,
+                        "day": 2
+                      },
+                      "end": {
+                        "year": 2025,
+                        "month": 7,
+                        "day": 2
+                      }
+                    }
+                  },
+                  "unlistedNotice": null
+                }
+              ],
+              "integrations": [],
+              "pending": [
+                {
+                  "buyEventId": "e-12",
+                  "acquiredAt": "2025-06-10T10:00:00.000Z",
+                  "instrumentId": "US00TEST0103",
+                  "pieces": [
+                    {
+                      "originEventId": "e-9",
+                      "amount": "-100"
+                    },
+                    {
+                      "originEventId": "e-11",
+                      "amount": "-25"
+                    }
+                  ]
+                }
+              ],
+              "computableNet": "-100"
+            },
+            "carryforward": {
+              "targetYear": 2025,
+              "steps": [
+                {
+                  "year": 2021,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2022,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2023,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2024,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2025,
+                  "ownNet": "-100",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "-100",
+                  "pendingLossRemaining": "100"
+                }
+              ],
+              "netSavingsBase": "-100"
+            },
+            "view": {
+              "affectedCount": 2,
+              "ownNet": "-225.00",
+              "nonComputableSum": "-125.00",
+              "integratedSum": "0.00",
+              "computableNet": "-100",
+              "pendingSum": "-125.00",
+              "netSavingsBase": "-100",
+              "scale": null,
+              "quota": null,
+              "inKindIncome": {
+                "count": 0,
+                "gross": "0.00",
+                "withheld": "0.00"
+              }
+            }
+          },
+          "2026": {
+            "taxYear": {
+              "year": 2026,
+              "territory": "bizkaia",
+              "gains": [
+                {
+                  "eventId": "e-13",
+                  "ts": "2026-02-02T10:00:00.000Z",
+                  "instrumentId": "US00TEST0103",
+                  "quantity": "5",
+                  "grossAmount": "400",
+                  "fees": "1",
+                  "costBasis": "360",
+                  "realizedPnL": "39",
+                  "lots": [
+                    {
+                      "buyEventId": "e-12",
+                      "acquiredAt": "2025-06-10T10:00:00.000Z",
+                      "quantity": "5",
+                      "unitCost": "72"
+                    }
+                  ],
+                  "computablePnL": "39",
+                  "nonComputable": "0",
+                  "carriedOver": "0",
+                  "washSale": null,
+                  "repurchaseWindow": {
+                    "letter": "g",
+                    "window": {
+                      "start": {
+                        "year": 2025,
+                        "month": 12,
+                        "day": 2
+                      },
+                      "end": {
+                        "year": 2026,
+                        "month": 4,
+                        "day": 2
+                      }
+                    }
+                  },
+                  "unlistedNotice": null
+                }
+              ],
+              "integrations": [
+                {
+                  "originEventId": "e-9",
+                  "originTs": "2025-04-01T10:00:00.000Z",
+                  "integratedByEventId": "e-13",
+                  "ts": "2026-02-02T10:00:00.000Z",
+                  "instrumentId": "US00TEST0103",
+                  "amount": "-100"
+                },
+                {
+                  "originEventId": "e-11",
+                  "originTs": "2025-05-02T10:00:00.000Z",
+                  "integratedByEventId": "e-13",
+                  "ts": "2026-02-02T10:00:00.000Z",
+                  "instrumentId": "US00TEST0103",
+                  "amount": "-25"
+                }
+              ],
+              "pending": [],
+              "computableNet": "-86"
+            },
+            "carryforward": {
+              "targetYear": 2026,
+              "steps": [
+                {
+                  "year": 2022,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2023,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2024,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2025,
+                  "ownNet": "-100",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "-100",
+                  "pendingLossRemaining": "100"
+                },
+                {
+                  "year": 2026,
+                  "ownNet": "-86",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "-86",
+                  "pendingLossRemaining": "186"
+                }
+              ],
+              "netSavingsBase": "-86"
+            },
+            "view": {
+              "affectedCount": 0,
+              "ownNet": "39.00",
+              "nonComputableSum": "0.00",
+              "integratedSum": "-125.00",
+              "computableNet": "-86",
+              "pendingSum": "0.00",
+              "netSavingsBase": "-86",
+              "scale": {
+                "source": "Art. 76 NF 13/2013 de Bizkaia, redacción NF 2/2025, efectos 1-1-2026",
+                "brackets": [
+                  {
+                    "from": "0",
+                    "to": "7500",
+                    "rate": "0.19"
+                  },
+                  {
+                    "from": "7500",
+                    "to": "15000",
+                    "rate": "0.20"
+                  },
+                  {
+                    "from": "15000",
+                    "to": "30000",
+                    "rate": "0.22"
+                  },
+                  {
+                    "from": "30000",
+                    "to": "50000",
+                    "rate": "0.24"
+                  },
+                  {
+                    "from": "50000",
+                    "to": "90000",
+                    "rate": "0.255"
+                  },
+                  {
+                    "from": "90000",
+                    "to": "120000",
+                    "rate": "0.26"
+                  },
+                  {
+                    "from": "120000",
+                    "to": "240000",
+                    "rate": "0.265"
+                  },
+                  {
+                    "from": "240000",
+                    "to": "300000",
+                    "rate": "0.27"
+                  },
+                  {
+                    "from": "300000",
+                    "to": null,
+                    "rate": "0.28"
+                  }
+                ]
+              },
+              "quota": "0",
+              "inKindIncome": {
+                "count": 0,
+                "gross": "0.00",
+                "withheld": "0.00"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Crypto: a loss in 2024 rebought within the year only gets a notice; a loss in 2025 falls under letter i",
+      "residence": "bizkaia",
+      "instruments": [
+        {
+          "id": "TESTCOIN",
+          "type": "CRYPTO"
+        }
+      ],
+      "events": [
+        {
+          "id": "e-14",
+          "ts": "2024-03-01T12:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "TESTCOIN",
+          "quantity": "1",
+          "price": "1000",
+          "grossAmount": "1000",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-14"
+        },
+        {
+          "id": "e-15",
+          "ts": "2024-11-04T12:00:00.000Z",
+          "type": "SELL",
+          "instrumentId": "TESTCOIN",
+          "quantity": "1",
+          "price": "800",
+          "grossAmount": "800",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-15"
+        },
+        {
+          "id": "e-16",
+          "ts": "2024-11-20T12:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "TESTCOIN",
+          "quantity": "1",
+          "price": "850",
+          "grossAmount": "850",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-16"
+        },
+        {
+          "id": "e-17",
+          "ts": "2025-02-03T12:00:00.000Z",
+          "type": "SELL",
+          "instrumentId": "TESTCOIN",
+          "quantity": "1",
+          "price": "700",
+          "grossAmount": "700",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-17"
+        },
+        {
+          "id": "e-18",
+          "ts": "2025-02-17T12:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "TESTCOIN",
+          "quantity": "1",
+          "price": "720",
+          "grossAmount": "720",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-18"
+        }
+      ],
+      "years": [
+        2024,
+        2025
+      ],
+      "expect": {
+        "assetClasses": {
+          "TESTCOIN": "fungible-crypto"
+        },
+        "history": {
+          "gains": [
+            {
+              "eventId": "e-15",
+              "ts": "2024-11-04T12:00:00.000Z",
+              "instrumentId": "TESTCOIN",
+              "quantity": "1",
+              "grossAmount": "800",
+              "fees": "0",
+              "costBasis": "1000",
+              "realizedPnL": "-200",
+              "lots": [
+                {
+                  "buyEventId": "e-14",
+                  "acquiredAt": "2024-03-01T12:00:00.000Z",
+                  "quantity": "1",
+                  "unitCost": "1000"
+                }
+              ],
+              "computablePnL": "-200",
+              "nonComputable": "0",
+              "carriedOver": "0",
+              "washSale": null,
+              "repurchaseWindow": null,
+              "unlistedNotice": {
+                "buyEventId": "e-16",
+                "buyTs": "2024-11-20T12:00:00.000Z"
+              }
+            },
+            {
+              "eventId": "e-17",
+              "ts": "2025-02-03T12:00:00.000Z",
+              "instrumentId": "TESTCOIN",
+              "quantity": "1",
+              "grossAmount": "700",
+              "fees": "0",
+              "costBasis": "850",
+              "realizedPnL": "-150",
+              "lots": [
+                {
+                  "buyEventId": "e-16",
+                  "acquiredAt": "2024-11-20T12:00:00.000Z",
+                  "quantity": "1",
+                  "unitCost": "850"
+                }
+              ],
+              "computablePnL": "0",
+              "nonComputable": "-150",
+              "carriedOver": "0",
+              "washSale": {
+                "letter": "i",
+                "windowMonths": 2,
+                "window": {
+                  "start": {
+                    "year": 2024,
+                    "month": 12,
+                    "day": 3
+                  },
+                  "end": {
+                    "year": 2025,
+                    "month": 4,
+                    "day": 3
+                  }
+                },
+                "before": "0",
+                "remainingAfter": "0",
+                "repurchaseBefore": "0",
+                "repurchaseAfter": "1",
+                "repurchased": "1",
+                "fraction": "1",
+                "recipients": [
+                  {
+                    "buyEventId": "e-18",
+                    "acquiredAt": "2025-02-17T12:00:00.000Z",
+                    "quantity": "1",
+                    "deferredLoss": "-150"
+                  }
+                ]
+              },
+              "repurchaseWindow": {
+                "letter": "i",
+                "window": {
+                  "start": {
+                    "year": 2024,
+                    "month": 12,
+                    "day": 3
+                  },
+                  "end": {
+                    "year": 2025,
+                    "month": 4,
+                    "day": 3
+                  }
+                }
+              },
+              "unlistedNotice": null
+            }
+          ],
+          "integrations": [],
+          "pendingByYear": {
+            "2024": [],
+            "2025": [
+              {
+                "buyEventId": "e-18",
+                "acquiredAt": "2025-02-17T12:00:00.000Z",
+                "instrumentId": "TESTCOIN",
+                "pieces": [
+                  {
+                    "originEventId": "e-17",
+                    "amount": "-150"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "years": {
+          "2024": {
+            "taxYear": {
+              "year": 2024,
+              "territory": "bizkaia",
+              "gains": [
+                {
+                  "eventId": "e-15",
+                  "ts": "2024-11-04T12:00:00.000Z",
+                  "instrumentId": "TESTCOIN",
+                  "quantity": "1",
+                  "grossAmount": "800",
+                  "fees": "0",
+                  "costBasis": "1000",
+                  "realizedPnL": "-200",
+                  "lots": [
+                    {
+                      "buyEventId": "e-14",
+                      "acquiredAt": "2024-03-01T12:00:00.000Z",
+                      "quantity": "1",
+                      "unitCost": "1000"
+                    }
+                  ],
+                  "computablePnL": "-200",
+                  "nonComputable": "0",
+                  "carriedOver": "0",
+                  "washSale": null,
+                  "repurchaseWindow": null,
+                  "unlistedNotice": {
+                    "buyEventId": "e-16",
+                    "buyTs": "2024-11-20T12:00:00.000Z"
+                  }
+                }
+              ],
+              "integrations": [],
+              "pending": [],
+              "computableNet": "-200"
+            },
+            "carryforward": {
+              "targetYear": 2024,
+              "steps": [
+                {
+                  "year": 2020,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2021,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2022,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2023,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2024,
+                  "ownNet": "-200",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "-200",
+                  "pendingLossRemaining": "200"
+                }
+              ],
+              "netSavingsBase": "-200"
+            },
+            "view": {
+              "affectedCount": 0,
+              "ownNet": "-200.00",
+              "nonComputableSum": "0.00",
+              "integratedSum": "0.00",
+              "computableNet": "-200",
+              "pendingSum": "0.00",
+              "netSavingsBase": "-200",
+              "scale": null,
+              "quota": null,
+              "inKindIncome": {
+                "count": 0,
+                "gross": "0.00",
+                "withheld": "0.00"
+              }
+            }
+          },
+          "2025": {
+            "taxYear": {
+              "year": 2025,
+              "territory": "bizkaia",
+              "gains": [
+                {
+                  "eventId": "e-17",
+                  "ts": "2025-02-03T12:00:00.000Z",
+                  "instrumentId": "TESTCOIN",
+                  "quantity": "1",
+                  "grossAmount": "700",
+                  "fees": "0",
+                  "costBasis": "850",
+                  "realizedPnL": "-150",
+                  "lots": [
+                    {
+                      "buyEventId": "e-16",
+                      "acquiredAt": "2024-11-20T12:00:00.000Z",
+                      "quantity": "1",
+                      "unitCost": "850"
+                    }
+                  ],
+                  "computablePnL": "0",
+                  "nonComputable": "-150",
+                  "carriedOver": "0",
+                  "washSale": {
+                    "letter": "i",
+                    "windowMonths": 2,
+                    "window": {
+                      "start": {
+                        "year": 2024,
+                        "month": 12,
+                        "day": 3
+                      },
+                      "end": {
+                        "year": 2025,
+                        "month": 4,
+                        "day": 3
+                      }
+                    },
+                    "before": "0",
+                    "remainingAfter": "0",
+                    "repurchaseBefore": "0",
+                    "repurchaseAfter": "1",
+                    "repurchased": "1",
+                    "fraction": "1",
+                    "recipients": [
+                      {
+                        "buyEventId": "e-18",
+                        "acquiredAt": "2025-02-17T12:00:00.000Z",
+                        "quantity": "1",
+                        "deferredLoss": "-150"
+                      }
+                    ]
+                  },
+                  "repurchaseWindow": {
+                    "letter": "i",
+                    "window": {
+                      "start": {
+                        "year": 2024,
+                        "month": 12,
+                        "day": 3
+                      },
+                      "end": {
+                        "year": 2025,
+                        "month": 4,
+                        "day": 3
+                      }
+                    }
+                  },
+                  "unlistedNotice": null
+                }
+              ],
+              "integrations": [],
+              "pending": [
+                {
+                  "buyEventId": "e-18",
+                  "acquiredAt": "2025-02-17T12:00:00.000Z",
+                  "instrumentId": "TESTCOIN",
+                  "pieces": [
+                    {
+                      "originEventId": "e-17",
+                      "amount": "-150"
+                    }
+                  ]
+                }
+              ],
+              "computableNet": "0"
+            },
+            "carryforward": {
+              "targetYear": 2025,
+              "steps": [
+                {
+                  "year": 2021,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2022,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2023,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2024,
+                  "ownNet": "-200",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "-200",
+                  "pendingLossRemaining": "200"
+                },
+                {
+                  "year": 2025,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "200"
+                }
+              ],
+              "netSavingsBase": "0"
+            },
+            "view": {
+              "affectedCount": 1,
+              "ownNet": "-150.00",
+              "nonComputableSum": "-150.00",
+              "integratedSum": "0.00",
+              "computableNet": "0",
+              "pendingSum": "-150.00",
+              "netSavingsBase": "0",
+              "scale": null,
+              "quota": null,
+              "inKindIncome": {
+                "count": 0,
+                "gross": "0.00",
+                "withheld": "0.00"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "A crypto swap valued at the greater side, then the received asset sold at a gain",
+      "residence": "bizkaia",
+      "instruments": [
+        {
+          "id": "TESTCOIN",
+          "type": "CRYPTO"
+        },
+        {
+          "id": "TESTTOKEN",
+          "type": "CRYPTO"
+        }
+      ],
+      "events": [
+        {
+          "id": "e-19",
+          "ts": "2025-03-01T12:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "TESTCOIN",
+          "quantity": "1",
+          "price": "1000",
+          "grossAmount": "1000",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-19"
+        },
+        {
+          "id": "e-20",
+          "ts": "2025-03-31T22:30:00.000Z",
+          "type": "BUY",
+          "instrumentId": "TESTTOKEN",
+          "quantity": "10",
+          "price": "58",
+          "grossAmount": "580",
+          "fees": "25",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-20",
+          "linkId": "swap-1",
+          "linkKind": "swap"
+        },
+        {
+          "id": "e-21",
+          "ts": "2025-03-31T22:30:00.000Z",
+          "type": "SELL",
+          "instrumentId": "TESTCOIN",
+          "quantity": "0.5",
+          "price": "1200",
+          "grossAmount": "600",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-21",
+          "linkId": "swap-1",
+          "linkKind": "swap"
+        },
+        {
+          "id": "e-22",
+          "ts": "2025-09-01T12:00:00.000Z",
+          "type": "SELL",
+          "instrumentId": "TESTTOKEN",
+          "quantity": "10",
+          "price": "65",
+          "grossAmount": "650",
+          "fees": "2",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-22"
+        }
+      ],
+      "years": [
+        2025
+      ],
+      "expect": {
+        "assetClasses": {
+          "TESTCOIN": "fungible-crypto",
+          "TESTTOKEN": "fungible-crypto"
+        },
+        "history": {
+          "gains": [
+            {
+              "eventId": "e-21",
+              "ts": "2025-03-31T22:30:00.000Z",
+              "instrumentId": "TESTCOIN",
+              "quantity": "0.5",
+              "grossAmount": "605",
+              "fees": "25",
+              "costBasis": "500",
+              "realizedPnL": "80",
+              "lots": [
+                {
+                  "buyEventId": "e-19",
+                  "acquiredAt": "2025-03-01T12:00:00.000Z",
+                  "quantity": "0.5",
+                  "unitCost": "1000"
+                }
+              ],
+              "computablePnL": "80",
+              "nonComputable": "0",
+              "carriedOver": "0",
+              "washSale": null,
+              "repurchaseWindow": null,
+              "unlistedNotice": null
+            },
+            {
+              "eventId": "e-22",
+              "ts": "2025-09-01T12:00:00.000Z",
+              "instrumentId": "TESTTOKEN",
+              "quantity": "10",
+              "grossAmount": "650",
+              "fees": "2",
+              "costBasis": "580",
+              "realizedPnL": "68",
+              "lots": [
+                {
+                  "buyEventId": "e-20",
+                  "acquiredAt": "2025-03-31T22:30:00.000Z",
+                  "quantity": "10",
+                  "unitCost": "58"
+                }
+              ],
+              "computablePnL": "68",
+              "nonComputable": "0",
+              "carriedOver": "0",
+              "washSale": null,
+              "repurchaseWindow": null,
+              "unlistedNotice": null
+            }
+          ],
+          "integrations": [],
+          "pendingByYear": {
+            "2025": []
+          }
+        },
+        "years": {
+          "2025": {
+            "taxYear": {
+              "year": 2025,
+              "territory": "bizkaia",
+              "gains": [
+                {
+                  "eventId": "e-21",
+                  "ts": "2025-03-31T22:30:00.000Z",
+                  "instrumentId": "TESTCOIN",
+                  "quantity": "0.5",
+                  "grossAmount": "605",
+                  "fees": "25",
+                  "costBasis": "500",
+                  "realizedPnL": "80",
+                  "lots": [
+                    {
+                      "buyEventId": "e-19",
+                      "acquiredAt": "2025-03-01T12:00:00.000Z",
+                      "quantity": "0.5",
+                      "unitCost": "1000"
+                    }
+                  ],
+                  "computablePnL": "80",
+                  "nonComputable": "0",
+                  "carriedOver": "0",
+                  "washSale": null,
+                  "repurchaseWindow": null,
+                  "unlistedNotice": null
+                },
+                {
+                  "eventId": "e-22",
+                  "ts": "2025-09-01T12:00:00.000Z",
+                  "instrumentId": "TESTTOKEN",
+                  "quantity": "10",
+                  "grossAmount": "650",
+                  "fees": "2",
+                  "costBasis": "580",
+                  "realizedPnL": "68",
+                  "lots": [
+                    {
+                      "buyEventId": "e-20",
+                      "acquiredAt": "2025-03-31T22:30:00.000Z",
+                      "quantity": "10",
+                      "unitCost": "58"
+                    }
+                  ],
+                  "computablePnL": "68",
+                  "nonComputable": "0",
+                  "carriedOver": "0",
+                  "washSale": null,
+                  "repurchaseWindow": null,
+                  "unlistedNotice": null
+                }
+              ],
+              "integrations": [],
+              "pending": [],
+              "computableNet": "148"
+            },
+            "carryforward": {
+              "targetYear": 2025,
+              "steps": [
+                {
+                  "year": 2021,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2022,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2023,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2024,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2025,
+                  "ownNet": "148",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "148",
+                  "pendingLossRemaining": "0"
+                }
+              ],
+              "netSavingsBase": "148"
+            },
+            "view": {
+              "affectedCount": 0,
+              "ownNet": "148.00",
+              "nonComputableSum": "0.00",
+              "integratedSum": "0.00",
+              "computableNet": "148",
+              "pendingSum": "0.00",
+              "netSavingsBase": "148",
+              "scale": null,
+              "quota": null,
+              "inKindIncome": {
+                "count": 0,
+                "gross": "0.00",
+                "withheld": "0.00"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Four years of carryforward: a 2021 loss offsets later gains oldest first and is gone by 2026",
+      "residence": "bizkaia",
+      "instruments": [
+        {
+          "id": "IE00TEST0101",
+          "type": "ETF"
+        },
+        {
+          "id": "US00TEST0102",
+          "type": "STOCK"
+        },
+        {
+          "id": "US00TEST0103",
+          "type": "STOCK"
+        },
+        {
+          "id": "US00TEST0104",
+          "type": "STOCK"
+        }
+      ],
+      "events": [
+        {
+          "id": "e-23",
+          "ts": "2021-01-11T09:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "IE00TEST0101",
+          "quantity": "10",
+          "price": "100",
+          "grossAmount": "1000",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-23"
+        },
+        {
+          "id": "e-24",
+          "ts": "2021-06-01T09:00:00.000Z",
+          "type": "SELL",
+          "instrumentId": "IE00TEST0101",
+          "quantity": "10",
+          "price": "50",
+          "grossAmount": "500",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-24"
+        },
+        {
+          "id": "e-25",
+          "ts": "2022-01-10T09:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "US00TEST0102",
+          "quantity": "10",
+          "price": "100",
+          "grossAmount": "1000",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-25"
+        },
+        {
+          "id": "e-26",
+          "ts": "2022-06-01T09:00:00.000Z",
+          "type": "SELL",
+          "instrumentId": "US00TEST0102",
+          "quantity": "10",
+          "price": "110",
+          "grossAmount": "1100",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-26"
+        },
+        {
+          "id": "e-27",
+          "ts": "2025-01-10T09:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "US00TEST0103",
+          "quantity": "10",
+          "price": "100",
+          "grossAmount": "1000",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-27"
+        },
+        {
+          "id": "e-28",
+          "ts": "2025-06-02T09:00:00.000Z",
+          "type": "SELL",
+          "instrumentId": "US00TEST0103",
+          "quantity": "10",
+          "price": "130",
+          "grossAmount": "1300",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-28"
+        },
+        {
+          "id": "e-29",
+          "ts": "2026-01-12T09:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "US00TEST0104",
+          "quantity": "10",
+          "price": "100",
+          "grossAmount": "1000",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-29"
+        },
+        {
+          "id": "e-30",
+          "ts": "2026-06-01T09:00:00.000Z",
+          "type": "SELL",
+          "instrumentId": "US00TEST0104",
+          "quantity": "10",
+          "price": "120",
+          "grossAmount": "1200",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-30"
+        }
+      ],
+      "years": [
+        2025,
+        2026
+      ],
+      "byHand": {
+        "arithmetic": "Own nets: 2021 −500, 2022 +100, 2025 +300, 2026 +200. For 2025 the window is 2021–2025: 2022 takes 100 of the 2021 loss (400 left), 2025 takes 300 (100 left), so the base is 0. For 2026 the window is 2022–2026 and the 2021 loss is outside it: the 100 left expired, the base is 200 and the quota 200 × 0.19 = 38.",
+        "figures": {
+          "years.2025.carryforward.netSavingsBase": "0",
+          "years.2025.carryforward.steps.4.pendingLossRemaining": "100",
+          "years.2026.carryforward.netSavingsBase": "200",
+          "years.2026.view.quota": "38"
+        }
+      },
+      "expect": {
+        "assetClasses": {
+          "IE00TEST0101": "listed-security",
+          "US00TEST0102": "listed-security",
+          "US00TEST0103": "listed-security",
+          "US00TEST0104": "listed-security"
+        },
+        "history": {
+          "gains": [
+            {
+              "eventId": "e-24",
+              "ts": "2021-06-01T09:00:00.000Z",
+              "instrumentId": "IE00TEST0101",
+              "quantity": "10",
+              "grossAmount": "500",
+              "fees": "0",
+              "costBasis": "1000",
+              "realizedPnL": "-500",
+              "lots": [
+                {
+                  "buyEventId": "e-23",
+                  "acquiredAt": "2021-01-11T09:00:00.000Z",
+                  "quantity": "10",
+                  "unitCost": "100"
+                }
+              ],
+              "computablePnL": "-500",
+              "nonComputable": "0",
+              "carriedOver": "0",
+              "washSale": null,
+              "repurchaseWindow": {
+                "letter": "g",
+                "window": {
+                  "start": {
+                    "year": 2021,
+                    "month": 4,
+                    "day": 1
+                  },
+                  "end": {
+                    "year": 2021,
+                    "month": 8,
+                    "day": 1
+                  }
+                }
+              },
+              "unlistedNotice": null
+            },
+            {
+              "eventId": "e-26",
+              "ts": "2022-06-01T09:00:00.000Z",
+              "instrumentId": "US00TEST0102",
+              "quantity": "10",
+              "grossAmount": "1100",
+              "fees": "0",
+              "costBasis": "1000",
+              "realizedPnL": "100",
+              "lots": [
+                {
+                  "buyEventId": "e-25",
+                  "acquiredAt": "2022-01-10T09:00:00.000Z",
+                  "quantity": "10",
+                  "unitCost": "100"
+                }
+              ],
+              "computablePnL": "100",
+              "nonComputable": "0",
+              "carriedOver": "0",
+              "washSale": null,
+              "repurchaseWindow": null,
+              "unlistedNotice": null
+            },
+            {
+              "eventId": "e-28",
+              "ts": "2025-06-02T09:00:00.000Z",
+              "instrumentId": "US00TEST0103",
+              "quantity": "10",
+              "grossAmount": "1300",
+              "fees": "0",
+              "costBasis": "1000",
+              "realizedPnL": "300",
+              "lots": [
+                {
+                  "buyEventId": "e-27",
+                  "acquiredAt": "2025-01-10T09:00:00.000Z",
+                  "quantity": "10",
+                  "unitCost": "100"
+                }
+              ],
+              "computablePnL": "300",
+              "nonComputable": "0",
+              "carriedOver": "0",
+              "washSale": null,
+              "repurchaseWindow": null,
+              "unlistedNotice": null
+            },
+            {
+              "eventId": "e-30",
+              "ts": "2026-06-01T09:00:00.000Z",
+              "instrumentId": "US00TEST0104",
+              "quantity": "10",
+              "grossAmount": "1200",
+              "fees": "0",
+              "costBasis": "1000",
+              "realizedPnL": "200",
+              "lots": [
+                {
+                  "buyEventId": "e-29",
+                  "acquiredAt": "2026-01-12T09:00:00.000Z",
+                  "quantity": "10",
+                  "unitCost": "100"
+                }
+              ],
+              "computablePnL": "200",
+              "nonComputable": "0",
+              "carriedOver": "0",
+              "washSale": null,
+              "repurchaseWindow": null,
+              "unlistedNotice": null
+            }
+          ],
+          "integrations": [],
+          "pendingByYear": {
+            "2021": [],
+            "2022": [],
+            "2025": [],
+            "2026": []
+          }
+        },
+        "years": {
+          "2025": {
+            "taxYear": {
+              "year": 2025,
+              "territory": "bizkaia",
+              "gains": [
+                {
+                  "eventId": "e-28",
+                  "ts": "2025-06-02T09:00:00.000Z",
+                  "instrumentId": "US00TEST0103",
+                  "quantity": "10",
+                  "grossAmount": "1300",
+                  "fees": "0",
+                  "costBasis": "1000",
+                  "realizedPnL": "300",
+                  "lots": [
+                    {
+                      "buyEventId": "e-27",
+                      "acquiredAt": "2025-01-10T09:00:00.000Z",
+                      "quantity": "10",
+                      "unitCost": "100"
+                    }
+                  ],
+                  "computablePnL": "300",
+                  "nonComputable": "0",
+                  "carriedOver": "0",
+                  "washSale": null,
+                  "repurchaseWindow": null,
+                  "unlistedNotice": null
+                }
+              ],
+              "integrations": [],
+              "pending": [],
+              "computableNet": "300"
+            },
+            "carryforward": {
+              "targetYear": 2025,
+              "steps": [
+                {
+                  "year": 2021,
+                  "ownNet": "-500",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "-500",
+                  "pendingLossRemaining": "500"
+                },
+                {
+                  "year": 2022,
+                  "ownNet": "100",
+                  "consumedFromCarryforward": "100",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "400"
+                },
+                {
+                  "year": 2023,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "400"
+                },
+                {
+                  "year": 2024,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "400"
+                },
+                {
+                  "year": 2025,
+                  "ownNet": "300",
+                  "consumedFromCarryforward": "300",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "100"
+                }
+              ],
+              "netSavingsBase": "0"
+            },
+            "view": {
+              "affectedCount": 0,
+              "ownNet": "300.00",
+              "nonComputableSum": "0.00",
+              "integratedSum": "0.00",
+              "computableNet": "300",
+              "pendingSum": "0.00",
+              "netSavingsBase": "0",
+              "scale": null,
+              "quota": null,
+              "inKindIncome": {
+                "count": 0,
+                "gross": "0.00",
+                "withheld": "0.00"
+              }
+            }
+          },
+          "2026": {
+            "taxYear": {
+              "year": 2026,
+              "territory": "bizkaia",
+              "gains": [
+                {
+                  "eventId": "e-30",
+                  "ts": "2026-06-01T09:00:00.000Z",
+                  "instrumentId": "US00TEST0104",
+                  "quantity": "10",
+                  "grossAmount": "1200",
+                  "fees": "0",
+                  "costBasis": "1000",
+                  "realizedPnL": "200",
+                  "lots": [
+                    {
+                      "buyEventId": "e-29",
+                      "acquiredAt": "2026-01-12T09:00:00.000Z",
+                      "quantity": "10",
+                      "unitCost": "100"
+                    }
+                  ],
+                  "computablePnL": "200",
+                  "nonComputable": "0",
+                  "carriedOver": "0",
+                  "washSale": null,
+                  "repurchaseWindow": null,
+                  "unlistedNotice": null
+                }
+              ],
+              "integrations": [],
+              "pending": [],
+              "computableNet": "200"
+            },
+            "carryforward": {
+              "targetYear": 2026,
+              "steps": [
+                {
+                  "year": 2022,
+                  "ownNet": "100",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "100",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2023,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2024,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2025,
+                  "ownNet": "300",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "300",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2026,
+                  "ownNet": "200",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "200",
+                  "pendingLossRemaining": "0"
+                }
+              ],
+              "netSavingsBase": "200"
+            },
+            "view": {
+              "affectedCount": 0,
+              "ownNet": "200.00",
+              "nonComputableSum": "0.00",
+              "integratedSum": "0.00",
+              "computableNet": "200",
+              "pendingSum": "0.00",
+              "netSavingsBase": "200",
+              "scale": {
+                "source": "Art. 76 NF 13/2013 de Bizkaia, redacción NF 2/2025, efectos 1-1-2026",
+                "brackets": [
+                  {
+                    "from": "0",
+                    "to": "7500",
+                    "rate": "0.19"
+                  },
+                  {
+                    "from": "7500",
+                    "to": "15000",
+                    "rate": "0.20"
+                  },
+                  {
+                    "from": "15000",
+                    "to": "30000",
+                    "rate": "0.22"
+                  },
+                  {
+                    "from": "30000",
+                    "to": "50000",
+                    "rate": "0.24"
+                  },
+                  {
+                    "from": "50000",
+                    "to": "90000",
+                    "rate": "0.255"
+                  },
+                  {
+                    "from": "90000",
+                    "to": "120000",
+                    "rate": "0.26"
+                  },
+                  {
+                    "from": "120000",
+                    "to": "240000",
+                    "rate": "0.265"
+                  },
+                  {
+                    "from": "240000",
+                    "to": "300000",
+                    "rate": "0.27"
+                  },
+                  {
+                    "from": "300000",
+                    "to": null,
+                    "rate": "0.28"
+                  }
+                ]
+              },
+              "quota": "38",
+              "inKindIncome": {
+                "count": 0,
+                "gross": "0.00",
+                "withheld": "0.00"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "A sale and in-kind income at 23:30Z on 31 December belong to the next fiscal year in Madrid",
+      "residence": "bizkaia",
+      "instruments": [
+        {
+          "id": "IE00TEST0101",
+          "type": "ETF"
+        }
+      ],
+      "events": [
+        {
+          "id": "e-31",
+          "ts": "2025-06-02T09:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "IE00TEST0101",
+          "quantity": "10",
+          "price": "100",
+          "grossAmount": "1000",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-31"
+        },
+        {
+          "id": "e-32",
+          "ts": "2025-12-31T23:30:00.000Z",
+          "type": "SELL",
+          "instrumentId": "IE00TEST0101",
+          "quantity": "10",
+          "price": "120",
+          "grossAmount": "1200",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-32"
+        },
+        {
+          "id": "e-33",
+          "ts": "2025-12-31T23:30:00.000Z",
+          "type": "DIVIDEND",
+          "instrumentId": "IE00TEST0101",
+          "grossAmount": "5",
+          "taxWithheld": "0.95",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-33",
+          "funding": "IN_KIND"
+        }
+      ],
+      "years": [
+        2025,
+        2026
+      ],
+      "expect": {
+        "assetClasses": {
+          "IE00TEST0101": "listed-security"
+        },
+        "history": {
+          "gains": [
+            {
+              "eventId": "e-32",
+              "ts": "2025-12-31T23:30:00.000Z",
+              "instrumentId": "IE00TEST0101",
+              "quantity": "10",
+              "grossAmount": "1200",
+              "fees": "0",
+              "costBasis": "1000",
+              "realizedPnL": "200",
+              "lots": [
+                {
+                  "buyEventId": "e-31",
+                  "acquiredAt": "2025-06-02T09:00:00.000Z",
+                  "quantity": "10",
+                  "unitCost": "100"
+                }
+              ],
+              "computablePnL": "200",
+              "nonComputable": "0",
+              "carriedOver": "0",
+              "washSale": null,
+              "repurchaseWindow": null,
+              "unlistedNotice": null
+            }
+          ],
+          "integrations": [],
+          "pendingByYear": {
+            "2026": []
+          }
+        },
+        "years": {
+          "2025": {
+            "taxYear": {
+              "year": 2025,
+              "territory": "bizkaia",
+              "gains": [],
+              "integrations": [],
+              "pending": [],
+              "computableNet": "0"
+            },
+            "carryforward": {
+              "targetYear": 2025,
+              "steps": [
+                {
+                  "year": 2021,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2022,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2023,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2024,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2025,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                }
+              ],
+              "netSavingsBase": "0"
+            },
+            "view": {
+              "affectedCount": 0,
+              "ownNet": "0.00",
+              "nonComputableSum": "0.00",
+              "integratedSum": "0.00",
+              "computableNet": "0",
+              "pendingSum": "0.00",
+              "netSavingsBase": "0",
+              "scale": null,
+              "quota": null,
+              "inKindIncome": {
+                "count": 0,
+                "gross": "0.00",
+                "withheld": "0.00"
+              }
+            }
+          },
+          "2026": {
+            "taxYear": {
+              "year": 2026,
+              "territory": "bizkaia",
+              "gains": [
+                {
+                  "eventId": "e-32",
+                  "ts": "2025-12-31T23:30:00.000Z",
+                  "instrumentId": "IE00TEST0101",
+                  "quantity": "10",
+                  "grossAmount": "1200",
+                  "fees": "0",
+                  "costBasis": "1000",
+                  "realizedPnL": "200",
+                  "lots": [
+                    {
+                      "buyEventId": "e-31",
+                      "acquiredAt": "2025-06-02T09:00:00.000Z",
+                      "quantity": "10",
+                      "unitCost": "100"
+                    }
+                  ],
+                  "computablePnL": "200",
+                  "nonComputable": "0",
+                  "carriedOver": "0",
+                  "washSale": null,
+                  "repurchaseWindow": null,
+                  "unlistedNotice": null
+                }
+              ],
+              "integrations": [],
+              "pending": [],
+              "computableNet": "200"
+            },
+            "carryforward": {
+              "targetYear": 2026,
+              "steps": [
+                {
+                  "year": 2022,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2023,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2024,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2025,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2026,
+                  "ownNet": "200",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "200",
+                  "pendingLossRemaining": "0"
+                }
+              ],
+              "netSavingsBase": "200"
+            },
+            "view": {
+              "affectedCount": 0,
+              "ownNet": "200.00",
+              "nonComputableSum": "0.00",
+              "integratedSum": "0.00",
+              "computableNet": "200",
+              "pendingSum": "0.00",
+              "netSavingsBase": "200",
+              "scale": {
+                "source": "Art. 76 NF 13/2013 de Bizkaia, redacción NF 2/2025, efectos 1-1-2026",
+                "brackets": [
+                  {
+                    "from": "0",
+                    "to": "7500",
+                    "rate": "0.19"
+                  },
+                  {
+                    "from": "7500",
+                    "to": "15000",
+                    "rate": "0.20"
+                  },
+                  {
+                    "from": "15000",
+                    "to": "30000",
+                    "rate": "0.22"
+                  },
+                  {
+                    "from": "30000",
+                    "to": "50000",
+                    "rate": "0.24"
+                  },
+                  {
+                    "from": "50000",
+                    "to": "90000",
+                    "rate": "0.255"
+                  },
+                  {
+                    "from": "90000",
+                    "to": "120000",
+                    "rate": "0.26"
+                  },
+                  {
+                    "from": "120000",
+                    "to": "240000",
+                    "rate": "0.265"
+                  },
+                  {
+                    "from": "240000",
+                    "to": "300000",
+                    "rate": "0.27"
+                  },
+                  {
+                    "from": "300000",
+                    "to": null,
+                    "rate": "0.28"
+                  }
+                ]
+              },
+              "quota": "38",
+              "inKindIncome": {
+                "count": 1,
+                "gross": "5.00",
+                "withheld": "0.95"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

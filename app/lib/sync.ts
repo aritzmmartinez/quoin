@@ -1,12 +1,18 @@
+import type {
+  SyncSender,
+  SyncStore,
+  SyncTx,
+} from "~/adapters/persistence/sync-repository";
 import {
-  exchangeSchema,
+  changesData,
+  exportDevice,
   merge,
   parseExchange,
-  SCHEMA_VERSION,
   type Effect,
   type Exchange,
   type MergePlan,
   type Peer,
+  type Resolutions,
   type SyncState,
 } from "~/core/sync";
 
@@ -14,21 +20,7 @@ import { describeFailure } from "./describe-failure";
 import { inTurn } from "./in-turn";
 import { haltsSync } from "./prices-sync";
 
-export interface SyncRepository {
-  device(): Promise<{ deviceId: string; name: string | null }>;
-  exportMark(): Promise<string>;
-  state(): Promise<SyncState>;
-  apply(
-    plan: MergePlan["apply"],
-    sender: { deviceId: string; name: string | null },
-    now: Date,
-  ): Promise<void>;
-  savePeers(
-    peers: readonly Peer[],
-    sender: { deviceId: string; name: string | null },
-    now: Date,
-  ): Promise<void>;
-}
+export type { SyncStore, SyncTx } from "~/adapters/persistence/sync-repository";
 
 export type EffectOutcome = { effect: Effect } & (
   | { ok: true }
@@ -37,27 +29,42 @@ export type EffectOutcome = { effect: Effect } & (
 
 export type RunEffect = (effect: Effect) => Promise<EffectOutcome>;
 
-export async function exportState(
-  repository: SyncRepository,
+export function exportState(
+  store: SyncStore,
+  now: Date,
+  defaultName: string | null = null,
 ): Promise<Exchange> {
-  const mark = await repository.exportMark();
-  const [device, state] = await Promise.all([
-    repository.device(),
-    repository.state(),
-  ]);
-  return exchangeSchema.parse({
-    schemaVersion: SCHEMA_VERSION,
-    deviceName: device.name,
-    exportHlc: mark,
-    ...state,
+  return store.transaction((tx) => {
+    const { device, name } = tx.read();
+    const exported = exportDevice(device, now.getTime(), name ?? defaultName);
+    if (exported.device.lastHlc) tx.setLastHlc(exported.device.lastHlc);
+    return exported.exchange;
   });
 }
 
-export interface ImportDeps {
-  repository: SyncRepository;
-  runEffect: RunEffect;
-  beforeApply?: () => Promise<void> | void;
+export interface ApplyDeps {
+  store: SyncStore;
+  beforeApply?: () => void;
+  settled?: (
+    tx: SyncTx,
+    outcome: { status: "up-to-date" | "applied"; counts: PlanCounts },
+  ) => void;
   now: Date;
+}
+
+export interface ImportDeps extends ApplyDeps {
+  runEffect: RunEffect;
+}
+
+export interface ImportOptions {
+  dryRun: boolean;
+  resolutions?: Resolutions;
+}
+
+export interface ApplyResult {
+  status: "conflicts" | "up-to-date" | "dry-run" | "applied";
+  plan: MergePlan;
+  counts: PlanCounts;
 }
 
 export type ImportResult = { plan: MergePlan; counts: PlanCounts } & (
@@ -67,41 +74,73 @@ export type ImportResult = { plan: MergePlan; counts: PlanCounts } & (
   | { status: "applied"; effects: EffectOutcome[] }
 );
 
-export async function importState(
-  deps: ImportDeps,
+export async function applyState(
+  deps: ApplyDeps,
   raw: unknown,
-  options: { dryRun: boolean },
-): Promise<ImportResult> {
+  options: ImportOptions,
+): Promise<ApplyResult> {
   const incoming = parseExchange(raw);
-  const local = await deps.repository.state();
-  const plan = merge(local, incoming);
-  const counts = planCounts(plan, local);
-  if (plan.conflicts.length > 0) return { status: "conflicts", plan, counts };
+  const sender: SyncSender = {
+    deviceId: incoming.deviceId,
+    name: incoming.deviceName,
+  };
+  const nowMs = deps.now.getTime();
 
-  const sender = { deviceId: incoming.deviceId, name: incoming.deviceName };
-  if (!hasDataChanges(plan)) {
-    if (!options.dryRun && !samePeers(local.peers, plan.apply.peers)) {
-      await deps.repository.savePeers(plan.apply.peers, sender, deps.now);
+  return deps.store.transaction((tx) => {
+    const { state } = tx.read().device;
+    const plan = merge(state, incoming, options.resolutions);
+    const counts = planCounts(plan, state);
+    if (plan.conflicts.length > 0) {
+      return { status: "conflicts" as const, plan, counts };
     }
-    return { status: "up-to-date", plan, counts };
-  }
-  if (options.dryRun) return { status: "dry-run", plan, counts };
+    if (!changesData(plan)) {
+      if (!options.dryRun && !samePeers(state.peers, plan.apply.peers)) {
+        tx.savePeers(plan.apply.peers, sender, nowMs);
+      }
+      if (!options.dryRun) deps.settled?.(tx, { status: "up-to-date", counts });
+      return { status: "up-to-date" as const, plan, counts };
+    }
+    if (options.dryRun) return { status: "dry-run" as const, plan, counts };
 
-  await deps.beforeApply?.();
-  await deps.repository.apply(plan.apply, sender, deps.now);
+    deps.beforeApply?.();
+    tx.apply(plan.apply, sender, nowMs);
+    deps.settled?.(tx, { status: "applied", counts });
+    return { status: "applied" as const, plan, counts };
+  });
+}
 
-  const effects = await inTurn(plan.effects, deps.runEffect, {
+export function runEffects(
+  effects: readonly Effect[],
+  runEffect: RunEffect,
+): Promise<EffectOutcome[]> {
+  return inTurn(effects, runEffect, {
     onError: (error, effect): EffectOutcome => {
       if (haltsSync(error)) throw error;
       return { effect, ok: false, reason: describeFailure(error) };
     },
   });
-  return { status: "applied", plan, counts, effects };
+}
+
+export async function importState(
+  deps: ImportDeps,
+  raw: unknown,
+  options: ImportOptions,
+): Promise<ImportResult> {
+  const result = await applyState(deps, raw, options);
+  if (result.status !== "applied") {
+    return { ...result, status: result.status };
+  }
+  return {
+    ...result,
+    status: "applied",
+    effects: await runEffects(result.plan.effects, deps.runEffect),
+  };
 }
 
 export interface PlanCounts {
   ledger: number;
   inKind: number;
+  setAside: number;
   newInstruments: number;
   changedInstruments: number;
   newTargets: number;
@@ -111,9 +150,11 @@ export interface PlanCounts {
   newIdentities: number;
   updatedIdentities: number;
   settings: boolean;
+  restamped: number;
 }
 
-export function planCounts({ apply }: MergePlan, local: SyncState): PlanCounts {
+export function planCounts(plan: MergePlan, local: SyncState): PlanCounts {
+  const { apply } = plan;
   const funds = new Set(local.holdings.map((b) => b.instrumentId));
   const known = new Set(local.identities.map((i) => i.identity));
   const newHoldings = apply.holdings.filter(
@@ -125,6 +166,7 @@ export function planCounts({ apply }: MergePlan, local: SyncState): PlanCounts {
   return {
     ledger: apply.ledger.insert.length,
     inKind: apply.ledger.markInKind.length,
+    setAside: plan.setAside.length,
     newInstruments: apply.instruments.insert.length,
     changedInstruments: apply.instruments.update.length,
     newTargets: apply.targets.insert.length,
@@ -134,22 +176,8 @@ export function planCounts({ apply }: MergePlan, local: SyncState): PlanCounts {
     newIdentities,
     updatedIdentities: apply.identities.length - newIdentities,
     settings: apply.settings !== null,
+    restamped: apply.restamp.length,
   };
-}
-
-function hasDataChanges({ apply }: MergePlan): boolean {
-  return (
-    apply.ledger.insert.length > 0 ||
-    apply.ledger.markInKind.length > 0 ||
-    apply.instruments.insert.length > 0 ||
-    apply.instruments.update.length > 0 ||
-    apply.targets.insert.length > 0 ||
-    apply.targets.delete.length > 0 ||
-    apply.tombstones.length > 0 ||
-    apply.holdings.length > 0 ||
-    apply.identities.length > 0 ||
-    apply.settings !== null
-  );
 }
 
 const samePeers = (a: readonly Peer[], b: readonly Peer[]) =>

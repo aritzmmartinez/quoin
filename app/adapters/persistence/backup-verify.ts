@@ -2,15 +2,7 @@ import { existsSync, unlinkSync } from "node:fs";
 
 import Database from "better-sqlite3";
 
-/**
- * Prove a snapshot is a database before anything treats it as one.
- *
- * Separated from `db-backup.ts` so it can be tested against a genuinely corrupt file.
- * That mattered: this is the step that decides whether a backup counts as good, and
- * rotation — the only destructive part — runs on the strength of its answer. A
- * verification that fails open would let a bad copy displace a good one. `PRAGMA
- * integrity_check` being written down is not evidence that its result is read correctly.
- */
+export class CountMismatchError extends Error {}
 
 export function tableCounts(db: Database.Database): Map<string, number> {
   const tables = db
@@ -74,7 +66,7 @@ export function verifyBackup(
 
     const problems = describeCountMismatches(expected, tableCounts(copy));
     if (problems.length > 0) {
-      throw new Error(
+      throw new CountMismatchError(
         `the copy does not match the source:\n  - ${problems.join("\n  - ")}\n` +
           `If the app was writing during the backup, run it again with nothing else ` +
           `touching the database.`,

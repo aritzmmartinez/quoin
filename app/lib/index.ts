@@ -13,6 +13,7 @@ export * from "./ingest";
 export * from "./instruments";
 export * from "./locale";
 export * from "./ipc-sync";
+export * from "./sync-devices";
 export * from "./movements";
 export * from "./opportunity-cost";
 export * from "./pagination";

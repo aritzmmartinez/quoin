@@ -1,0 +1,63 @@
+{
+  "contract": "sync-pairing",
+  "version": 1,
+  "description": "The six digits both screens show while pairing: HMAC-SHA256 with the token as key over the device id, both as UTF-8; the first four bytes of the digest as a big-endian unsigned integer, modulo 1000000, left-padded with zeros to six digits. Shared with the mobile client.",
+  "cases": [
+    {
+      "name": "a first byte with its top bit set stays unsigned",
+      "token": "test-token",
+      "deviceId": "dev-phone",
+      "byHand": {
+        "arithmetic": "printf 'dev-phone' | openssl dgst -sha256 -hmac test-token starts 877d42e8; as an unsigned integer 2273133288; its last six digits.",
+        "figures": {
+          "code": "133288"
+        }
+      },
+      "expect": {
+        "code": "133288"
+      }
+    },
+    {
+      "name": "a first byte with its top bit clear",
+      "token": "tok-b",
+      "deviceId": "phone-1",
+      "byHand": {
+        "arithmetic": "printf 'phone-1' | openssl dgst -sha256 -hmac tok-b starts 7c5e525c; as an unsigned integer 2086556252; its last six digits.",
+        "figures": {
+          "code": "556252"
+        }
+      },
+      "expect": {
+        "code": "556252"
+      }
+    },
+    {
+      "name": "a small remainder keeps its leading zeros",
+      "token": "tok-zero",
+      "deviceId": "phone-36",
+      "byHand": {
+        "arithmetic": "printf 'phone-36' | openssl dgst -sha256 -hmac tok-zero starts e2426c60; as an unsigned integer 3796003936; its last six digits.",
+        "figures": {
+          "code": "003936"
+        }
+      },
+      "expect": {
+        "code": "003936"
+      }
+    },
+    {
+      "name": "a device id is hashed as UTF-8",
+      "token": "tok-a",
+      "deviceId": "móvil-ñ",
+      "byHand": {
+        "arithmetic": "printf 'm\\xc3\\xb3vil-\\xc3\\xb1' | openssl dgst -sha256 -hmac tok-a starts c5fd700c; as an unsigned integer 3321720844; its last six digits.",
+        "figures": {
+          "code": "720844"
+        }
+      },
+      "expect": {
+        "code": "720844"
+      }
+    }
+  ]
+}

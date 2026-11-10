@@ -1,6 +1,7 @@
 import Decimal from "decimal.js";
 
 import { Money, compareCodeUnits } from "../domain";
+import { sortByTime } from "../series";
 import type { InvestedVsValuePoint } from "./invested-vs-value";
 import type { MarketValue } from "./market-value";
 import type { Position } from "./positions";
@@ -186,13 +187,11 @@ export function computePortfolioInvestedVsValueSeries(
   if (timestamps.size === 0) return [];
 
   const sorted = [...seriesByInstrument].map((series) =>
-    [...series]
-      .sort((a, b) => a.t - b.t)
-      .map((point) => ({
-        t: point.t,
-        invested: Money.fromString(point.invested),
-        value: Money.fromString(point.value),
-      })),
+    sortByTime(series).map((point) => ({
+      t: point.t,
+      invested: Money.fromString(point.invested),
+      value: Money.fromString(point.value),
+    })),
   );
   const cursors = sorted.map(() => 0);
   const carried: ({ invested: Money; value: Money } | undefined)[] = sorted.map(

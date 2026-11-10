@@ -1,7 +1,8 @@
-import { execSync } from "node:child_process";
 import { mkdirSync, rmSync } from "node:fs";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import { migratedDatabase } from "../../test/integration/template";
 
 import type { Instrument, LedgerEvent } from "~/core/domain";
 
@@ -76,10 +77,7 @@ beforeAll(async () => {
   mkdirSync(tmpDir, { recursive: true });
   const dbUrl = `file:${dbPath}`;
   process.env.DATABASE_URL = dbUrl;
-  execSync("pnpm exec prisma migrate deploy", {
-    stdio: "ignore",
-    env: { ...process.env, DATABASE_URL: dbUrl },
-  });
+  migratedDatabase(dbPath);
 
   persistence = await import("~/adapters/persistence");
   route = await import("./summary");
@@ -89,19 +87,21 @@ beforeAll(async () => {
     UNPRICED_BUY,
     PRICED_BUY,
   ]);
-  await persistence.prisma.priceSnapshot.createMany({
-    data: [
-      ["2026-02-01T16:00:00Z", "105"],
-      ["2026-04-01T16:00:00Z", "110"],
-      ["2026-08-03T16:00:00Z", "120"],
-    ].map(([asOf, price]) => ({
-      instrumentId: PRICED,
-      price: price!,
-      currency: "EUR",
-      asOf: new Date(asOf!),
-      source: "YAHOO",
-    })),
-  });
+  await persistence.prisma.$transaction((tx) =>
+    tx.priceSnapshot.createMany({
+      data: [
+        ["2026-02-01T16:00:00Z", "105"],
+        ["2026-04-01T16:00:00Z", "110"],
+        ["2026-08-03T16:00:00Z", "120"],
+      ].map(([asOf, price]) => ({
+        instrumentId: PRICED,
+        price: price!,
+        currency: "EUR",
+        asOf: new Date(asOf!),
+        source: "YAHOO",
+      })),
+    }),
+  );
 });
 
 afterAll(async () => {

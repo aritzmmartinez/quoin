@@ -1,9 +1,13 @@
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import type { Broker, ImportSummary } from "~/adapters/ingestion";
+import type { ImportSummary } from "~/adapters/ingestion";
 import { CsvFileError, decodeCsv } from "~/adapters/ingestion/decode";
-import type { PendingMapping, PriceFillResult } from "~/lib/ingest";
+import type {
+  IngestPreview,
+  PendingMapping,
+  PriceFillResult,
+} from "~/lib/ingest";
 
 import {
   earliestUnpriced,
@@ -46,10 +50,7 @@ export function IngestStepper({
   const [stage, setStage] = useState<Stage>("file");
   const [reached, setReached] = useState<Stage>("file");
   const [file, setFile] = useState<Loaded | null>(null);
-  const [preview, setPreview] = useState<{
-    broker: Broker;
-    summary: ImportSummary;
-  } | null>(null);
+  const [preview, setPreview] = useState<IngestPreview | null>(null);
   const [summary, setSummary] = useState<ImportSummary | null>(null);
   const [pending, setPending] = useState<PendingMapping[]>([]);
   const [mapped, setMapped] = useState<Record<string, string>>({});
@@ -97,7 +98,11 @@ export function IngestStepper({
       return;
     }
     if (response.step === "preview") {
-      setPreview({ broker: response.broker, summary: response.summary });
+      setPreview({
+        broker: response.broker,
+        summary: response.summary,
+        rateConflicts: response.rateConflicts,
+      });
     }
   }
 

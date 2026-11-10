@@ -1,7 +1,8 @@
-import { execSync } from "node:child_process";
 import { mkdirSync, rmSync } from "node:fs";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import { migratedDatabase } from "../../../test/integration/template";
 
 import { originOf } from "~/core/sync";
 
@@ -14,10 +15,7 @@ beforeAll(async () => {
   mkdirSync(tmpDir, { recursive: true });
   const dbUrl = `file:${dbPath}`;
   process.env.DATABASE_URL = dbUrl;
-  execSync("pnpm exec prisma migrate deploy", {
-    stdio: "ignore",
-    env: { ...process.env, DATABASE_URL: dbUrl },
-  });
+  migratedDatabase(dbPath);
   persistence = await import("./index");
   await new persistence.PrismaInstrumentRepository().upsert([
     { id: "IE00TEST0001", name: "Test Fund", type: "ETF", thesis: "CORE" },
@@ -52,8 +50,10 @@ describe("sync marks (integration)", () => {
     );
     expect(row.lastHlc).toBeNull();
     await expect(
-      persistence.prisma.$executeRawUnsafe(
-        `INSERT INTO "SyncDevice" ("id", "deviceId") VALUES (2, 'other')`,
+      persistence.prisma.$transaction((tx) =>
+        tx.$executeRawUnsafe(
+          `INSERT INTO "SyncDevice" ("id", "deviceId") VALUES (2, 'other')`,
+        ),
       ),
     ).rejects.toThrow();
   });
@@ -164,9 +164,11 @@ describe("sync marks (integration)", () => {
 
     await repo.replaceFor(ID, [...rows].reverse(), block);
     expect(
-      (await persistence.prisma.etfHoldingBlock.findUniqueOrThrow({
-        where: { instrumentId: ID },
-      })).hlc,
+      (
+        await persistence.prisma.etfHoldingBlock.findUniqueOrThrow({
+          where: { instrumentId: ID },
+        })
+      ).hlc,
     ).toBe(first.hlc);
 
     await repo.replaceFor(ID, rows.slice(0, 1), {
@@ -200,22 +202,30 @@ describe("sync marks (integration)", () => {
         where: { instrumentId: FUND },
       });
 
-    await repo.replaceFor(FUND, rows, { asOf: "2026-07-17", asOfInferred: true });
+    await repo.replaceFor(FUND, rows, {
+      asOf: "2026-07-17",
+      asOfInferred: true,
+    });
     const first = await block();
     const lastHlc = (await device()).lastHlc;
 
-    await repo.replaceFor(FUND, rows, { asOf: "2026-10-28", asOfInferred: true });
+    await repo.replaceFor(FUND, rows, {
+      asOf: "2026-10-28",
+      asOfInferred: true,
+    });
     expect(await block()).toEqual(first);
     expect((await device()).lastHlc).toBe(lastHlc);
 
     const changed = [row("US00TEST0201", "0.6"), row("US00TEST0202", "0.4")];
-    await repo.replaceFor(FUND, changed, { asOf: "2026-10-28", asOfInferred: true });
+    await repo.replaceFor(FUND, changed, {
+      asOf: "2026-10-28",
+      asOfInferred: true,
+    });
     const second = await block();
     expect(second).toMatchObject({ asOf: "2026-10-28", asOfInferred: true });
     expect(second.hlc! > first.hlc!).toBe(true);
-    expect((await repo.forInstrument(FUND)).map((h) => h.weight).sort()).toEqual([
-      "0.4",
-      "0.6",
-    ]);
+    expect(
+      (await repo.forInstrument(FUND)).map((h) => h.weight).sort(),
+    ).toEqual(["0.4", "0.6"]);
   });
 });

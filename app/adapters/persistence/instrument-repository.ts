@@ -9,16 +9,16 @@ import { instrumentToWriteData, rowToInstrument } from "./mappers";
 export class PrismaInstrumentRepository implements InstrumentRepository {
   async upsert(instruments: readonly Instrument[]): Promise<void> {
     if (instruments.length === 0) return;
-    await prisma.$transaction(
-      instruments.map((instrument) => {
+    await prisma.$transaction(async (tx) => {
+      for (const instrument of instruments) {
         const data = instrumentToWriteData(instrument);
-        return prisma.instrument.upsert({
+        await tx.instrument.upsert({
           where: { id: instrument.id },
           create: data,
           update: data,
         });
-      }),
-    );
+      }
+    });
   }
 
   async list(): Promise<Instrument[]> {
@@ -71,7 +71,11 @@ export class PrismaInstrumentRepository implements InstrumentRepository {
     await this.setStamped(
       id,
       (row) => row.exposureKind === kind && row.exposureLeafId === leafId,
-      (hlc) => ({ exposureKind: kind, exposureLeafId: leafId, exposureHlc: hlc }),
+      (hlc) => ({
+        exposureKind: kind,
+        exposureLeafId: leafId,
+        exposureHlc: hlc,
+      }),
     );
   }
 
@@ -85,7 +89,10 @@ export class PrismaInstrumentRepository implements InstrumentRepository {
     await prisma.$transaction(async (tx) => {
       const row = await tx.instrument.findUniqueOrThrow({ where: { id } });
       if (unchanged(row)) return;
-      await tx.instrument.update({ where: { id }, data: data(await stamp(tx)) });
+      await tx.instrument.update({
+        where: { id },
+        data: data(await stamp(tx)),
+      });
     });
   }
 }

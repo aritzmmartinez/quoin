@@ -10,6 +10,7 @@ import {
   type TradeEvent,
 } from "../domain";
 import { baseOf, bookable } from "../fx";
+import { sortByTime } from "../series";
 import type { InvestedVsValuePoint } from "./invested-vs-value";
 import { xirr, YEAR_MS, type CashFlow } from "./xirr";
 
@@ -206,6 +207,7 @@ function portfolioFlows(events: readonly LedgerEvent[]): PortfolioFlow[] {
   return bookable(events)
     .filter(isTrade)
     .filter((t) => !isSwapLeg(t))
+    .sort(compareTrades)
     .map((t) => {
       const gross = baseAmount(t, "grossAmount");
       const fees = baseAmount(t, "fees");
@@ -218,15 +220,14 @@ function portfolioFlows(events: readonly LedgerEvent[]): PortfolioFlow[] {
             net: gross.minus(fees),
             inKind,
           };
-    })
-    .sort((a, b) => a.t - b.t);
+    });
 }
 
 export function computePortfolioReturns(
   events: readonly LedgerEvent[],
   valueSeries: readonly InvestedVsValuePoint[],
 ): PortfolioReturnsSummary {
-  const points = [...valueSeries].sort((a, b) => a.t - b.t);
+  const points = sortByTime(valueSeries);
   const last = points[points.length - 1];
   if (!last) return EMPTY_PORTFOLIO_RETURNS;
 
@@ -259,7 +260,7 @@ export function explainPortfolioTwr(
   events: readonly LedgerEvent[],
   valueSeries: readonly InvestedVsValuePoint[],
 ): TwrSubPeriod[] {
-  const points = [...valueSeries].sort((a, b) => a.t - b.t);
+  const points = sortByTime(valueSeries);
   const flows = portfolioFlows(events);
   const rows: TwrSubPeriod[] = [];
   let cursor = 0;
