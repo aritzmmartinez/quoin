@@ -489,6 +489,13 @@ the scripts only parse and print.
   `SyncPeer.seen`; news to the sender likewise against the peers list in the file. A taken
   value keeps its origin's mark — restamping it locally makes the next exchange an echo
   conflict. Both new, or neither new with different values (two NULL marks), is a conflict.
+- **Devices converge when they hold the same values, deletions and rows set aside; marks
+  may differ only on a field whose value is the same, on purpose.** `merge` skips a field
+  whose values agree, so after a `keep` on the phone the PC the kept value came from keeps
+  its own older mark while the others hold the phone's. That mark is its own and already
+  seen, so it decides nothing; do not "fix" it by adopting marks on equal values. The
+  three-device scenarios in `test/contract/sync.json` pin it through `end`, each device's
+  whole final state, and a row is set aside only against a peer whose version differs.
 - **Copying the `.sqlite` copies `SyncDevice.deviceId`**, and an import refuses a file
   carrying its own id. Restore a backup on another machine and it is the same device.
 - **An open conflict writes nothing; a resolved one applies the whole plan.** Every

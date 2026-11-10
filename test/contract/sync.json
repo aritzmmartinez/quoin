@@ -1,7 +1,7 @@
 {
   "contract": "sync",
   "version": 1,
-  "description": "How two devices' user states merge, and which exchange files are refused. Shared with the mobile client: both implementations must reproduce every case. Omitted in a case: empty collections, peers [], settings { residence: bizkaia, residenceHlc: null }, schemaVersion 1 and deviceName null on the incoming file, and every optional row column (null; fees and taxWithheld \"0\", fxSource IDENTITY, funding CASH, hedgedToBase false, thesis CORE). A merge may carry resolutions, keyed by conflictKey; an expected error means merge throws. An expected plan compares apply and effects only when it lists no conflicts, unless compareApply is true; apply.peers is compared only when the case lists it; setAside is always compared. A scenario replays syncs between devices: each step exports `from` at nowMs (exportDevice), merges it into `to` with the step's resolutions, and then: with conflicts nothing changes; with no data to change (changesData false) only the peers are written and the status is up-to-date; otherwise applyPlan at nowMs. converged: the two user states (all but deviceId and peers) end equal.",
+  "description": "How two devices' user states merge, and which exchange files are refused. Shared with the mobile client: both implementations must reproduce every case. Omitted in a case: empty collections, peers [], settings { residence: bizkaia, residenceHlc: null }, schemaVersion 1 and deviceName null on the incoming file, and every optional row column (null; fees and taxWithheld \"0\", fxSource IDENTITY, funding CASH, hedgedToBase false, thesis CORE). A merge may carry resolutions, keyed by conflictKey; an expected error means merge throws. An expected plan compares apply and effects only when it lists no conflicts, unless compareApply is true; apply.peers is compared only when the case lists it; setAside is always compared. A scenario replays syncs between devices: each step exports `from` at nowMs (exportDevice), merges it into `to` with the step's resolutions, and then: with conflicts nothing changes; with no data to change (changesData false) only the peers are written and the status is up-to-date; otherwise applyPlan at nowMs. converged: the two user states (all but deviceId and peers) end equal. A scenario may hold more than two devices and three optional keys. A step { edit, nowMs, apply } is a change made on that device: applyPlan of that plan at nowMs with the device's peers left as they are, so a value in a patch gets its mark from a restamp. A sync step may carry apply, the plan merge must return, compared like a merge's expected.apply (whole, and peers only when listed). end gives, per device, its whole final state, peers included, and setAside: per peer it merged from, the ledger keys set aside in the last merge from that peer; a scenario with end states no converged. Devices that converge hold the same values, deletions and rows set aside; a mark may differ only on a field whose value is the same (after a keep, the device the kept value came from keeps its own older mark, which decides nothing). A row is set aside only against a peer whose version differs, so a device whose only peer holds its own version never lists it.",
   "merges": [
     {
       "name": "Two identical states: nothing to apply",
@@ -4133,6 +4133,2269 @@
         }
       ],
       "converged": false
+    },
+    {
+      "name": "Three devices: two PCs that only the phone talks to end with the same values, deletions and rows set aside",
+      "devices": {
+        "dev-a": {
+          "lastHlc": null,
+          "state": {
+            "deviceId": "dev-a"
+          }
+        },
+        "dev-b": {
+          "lastHlc": null,
+          "state": {
+            "deviceId": "dev-b",
+            "ledger": [
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "R2",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "TESTCOIN",
+                "quantity": "0.5",
+                "price": "2.12",
+                "grossAmount": "1.06",
+                "currency": "EUR",
+                "account": "kraken",
+                "funding": "IN_KIND",
+                "valuationSource": "yahoo"
+              },
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "R2:income",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "DIVIDEND",
+                "instrumentId": "TESTCOIN",
+                "quantity": null,
+                "price": null,
+                "grossAmount": "1.06",
+                "currency": "EUR",
+                "account": "kraken",
+                "funding": "IN_KIND",
+                "valuationSource": "yahoo"
+              },
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "t-9",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "TESTCOIN",
+                "quantity": "1",
+                "price": "100",
+                "grossAmount": "100",
+                "currency": "EUR",
+                "account": "kraken"
+              }
+            ],
+            "instruments": [
+              {
+                "id": "TESTCOIN",
+                "name": "Test Coin",
+                "type": "CRYPTO"
+              }
+            ]
+          }
+        },
+        "dev-c": {
+          "lastHlc": null,
+          "state": {
+            "deviceId": "dev-c"
+          }
+        }
+      },
+      "steps": [
+        {
+          "edit": "dev-a",
+          "nowMs": 1761600060000,
+          "apply": {
+            "ledger": {
+              "insert": [
+                {
+                  "source": "KRAKEN_CSV",
+                  "externalId": "R2",
+                  "ts": "2026-01-05T09:00:00.000Z",
+                  "type": "BUY",
+                  "instrumentId": "TESTCOIN",
+                  "quantity": "0.5",
+                  "price": "2.10",
+                  "grossAmount": "1.05",
+                  "currency": "EUR",
+                  "account": "kraken",
+                  "funding": "IN_KIND",
+                  "valuationSource": "yahoo"
+                },
+                {
+                  "source": "KRAKEN_CSV",
+                  "externalId": "R2:income",
+                  "ts": "2026-01-05T09:00:00.000Z",
+                  "type": "DIVIDEND",
+                  "instrumentId": "TESTCOIN",
+                  "quantity": null,
+                  "price": null,
+                  "grossAmount": "1.05",
+                  "currency": "EUR",
+                  "account": "kraken",
+                  "funding": "IN_KIND",
+                  "valuationSource": "yahoo"
+                },
+                {
+                  "source": "TR_CSV",
+                  "externalId": "t-1",
+                  "ts": "2026-01-05T09:00:00.000Z",
+                  "type": "BUY",
+                  "instrumentId": "IE00TEST0001",
+                  "quantity": "1",
+                  "price": "100",
+                  "grossAmount": "100",
+                  "currency": "EUR",
+                  "account": "trade-republic"
+                }
+              ]
+            },
+            "instruments": {
+              "insert": [
+                {
+                  "id": "IE00TEST0001",
+                  "name": "Test World ETF",
+                  "type": "ETF",
+                  "ter": "0.0020"
+                },
+                {
+                  "id": "TESTCOIN",
+                  "name": "Test Coin",
+                  "type": "CRYPTO"
+                }
+              ]
+            },
+            "targets": {
+              "insert": [
+                {
+                  "id": "v1",
+                  "name": "v1",
+                  "activeFrom": "2026-11-01",
+                  "createdAt": "2026-10-01T10:00:00.000Z",
+                  "lines": [
+                    {
+                      "instrumentId": "IE00TEST0001",
+                      "monthlyAmount": "300"
+                    }
+                  ]
+                },
+                {
+                  "id": "v2",
+                  "name": "v2",
+                  "activeFrom": "2026-12-01",
+                  "createdAt": "2026-10-01T10:00:00.000Z",
+                  "lines": [
+                    {
+                      "instrumentId": "IE00TEST0001",
+                      "monthlyAmount": "300"
+                    }
+                  ]
+                }
+              ]
+            },
+            "holdings": [
+              {
+                "instrumentId": "IE00TEST0001",
+                "asOf": "2026-09-30",
+                "asOfInferred": false,
+                "hlc": null,
+                "rows": [
+                  {
+                    "identity": "US00TEST0101",
+                    "identityKind": "ISIN",
+                    "name": "Alpha Corp",
+                    "weight": "0.6"
+                  },
+                  {
+                    "identity": "BETA.US",
+                    "identityKind": "TICKER",
+                    "name": "Beta Inc",
+                    "weight": "0.4"
+                  }
+                ]
+              }
+            ],
+            "restamp": [
+              {
+                "kind": "instrument",
+                "id": "IE00TEST0001",
+                "field": "ter"
+              },
+              {
+                "kind": "holdings",
+                "instrumentId": "IE00TEST0001"
+              }
+            ]
+          }
+        },
+        {
+          "edit": "dev-a",
+          "nowMs": 1761600120000,
+          "apply": {
+            "instruments": {
+              "update": [
+                {
+                  "id": "IE00TEST0001",
+                  "patch": {
+                    "ter": "0.0025"
+                  }
+                }
+              ]
+            },
+            "restamp": [
+              {
+                "kind": "instrument",
+                "id": "IE00TEST0001",
+                "field": "ter"
+              }
+            ]
+          }
+        },
+        {
+          "from": "dev-a",
+          "to": "dev-c",
+          "nowMs": 1761600600000,
+          "status": "applied"
+        },
+        {
+          "from": "dev-c",
+          "to": "dev-a",
+          "nowMs": 1761600660000,
+          "status": "up-to-date",
+          "apply": {
+            "peers": [
+              {
+                "deviceId": "dev-c",
+                "seen": "001761600660000-0000-dev-c"
+              }
+            ]
+          }
+        },
+        {
+          "from": "dev-b",
+          "to": "dev-c",
+          "nowMs": 1761600720000,
+          "status": "applied",
+          "setAside": [
+            "KRAKEN_CSV::R2",
+            "KRAKEN_CSV::R2:income"
+          ],
+          "apply": {
+            "ledger": {
+              "insert": [
+                {
+                  "source": "KRAKEN_CSV",
+                  "externalId": "t-9",
+                  "ts": "2026-01-05T09:00:00.000Z",
+                  "type": "BUY",
+                  "instrumentId": "TESTCOIN",
+                  "quantity": "1",
+                  "price": "100",
+                  "grossAmount": "100",
+                  "currency": "EUR",
+                  "account": "kraken"
+                }
+              ]
+            },
+            "peers": [
+              {
+                "deviceId": "dev-a",
+                "seen": "001761600600000-0000-dev-a"
+              },
+              {
+                "deviceId": "dev-b",
+                "seen": "001761600720000-0000-dev-b"
+              }
+            ]
+          }
+        },
+        {
+          "from": "dev-c",
+          "to": "dev-b",
+          "nowMs": 1761600780000,
+          "status": "applied",
+          "setAside": [
+            "KRAKEN_CSV::R2",
+            "KRAKEN_CSV::R2:income"
+          ],
+          "apply": {
+            "ledger": {
+              "insert": [
+                {
+                  "source": "TR_CSV",
+                  "externalId": "t-1",
+                  "ts": "2026-01-05T09:00:00.000Z",
+                  "type": "BUY",
+                  "instrumentId": "IE00TEST0001",
+                  "quantity": "1",
+                  "price": "100",
+                  "grossAmount": "100",
+                  "currency": "EUR",
+                  "account": "trade-republic"
+                }
+              ]
+            },
+            "instruments": {
+              "insert": [
+                {
+                  "id": "IE00TEST0001",
+                  "name": "Test World ETF",
+                  "type": "ETF",
+                  "ter": "0.0025",
+                  "terHlc": "001761600120000-0000-dev-a"
+                }
+              ]
+            },
+            "targets": {
+              "insert": [
+                {
+                  "id": "v1",
+                  "name": "v1",
+                  "activeFrom": "2026-11-01",
+                  "createdAt": "2026-10-01T10:00:00.000Z",
+                  "lines": [
+                    {
+                      "instrumentId": "IE00TEST0001",
+                      "monthlyAmount": "300"
+                    }
+                  ]
+                },
+                {
+                  "id": "v2",
+                  "name": "v2",
+                  "activeFrom": "2026-12-01",
+                  "createdAt": "2026-10-01T10:00:00.000Z",
+                  "lines": [
+                    {
+                      "instrumentId": "IE00TEST0001",
+                      "monthlyAmount": "300"
+                    }
+                  ]
+                }
+              ]
+            },
+            "holdings": [
+              {
+                "instrumentId": "IE00TEST0001",
+                "asOf": "2026-09-30",
+                "asOfInferred": false,
+                "hlc": "001761600060000-0001-dev-a",
+                "rows": [
+                  {
+                    "identity": "US00TEST0101",
+                    "identityKind": "ISIN",
+                    "name": "Alpha Corp",
+                    "weight": "0.6"
+                  },
+                  {
+                    "identity": "BETA.US",
+                    "identityKind": "TICKER",
+                    "name": "Beta Inc",
+                    "weight": "0.4"
+                  }
+                ]
+              }
+            ],
+            "peers": [
+              {
+                "deviceId": "dev-a",
+                "seen": "001761600600000-0000-dev-a"
+              },
+              {
+                "deviceId": "dev-c",
+                "seen": "001761600780000-0000-dev-c"
+              }
+            ]
+          }
+        },
+        {
+          "edit": "dev-b",
+          "nowMs": 1761601200000,
+          "apply": {
+            "instruments": {
+              "update": [
+                {
+                  "id": "IE00TEST0001",
+                  "patch": {
+                    "ter": "0.0030",
+                    "thesis": "TACTICAL",
+                    "exposureKind": "COMMODITY",
+                    "exposureLeafId": "XAU"
+                  }
+                }
+              ]
+            },
+            "targets": {
+              "delete": [
+                "v1"
+              ]
+            },
+            "restamp": [
+              {
+                "kind": "instrument",
+                "id": "IE00TEST0001",
+                "field": "ter"
+              },
+              {
+                "kind": "instrument",
+                "id": "IE00TEST0001",
+                "field": "thesis"
+              },
+              {
+                "kind": "instrument",
+                "id": "IE00TEST0001",
+                "field": "exposure"
+              },
+              {
+                "kind": "tombstone",
+                "key": "v1"
+              }
+            ]
+          }
+        },
+        {
+          "edit": "dev-a",
+          "nowMs": 1761601260000,
+          "apply": {
+            "instruments": {
+              "update": [
+                {
+                  "id": "IE00TEST0001",
+                  "patch": {
+                    "ter": "0.0035",
+                    "thesis": "CONVICTION",
+                    "hedgedToBase": true
+                  }
+                }
+              ]
+            },
+            "restamp": [
+              {
+                "kind": "instrument",
+                "id": "IE00TEST0001",
+                "field": "ter"
+              },
+              {
+                "kind": "instrument",
+                "id": "IE00TEST0001",
+                "field": "thesis"
+              },
+              {
+                "kind": "instrument",
+                "id": "IE00TEST0001",
+                "field": "hedgedToBase"
+              }
+            ]
+          }
+        },
+        {
+          "from": "dev-a",
+          "to": "dev-c",
+          "nowMs": 1761601800000,
+          "status": "applied",
+          "apply": {
+            "instruments": {
+              "update": [
+                {
+                  "id": "IE00TEST0001",
+                  "patch": {
+                    "ter": "0.0035",
+                    "terHlc": "001761601260000-0000-dev-a",
+                    "thesis": "CONVICTION",
+                    "thesisHlc": "001761601260000-0001-dev-a",
+                    "hedgedToBase": true,
+                    "hedgedToBaseHlc": "001761601260000-0002-dev-a"
+                  }
+                }
+              ]
+            },
+            "peers": [
+              {
+                "deviceId": "dev-a",
+                "seen": "001761601800000-0000-dev-a"
+              },
+              {
+                "deviceId": "dev-b",
+                "seen": "001761600720000-0000-dev-b"
+              }
+            ]
+          }
+        },
+        {
+          "from": "dev-c",
+          "to": "dev-a",
+          "nowMs": 1761601860000,
+          "status": "applied",
+          "apply": {
+            "ledger": {
+              "insert": [
+                {
+                  "source": "KRAKEN_CSV",
+                  "externalId": "t-9",
+                  "ts": "2026-01-05T09:00:00.000Z",
+                  "type": "BUY",
+                  "instrumentId": "TESTCOIN",
+                  "quantity": "1",
+                  "price": "100",
+                  "grossAmount": "100",
+                  "currency": "EUR",
+                  "account": "kraken"
+                }
+              ]
+            },
+            "peers": [
+              {
+                "deviceId": "dev-b",
+                "seen": "001761600720000-0000-dev-b"
+              },
+              {
+                "deviceId": "dev-c",
+                "seen": "001761601860000-0000-dev-c"
+              }
+            ]
+          }
+        },
+        {
+          "from": "dev-b",
+          "to": "dev-c",
+          "nowMs": 1761601920000,
+          "status": "conflicts",
+          "conflicts": [
+            "instrument:IE00TEST0001:ter",
+            "instrument:IE00TEST0001:thesis"
+          ],
+          "setAside": [
+            "KRAKEN_CSV::R2",
+            "KRAKEN_CSV::R2:income"
+          ]
+        },
+        {
+          "from": "dev-b",
+          "to": "dev-c",
+          "nowMs": 1761601980000,
+          "resolutions": {
+            "instrument:IE00TEST0001:ter": "keep",
+            "instrument:IE00TEST0001:thesis": "take"
+          },
+          "status": "applied",
+          "setAside": [
+            "KRAKEN_CSV::R2",
+            "KRAKEN_CSV::R2:income"
+          ],
+          "apply": {
+            "instruments": {
+              "update": [
+                {
+                  "id": "IE00TEST0001",
+                  "patch": {
+                    "exposureKind": "COMMODITY",
+                    "exposureLeafId": "XAU",
+                    "exposureHlc": "001761601200000-0002-dev-b",
+                    "thesis": "TACTICAL",
+                    "thesisHlc": "001761601200000-0001-dev-b"
+                  }
+                }
+              ]
+            },
+            "targets": {
+              "delete": [
+                "v1"
+              ]
+            },
+            "tombstones": [
+              {
+                "entity": "PortfolioTarget",
+                "key": "v1",
+                "hlc": "001761601200000-0003-dev-b"
+              }
+            ],
+            "restamp": [
+              {
+                "kind": "instrument",
+                "id": "IE00TEST0001",
+                "field": "ter"
+              }
+            ],
+            "peers": [
+              {
+                "deviceId": "dev-a",
+                "seen": "001761601800000-0000-dev-a"
+              },
+              {
+                "deviceId": "dev-b",
+                "seen": "001761601980000-0000-dev-b"
+              }
+            ]
+          }
+        },
+        {
+          "from": "dev-c",
+          "to": "dev-b",
+          "nowMs": 1761602040000,
+          "status": "applied",
+          "setAside": [
+            "KRAKEN_CSV::R2",
+            "KRAKEN_CSV::R2:income"
+          ],
+          "apply": {
+            "instruments": {
+              "update": [
+                {
+                  "id": "IE00TEST0001",
+                  "patch": {
+                    "ter": "0.0035",
+                    "terHlc": "001761601980000-0000-dev-c",
+                    "hedgedToBase": true,
+                    "hedgedToBaseHlc": "001761601260000-0002-dev-a"
+                  }
+                }
+              ]
+            },
+            "peers": [
+              {
+                "deviceId": "dev-a",
+                "seen": "001761601800000-0000-dev-a"
+              },
+              {
+                "deviceId": "dev-c",
+                "seen": "001761602040000-0000-dev-c"
+              }
+            ]
+          }
+        },
+        {
+          "from": "dev-a",
+          "to": "dev-c",
+          "nowMs": 1761602100000,
+          "status": "up-to-date",
+          "apply": {
+            "peers": [
+              {
+                "deviceId": "dev-a",
+                "seen": "001761602100000-0000-dev-a"
+              },
+              {
+                "deviceId": "dev-b",
+                "seen": "001761601980000-0000-dev-b"
+              }
+            ]
+          }
+        },
+        {
+          "from": "dev-c",
+          "to": "dev-a",
+          "nowMs": 1761602160000,
+          "status": "applied",
+          "apply": {
+            "instruments": {
+              "update": [
+                {
+                  "id": "IE00TEST0001",
+                  "patch": {
+                    "exposureKind": "COMMODITY",
+                    "exposureLeafId": "XAU",
+                    "exposureHlc": "001761601200000-0002-dev-b",
+                    "thesis": "TACTICAL",
+                    "thesisHlc": "001761601200000-0001-dev-b"
+                  }
+                }
+              ]
+            },
+            "targets": {
+              "delete": [
+                "v1"
+              ]
+            },
+            "tombstones": [
+              {
+                "entity": "PortfolioTarget",
+                "key": "v1",
+                "hlc": "001761601200000-0003-dev-b"
+              }
+            ],
+            "peers": [
+              {
+                "deviceId": "dev-b",
+                "seen": "001761601980000-0000-dev-b"
+              },
+              {
+                "deviceId": "dev-c",
+                "seen": "001761602160000-0000-dev-c"
+              }
+            ]
+          }
+        },
+        {
+          "from": "dev-b",
+          "to": "dev-c",
+          "nowMs": 1761602220000,
+          "status": "up-to-date",
+          "setAside": [
+            "KRAKEN_CSV::R2",
+            "KRAKEN_CSV::R2:income"
+          ],
+          "apply": {
+            "peers": [
+              {
+                "deviceId": "dev-a",
+                "seen": "001761602100000-0000-dev-a"
+              },
+              {
+                "deviceId": "dev-b",
+                "seen": "001761602220000-0000-dev-b"
+              }
+            ]
+          }
+        },
+        {
+          "from": "dev-c",
+          "to": "dev-b",
+          "nowMs": 1761602280000,
+          "status": "up-to-date",
+          "setAside": [
+            "KRAKEN_CSV::R2",
+            "KRAKEN_CSV::R2:income"
+          ],
+          "apply": {
+            "peers": [
+              {
+                "deviceId": "dev-a",
+                "seen": "001761602100000-0000-dev-a"
+              },
+              {
+                "deviceId": "dev-c",
+                "seen": "001761602280000-0000-dev-c"
+              }
+            ]
+          }
+        },
+        {
+          "from": "dev-a",
+          "to": "dev-c",
+          "nowMs": 1761602340000,
+          "status": "up-to-date",
+          "apply": {
+            "peers": [
+              {
+                "deviceId": "dev-a",
+                "seen": "001761602340000-0000-dev-a"
+              },
+              {
+                "deviceId": "dev-b",
+                "seen": "001761602220000-0000-dev-b"
+              }
+            ]
+          }
+        },
+        {
+          "from": "dev-c",
+          "to": "dev-a",
+          "nowMs": 1761602400000,
+          "status": "up-to-date",
+          "apply": {
+            "peers": [
+              {
+                "deviceId": "dev-b",
+                "seen": "001761602220000-0000-dev-b"
+              },
+              {
+                "deviceId": "dev-c",
+                "seen": "001761602400000-0000-dev-c"
+              }
+            ]
+          }
+        }
+      ],
+      "end": {
+        "dev-a": {
+          "setAside": {
+            "dev-c": []
+          },
+          "state": {
+            "deviceId": "dev-a",
+            "peers": [
+              {
+                "deviceId": "dev-b",
+                "seen": "001761602220000-0000-dev-b"
+              },
+              {
+                "deviceId": "dev-c",
+                "seen": "001761602400000-0000-dev-c"
+              }
+            ],
+            "ledger": [
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "R2",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "TESTCOIN",
+                "quantity": "0.5",
+                "price": "2.10",
+                "grossAmount": "1.05",
+                "currency": "EUR",
+                "account": "kraken",
+                "funding": "IN_KIND",
+                "valuationSource": "yahoo"
+              },
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "R2:income",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "DIVIDEND",
+                "instrumentId": "TESTCOIN",
+                "quantity": null,
+                "price": null,
+                "grossAmount": "1.05",
+                "currency": "EUR",
+                "account": "kraken",
+                "funding": "IN_KIND",
+                "valuationSource": "yahoo"
+              },
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "t-9",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "TESTCOIN",
+                "quantity": "1",
+                "price": "100",
+                "grossAmount": "100",
+                "currency": "EUR",
+                "account": "kraken"
+              },
+              {
+                "source": "TR_CSV",
+                "externalId": "t-1",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "IE00TEST0001",
+                "quantity": "1",
+                "price": "100",
+                "grossAmount": "100",
+                "currency": "EUR",
+                "account": "trade-republic"
+              }
+            ],
+            "instruments": [
+              {
+                "id": "IE00TEST0001",
+                "name": "Test World ETF",
+                "type": "ETF",
+                "exposureKind": "COMMODITY",
+                "exposureLeafId": "XAU",
+                "exposureHlc": "001761601200000-0002-dev-b",
+                "thesis": "TACTICAL",
+                "thesisHlc": "001761601200000-0001-dev-b",
+                "ter": "0.0035",
+                "terHlc": "001761601260000-0000-dev-a",
+                "hedgedToBase": true,
+                "hedgedToBaseHlc": "001761601260000-0002-dev-a"
+              },
+              {
+                "id": "TESTCOIN",
+                "name": "Test Coin",
+                "type": "CRYPTO"
+              }
+            ],
+            "targets": [
+              {
+                "id": "v2",
+                "name": "v2",
+                "activeFrom": "2026-12-01",
+                "createdAt": "2026-10-01T10:00:00.000Z",
+                "lines": [
+                  {
+                    "instrumentId": "IE00TEST0001",
+                    "monthlyAmount": "300"
+                  }
+                ]
+              }
+            ],
+            "tombstones": [
+              {
+                "entity": "PortfolioTarget",
+                "key": "v1",
+                "hlc": "001761601200000-0003-dev-b"
+              }
+            ],
+            "holdings": [
+              {
+                "instrumentId": "IE00TEST0001",
+                "asOf": "2026-09-30",
+                "asOfInferred": false,
+                "hlc": "001761600060000-0001-dev-a",
+                "rows": [
+                  {
+                    "identity": "US00TEST0101",
+                    "identityKind": "ISIN",
+                    "name": "Alpha Corp",
+                    "weight": "0.6"
+                  },
+                  {
+                    "identity": "BETA.US",
+                    "identityKind": "TICKER",
+                    "name": "Beta Inc",
+                    "weight": "0.4"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "dev-b": {
+          "setAside": {
+            "dev-c": [
+              "KRAKEN_CSV::R2",
+              "KRAKEN_CSV::R2:income"
+            ]
+          },
+          "state": {
+            "deviceId": "dev-b",
+            "peers": [
+              {
+                "deviceId": "dev-a",
+                "seen": "001761602100000-0000-dev-a"
+              },
+              {
+                "deviceId": "dev-c",
+                "seen": "001761602280000-0000-dev-c"
+              }
+            ],
+            "ledger": [
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "R2",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "TESTCOIN",
+                "quantity": "0.5",
+                "price": "2.12",
+                "grossAmount": "1.06",
+                "currency": "EUR",
+                "account": "kraken",
+                "funding": "IN_KIND",
+                "valuationSource": "yahoo"
+              },
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "R2:income",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "DIVIDEND",
+                "instrumentId": "TESTCOIN",
+                "quantity": null,
+                "price": null,
+                "grossAmount": "1.06",
+                "currency": "EUR",
+                "account": "kraken",
+                "funding": "IN_KIND",
+                "valuationSource": "yahoo"
+              },
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "t-9",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "TESTCOIN",
+                "quantity": "1",
+                "price": "100",
+                "grossAmount": "100",
+                "currency": "EUR",
+                "account": "kraken"
+              },
+              {
+                "source": "TR_CSV",
+                "externalId": "t-1",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "IE00TEST0001",
+                "quantity": "1",
+                "price": "100",
+                "grossAmount": "100",
+                "currency": "EUR",
+                "account": "trade-republic"
+              }
+            ],
+            "instruments": [
+              {
+                "id": "IE00TEST0001",
+                "name": "Test World ETF",
+                "type": "ETF",
+                "exposureKind": "COMMODITY",
+                "exposureLeafId": "XAU",
+                "exposureHlc": "001761601200000-0002-dev-b",
+                "thesis": "TACTICAL",
+                "thesisHlc": "001761601200000-0001-dev-b",
+                "ter": "0.0035",
+                "terHlc": "001761601980000-0000-dev-c",
+                "hedgedToBase": true,
+                "hedgedToBaseHlc": "001761601260000-0002-dev-a"
+              },
+              {
+                "id": "TESTCOIN",
+                "name": "Test Coin",
+                "type": "CRYPTO"
+              }
+            ],
+            "targets": [
+              {
+                "id": "v2",
+                "name": "v2",
+                "activeFrom": "2026-12-01",
+                "createdAt": "2026-10-01T10:00:00.000Z",
+                "lines": [
+                  {
+                    "instrumentId": "IE00TEST0001",
+                    "monthlyAmount": "300"
+                  }
+                ]
+              }
+            ],
+            "tombstones": [
+              {
+                "entity": "PortfolioTarget",
+                "key": "v1",
+                "hlc": "001761601200000-0003-dev-b"
+              }
+            ],
+            "holdings": [
+              {
+                "instrumentId": "IE00TEST0001",
+                "asOf": "2026-09-30",
+                "asOfInferred": false,
+                "hlc": "001761600060000-0001-dev-a",
+                "rows": [
+                  {
+                    "identity": "US00TEST0101",
+                    "identityKind": "ISIN",
+                    "name": "Alpha Corp",
+                    "weight": "0.6"
+                  },
+                  {
+                    "identity": "BETA.US",
+                    "identityKind": "TICKER",
+                    "name": "Beta Inc",
+                    "weight": "0.4"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "dev-c": {
+          "setAside": {
+            "dev-a": [],
+            "dev-b": [
+              "KRAKEN_CSV::R2",
+              "KRAKEN_CSV::R2:income"
+            ]
+          },
+          "state": {
+            "deviceId": "dev-c",
+            "peers": [
+              {
+                "deviceId": "dev-a",
+                "seen": "001761602340000-0000-dev-a"
+              },
+              {
+                "deviceId": "dev-b",
+                "seen": "001761602220000-0000-dev-b"
+              }
+            ],
+            "ledger": [
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "R2",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "TESTCOIN",
+                "quantity": "0.5",
+                "price": "2.10",
+                "grossAmount": "1.05",
+                "currency": "EUR",
+                "account": "kraken",
+                "funding": "IN_KIND",
+                "valuationSource": "yahoo"
+              },
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "R2:income",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "DIVIDEND",
+                "instrumentId": "TESTCOIN",
+                "quantity": null,
+                "price": null,
+                "grossAmount": "1.05",
+                "currency": "EUR",
+                "account": "kraken",
+                "funding": "IN_KIND",
+                "valuationSource": "yahoo"
+              },
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "t-9",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "TESTCOIN",
+                "quantity": "1",
+                "price": "100",
+                "grossAmount": "100",
+                "currency": "EUR",
+                "account": "kraken"
+              },
+              {
+                "source": "TR_CSV",
+                "externalId": "t-1",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "IE00TEST0001",
+                "quantity": "1",
+                "price": "100",
+                "grossAmount": "100",
+                "currency": "EUR",
+                "account": "trade-republic"
+              }
+            ],
+            "instruments": [
+              {
+                "id": "IE00TEST0001",
+                "name": "Test World ETF",
+                "type": "ETF",
+                "exposureKind": "COMMODITY",
+                "exposureLeafId": "XAU",
+                "exposureHlc": "001761601200000-0002-dev-b",
+                "thesis": "TACTICAL",
+                "thesisHlc": "001761601200000-0001-dev-b",
+                "ter": "0.0035",
+                "terHlc": "001761601980000-0000-dev-c",
+                "hedgedToBase": true,
+                "hedgedToBaseHlc": "001761601260000-0002-dev-a"
+              },
+              {
+                "id": "TESTCOIN",
+                "name": "Test Coin",
+                "type": "CRYPTO"
+              }
+            ],
+            "targets": [
+              {
+                "id": "v2",
+                "name": "v2",
+                "activeFrom": "2026-12-01",
+                "createdAt": "2026-10-01T10:00:00.000Z",
+                "lines": [
+                  {
+                    "instrumentId": "IE00TEST0001",
+                    "monthlyAmount": "300"
+                  }
+                ]
+              }
+            ],
+            "tombstones": [
+              {
+                "entity": "PortfolioTarget",
+                "key": "v1",
+                "hlc": "001761601200000-0003-dev-b"
+              }
+            ],
+            "holdings": [
+              {
+                "instrumentId": "IE00TEST0001",
+                "asOf": "2026-09-30",
+                "asOfInferred": false,
+                "hlc": "001761600060000-0001-dev-a",
+                "rows": [
+                  {
+                    "identity": "US00TEST0101",
+                    "identityKind": "ISIN",
+                    "name": "Alpha Corp",
+                    "weight": "0.6"
+                  },
+                  {
+                    "identity": "BETA.US",
+                    "identityKind": "TICKER",
+                    "name": "Beta Inc",
+                    "weight": "0.4"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "Three devices, afterwards: the field whose mark differs on A is edited on B, on A and on the phone, and each edit reaches the other two with no conflict",
+      "devices": {
+        "dev-a": {
+          "lastHlc": "001761602340000-0000-dev-a",
+          "state": {
+            "deviceId": "dev-a",
+            "peers": [
+              {
+                "deviceId": "dev-b",
+                "seen": "001761602220000-0000-dev-b"
+              },
+              {
+                "deviceId": "dev-c",
+                "seen": "001761602400000-0000-dev-c"
+              }
+            ],
+            "ledger": [
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "R2",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "TESTCOIN",
+                "quantity": "0.5",
+                "price": "2.10",
+                "grossAmount": "1.05",
+                "currency": "EUR",
+                "account": "kraken",
+                "funding": "IN_KIND",
+                "valuationSource": "yahoo"
+              },
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "R2:income",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "DIVIDEND",
+                "instrumentId": "TESTCOIN",
+                "quantity": null,
+                "price": null,
+                "grossAmount": "1.05",
+                "currency": "EUR",
+                "account": "kraken",
+                "funding": "IN_KIND",
+                "valuationSource": "yahoo"
+              },
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "t-9",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "TESTCOIN",
+                "quantity": "1",
+                "price": "100",
+                "grossAmount": "100",
+                "currency": "EUR",
+                "account": "kraken"
+              },
+              {
+                "source": "TR_CSV",
+                "externalId": "t-1",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "IE00TEST0001",
+                "quantity": "1",
+                "price": "100",
+                "grossAmount": "100",
+                "currency": "EUR",
+                "account": "trade-republic"
+              }
+            ],
+            "instruments": [
+              {
+                "id": "IE00TEST0001",
+                "name": "Test World ETF",
+                "type": "ETF",
+                "exposureKind": "COMMODITY",
+                "exposureLeafId": "XAU",
+                "exposureHlc": "001761601200000-0002-dev-b",
+                "thesis": "TACTICAL",
+                "thesisHlc": "001761601200000-0001-dev-b",
+                "ter": "0.0035",
+                "terHlc": "001761601260000-0000-dev-a",
+                "hedgedToBase": true,
+                "hedgedToBaseHlc": "001761601260000-0002-dev-a"
+              },
+              {
+                "id": "TESTCOIN",
+                "name": "Test Coin",
+                "type": "CRYPTO"
+              }
+            ],
+            "targets": [
+              {
+                "id": "v2",
+                "name": "v2",
+                "activeFrom": "2026-12-01",
+                "createdAt": "2026-10-01T10:00:00.000Z",
+                "lines": [
+                  {
+                    "instrumentId": "IE00TEST0001",
+                    "monthlyAmount": "300"
+                  }
+                ]
+              }
+            ],
+            "tombstones": [
+              {
+                "entity": "PortfolioTarget",
+                "key": "v1",
+                "hlc": "001761601200000-0003-dev-b"
+              }
+            ],
+            "holdings": [
+              {
+                "instrumentId": "IE00TEST0001",
+                "asOf": "2026-09-30",
+                "asOfInferred": false,
+                "hlc": "001761600060000-0001-dev-a",
+                "rows": [
+                  {
+                    "identity": "US00TEST0101",
+                    "identityKind": "ISIN",
+                    "name": "Alpha Corp",
+                    "weight": "0.6"
+                  },
+                  {
+                    "identity": "BETA.US",
+                    "identityKind": "TICKER",
+                    "name": "Beta Inc",
+                    "weight": "0.4"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "dev-b": {
+          "lastHlc": "001761602220000-0000-dev-b",
+          "state": {
+            "deviceId": "dev-b",
+            "peers": [
+              {
+                "deviceId": "dev-a",
+                "seen": "001761602100000-0000-dev-a"
+              },
+              {
+                "deviceId": "dev-c",
+                "seen": "001761602280000-0000-dev-c"
+              }
+            ],
+            "ledger": [
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "R2",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "TESTCOIN",
+                "quantity": "0.5",
+                "price": "2.12",
+                "grossAmount": "1.06",
+                "currency": "EUR",
+                "account": "kraken",
+                "funding": "IN_KIND",
+                "valuationSource": "yahoo"
+              },
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "R2:income",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "DIVIDEND",
+                "instrumentId": "TESTCOIN",
+                "quantity": null,
+                "price": null,
+                "grossAmount": "1.06",
+                "currency": "EUR",
+                "account": "kraken",
+                "funding": "IN_KIND",
+                "valuationSource": "yahoo"
+              },
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "t-9",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "TESTCOIN",
+                "quantity": "1",
+                "price": "100",
+                "grossAmount": "100",
+                "currency": "EUR",
+                "account": "kraken"
+              },
+              {
+                "source": "TR_CSV",
+                "externalId": "t-1",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "IE00TEST0001",
+                "quantity": "1",
+                "price": "100",
+                "grossAmount": "100",
+                "currency": "EUR",
+                "account": "trade-republic"
+              }
+            ],
+            "instruments": [
+              {
+                "id": "IE00TEST0001",
+                "name": "Test World ETF",
+                "type": "ETF",
+                "exposureKind": "COMMODITY",
+                "exposureLeafId": "XAU",
+                "exposureHlc": "001761601200000-0002-dev-b",
+                "thesis": "TACTICAL",
+                "thesisHlc": "001761601200000-0001-dev-b",
+                "ter": "0.0035",
+                "terHlc": "001761601980000-0000-dev-c",
+                "hedgedToBase": true,
+                "hedgedToBaseHlc": "001761601260000-0002-dev-a"
+              },
+              {
+                "id": "TESTCOIN",
+                "name": "Test Coin",
+                "type": "CRYPTO"
+              }
+            ],
+            "targets": [
+              {
+                "id": "v2",
+                "name": "v2",
+                "activeFrom": "2026-12-01",
+                "createdAt": "2026-10-01T10:00:00.000Z",
+                "lines": [
+                  {
+                    "instrumentId": "IE00TEST0001",
+                    "monthlyAmount": "300"
+                  }
+                ]
+              }
+            ],
+            "tombstones": [
+              {
+                "entity": "PortfolioTarget",
+                "key": "v1",
+                "hlc": "001761601200000-0003-dev-b"
+              }
+            ],
+            "holdings": [
+              {
+                "instrumentId": "IE00TEST0001",
+                "asOf": "2026-09-30",
+                "asOfInferred": false,
+                "hlc": "001761600060000-0001-dev-a",
+                "rows": [
+                  {
+                    "identity": "US00TEST0101",
+                    "identityKind": "ISIN",
+                    "name": "Alpha Corp",
+                    "weight": "0.6"
+                  },
+                  {
+                    "identity": "BETA.US",
+                    "identityKind": "TICKER",
+                    "name": "Beta Inc",
+                    "weight": "0.4"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "dev-c": {
+          "lastHlc": "001761602400000-0000-dev-c",
+          "state": {
+            "deviceId": "dev-c",
+            "peers": [
+              {
+                "deviceId": "dev-a",
+                "seen": "001761602340000-0000-dev-a"
+              },
+              {
+                "deviceId": "dev-b",
+                "seen": "001761602220000-0000-dev-b"
+              }
+            ],
+            "ledger": [
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "R2",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "TESTCOIN",
+                "quantity": "0.5",
+                "price": "2.10",
+                "grossAmount": "1.05",
+                "currency": "EUR",
+                "account": "kraken",
+                "funding": "IN_KIND",
+                "valuationSource": "yahoo"
+              },
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "R2:income",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "DIVIDEND",
+                "instrumentId": "TESTCOIN",
+                "quantity": null,
+                "price": null,
+                "grossAmount": "1.05",
+                "currency": "EUR",
+                "account": "kraken",
+                "funding": "IN_KIND",
+                "valuationSource": "yahoo"
+              },
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "t-9",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "TESTCOIN",
+                "quantity": "1",
+                "price": "100",
+                "grossAmount": "100",
+                "currency": "EUR",
+                "account": "kraken"
+              },
+              {
+                "source": "TR_CSV",
+                "externalId": "t-1",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "IE00TEST0001",
+                "quantity": "1",
+                "price": "100",
+                "grossAmount": "100",
+                "currency": "EUR",
+                "account": "trade-republic"
+              }
+            ],
+            "instruments": [
+              {
+                "id": "IE00TEST0001",
+                "name": "Test World ETF",
+                "type": "ETF",
+                "exposureKind": "COMMODITY",
+                "exposureLeafId": "XAU",
+                "exposureHlc": "001761601200000-0002-dev-b",
+                "thesis": "TACTICAL",
+                "thesisHlc": "001761601200000-0001-dev-b",
+                "ter": "0.0035",
+                "terHlc": "001761601980000-0000-dev-c",
+                "hedgedToBase": true,
+                "hedgedToBaseHlc": "001761601260000-0002-dev-a"
+              },
+              {
+                "id": "TESTCOIN",
+                "name": "Test Coin",
+                "type": "CRYPTO"
+              }
+            ],
+            "targets": [
+              {
+                "id": "v2",
+                "name": "v2",
+                "activeFrom": "2026-12-01",
+                "createdAt": "2026-10-01T10:00:00.000Z",
+                "lines": [
+                  {
+                    "instrumentId": "IE00TEST0001",
+                    "monthlyAmount": "300"
+                  }
+                ]
+              }
+            ],
+            "tombstones": [
+              {
+                "entity": "PortfolioTarget",
+                "key": "v1",
+                "hlc": "001761601200000-0003-dev-b"
+              }
+            ],
+            "holdings": [
+              {
+                "instrumentId": "IE00TEST0001",
+                "asOf": "2026-09-30",
+                "asOfInferred": false,
+                "hlc": "001761600060000-0001-dev-a",
+                "rows": [
+                  {
+                    "identity": "US00TEST0101",
+                    "identityKind": "ISIN",
+                    "name": "Alpha Corp",
+                    "weight": "0.6"
+                  },
+                  {
+                    "identity": "BETA.US",
+                    "identityKind": "TICKER",
+                    "name": "Beta Inc",
+                    "weight": "0.4"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "steps": [
+        {
+          "edit": "dev-b",
+          "nowMs": 1761603000000,
+          "apply": {
+            "instruments": {
+              "update": [
+                {
+                  "id": "IE00TEST0001",
+                  "patch": {
+                    "ter": "0.0040"
+                  }
+                }
+              ]
+            },
+            "restamp": [
+              {
+                "kind": "instrument",
+                "id": "IE00TEST0001",
+                "field": "ter"
+              }
+            ]
+          }
+        },
+        {
+          "from": "dev-b",
+          "to": "dev-c",
+          "nowMs": 1761603060000,
+          "status": "applied",
+          "setAside": [
+            "KRAKEN_CSV::R2",
+            "KRAKEN_CSV::R2:income"
+          ],
+          "apply": {
+            "instruments": {
+              "update": [
+                {
+                  "id": "IE00TEST0001",
+                  "patch": {
+                    "ter": "0.0040",
+                    "terHlc": "001761603000000-0000-dev-b"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "from": "dev-c",
+          "to": "dev-b",
+          "nowMs": 1761603120000,
+          "status": "up-to-date",
+          "setAside": [
+            "KRAKEN_CSV::R2",
+            "KRAKEN_CSV::R2:income"
+          ]
+        },
+        {
+          "from": "dev-a",
+          "to": "dev-c",
+          "nowMs": 1761603180000,
+          "status": "up-to-date"
+        },
+        {
+          "from": "dev-c",
+          "to": "dev-a",
+          "nowMs": 1761603240000,
+          "status": "applied",
+          "apply": {
+            "instruments": {
+              "update": [
+                {
+                  "id": "IE00TEST0001",
+                  "patch": {
+                    "ter": "0.0040",
+                    "terHlc": "001761603000000-0000-dev-b"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "edit": "dev-a",
+          "nowMs": 1761603600000,
+          "apply": {
+            "instruments": {
+              "update": [
+                {
+                  "id": "IE00TEST0001",
+                  "patch": {
+                    "ter": "0.0045"
+                  }
+                }
+              ]
+            },
+            "restamp": [
+              {
+                "kind": "instrument",
+                "id": "IE00TEST0001",
+                "field": "ter"
+              }
+            ]
+          }
+        },
+        {
+          "from": "dev-a",
+          "to": "dev-c",
+          "nowMs": 1761603660000,
+          "status": "applied",
+          "apply": {
+            "instruments": {
+              "update": [
+                {
+                  "id": "IE00TEST0001",
+                  "patch": {
+                    "ter": "0.0045",
+                    "terHlc": "001761603600000-0000-dev-a"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "from": "dev-c",
+          "to": "dev-a",
+          "nowMs": 1761603720000,
+          "status": "up-to-date"
+        },
+        {
+          "from": "dev-b",
+          "to": "dev-c",
+          "nowMs": 1761603780000,
+          "status": "up-to-date",
+          "setAside": [
+            "KRAKEN_CSV::R2",
+            "KRAKEN_CSV::R2:income"
+          ]
+        },
+        {
+          "from": "dev-c",
+          "to": "dev-b",
+          "nowMs": 1761603840000,
+          "status": "applied",
+          "setAside": [
+            "KRAKEN_CSV::R2",
+            "KRAKEN_CSV::R2:income"
+          ],
+          "apply": {
+            "instruments": {
+              "update": [
+                {
+                  "id": "IE00TEST0001",
+                  "patch": {
+                    "ter": "0.0045",
+                    "terHlc": "001761603600000-0000-dev-a"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "edit": "dev-c",
+          "nowMs": 1761604200000,
+          "apply": {
+            "instruments": {
+              "update": [
+                {
+                  "id": "IE00TEST0001",
+                  "patch": {
+                    "ter": "0.0050"
+                  }
+                }
+              ]
+            },
+            "restamp": [
+              {
+                "kind": "instrument",
+                "id": "IE00TEST0001",
+                "field": "ter"
+              }
+            ]
+          }
+        },
+        {
+          "from": "dev-a",
+          "to": "dev-c",
+          "nowMs": 1761604260000,
+          "status": "up-to-date"
+        },
+        {
+          "from": "dev-c",
+          "to": "dev-a",
+          "nowMs": 1761604320000,
+          "status": "applied",
+          "apply": {
+            "instruments": {
+              "update": [
+                {
+                  "id": "IE00TEST0001",
+                  "patch": {
+                    "ter": "0.0050",
+                    "terHlc": "001761604200000-0000-dev-c"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "from": "dev-b",
+          "to": "dev-c",
+          "nowMs": 1761604380000,
+          "status": "up-to-date",
+          "setAside": [
+            "KRAKEN_CSV::R2",
+            "KRAKEN_CSV::R2:income"
+          ]
+        },
+        {
+          "from": "dev-c",
+          "to": "dev-b",
+          "nowMs": 1761604440000,
+          "status": "applied",
+          "setAside": [
+            "KRAKEN_CSV::R2",
+            "KRAKEN_CSV::R2:income"
+          ],
+          "apply": {
+            "instruments": {
+              "update": [
+                {
+                  "id": "IE00TEST0001",
+                  "patch": {
+                    "ter": "0.0050",
+                    "terHlc": "001761604200000-0000-dev-c"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "end": {
+        "dev-a": {
+          "setAside": {
+            "dev-c": []
+          },
+          "state": {
+            "deviceId": "dev-a",
+            "peers": [
+              {
+                "deviceId": "dev-b",
+                "seen": "001761603780000-0000-dev-b"
+              },
+              {
+                "deviceId": "dev-c",
+                "seen": "001761604320000-0000-dev-c"
+              }
+            ],
+            "ledger": [
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "R2",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "TESTCOIN",
+                "quantity": "0.5",
+                "price": "2.10",
+                "grossAmount": "1.05",
+                "currency": "EUR",
+                "account": "kraken",
+                "funding": "IN_KIND",
+                "valuationSource": "yahoo"
+              },
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "R2:income",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "DIVIDEND",
+                "instrumentId": "TESTCOIN",
+                "quantity": null,
+                "price": null,
+                "grossAmount": "1.05",
+                "currency": "EUR",
+                "account": "kraken",
+                "funding": "IN_KIND",
+                "valuationSource": "yahoo"
+              },
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "t-9",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "TESTCOIN",
+                "quantity": "1",
+                "price": "100",
+                "grossAmount": "100",
+                "currency": "EUR",
+                "account": "kraken"
+              },
+              {
+                "source": "TR_CSV",
+                "externalId": "t-1",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "IE00TEST0001",
+                "quantity": "1",
+                "price": "100",
+                "grossAmount": "100",
+                "currency": "EUR",
+                "account": "trade-republic"
+              }
+            ],
+            "instruments": [
+              {
+                "id": "IE00TEST0001",
+                "name": "Test World ETF",
+                "type": "ETF",
+                "exposureKind": "COMMODITY",
+                "exposureLeafId": "XAU",
+                "exposureHlc": "001761601200000-0002-dev-b",
+                "thesis": "TACTICAL",
+                "thesisHlc": "001761601200000-0001-dev-b",
+                "ter": "0.0050",
+                "terHlc": "001761604200000-0000-dev-c",
+                "hedgedToBase": true,
+                "hedgedToBaseHlc": "001761601260000-0002-dev-a"
+              },
+              {
+                "id": "TESTCOIN",
+                "name": "Test Coin",
+                "type": "CRYPTO"
+              }
+            ],
+            "targets": [
+              {
+                "id": "v2",
+                "name": "v2",
+                "activeFrom": "2026-12-01",
+                "createdAt": "2026-10-01T10:00:00.000Z",
+                "lines": [
+                  {
+                    "instrumentId": "IE00TEST0001",
+                    "monthlyAmount": "300"
+                  }
+                ]
+              }
+            ],
+            "tombstones": [
+              {
+                "entity": "PortfolioTarget",
+                "key": "v1",
+                "hlc": "001761601200000-0003-dev-b"
+              }
+            ],
+            "holdings": [
+              {
+                "instrumentId": "IE00TEST0001",
+                "asOf": "2026-09-30",
+                "asOfInferred": false,
+                "hlc": "001761600060000-0001-dev-a",
+                "rows": [
+                  {
+                    "identity": "US00TEST0101",
+                    "identityKind": "ISIN",
+                    "name": "Alpha Corp",
+                    "weight": "0.6"
+                  },
+                  {
+                    "identity": "BETA.US",
+                    "identityKind": "TICKER",
+                    "name": "Beta Inc",
+                    "weight": "0.4"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "dev-b": {
+          "setAside": {
+            "dev-c": [
+              "KRAKEN_CSV::R2",
+              "KRAKEN_CSV::R2:income"
+            ]
+          },
+          "state": {
+            "deviceId": "dev-b",
+            "peers": [
+              {
+                "deviceId": "dev-a",
+                "seen": "001761604260000-0000-dev-a"
+              },
+              {
+                "deviceId": "dev-c",
+                "seen": "001761604440000-0000-dev-c"
+              }
+            ],
+            "ledger": [
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "R2",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "TESTCOIN",
+                "quantity": "0.5",
+                "price": "2.12",
+                "grossAmount": "1.06",
+                "currency": "EUR",
+                "account": "kraken",
+                "funding": "IN_KIND",
+                "valuationSource": "yahoo"
+              },
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "R2:income",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "DIVIDEND",
+                "instrumentId": "TESTCOIN",
+                "quantity": null,
+                "price": null,
+                "grossAmount": "1.06",
+                "currency": "EUR",
+                "account": "kraken",
+                "funding": "IN_KIND",
+                "valuationSource": "yahoo"
+              },
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "t-9",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "TESTCOIN",
+                "quantity": "1",
+                "price": "100",
+                "grossAmount": "100",
+                "currency": "EUR",
+                "account": "kraken"
+              },
+              {
+                "source": "TR_CSV",
+                "externalId": "t-1",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "IE00TEST0001",
+                "quantity": "1",
+                "price": "100",
+                "grossAmount": "100",
+                "currency": "EUR",
+                "account": "trade-republic"
+              }
+            ],
+            "instruments": [
+              {
+                "id": "IE00TEST0001",
+                "name": "Test World ETF",
+                "type": "ETF",
+                "exposureKind": "COMMODITY",
+                "exposureLeafId": "XAU",
+                "exposureHlc": "001761601200000-0002-dev-b",
+                "thesis": "TACTICAL",
+                "thesisHlc": "001761601200000-0001-dev-b",
+                "ter": "0.0050",
+                "terHlc": "001761604200000-0000-dev-c",
+                "hedgedToBase": true,
+                "hedgedToBaseHlc": "001761601260000-0002-dev-a"
+              },
+              {
+                "id": "TESTCOIN",
+                "name": "Test Coin",
+                "type": "CRYPTO"
+              }
+            ],
+            "targets": [
+              {
+                "id": "v2",
+                "name": "v2",
+                "activeFrom": "2026-12-01",
+                "createdAt": "2026-10-01T10:00:00.000Z",
+                "lines": [
+                  {
+                    "instrumentId": "IE00TEST0001",
+                    "monthlyAmount": "300"
+                  }
+                ]
+              }
+            ],
+            "tombstones": [
+              {
+                "entity": "PortfolioTarget",
+                "key": "v1",
+                "hlc": "001761601200000-0003-dev-b"
+              }
+            ],
+            "holdings": [
+              {
+                "instrumentId": "IE00TEST0001",
+                "asOf": "2026-09-30",
+                "asOfInferred": false,
+                "hlc": "001761600060000-0001-dev-a",
+                "rows": [
+                  {
+                    "identity": "US00TEST0101",
+                    "identityKind": "ISIN",
+                    "name": "Alpha Corp",
+                    "weight": "0.6"
+                  },
+                  {
+                    "identity": "BETA.US",
+                    "identityKind": "TICKER",
+                    "name": "Beta Inc",
+                    "weight": "0.4"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "dev-c": {
+          "setAside": {
+            "dev-a": [],
+            "dev-b": [
+              "KRAKEN_CSV::R2",
+              "KRAKEN_CSV::R2:income"
+            ]
+          },
+          "state": {
+            "deviceId": "dev-c",
+            "peers": [
+              {
+                "deviceId": "dev-a",
+                "seen": "001761604260000-0000-dev-a"
+              },
+              {
+                "deviceId": "dev-b",
+                "seen": "001761604380000-0000-dev-b"
+              }
+            ],
+            "ledger": [
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "R2",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "TESTCOIN",
+                "quantity": "0.5",
+                "price": "2.10",
+                "grossAmount": "1.05",
+                "currency": "EUR",
+                "account": "kraken",
+                "funding": "IN_KIND",
+                "valuationSource": "yahoo"
+              },
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "R2:income",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "DIVIDEND",
+                "instrumentId": "TESTCOIN",
+                "quantity": null,
+                "price": null,
+                "grossAmount": "1.05",
+                "currency": "EUR",
+                "account": "kraken",
+                "funding": "IN_KIND",
+                "valuationSource": "yahoo"
+              },
+              {
+                "source": "KRAKEN_CSV",
+                "externalId": "t-9",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "TESTCOIN",
+                "quantity": "1",
+                "price": "100",
+                "grossAmount": "100",
+                "currency": "EUR",
+                "account": "kraken"
+              },
+              {
+                "source": "TR_CSV",
+                "externalId": "t-1",
+                "ts": "2026-01-05T09:00:00.000Z",
+                "type": "BUY",
+                "instrumentId": "IE00TEST0001",
+                "quantity": "1",
+                "price": "100",
+                "grossAmount": "100",
+                "currency": "EUR",
+                "account": "trade-republic"
+              }
+            ],
+            "instruments": [
+              {
+                "id": "IE00TEST0001",
+                "name": "Test World ETF",
+                "type": "ETF",
+                "exposureKind": "COMMODITY",
+                "exposureLeafId": "XAU",
+                "exposureHlc": "001761601200000-0002-dev-b",
+                "thesis": "TACTICAL",
+                "thesisHlc": "001761601200000-0001-dev-b",
+                "ter": "0.0050",
+                "terHlc": "001761604200000-0000-dev-c",
+                "hedgedToBase": true,
+                "hedgedToBaseHlc": "001761601260000-0002-dev-a"
+              },
+              {
+                "id": "TESTCOIN",
+                "name": "Test Coin",
+                "type": "CRYPTO"
+              }
+            ],
+            "targets": [
+              {
+                "id": "v2",
+                "name": "v2",
+                "activeFrom": "2026-12-01",
+                "createdAt": "2026-10-01T10:00:00.000Z",
+                "lines": [
+                  {
+                    "instrumentId": "IE00TEST0001",
+                    "monthlyAmount": "300"
+                  }
+                ]
+              }
+            ],
+            "tombstones": [
+              {
+                "entity": "PortfolioTarget",
+                "key": "v1",
+                "hlc": "001761601200000-0003-dev-b"
+              }
+            ],
+            "holdings": [
+              {
+                "instrumentId": "IE00TEST0001",
+                "asOf": "2026-09-30",
+                "asOfInferred": false,
+                "hlc": "001761600060000-0001-dev-a",
+                "rows": [
+                  {
+                    "identity": "US00TEST0101",
+                    "identityKind": "ISIN",
+                    "name": "Alpha Corp",
+                    "weight": "0.6"
+                  },
+                  {
+                    "identity": "BETA.US",
+                    "identityKind": "TICKER",
+                    "name": "Beta Inc",
+                    "weight": "0.4"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
     }
   ],
   "refusals": [
