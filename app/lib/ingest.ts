@@ -3,6 +3,7 @@ import type {
   DiscardDetail,
   ImportSummary,
 } from "~/adapters/ingestion";
+import { writesLedger } from "~/adapters/ingestion/ingest";
 import type { Instrument } from "~/core/domain";
 
 import type { RateConflict } from "./fx-sync";
@@ -136,6 +137,7 @@ export function mergeRetry(
     summary: {
       ...first,
       imported: first.imported + retry.imported,
+      completed: first.completed + retry.completed,
       discarded,
       discardedDetails,
     },
@@ -169,7 +171,7 @@ export function unpricedNeedMapping(
 export type ImportAction = "import" | "value-unpriced" | "nothing";
 
 export function importAction(summary: ImportSummary): ImportAction {
-  if (summary.imported > 0) return "import";
+  if (writesLedger(summary)) return "import";
   if (unpricedEntries(summary) > 0) return "value-unpriced";
   return "nothing";
 }

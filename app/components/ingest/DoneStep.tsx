@@ -1,16 +1,18 @@
-import type { ImportSummary } from "~/adapters/ingestion";
+import type { Broker, ImportSummary } from "~/adapters/ingestion";
 import type { PriceFillResult } from "~/lib/ingest";
 
 import { useCopy } from "~/lib";
 import { SummaryList } from "./SummaryList";
 
 export function DoneStep({
+  broker,
   summary,
   fill,
   unmapped,
   recovered,
   needsMapping,
 }: {
+  broker: Broker | null;
   summary: ImportSummary;
   fill: PriceFillResult | null;
   unmapped: number;
@@ -28,7 +30,7 @@ export function DoneStep({
     <>
       <p className="mb-3 text-[13px] font-medium">{copy.title}</p>
 
-      <SummaryList summary={summary} />
+      <SummaryList broker={broker} summary={summary} />
 
       <ul className="mt-3 space-y-1 text-[12px] text-muted">
         <li>{copy.imported(summary.imported)}</li>

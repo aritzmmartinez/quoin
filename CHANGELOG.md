@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Import: the summary counts operations in every figure, so its rows add up to the total. A Trade Republic saveback and the purchase it paid for were two in the total, and two set-aside or failed entries when the purchase could not be imported; they are one operation now, listed by the purchase with the saveback beneath it as the same operation.
+- Import: the summary names a row by its type in your language (Saveback, Card payment, Reward…) instead of the broker's own code, and a file with nothing that can be saved no longer says that every trade was already in the ledger.
+- Import: a purchase already in the ledger that only gains its missing saveback row is no longer counted as new. It is counted apart, as Completed, in a row the summary shows only when there is one.
+
 ## [0.16.0] - 2026-11-10
 
 ### Upgrading

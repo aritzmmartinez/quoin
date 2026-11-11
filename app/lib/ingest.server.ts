@@ -97,7 +97,7 @@ async function plan(
       );
     }
     if (error instanceof CsvFileError) {
-      throw new IngestError(fileErrorMessage(t, error));
+      throw new IngestError(fileErrorMessage(t, broker, error));
     }
     if (error instanceof KrakenLegacyExportError) {
       throw new IngestError(t.ingest.krakenLegacyExport);

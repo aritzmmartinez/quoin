@@ -47,20 +47,19 @@ export class TradeRepublicCsvAdapter {
         else builder.add(mapRow(row));
       } catch (error) {
         const reason = rowErrorReason(error);
-        for (const failed of saveback ? [saveback, row] : [row]) {
-          builder.addError({
-            ...rowRef(
-              failed.transaction_id,
-              failed.position,
-              failed.datetime,
-              failed.type,
-            ),
-            reason,
-          });
-        }
+        const named = (failed: TradeRepublicParsedRow) => ({
+          ...rowRef(
+            failed.transaction_id,
+            failed.position,
+            failed.datetime,
+            failed.type,
+          ),
+          reason,
+        });
+        builder.addError(named(row), ...(saveback ? [named(saveback)] : []));
       }
     }
-    return builder.build(rows.length + errors.length);
+    return builder.build();
   }
 
   async import(csv: string): Promise<ImportSummary> {

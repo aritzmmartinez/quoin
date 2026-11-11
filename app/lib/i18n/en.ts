@@ -816,6 +816,27 @@ export const en: Copy = {
     summary: {
       total: "Trades in the file",
       imported: "New",
+      completed: "Completed",
+      sameOperation: "same operation",
+      rowTypes: {
+        interest: "Interest",
+        deposit: "Deposit",
+        withdrawal: "Withdrawal",
+        transferIn: "Transfer in",
+        transferOut: "Transfer out",
+        transfer: "Transfer",
+        directDebit: "Direct debit",
+        saveback: "Saveback",
+        cardPayment: "Card payment",
+        cardPaymentAbroad: "International card payment",
+        reward: "Reward",
+        earn: "Earn",
+        earnWithdrawal: "Earn withdrawal",
+        spend: "Spend",
+        receive: "Receive",
+        trade: "Trade",
+      },
+      completedHelp: "Already imported; the missing part was added",
       duplicates: "Duplicates",
       instruments: "Instruments",
       discarded: "Discarded",
@@ -841,6 +862,8 @@ export const en: Copy = {
     },
     nothingNew:
       "Nothing new to import: every trade in this file was already in the ledger.",
+    nothingToSave:
+      "Nothing to import: no trade in this file can be saved. The reasons are above.",
     confirmPending: "Continue to value the rewards and swaps",
     confirmCount: (count: number): string =>
       count === 1 ? "Import 1 trade" : `Import ${count} trades`,

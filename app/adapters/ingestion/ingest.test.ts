@@ -8,8 +8,12 @@ import { rateLookupFrom } from "./fx";
 
 import {
   BatchBuilder,
+  countOperations,
   InvalidLedgerEventError,
+  nothingToImport,
+  operationsToWrite,
   previewBatch,
+  writesLedger,
   type MappedBatch,
 } from "./ingest";
 
@@ -33,7 +37,7 @@ function batch(events: LedgerEvent[]): MappedBatch {
   const builder = new BatchBuilder(MADRID);
   for (const e of events)
     builder.add({ kind: "domain", instrument: null, event: e });
-  return builder.build(events.length);
+  return builder.build();
 }
 
 describe("previewBatch", () => {
@@ -75,7 +79,7 @@ describe("counting by operation", () => {
     builder.addOperation([
       { kind: "domain", instrument: null, event: event("D1") },
     ]);
-    return builder.build(5);
+    return builder.build();
   }
 
   it("counts a reward's two rows as one operation", async () => {
@@ -84,13 +88,69 @@ describe("counting by operation", () => {
     expect(summary.duplicates).toBe(0);
   });
 
-  it("counts an operation as new when any of its rows is, and as a duplicate only when all are", async () => {
+  it("counts an operation as new only when none of its rows is stored, as a duplicate when all are, and as completed in between", async () => {
     const summary = await previewBatch(
-      ledgerWith(["R1", "R1:income", "R2", "D1"]),
+      ledgerWith(["R1", "R1:income", "R2"]),
       rewardBatch(),
     );
     expect(summary.imported).toBe(1);
-    expect(summary.duplicates).toBe(2);
+    expect(summary.completed).toBe(1);
+    expect(summary.duplicates).toBe(1);
+  });
+
+  it("counts every operation exactly once, whatever is stored", () => {
+    const stored = [
+      [],
+      ["R1"],
+      ["R1:income", "R2"],
+      ["R1", "R1:income", "R2", "D1"],
+      ["R1", "R1:income", "R2", "R2:income", "D1"],
+    ];
+    const expected = [
+      { imported: 3, completed: 0, duplicates: 0 },
+      { imported: 2, completed: 1, duplicates: 0 },
+      { imported: 1, completed: 2, duplicates: 0 },
+      { imported: 0, completed: 1, duplicates: 2 },
+      { imported: 0, completed: 0, duplicates: 3 },
+    ];
+    const b = rewardBatch();
+    const operations = new Set(b.operationOf).size;
+    expect(operations).toBe(3);
+    stored.forEach((keys, i) => {
+      const counts = countOperations(
+        b,
+        new Set(keys.map((k) => ledgerDedupKey("TEST", k))),
+      );
+      expect(counts).toEqual(expected[i]);
+      expect(counts.imported + counts.completed + counts.duplicates).toBe(
+        operations,
+      );
+    });
+  });
+
+  it("counts what the import button writes: new and completed, never duplicates", () => {
+    expect(operationsToWrite({ imported: 0, completed: 1 })).toBe(1);
+    expect(operationsToWrite({ imported: 2, completed: 1 })).toBe(3);
+    expect(operationsToWrite({ imported: 0, completed: 0 })).toBe(0);
+  });
+
+  it("says a file is already stored only when every operation is a duplicate", () => {
+    expect(nothingToImport({ total: 3, duplicates: 3 })).toBe("already-stored");
+    expect(nothingToImport({ total: 2, duplicates: 0 })).toBe(
+      "nothing-to-save",
+    );
+    expect(nothingToImport({ total: 3, duplicates: 2 })).toBe(
+      "nothing-to-save",
+    );
+    expect(nothingToImport({ total: 0, duplicates: 0 })).toBe(
+      "nothing-to-save",
+    );
+  });
+
+  it("writes when an operation is new or completed, and not for duplicates alone", () => {
+    expect(writesLedger({ imported: 1, completed: 0 })).toBe(true);
+    expect(writesLedger({ imported: 0, completed: 1 })).toBe(true);
+    expect(writesLedger({ imported: 0, completed: 0 })).toBe(false);
   });
 
   it("adds up to the operations in the file", async () => {
@@ -106,7 +166,7 @@ describe("counting by operation", () => {
       type: "BUY",
       reason: "invalid-number",
     });
-    const b = builder.build(3);
+    const b = builder.build();
 
     const summary = await previewBatch(ledgerWith([]), b);
     const discarded = Object.values(summary.discarded).reduce(
@@ -114,8 +174,52 @@ describe("counting by operation", () => {
       0,
     );
     expect(
-      summary.imported + summary.duplicates + discarded + summary.errors.length,
+      summary.imported +
+        summary.completed +
+        summary.duplicates +
+        discarded +
+        summary.failed,
     ).toBe(summary.total);
+    expect(summary.failed).toBe(summary.errors.length);
+  });
+
+  it("counts an operation set aside or failed once, its other rows nested under its main one", () => {
+    const builder = new BatchBuilder(MADRID);
+    const row = (type: string) => ({
+      date: "2025-01-01",
+      type,
+      subtype: null,
+      instrument: "F",
+    });
+    builder.addOperation([
+      {
+        kind: "discard",
+        reason: "unsupported-asset-class",
+        detail: row("BUY"),
+      },
+      {
+        kind: "discard",
+        reason: "saveback-unpaired",
+        detail: row("BENEFITS_SAVEBACK"),
+      },
+    ]);
+    const error = (externalId: string) => ({
+      externalId,
+      position: null,
+      date: "2025-01-02",
+      type: "BUY",
+      reason: "invalid-number" as const,
+    });
+    builder.addError(error("b1"), error("s1"));
+    const b = builder.build();
+
+    expect(b.total).toBe(2);
+    expect(b.discarded).toEqual({ "unsupported-asset-class": 1 });
+    expect(b.discardedDetails["unsupported-asset-class"]).toEqual([
+      { ...row("BUY"), rows: [row("BENEFITS_SAVEBACK")] },
+    ]);
+    expect(b.failed).toBe(1);
+    expect(b.errors).toEqual([{ ...error("b1"), rows: [error("s1")] }]);
   });
 });
 
@@ -142,7 +246,7 @@ describe("events the ledger cannot book as they stand", () => {
   it("converts an amount in another currency at the ECB rate of its Madrid day", () => {
     const builder = new BatchBuilder(MADRID, rates);
     builder.add({ kind: "domain", instrument: null, event: usd("b") });
-    const b = builder.build(1);
+    const b = builder.build();
 
     expect(b.events).toHaveLength(1);
     expect(b.events[0]).toMatchObject({
@@ -160,7 +264,7 @@ describe("events the ledger cannot book as they stand", () => {
     const builder = new BatchBuilder(MADRID);
     builder.add({ kind: "domain", instrument: null, event: event("a") });
     builder.add({ kind: "domain", instrument: null, event: usd("b") });
-    const b = builder.build(2);
+    const b = builder.build();
 
     expect(b.events.map((e) => e.externalId)).toEqual(["a"]);
     expect(b.discarded).toEqual({ "fx-unavailable": 1 });
@@ -188,7 +292,7 @@ describe("events the ledger cannot book as they stand", () => {
     });
 
     expect(
-      builder.build(1).discardedDetails["fx-unavailable"]?.[0]?.instrument,
+      builder.build().discardedDetails["fx-unavailable"]?.[0]?.instrument,
     ).toBe("Synthetic Stock (USD)");
   });
 
@@ -206,7 +310,7 @@ describe("events the ledger cannot book as they stand", () => {
       event: { ...usd("d"), currency: "GBP" },
     });
 
-    expect(builder.build(3).ratesNeeded).toEqual(
+    expect(builder.build().ratesNeeded).toEqual(
       new Map([
         ["USD", "2025-11-02"],
         ["GBP", "2025-11-14"],
@@ -220,7 +324,7 @@ describe("events the ledger cannot book as they stand", () => {
       { kind: "domain", instrument: null, event: event("p") },
       { kind: "domain", instrument: null, event: usd("p:income") },
     ]);
-    const b = builder.build(1);
+    const b = builder.build();
 
     expect(b.events).toEqual([]);
     expect(b.discarded).toEqual({ "fx-unavailable": 1 });
@@ -237,7 +341,7 @@ describe("events the ledger cannot book as they stand", () => {
 
     let error: unknown;
     try {
-      builder.build(2);
+      builder.build();
     } catch (e) {
       error = e;
     }

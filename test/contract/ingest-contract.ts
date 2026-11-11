@@ -64,6 +64,14 @@ const FUND = "XS00TEST0001";
 const STOCK = "XS00TEST0002";
 const USD_STOCK = "XS00TEST0003";
 const BOND = "XS00TEST0004";
+const pairSetAside = [
+  `2025-10-01T08:00:00Z,CASH,BENEFITS_SAVEBACK,,Test Bond,${BOND},,,15,,,EUR,s1`,
+  `2025-10-03T09:00:00Z,TRADING,BUY,BOND,Test Bond,${BOND},0.15,100,-15,,-2.85,EUR,b1`,
+];
+const pairFailed = [
+  `2025-12-01T08:00:00Z,CASH,BENEFITS_SAVEBACK,,,,,,15,,-2.85,EUR,s2`,
+  `2025-12-02T09:00:00Z,TRADING,BUY,FUND,Test Fund,,0.1215,100,-12.15,,,EUR,b2`,
+];
 const COIN = "TESTCOIN";
 const TOKEN = "TESTTOKEN";
 
@@ -127,6 +135,28 @@ const cases: Case[] = [
       `2025-12-02T09:00:00Z,TRADING,BUY,FUND,Test Fund,${FUND},0.1215,100,-12.15,,,EUR,b2`,
       `2026-01-05T08:00:00Z,CASH,BENEFITS_SAVEBACK,,,,,,7,,,EUR,s3`,
     ),
+  },
+  {
+    name: "Trade Republic saveback whose purchase is already stored: the operation is completed, not new",
+    csv: tr(
+      `2025-10-01T08:00:00Z,CASH,BENEFITS_SAVEBACK,,Test Fund,${FUND},,,15,,,EUR,s1`,
+      `2025-10-03T09:00:00Z,TRADING,BUY,FUND,Test Fund,${FUND},0.15,100,-15,,-2.85,EUR,b1`,
+      `2025-10-04T09:00:00Z,TRADING,BUY,FUND,Test Fund,${FUND},1,100,-100,,,EUR,t1`,
+      `2025-10-05T09:00:00Z,TRADING,BUY,FUND,Test Fund,${FUND},1,101,-101,,,EUR,t2`,
+    ),
+    stored: { existing: ["TR_CSV::b1", "TR_CSV::t1"] },
+  },
+  {
+    name: "Trade Republic saveback whose purchase is set aside: one operation discarded, the saveback nested under the purchase",
+    csv: tr(...pairSetAside),
+  },
+  {
+    name: "Trade Republic saveback whose purchase cannot be read: one operation failed, the saveback nested under the purchase",
+    csv: tr(...pairFailed),
+  },
+  {
+    name: "Trade Republic saveback pairs with their rows in the opposite order: the same operations, the purchase still first",
+    csv: tr(...[...pairFailed].reverse(), ...[...pairSetAside].reverse()),
   },
   {
     name: "Trade Republic rows in another currency, one day with an ECB rate and one without",
@@ -468,6 +498,7 @@ function outcome(batch: MappedBatch, existing: readonly string[]) {
     noticed: batch.noticed,
     errors: batch.errors,
     ratesNeeded: Object.fromEntries(batch.ratesNeeded),
+    failed: batch.failed,
     ...countOperations(batch, new Set(existing)),
   };
 }
@@ -544,7 +575,7 @@ export async function ingestContractJson(): Promise<string> {
       contract: "ingest",
       version: 1,
       description:
-        "What a broker CSV becomes before anything is written: the broker detected, then instruments, ledger events, discards with their detail, notices, named row errors, the currencies whose ECB rates are missing, and how many operations are new against the keys already stored — or the whole file refused with a named reason. Shared with the mobile client: both implementations must reproduce every case. Input: the csv text is encoded as `encoding` and decoded as strict UTF-8 (a BOM is dropped); `rates` is the ECB rate book, a row booked at the rate of its own day in `zone`; `prices` is the price history Kraken rewards and swaps fall back to; `stored.names` are instrument names already stored (they win over the file's), `stored.rewardRefids` are Kraken refids an earlier import booked as rewards, and `stored.existing` are ledger keys `source::externalId`. Output: events omit `id`, which is random; ts is ISO; operationOf gives each event's operation; a row error names the row by externalId, date and type as written, and by its 1-based position among the file's non-empty records only when it has no id. Detection splits the first non-empty line on , ; tab or |; parsing reads commas only. expect is written by running the TypeScript adapters.",
+        "What a broker CSV becomes before anything is written: the broker detected, then instruments, ledger events, discards with their detail, notices, named row errors, the currencies whose ECB rates are missing, and how many operations are new (imported: none of its events is stored), completed (some are stored and some are not, as a saveback purchase stored before its saveback row was read) and duplicates (all are) against the keys already stored — or the whole file refused with a named reason. Shared with the mobile client: both implementations must reproduce every case. Input: the csv text is encoded as `encoding` and decoded as strict UTF-8 (a BOM is dropped); `rates` is the ECB rate book, a row booked at the rate of its own day in `zone`; `prices` is the price history Kraken rewards and swaps fall back to; `stored.names` are instrument names already stored (they win over the file's), `stored.rewardRefids` are Kraken refids an earlier import booked as rewards, and `stored.existing` are ledger keys `source::externalId`. Output: events omit `id`, which is random; ts is ISO; operationOf gives each event's operation; a row error names the row by externalId, date and type as written, and by its 1-based position among the file's non-empty records only when it has no id. Every figure counts operations, not rows: total is the operations in the file, discarded counts each operation set aside once, under the reason of its main row, and failed counts the operations that could not be read and equals the number of errors; imported + completed + duplicates + the discarded counts + failed = total. A Trade Republic saveback and the purchase it paid for are one operation; a Kraken refid is one. The main row of an operation is chosen by role, never by its place in the file: of a saveback pair, the purchase. Its other rows are nested in that discard detail or row error as rows, in the order of their role (the saveback after its purchase). A row the parser cannot read is an operation of its own: it is never paired, so if it was the purchase of a saveback, the saveback is discarded as saveback-unpaired. Detection splits the first non-empty line on , ; tab or |; parsing reads commas only. expect is written by running the TypeScript adapters.",
       cases: evaluated,
     },
     null,

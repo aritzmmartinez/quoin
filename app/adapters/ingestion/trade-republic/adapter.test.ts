@@ -407,13 +407,16 @@ describe("TradeRepublicCsvAdapter with crypto", () => {
 
     expect(summary.imported).toBe(2);
     expect(summary.errors).toEqual([]);
-    expect(summary.discarded).toEqual({
-      "invalid-crypto-code": 2,
-      "saveback-unpaired": 1,
-    });
+    expect(summary.discarded).toEqual({ "invalid-crypto-code": 2 });
     expect(
-      summary.discardedDetails["invalid-crypto-code"]?.map((d) => d.instrument),
-    ).toEqual(["XF000BTC0017", "XF000BTC0017"]);
+      summary.discardedDetails["invalid-crypto-code"]?.map((d) => [
+        d.instrument,
+        d.rows?.map((row) => row.type),
+      ]),
+    ).toEqual([
+      ["XF000BTC0017", ["BENEFITS_SAVEBACK"]],
+      ["XF000BTC0017", undefined],
+    ]);
     expect(instruments.upserted.map((i) => i.id)).toEqual(["BTC"]);
     expect(ledger.appended.map((e) => e.externalId).sort()).toEqual([
       "b-btc",
@@ -487,17 +490,20 @@ describe("TradeRepublicCsvAdapter and rows it cannot read", () => {
     ]);
   });
 
-  it("names a saveback with the purchase it paid for when that purchase cannot be read", async () => {
+  it("names a saveback under the purchase it paid for when that purchase cannot be read, as one failed operation", async () => {
     const batch = await plan([
       `"2025-01-01T10:00:00Z","CASH","BENEFITS_SAVEBACK","","","","","","15","","","EUR","s1"`,
       `"2025-01-02T10:00:00Z","TRADING","BUY","FUND","F","IE00TEST0001","x","100","-15","","","EUR","b1"`,
     ]);
+    expect(batch.total).toBe(1);
+    expect(batch.failed).toBe(1);
     expect(
-      batch.errors.map((error) => [error.externalId, error.reason]),
-    ).toEqual([
-      ["s1", "invalid-number"],
-      ["b1", "invalid-number"],
-    ]);
+      batch.errors.map((error) => [
+        error.externalId,
+        error.reason,
+        error.rows?.map((row) => row.externalId),
+      ]),
+    ).toEqual([["b1", "invalid-number", ["s1"]]]);
   });
 
   it("refuses a file missing a column, naming it", async () => {
