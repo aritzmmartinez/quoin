@@ -499,13 +499,13 @@ describe("the summary counts operations, like the file and the discards (integra
     imported: number;
     completed: number;
     duplicates: number;
-    errors: readonly unknown[];
+    failed: number;
     discarded: Partial<Record<string, number>>;
   }) =>
     summary.imported +
     summary.completed +
     summary.duplicates +
-    summary.errors.length +
+    summary.failed +
     Object.values(summary.discarded).reduce(
       (sum: number, n) => sum + (n ?? 0),
       0,

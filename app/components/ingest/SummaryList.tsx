@@ -1,6 +1,7 @@
 import { ChevronDown } from "lucide-react";
 
 import type {
+  Broker,
   DiscardDetail,
   ImportSummary,
   RowError,
@@ -11,7 +12,7 @@ import {
   type NoticeGroup as Notice,
   describeRow,
   discardGroups,
-  discardTypeLabel,
+  rowTypeLabel,
   noticeGroups,
   useCopy,
   useFormat,
@@ -37,7 +38,15 @@ function Row({
   );
 }
 
-function DiscardGroup({ group, pending }: { group: Group; pending: boolean }) {
+function DiscardGroup({
+  broker,
+  group,
+  pending,
+}: {
+  broker: Broker | null;
+  group: Group;
+  pending: boolean;
+}) {
   const t = useCopy();
   const copy = t.ingest.summary;
   const { reason, details } = group;
@@ -64,12 +73,18 @@ function DiscardGroup({ group, pending }: { group: Group; pending: boolean }) {
         </p>
       )}
       {!warn && help && <p className="mt-1 text-[12px] text-body">{help}</p>}
-      <DetailList details={details} />
+      <DetailList broker={broker} details={details} />
     </details>
   );
 }
 
-function DetailList({ details }: { details: readonly DiscardDetail[] }) {
+function DetailList({
+  broker,
+  details,
+}: {
+  broker: Broker | null;
+  details: readonly DiscardDetail[];
+}) {
   const { formatInstant } = useFormat();
   const t = useCopy();
   const copy = t.ingest.summary;
@@ -79,23 +94,44 @@ function DetailList({ details }: { details: readonly DiscardDetail[] }) {
       {details.map((row, i) => (
         <li
           key={i}
-          className="flex justify-between gap-3 border-b border-border py-1.5 text-[12px] last:border-b-0"
+          className="border-b border-border py-1.5 text-[12px] last:border-b-0"
         >
-          <span className="min-w-0 truncate">
-            {row.instrument ?? copy.noInstrument} ·{" "}
-            {discardTypeLabel(t, row.type)}
-            {row.subtype ? ` / ${row.subtype}` : ""}
-          </span>
-          <span className="shrink-0 tabular-nums text-muted">
-            {formatInstant(row.date)}
-          </span>
+          <div className="flex justify-between gap-3">
+            <span className="min-w-0 truncate">
+              {row.instrument ?? copy.noInstrument} ·{" "}
+              {rowTypeLabel(t, broker, row.type)}
+              {row.subtype ? ` / ${row.subtype}` : ""}
+            </span>
+            <span className="shrink-0 tabular-nums text-muted">
+              {formatInstant(row.date)}
+            </span>
+          </div>
+          {row.rows?.map((other, j) => (
+            <div
+              key={j}
+              className="mt-1 flex justify-between gap-3 pl-4 text-faint"
+            >
+              <span className="min-w-0 truncate">
+                {copy.sameOperation}: {rowTypeLabel(t, broker, other.type)}
+              </span>
+              <span className="shrink-0 tabular-nums">
+                {formatInstant(other.date)}
+              </span>
+            </div>
+          ))}
         </li>
       ))}
     </ul>
   );
 }
 
-function NoticeGroupItem({ group }: { group: Notice }) {
+function NoticeGroupItem({
+  broker,
+  group,
+}: {
+  broker: Broker | null;
+  group: Notice;
+}) {
   const copy = useCopy().ingest.summary;
   const warn = group.reason === "internal-booked-as-reward";
 
@@ -116,12 +152,18 @@ function NoticeGroupItem({ group }: { group: Notice }) {
       <p className={`mt-2 text-[12px] ${warn ? "text-negative" : "text-body"}`}>
         {copy.noticeHelp[group.reason]}
       </p>
-      <DetailList details={group.details} />
+      <DetailList broker={broker} details={group.details} />
     </details>
   );
 }
 
-function ErrorList({ errors }: { errors: readonly RowError[] }) {
+function ErrorList({
+  broker,
+  errors,
+}: {
+  broker: Broker | null;
+  errors: readonly RowError[];
+}) {
   const t = useCopy();
   const copy = t.ingest.summary;
 
@@ -142,12 +184,21 @@ function ErrorList({ errors }: { errors: readonly RowError[] }) {
         {errors.map((error, i) => (
           <li
             key={i}
-            className="flex justify-between gap-3 border-b border-border py-1.5 text-[12px] last:border-b-0"
+            className="border-b border-border py-1.5 text-[12px] last:border-b-0"
           >
-            <span className="min-w-0 truncate">{describeRow(t, error)}</span>
-            <span className="shrink-0 text-muted">
-              {copy.rowErrors[error.reason]}
-            </span>
+            <div className="flex justify-between gap-3">
+              <span className="min-w-0 truncate">
+                {describeRow(t, broker, error)}
+              </span>
+              <span className="shrink-0 text-muted">
+                {copy.rowErrors[error.reason]}
+              </span>
+            </div>
+            {error.rows?.map((other, j) => (
+              <div key={j} className="mt-1 truncate pl-4 text-faint">
+                {copy.sameOperation}: {describeRow(t, broker, other)}
+              </div>
+            ))}
           </li>
         ))}
       </ul>
@@ -156,9 +207,11 @@ function ErrorList({ errors }: { errors: readonly RowError[] }) {
 }
 
 export function SummaryList({
+  broker,
   summary,
   pendingPrice = false,
 }: {
+  broker: Broker | null;
   summary: ImportSummary;
   pendingPrice?: boolean;
 }) {
@@ -208,8 +261,8 @@ export function SummaryList({
               .join(" · ")}
           />
         )}
-        {summary.errors.length > 0 && (
-          <Row label={copy.errors} value={String(summary.errors.length)} />
+        {summary.failed > 0 && (
+          <Row label={copy.errors} value={String(summary.failed)} />
         )}
       </dl>
 
@@ -217,15 +270,18 @@ export function SummaryList({
         group.details.length > 0 ? (
           <DiscardGroup
             key={group.reason}
+            broker={broker}
             group={group}
             pending={isPending(group.reason)}
           />
         ) : null,
       )}
       {notices.map((group) => (
-        <NoticeGroupItem key={group.reason} group={group} />
+        <NoticeGroupItem key={group.reason} broker={broker} group={group} />
       ))}
-      {summary.errors.length > 0 && <ErrorList errors={summary.errors} />}
+      {summary.errors.length > 0 && (
+        <ErrorList broker={broker} errors={summary.errors} />
+      )}
     </>
   );
 }

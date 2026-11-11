@@ -1,3 +1,7 @@
+import type { RowTypeKey } from "./discard";
+import { KRAKEN_ROW_TYPES } from "./kraken/row-types";
+import { TRADE_REPUBLIC_ROW_TYPES } from "./trade-republic/row-types";
+
 export const BROKERS = ["trade-republic", "kraken"] as const;
 
 export type Broker = (typeof BROKERS)[number];
@@ -5,6 +9,13 @@ export type Broker = (typeof BROKERS)[number];
 const SIGNATURES: Readonly<Record<Broker, string>> = {
   "trade-republic": "transaction_id",
   kraken: "refid",
+};
+
+export const BROKER_ROW_TYPES: Readonly<
+  Record<Broker, Readonly<Record<string, RowTypeKey>>>
+> = {
+  "trade-republic": TRADE_REPUBLIC_ROW_TYPES,
+  kraken: KRAKEN_ROW_TYPES,
 };
 
 export function detectBroker(csv: string): Broker | null {

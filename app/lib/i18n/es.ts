@@ -2,6 +2,7 @@ import type {
   DiscardReason,
   NoticeReason,
   RowErrorReason,
+  RowTypeKey,
 } from "~/adapters/ingestion/discard";
 import type {
   ExposureKind,
@@ -28,6 +29,25 @@ const REFRESH_NOW = "Actualizar ahora";
 const REDOWNLOAD = "Volver a descargar el histórico";
 const REFRESH_RATES = `pulsa «${REFRESH_NOW}» en los tipos de cambio de ${EXTERNAL_DATA} (${SETTINGS})`;
 const REFRESH_CPI = `pulsa «${REFRESH_NOW}» en el IPC de ${EXTERNAL_DATA} (${SETTINGS})`;
+
+const ROW_TYPE_LABELS: Record<RowTypeKey, string> = {
+  interest: "Intereses",
+  deposit: "Ingreso",
+  withdrawal: "Retirada",
+  transferIn: "Transferencia recibida",
+  transferOut: "Transferencia enviada",
+  transfer: "Transferencia",
+  directDebit: "Adeudo domiciliado",
+  saveback: "Saveback",
+  cardPayment: "Pago con tarjeta",
+  cardPaymentAbroad: "Pago con tarjeta en el extranjero",
+  reward: "Recompensa",
+  earn: "Earn",
+  earnWithdrawal: "Retirada de Earn",
+  spend: "Entrega",
+  receive: "Recepción",
+  trade: "Operación",
+};
 
 const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
   "swap-unpriced": "Intercambios entre criptos sin precio",
@@ -829,6 +849,8 @@ export const es = {
       total: "Operaciones en el fichero",
       imported: "Nuevas",
       completed: "Completadas",
+      sameOperation: "misma operación",
+      rowTypes: ROW_TYPE_LABELS,
       completedHelp:
         "Ya estaban importadas; se ha añadido la parte que faltaba",
       duplicates: "Duplicadas",
@@ -856,6 +878,8 @@ export const es = {
     },
     nothingNew:
       "Nada nuevo que importar: todas las operaciones de este fichero ya estaban en el registro.",
+    nothingToSave:
+      "Nada que importar: ninguna operación de este fichero se puede guardar. Arriba se explica por qué.",
     confirmPending: "Continuar para valorar las recompensas y los intercambios",
     confirmCount: (count: number): string =>
       count === 1 ? "Importar 1 operación" : `Importar ${count} operaciones`,

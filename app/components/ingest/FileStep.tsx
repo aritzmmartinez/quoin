@@ -1,6 +1,9 @@
 import { FileText } from "lucide-react";
 
-import { operationsToWrite } from "~/adapters/ingestion/ingest";
+import {
+  nothingToImport,
+  operationsToWrite,
+} from "~/adapters/ingestion/ingest";
 import { importAction, useCopy, useFormat, type IngestPreview } from "~/lib";
 import { Button } from "../ui/Button";
 import { FileDropzone } from "../ui/FileDropzone";
@@ -64,12 +67,20 @@ export function FileStep({
         </Button>
       </div>
 
-      <SummaryList summary={preview.summary} pendingPrice />
+      <SummaryList
+        broker={preview.broker}
+        summary={preview.summary}
+        pendingPrice
+      />
 
       <RateConflicts conflicts={preview.rateConflicts} />
 
       {!canImport ? (
-        <p className="mt-3 text-[12px] text-muted">{copy.nothingNew}</p>
+        <p className="mt-3 text-[12px] text-muted">
+          {nothingToImport(preview.summary) === "already-stored"
+            ? copy.nothingNew
+            : copy.nothingToSave}
+        </p>
       ) : (
         <p className="mt-3 text-[12px] text-muted">{copy.appliesNow}</p>
       )}

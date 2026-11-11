@@ -84,7 +84,7 @@ export function IngestStepper({
       setBusy(null);
       setError(
         error instanceof CsvFileError
-          ? fileErrorMessage(t, error)
+          ? fileErrorMessage(t, null, error)
           : copy.unreadable,
       );
       return;
@@ -226,6 +226,7 @@ export function IngestStepper({
 
         {stage === "done" && summary && (
           <DoneStep
+            broker={preview?.broker ?? null}
             summary={summary}
             fill={fill}
             unmapped={unmapped}

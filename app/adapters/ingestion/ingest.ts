@@ -47,6 +47,7 @@ export type MappedItem =
 
 export interface MappedBatch {
   total: number;
+  failed: number;
   instruments: Instrument[];
   events: LedgerEvent[];
   operationOf: number[];
@@ -63,6 +64,7 @@ export interface ImportSummary {
   completed: number;
   duplicates: number;
   discarded: DiscardCounts;
+  failed: number;
   discardedDetails: DiscardDetails;
   noticed: NoticeDetails;
   errors: RowError[];
@@ -116,7 +118,7 @@ export class BatchBuilder {
       const rate = this.rateAt(item.event.currency, item.event.ts);
       if (rate === null) {
         this.needRate(item.event.currency, dayOf(item.event.ts, this.zone));
-        this.addItem(unratedDiscard(item), operation);
+        this.addDiscard(unratedDiscard(item), null);
         return;
       }
       converted.push({
@@ -131,7 +133,12 @@ export class BatchBuilder {
       });
     }
 
+    let lead: { detail: DiscardDetail | undefined } | null = null;
     for (const item of converted) {
+      if (item.kind === "discard") {
+        lead = this.addDiscard(item, lead);
+        continue;
+      }
       if (
         item.kind === "domain" &&
         this.invalid === null &&
@@ -153,21 +160,35 @@ export class BatchBuilder {
     this.noticed[reason] = list;
   }
 
-  private addItem(item: MappedItem, operation: number): void {
+  private addDiscard(
+    item: Extract<MappedItem, { kind: "discard" }>,
+    lead: { detail: DiscardDetail | undefined } | null,
+  ): { detail: DiscardDetail | undefined } {
+    for (const instrument of [item.instrument, ...(item.related ?? [])]) {
+      if (instrument) this.instruments.set(instrument.id, instrument);
+    }
+    if (lead) {
+      if (lead.detail && item.detail) {
+        lead.detail.rows = [...(lead.detail.rows ?? []), item.detail];
+      }
+      return lead;
+    }
+    this.discarded[item.reason] = (this.discarded[item.reason] ?? 0) + 1;
+    const detail = item.detail && { ...item.detail };
+    if (detail) {
+      const list = this.discardedDetails[item.reason] ?? [];
+      list.push(detail);
+      this.discardedDetails[item.reason] = list;
+    }
+    return { detail };
+  }
+
+  private addItem(
+    item: Exclude<MappedItem, { kind: "discard" }>,
+    operation: number,
+  ): void {
     if (item.kind === "notice") {
       this.addNotice(item.reason, item.detail);
-      return;
-    }
-    if (item.kind === "discard") {
-      this.discarded[item.reason] = (this.discarded[item.reason] ?? 0) + 1;
-      if (item.detail) {
-        const list = this.discardedDetails[item.reason] ?? [];
-        list.push(item.detail);
-        this.discardedDetails[item.reason] = list;
-      }
-      for (const instrument of [item.instrument, ...(item.related ?? [])]) {
-        if (instrument) this.instruments.set(instrument.id, instrument);
-      }
       return;
     }
     if (item.instrument) {
@@ -182,14 +203,16 @@ export class BatchBuilder {
     if (held === undefined || day < held) this.ratesNeeded.set(currency, day);
   }
 
-  addError(error: RowError): void {
-    this.errors.push(error);
+  addError(error: RowError, ...others: RowError[]): void {
+    this.operations += 1;
+    this.errors.push(others.length > 0 ? { ...error, rows: others } : error);
   }
 
-  build(total: number): MappedBatch {
+  build(): MappedBatch {
     if (this.invalid) throw this.invalid;
     return {
-      total,
+      total: this.operations,
+      failed: this.errors.length,
       instruments: [...this.instruments.values()],
       events: this.events,
       operationOf: this.operationOf,
@@ -214,7 +237,7 @@ export function rowErrorReason(error: unknown): RowErrorReason {
 
 function unratedDiscard(
   item: Extract<MappedItem, { kind: "domain" }>,
-): MappedItem {
+): Extract<MappedItem, { kind: "discard" }> {
   const { event } = item;
   const name = item.instrument?.name ?? null;
   return {
@@ -265,6 +288,15 @@ export function operationsToWrite(
   return counts.imported + counts.completed;
 }
 
+export function nothingToImport(counts: {
+  total: number;
+  duplicates: number;
+}): "already-stored" | "nothing-to-save" {
+  return counts.total > 0 && counts.duplicates === counts.total
+    ? "already-stored"
+    : "nothing-to-save";
+}
+
 export function writesLedger(
   counts: Pick<OperationCounts, "imported" | "completed">,
 ): boolean {
@@ -278,6 +310,7 @@ function summarize(batch: MappedBatch, counts: OperationCounts): ImportSummary {
     completed: counts.completed,
     duplicates: counts.duplicates,
     discarded: batch.discarded,
+    failed: batch.failed,
     discardedDetails: batch.discardedDetails,
     noticed: batch.noticed,
     errors: batch.errors,
