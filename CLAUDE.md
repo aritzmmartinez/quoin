@@ -172,9 +172,11 @@ piece of the contract with the mobile client, which must assign the same days.
   - `returns` — TWR, MWR/XIRR, `periodReturns`, range and hero changes.
   - `series` — cost line, value against invested, the portfolio merge, prices in euros.
   - `analysis` — opportunity cost, weighted TER, rebalance.
+  - `exposure-default` — the category an instrument is shown under: the user's, else
+    derived from `Instrument.type` (`effectiveExposure`), else none.
 
   Except `ingest`, `sync` and `sync-pairing`, results come from the core, and `byHand` figures in some
-  cases (a dotted path into `expect` for the last five), worked out by hand and checked
+  cases (a dotted path into `expect` for the last six), worked out by hand and checked
   against the core, are what stop a regenerated file from blessing a regression.
   **Any sort whose ties could reach a contract states its tie-break**: Dart's `List.sort`
   is not stable, so an order left to the engine is one the mobile client cannot reproduce
@@ -654,6 +656,12 @@ picks up that currency's moves), and always sanity-check the price magnitude.
 - **What cannot be decomposed is reported, not spread.** A fund with no holdings data
   resolves to a single `UNRESOLVED` leaf carrying its own value. Pro-rating it across the
   known leaves would invent a concentration that isn't there. Same rule as `unpricedCount`.
+- **The category shown is `effectiveExposure`, derived at read and never written.** The
+  user's `exposureKind` wins; with none, `STOCK` is `COMPANY` and `CRYPTO` is `CRYPTO`
+  (stablecoins too: Kraken's `subclass` is not stored); any other type stays unclassified.
+  Distribution, look-through and Instruments read it; the sync, the write paths and the
+  Instruments select carry only the user's. Never store the derived one in `exposureKind`:
+  it would sync as a choice and outrank a later decision on another device.
 - **`Instrument.type` cannot classify a fund.** Trade Republic maps both `FUND` and
   `SYNTHETIC` to `"ETF"`, so a physical-gold ETC is stored as an ETF and is
   indistinguishable from an index fund. The information is not in the CSV — a human sets it

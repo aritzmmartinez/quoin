@@ -1,7 +1,7 @@
 import Decimal from "decimal.js";
 import { z } from "zod";
 
-import type { Instrument } from "./ledger";
+import type { Instrument, InstrumentType } from "./ledger";
 
 export const leafKindSchema = z.enum([
   "COMPANY",
@@ -49,28 +49,47 @@ export const KINDS_NEEDING_LEAF: readonly ExposureKind[] = [
   "CRYPTO",
 ];
 
+export type ExposureSource = "user" | "derived" | "none";
+
+export interface EffectiveExposure {
+  kind: ExposureKind | null;
+  source: ExposureSource;
+}
+
+const KIND_OF_TYPE: Readonly<Partial<Record<InstrumentType, ExposureKind>>> = {
+  STOCK: "COMPANY",
+  CRYPTO: "CRYPTO",
+  COMMODITY: "COMMODITY",
+};
+
+export function effectiveExposure(
+  instrument: Pick<Instrument, "type" | "exposureKind">,
+): EffectiveExposure {
+  if (instrument.exposureKind) {
+    return { kind: instrument.exposureKind, source: "user" };
+  }
+  const derived = KIND_OF_TYPE[instrument.type];
+  return derived
+    ? { kind: derived, source: "derived" }
+    : { kind: null, source: "none" };
+}
+
 export function resolveIntrinsic(instrument: Instrument): WeightedLeaf[] {
   const one = (kind: LeafKind, id: string): WeightedLeaf[] => [
     { leaf: { kind, id }, name: instrument.name, weight: "1" },
   ];
 
-  const explicit = instrument.exposureKind;
-  const leafId = instrument.exposureLeafId ?? instrument.id;
+  const { kind, source } = effectiveExposure(instrument);
+  const leafId =
+    source === "user"
+      ? (instrument.exposureLeafId ?? instrument.id)
+      : instrument.id;
 
-  if (explicit === "COMPANY") return one("COMPANY", leafId);
-  if (explicit === "COMMODITY") return one("COMMODITY", leafId);
-  if (explicit === "CRYPTO") return one("CRYPTO", leafId);
-  if (explicit === "EQUITY_FUND" || explicit === "BOND_FUND") {
-    return one("UNRESOLVED", instrument.id);
-  }
-
-  switch (instrument.type) {
-    case "STOCK":
-      return one("COMPANY", instrument.id);
-    case "CRYPTO":
-      return one("CRYPTO", instrument.id);
+  switch (kind) {
+    case "COMPANY":
     case "COMMODITY":
-      return one("COMMODITY", instrument.id);
+    case "CRYPTO":
+      return one(kind, leafId);
     default:
       return one("UNRESOLVED", instrument.id);
   }

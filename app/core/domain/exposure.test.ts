@@ -4,6 +4,8 @@ import Decimal from "decimal.js";
 
 import {
   canonicaliseLeaves,
+  effectiveExposure,
+  resolveIntrinsic,
   resolveWithHoldings,
   type FundHolding,
 } from "./exposure";
@@ -214,5 +216,43 @@ describe("canonicaliseLeaves", () => {
 
   it("handles an empty set", () => {
     expect(canonicaliseLeaves([], new Map())).toEqual([]);
+  });
+});
+
+describe("effectiveExposure", () => {
+  it("derives a stock as a company and a crypto asset as crypto", () => {
+    expect(effectiveExposure({ type: "STOCK", exposureKind: null })).toEqual({
+      kind: "COMPANY",
+      source: "derived",
+    });
+    expect(effectiveExposure({ type: "CRYPTO" })).toEqual({
+      kind: "CRYPTO",
+      source: "derived",
+    });
+  });
+
+  it("leaves a fund unclassified: the type does not say what it holds", () => {
+    expect(effectiveExposure(fund({ exposureKind: null }))).toEqual({
+      kind: null,
+      source: "none",
+    });
+  });
+
+  it("lets the user's choice win over the derived one", () => {
+    expect(
+      effectiveExposure({ type: "STOCK", exposureKind: "COMMODITY" }),
+    ).toEqual({ kind: "COMMODITY", source: "user" });
+  });
+
+  it("reads a derived leaf from the instrument id, never a stray leaf id", () => {
+    const [leaf] = resolveIntrinsic(
+      fund({
+        id: "US00TEST0099",
+        type: "STOCK",
+        exposureKind: null,
+        exposureLeafId: "XAU",
+      }),
+    );
+    expect(leaf?.leaf).toEqual({ kind: "COMPANY", id: "US00TEST0099" });
   });
 });

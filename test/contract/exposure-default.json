@@ -1,0 +1,182 @@
+{
+  "contract": "exposure-default",
+  "version": 1,
+  "description": "The exposure category an instrument is shown under. The category the user chose (exposureKind) always wins, with source user. With none chosen it is derived from Instrument.type, with source derived: STOCK is COMPANY, CRYPTO is CRYPTO (a stablecoin included), COMMODITY is COMMODITY. Any other type, ETF, BOND and CASH, has no category, kind null and source none: a fund's type does not say what it holds. exposureLeafId, where a case carries it, is ignored without a category: it never makes the category the user's. The derived category is computed at read and never stored or synced. Shared with the mobile client: both implementations must reproduce every case. expect is written by running the TypeScript core; byHand.figures, where a case has it, are worked out by hand, its arithmetic says how, and each key is a dotted path into expect.",
+  "cases": [
+    {
+      "name": "A stock with no category chosen is a company",
+      "instrument": {
+        "id": "US00TEST0301",
+        "type": "STOCK",
+        "exposureKind": null
+      },
+      "byHand": {
+        "arithmetic": "A share is one company; the type alone says so.",
+        "figures": {
+          "kind": "COMPANY",
+          "source": "derived"
+        }
+      },
+      "expect": {
+        "kind": "COMPANY",
+        "source": "derived"
+      }
+    },
+    {
+      "name": "A crypto asset with no category chosen is crypto",
+      "instrument": {
+        "id": "TESTCOIN",
+        "type": "CRYPTO",
+        "exposureKind": null
+      },
+      "expect": {
+        "kind": "CRYPTO",
+        "source": "derived"
+      }
+    },
+    {
+      "name": "A stablecoin is crypto too: nothing stored tells it apart",
+      "instrument": {
+        "id": "TESTUSD",
+        "type": "CRYPTO",
+        "exposureKind": null
+      },
+      "byHand": {
+        "arithmetic": "Kraken's subclass stable_coin is read from the row and not stored, so the instrument is a CRYPTO like any other.",
+        "figures": {
+          "kind": "CRYPTO",
+          "source": "derived"
+        }
+      },
+      "expect": {
+        "kind": "CRYPTO",
+        "source": "derived"
+      }
+    },
+    {
+      "name": "A commodity with no category chosen is a commodity",
+      "instrument": {
+        "id": "TESTMETAL",
+        "type": "COMMODITY",
+        "exposureKind": null
+      },
+      "expect": {
+        "kind": "COMMODITY",
+        "source": "derived"
+      }
+    },
+    {
+      "name": "A fund with no category chosen stays unclassified",
+      "instrument": {
+        "id": "IE00TEST0302",
+        "type": "ETF",
+        "exposureKind": null
+      },
+      "byHand": {
+        "arithmetic": "Trade Republic sends equity funds, bond funds and gold ETCs alike as ETF, so the type decides nothing.",
+        "figures": {
+          "kind": null,
+          "source": "none"
+        }
+      },
+      "expect": {
+        "kind": null,
+        "source": "none"
+      }
+    },
+    {
+      "name": "A bond with no category chosen stays unclassified",
+      "instrument": {
+        "id": "XS00TEST0303",
+        "type": "BOND",
+        "exposureKind": null
+      },
+      "expect": {
+        "kind": null,
+        "source": "none"
+      }
+    },
+    {
+      "name": "Cash with no category chosen stays unclassified",
+      "instrument": {
+        "id": "TESTCASH",
+        "type": "CASH",
+        "exposureKind": null
+      },
+      "expect": {
+        "kind": null,
+        "source": "none"
+      }
+    },
+    {
+      "name": "A leaf id left without a category changes nothing",
+      "instrument": {
+        "id": "TESTCOIN2",
+        "type": "CRYPTO",
+        "exposureKind": null,
+        "exposureLeafId": "TESTCOIN"
+      },
+      "byHand": {
+        "arithmetic": "Only a category the user chose is the user's; a leaf id stored beside no category is not a choice, so the type decides.",
+        "figures": {
+          "kind": "CRYPTO",
+          "source": "derived"
+        }
+      },
+      "expect": {
+        "kind": "CRYPTO",
+        "source": "derived"
+      }
+    },
+    {
+      "name": "A fund the user classified keeps that category",
+      "instrument": {
+        "id": "IE00TEST0304",
+        "type": "ETF",
+        "exposureKind": "EQUITY_FUND"
+      },
+      "expect": {
+        "kind": "EQUITY_FUND",
+        "source": "user"
+      }
+    },
+    {
+      "name": "A gold ETC the user classified as a commodity",
+      "instrument": {
+        "id": "XS00TEST0305",
+        "type": "ETF",
+        "exposureKind": "COMMODITY"
+      },
+      "byHand": {
+        "arithmetic": "The user's category is taken as it is.",
+        "figures": {
+          "kind": "COMMODITY",
+          "source": "user"
+        }
+      },
+      "expect": {
+        "kind": "COMMODITY",
+        "source": "user"
+      }
+    },
+    {
+      "name": "The user's category wins over the one the type would give",
+      "instrument": {
+        "id": "US00TEST0306",
+        "type": "STOCK",
+        "exposureKind": "BOND_FUND"
+      },
+      "byHand": {
+        "arithmetic": "A stock derives COMPANY, but a category chosen by the user always decides.",
+        "figures": {
+          "kind": "BOND_FUND",
+          "source": "user"
+        }
+      },
+      "expect": {
+        "kind": "BOND_FUND",
+        "source": "user"
+      }
+    }
+  ]
+}
