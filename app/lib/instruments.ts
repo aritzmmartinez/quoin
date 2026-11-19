@@ -1,7 +1,9 @@
 import Decimal from "decimal.js";
 
 import {
+  effectiveExposure,
   resolveIntrinsic,
+  type EffectiveExposure,
   type ExposureKind,
   type Instrument,
   type InstrumentType,
@@ -20,6 +22,7 @@ export interface InstrumentListItem {
   type: InstrumentType;
   quoteSymbol: string | null;
   exposureKind: ExposureKind | null;
+  exposure: EffectiveExposure;
   exposureLeafId: string | null;
   ter: string | null;
   hedgedToBase: boolean;
@@ -62,6 +65,7 @@ export function toInstrumentListItems(
 
   const items = instruments.map((instrument) => {
     const [leaf] = resolveIntrinsic(instrument);
+    const exposure = effectiveExposure(instrument);
     const quantity = held.get(instrument.id) ?? new Decimal(0);
     const value = valued.get(instrument.id);
     const composition = holdings.get(instrument.id) ?? [];
@@ -77,12 +81,13 @@ export function toInstrumentListItems(
       type: instrument.type,
       quoteSymbol: instrument.quoteSymbol ?? null,
       exposureKind: instrument.exposureKind ?? null,
+      exposure,
       exposureLeafId: instrument.exposureLeafId ?? null,
       ter: instrument.ter ?? null,
       hedgedToBase: instrument.hedgedToBase ?? false,
       thesis: instrument.thesis,
       resolvesTo: leaf ? leaf.leaf : null,
-      isExplicit: Boolean(instrument.exposureKind),
+      isExplicit: exposure.source === "user",
       quantity: quantity.toFixed(),
       isClosed: quantity.isZero(),
       value: value ? value.toFixed(2) : null,

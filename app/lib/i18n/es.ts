@@ -1067,7 +1067,7 @@ export const es = {
     hedgedShort: "Cubierta",
     thesisHint:
       "La tesis dice por qué tienes el instrumento, no qué es: eso lo dice la exposición. Cambia cuando cambia tu razonamiento, así que vive aquí y no en la operación que lo compró.",
-    defaultOption: "(por defecto del tipo)",
+    autoOption: (kind: string): string => `Auto: ${kind}`,
     leafPlaceholder: "XAU, BTC…",
     leafRequired: "Esta clase necesita una hoja (p. ej. XAU).",
     terInvalid:

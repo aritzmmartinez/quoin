@@ -38,6 +38,7 @@ import {
   withoutInstruments,
 } from "~/core/projections";
 import {
+  allocationCategories,
   computeHeroChange,
   type Copy,
   copyFor,
@@ -121,16 +122,10 @@ export async function loader({ request }: Route.LoaderArgs) {
   const summary = computePortfolioSummary(positions, marketValues);
 
   const instrumentsById = new Map(instruments.map((i) => [i.id, i]));
-  const categories = new Map(
-    instruments.flatMap((i) =>
-      i.exposureKind ? [[i.id, i.exposureKind] as const] : [],
-    ),
-  );
-
   const allocation: AllocationRow[] = computeAllocation(
     positions,
     marketValues,
-    categories,
+    allocationCategories(instruments),
   ).map((slice) => ({
     ...slice,
     label: exposureKindLabel(t, slice.category),
