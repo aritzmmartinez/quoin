@@ -1,5 +1,10 @@
 import Decimal from "decimal.js";
 
+import {
+  effectiveExposure,
+  type ExposureKind,
+  type Instrument,
+} from "~/core/domain";
 import type {
   InvestedVsValuePoint,
   PortfolioSummary,
@@ -38,4 +43,15 @@ export function computeHeroChange(
     return { abs: summary.unrealizedPnL, pct: summary.returnPct };
   }
   return computeRangeChange(series);
+}
+
+export function allocationCategories(
+  instruments: readonly Instrument[],
+): Map<string, ExposureKind> {
+  return new Map(
+    instruments.flatMap((i) => {
+      const { kind } = effectiveExposure(i);
+      return kind ? [[i.id, kind] as const] : [];
+    }),
+  );
 }

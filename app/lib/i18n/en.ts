@@ -1047,7 +1047,7 @@ export const en: Copy = {
     hedgedShort: "Hedged",
     thesisHint:
       "The thesis says why you hold the instrument, not what it is: that is what the exposure says. It changes when your reasoning changes, so it lives here and not on the trade that bought it.",
-    defaultOption: "(default for the type)",
+    autoOption: (kind: string): string => `Auto: ${kind}`,
     leafPlaceholder: "XAU, BTC…",
     leafRequired: "This kind needs a leaf (e.g. XAU).",
     terInvalid:
