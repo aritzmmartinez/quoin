@@ -1438,6 +1438,8 @@ export const en: Copy = {
         interestWithoutWithholding:
           "Some interest this year has no recorded withholding. Interest imported before this version may lack its withholding even if it had one: check it against the broker's statement.",
         scale: (source: string): string => `Scale applied: ${source}`,
+        scaleInForce: (year: number): string =>
+          `The scale in force since ${year} applies. If Bizkaia approves a new one for this year, the tax will change.`,
         noScale:
           "No tax scale on file for this year. The tax cannot be computed.",
       },

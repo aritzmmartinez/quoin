@@ -409,6 +409,21 @@ describe("buildTaxYearView", () => {
     expect(view.quota).toBeNull();
   });
 
+  it("names the year the applied scale starts in, so a later year can say it is carried over", () => {
+    const events = [trade("BUY", "ETF", "1", "100", { ts: "2026-01-12" })];
+    const view = (year: number) =>
+      buildTaxYearView(
+        events,
+        [instrument("ETF", "Fund", "ETF")],
+        year,
+        BIZKAIA,
+        today(MADRID, new Date()),
+      );
+    expect(view(2026).scaleYear).toBe(2026);
+    expect(view(2027).scaleYear).toBe(2026);
+    expect(view(2024).scaleYear).toBeNull();
+  });
+
   it("shows a deferred loss with its breakdown and the units that carry it", () => {
     const buy1 = trade("BUY", "X", "10", "1000", { ts: "2025-01-01" });
     const sell = trade("SELL", "X", "10", "700", { ts: "2025-06-01" });

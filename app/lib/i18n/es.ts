@@ -1455,6 +1455,8 @@ export const es = {
         interestWithoutWithholding:
           "Algún interés de este año no tiene retención registrada. Los intereses importados antes de esta versión pueden no traer su retención aunque la tuvieran: compruébalos con el extracto del bróker.",
         scale: (source: string): string => `Escala aplicada: ${source}`,
+        scaleInForce: (year: number): string =>
+          `Se aplica la escala vigente desde ${year}. Si Bizkaia aprueba una nueva para este año, la cuota cambiará.`,
         noScale:
           "Sin escala fiscal cargada para este año. No se puede calcular la cuota.",
       },

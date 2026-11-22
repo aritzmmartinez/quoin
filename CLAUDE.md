@@ -1221,7 +1221,9 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
   2/2025 one, from 2026) covers the years after it. A year before the first scale returns
   `null` and the screen states the absence — a scale never reaches back. When a territory
   publishes a new scale it must be added here the same day: until then the old one is
-  applied, and a superseded scale is a wrong number that looks right.
+  applied, and a superseded scale is a wrong number that looks right. The tax view says
+  so beside the citation whenever the scale starts before the year shown (`scaleYear`,
+  compared in the web view only; the contract carries no such field).
 - **The savings base has two pools, carried forward together** (`carryforwardPools`):
   capital gains and income from movable capital — interest and cash dividends, gross in
   euros (`savingsIncomeNetOf`); in-kind income stays out. Each carries its own losses for

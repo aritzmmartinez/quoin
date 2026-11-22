@@ -341,6 +341,8 @@ export interface TaxYearView {
   savingsIncome: TaxSavingsIncome;
   savingsBase: string;
   scale: TaxScaleView | null;
+  /** The year the applied scale starts in; earlier than `year` when no newer one is on file. */
+  scaleYear: number | null;
   quota: string | null;
   withholdings: Withholdings;
   inKindIncome: TaxInKindIncome;
@@ -445,6 +447,7 @@ export function buildTaxYearView(
     },
     savingsBase,
     scale: scale ? { source: scale.source, brackets: scale.brackets } : null,
+    scaleYear: scale?.year ?? null,
     quota,
     withholdings: withholdingsOf(events, year, jurisdiction.zone),
     inKindIncome: inKindIncomeOf(events, year, jurisdiction.zone),

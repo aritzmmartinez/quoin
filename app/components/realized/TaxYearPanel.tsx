@@ -107,6 +107,9 @@ export function TaxYearPanel({
               {view.scale
                 ? copy.summary.scale(view.scale.source)
                 : copy.summary.noScale}
+              {view.scaleYear !== null && view.scaleYear < view.year && (
+                <> {copy.summary.scaleInForce(view.scaleYear)}</>
+              )}
             </p>
           </Card>
 
