@@ -22,6 +22,11 @@ export interface TerritoryRules {
   readonly repurchase: readonly RepurchaseRule[];
   readonly swapValuation: readonly SwapValuationRule[];
   readonly lossCarryforwardYears: number;
+  /**
+   * Share of one savings pool's positive balance that the other pool's negative
+   * balance may offset, as a decimal string. Zero keeps the pools apart.
+   */
+  readonly crossOffsetLimit: string;
   readonly unlistedNotice: UnlistedNoticeRule;
 }
 
@@ -96,6 +101,8 @@ const TERRITORY_RULES = {
     ],
     /** Art. 66 NF 13/2013 de Bizkaia — integración y compensación de rentas en la base imponible del ahorro (límite de cuatro años). */
     lossCarryforwardYears: 4,
+    /** Art. 66.1 NF 13/2013 de Bizkaia: income and gains compensate only within their own pool. */
+    crossOffsetLimit: "0",
     /** Crypto before letter i: whether a one-year repurchase rule reached those sales is unsettled. */
     unlistedNotice: { assetClass: "fungible-crypto", windowMonths: 12 },
   },

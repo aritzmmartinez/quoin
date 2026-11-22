@@ -55,6 +55,7 @@ describe("territoryRules", () => {
         },
       ],
       lossCarryforwardYears: 4,
+      crossOffsetLimit: "0",
       unlistedNotice: { assetClass: "fungible-crypto", windowMonths: 12 },
     });
   });
