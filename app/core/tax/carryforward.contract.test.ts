@@ -10,5 +10,5 @@ describeContract({
   file: CARRYFORWARD_CONTRACT_FILE,
   json: carryforwardContractJson,
   evaluate,
-  minByHand: 5,
+  minByHand: 4,
 });

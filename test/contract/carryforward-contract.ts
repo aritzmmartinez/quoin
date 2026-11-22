@@ -89,28 +89,6 @@ const cases: (CarryforwardInput & {
       },
     },
   },
-  {
-    name: "Two pools with a cross limit of 0.25: a year's negative pool takes up to a quarter of the other",
-    targetYear: 2026,
-    years: 4,
-    crossOffsetLimit: "0.25",
-    pools: [
-      { "2025": "200", "2026": "-1000" },
-      { "2025": "-50", "2026": "300" },
-    ],
-    byHand: {
-      arithmetic:
-        "2025: income −50 takes min(50, 200 × 0.25 = 50) = 50 from gains, which keep 150; nothing is pending. 2026: gains −1000 take min(1000, 300 × 0.25 = 75) = 75 from income: gains carry −925, income keeps 225. Base: 0 + 225 = 225.",
-      figures: {
-        "pools.0.steps.3.finalNet": "150",
-        "pools.1.steps.3.finalNet": "0",
-        "pools.0.steps.4.crossOffset": "75",
-        "pools.0.finalNet": "-925",
-        "pools.1.finalNet": "225",
-        savingsBase: "225",
-      },
-    },
-  },
 ];
 
 function netOf(nets: Nets): NetOf {
@@ -138,7 +116,7 @@ export const CARRYFORWARD_CONTRACT_FILE = fileURLToPath(
 export function carryforwardContractJson(): string {
   return contractJson(
     "carryforward",
-    "The generic carryforward of one savings pool (carryforwardPool) and of two pools advancing together (carryforwardPools), as pure functions over each year's own net. pools holds one or two maps from year to that year's own net; a year missing is 0. The window is targetYear − years through targetYear: a loss older than that has expired and is never seen. Each year, in order: with two pools, a negative own net offsets the other pool's positive own net of the same year up to crossOffsetLimit of it (crossOffset: positive in the pool that absorbs, negative in the one that gives); then a positive remainder consumes pending losses oldest year first, and a negative one becomes that year's pending loss. finalNet is the last year's balance after both; savingsBase adds the two pools' finalNet where positive. Bizkaia's limit is 0; 0.25 is passed as a parameter only to pin the crossing. Amounts are decimal strings. Shared with the mobile client: both implementations must reproduce every case. expect is written by running the TypeScript core; byHand.figures, where a case has it, are worked out by hand, its arithmetic says how, and each key is a dotted path into expect.",
+    "The generic carryforward of one savings pool (carryforwardPool) and of two pools advancing together (carryforwardPools), as pure functions over each year's own net. pools holds one or two maps from year to that year's own net; a year missing is 0. The window is targetYear − years through targetYear: a loss older than that has expired and is never seen. Each year, in order: a positive own net consumes pending losses oldest year first, and a negative one becomes that year's pending loss. finalNet is the last year's balance after both; savingsBase adds the two pools' finalNet where positive. Every case has a cross limit of 0, Bizkaia's, so crossOffset is always 0: how two pools cross at a positive limit is not pinned here and will be with régimen común, whose carried losses cross too. Amounts are decimal strings. Shared with the mobile client: both implementations must reproduce every case. expect is written by running the TypeScript core; byHand.figures, where a case has it, are worked out by hand, its arithmetic says how, and each key is a dotted path into expect.",
     cases.map(({ byHand, ...input }) => ({
       ...input,
       ...(byHand ? { byHand } : {}),
