@@ -48,7 +48,8 @@ function signedAmount(event: LedgerEvent, costs: Decimal): Decimal {
 function costsOf(event: LedgerEvent): Decimal {
   if (event.type === "BUY" || event.type === "SELL")
     return inBase(event, "fees");
-  if (event.type === "DIVIDEND") return inBase(event, "taxWithheld");
+  if (event.type === "DIVIDEND" || event.type === "INTEREST")
+    return inBase(event, "taxWithheld");
   return new Decimal(0);
 }
 

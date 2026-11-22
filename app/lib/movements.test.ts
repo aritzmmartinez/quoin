@@ -99,6 +99,24 @@ describe("toMovementRows", () => {
     expect(row?.price).toBeNull();
   });
 
+  it("nets withholding out of interest", () => {
+    const [row] = toMovementRows(
+      [
+        {
+          ...base,
+          id: "i1",
+          ts: new Date("2026-06-01T00:00:00Z"),
+          type: "INTEREST",
+          grossAmount: "10.00",
+          taxWithheld: "1.90",
+        } as LedgerEvent,
+      ],
+      INSTRUMENTS,
+    );
+    expect(row?.amount).toBe("8.10");
+    expect(row?.costs).toBe("1.90");
+  });
+
   it("signs cash events by direction and leaves them instrument-less", () => {
     const cash = (type: "DEPOSIT" | "WITHDRAWAL" | "INTEREST"): LedgerEvent =>
       ({
@@ -107,6 +125,7 @@ describe("toMovementRows", () => {
         ts: new Date("2026-05-01T00:00:00Z"),
         type,
         grossAmount: "500.00",
+        ...(type === "INTEREST" ? { taxWithheld: "0" } : {}),
       }) as LedgerEvent;
 
     const rows = toMovementRows(
