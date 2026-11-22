@@ -1427,7 +1427,16 @@ export const en: Copy = {
       noYears: "There are no sales recorded in any year yet.",
       summary: {
         netBase: "Taxable savings base",
+        gainsBalance: "Capital gains and losses balance",
+        incomeBalance: "Income from movable capital balance",
+        pools:
+          "Income from movable capital and capital gains and losses compensate only within their own pool (Art. 66.1): the base is the sum of the positive balances.",
         quota: "Resulting tax",
+        withheld: "Recorded withholdings",
+        withheldNote:
+          "Withholdings are payments on account of the whole income tax, not only of the savings base, and are not subtracted from the tax. This adds up what was withheld this year on interest and dividends paid in cash, with no split between Spanish and foreign withholdings.",
+        interestWithoutWithholding:
+          "Some interest this year has no recorded withholding. Interest imported before this version may lack its withholding even if it had one: check it against the broker's statement.",
         scale: (source: string): string => `Scale applied: ${source}`,
         noScale:
           "No tax scale on file for this year. The tax cannot be computed.",
@@ -1528,6 +1537,13 @@ export const en: Copy = {
       empty: {
         title: "No sales in this year",
         body: "Pick another tax year from the dropdown.",
+      },
+      savingsIncome: {
+        title: "Income from movable capital",
+        body: "Interest and dividends paid in cash, gross. They compensate only among themselves, and a negative balance is carried to the following years (Art. 66.1.a).",
+        count: "Payments",
+        gross: "Gross this year",
+        finalNet: "Balance after carryforward",
       },
       inKind: {
         title: "Income received in kind",

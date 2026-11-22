@@ -1444,7 +1444,16 @@ export const es = {
       noYears: "No hay ventas registradas todavía en ningún año.",
       summary: {
         netBase: "Base liquidable del ahorro",
+        gainsBalance: "Saldo de ganancias y pérdidas",
+        incomeBalance: "Saldo de rendimientos del capital mobiliario",
+        pools:
+          "Los rendimientos del capital mobiliario y las ganancias y pérdidas se compensan solo dentro de su propia bolsa (Art. 66.1): la base es la suma de los saldos positivos.",
         quota: "Cuota resultante",
+        withheld: "Retenciones registradas",
+        withheldNote:
+          "Las retenciones son pagos a cuenta de todo el IRPF, no solo de la base del ahorro, y no se restan de la cuota. Suma lo retenido este año en intereses y dividendos cobrados en efectivo, sin separar retenciones españolas y extranjeras.",
+        interestWithoutWithholding:
+          "Algún interés de este año no tiene retención registrada. Los intereses importados antes de esta versión pueden no traer su retención aunque la tuvieran: compruébalos con el extracto del bróker.",
         scale: (source: string): string => `Escala aplicada: ${source}`,
         noScale:
           "Sin escala fiscal cargada para este año. No se puede calcular la cuota.",
@@ -1546,6 +1555,13 @@ export const es = {
       empty: {
         title: "Sin ventas en este año",
         body: "Elige otro año fiscal en el desplegable.",
+      },
+      savingsIncome: {
+        title: "Rendimientos del capital mobiliario",
+        body: "Intereses y dividendos cobrados en efectivo, en bruto. Se compensan solo entre sí, y un saldo negativo se arrastra a los años siguientes (Art. 66.1.a).",
+        count: "Cobros",
+        gross: "Bruto del año",
+        finalNet: "Saldo tras el arrastre",
       },
       inKind: {
         title: "Ingresos en especie",
