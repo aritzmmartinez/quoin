@@ -146,10 +146,6 @@ async function startPairing(request: Request): Promise<DevicesResponse> {
 export async function devicesAction(
   request: Request,
 ): Promise<DevicesResponse> {
-  if (request.headers.get("Sec-Fetch-Site") === "cross-site") {
-    return { ok: false, error: "refused" };
-  }
-
   const form = await request.formData();
   const pairing = syncPairing();
   const repository = new PrismaPairedDeviceRepository();

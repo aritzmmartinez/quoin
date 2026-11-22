@@ -6,7 +6,15 @@ import { hostname } from "node:os";
 import { join, resolve } from "node:path";
 
 import Database from "better-sqlite3";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import { migratedDatabase } from "../../test/integration/template";
 import type { DevicesResponse } from "./sync-devices";
@@ -31,15 +39,11 @@ const form = (fields: Record<string, string>) => {
   return body;
 };
 
-function post(
-  fields: Record<string, string>,
-  headers: Record<string, string> = {},
-): Promise<DevicesResponse> {
+function post(fields: Record<string, string>): Promise<DevicesResponse> {
   return devices.devicesAction(
     new Request("http://localhost:3000/api/devices", {
       method: "POST",
       body: form(fields),
-      headers,
     }),
   );
 }
@@ -105,10 +109,7 @@ beforeEach(() => {
 });
 
 describe("Devices, from the settings screen to the phone", () => {
-  it("refuses what another site posts and an intent it does not know", async () => {
-    await expect(
-      post({ intent: "pair-start" }, { "Sec-Fetch-Site": "cross-site" }),
-    ).resolves.toEqual({ ok: false, error: "refused" });
+  it("refuses an intent it does not know", async () => {
     await expect(post({ intent: "nope" })).resolves.toEqual({
       ok: false,
       error: "refused",
@@ -119,9 +120,9 @@ describe("Devices, from the settings screen to the phone", () => {
     await expect(
       post({ intent: "save-host", host: "not a host" }),
     ).resolves.toEqual({ ok: false, error: "invalid-host" });
-    await expect(
-      post({ intent: "save-port", port: "70000" }),
-    ).resolves.toEqual({ ok: false, error: "invalid-port" });
+    await expect(post({ intent: "save-port", port: "70000" })).resolves.toEqual(
+      { ok: false, error: "invalid-port" },
+    );
     expect(await view()).toMatchObject({ host: null, port: 3443 });
   });
 
@@ -201,7 +202,9 @@ describe("Devices, from the settings screen to the phone", () => {
     const { devices: listed } = await view();
     const polled = await devices.pollDevices();
 
-    expect(listed).toMatchObject([{ deviceId: "dev-phone", name: "Test phone" }]);
+    expect(listed).toMatchObject([
+      { deviceId: "dev-phone", name: "Test phone" },
+    ]);
     expect(polled.devices).toEqual(listed);
     expect(JSON.stringify(polled)).not.toContain("tokenHash");
   });
