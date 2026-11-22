@@ -142,7 +142,7 @@ export const es = {
   common: {
     close: "Cerrar",
     marketDataUnavailable:
-      "No se ha podido consultar Yahoo. Inténtalo de nuevo.",
+      "No se ha podido consultar la fuente de precios. Inténtalo de nuevo.",
     halted: (cause: string): string =>
       `Se ha detenido sin terminar: ${cause.replace(/\.+$/, "")}. No es un fallo de un instrumento concreto, así que no se ha seguido con los demás.`,
     noRateExcluded: (names: readonly string[]): string => {
@@ -256,7 +256,11 @@ export const es = {
       noData: "Sin datos todavía",
       prices: {
         label: "Precios",
-        hint: "Yahoo Finance: posiciones abiertas e índice de referencia",
+        hint: "Yahoo Finance: acciones y fondos abiertos e índice de referencia",
+      },
+      cryptoPrices: {
+        label: "Precios de cripto",
+        hint: "Market Data: Kraken. Cripto abiertas con un par de Kraken",
       },
       inflation: { label: "IPC", hint: "INE: nacional y Bizkaia" },
       rates: {
@@ -908,10 +912,10 @@ export const es = {
     map: {
       title: "Símbolos de cotización",
       intro:
-        "Estos instrumentos no tienen aún símbolo de Yahoo, así que no se pueden valorar. Mapea la línea en euros de la plaza correcta y comprueba el valor implícito antes de guardar.",
+        "Estos instrumentos no tienen aún símbolo, así que no se pueden valorar. Para un fondo o una acción, mapea la línea de Yahoo en euros de la plaza correcta; para una cripto, su par de Kraken, como BTC/EUR. Comprueba el valor implícito antes de guardar.",
       warning:
         "Varias plazas cotizan en euros y aun así son otro fondo que replica el mismo índice, o el mismo fondo con otra proporción por participación. Compara el valor implícito con lo que dice tu bróker: la divisa sola no lo detecta, la magnitud sí.",
-      placeholder: "VWCE.DE, BTC-EUR…",
+      placeholder: "VWCE.DE, BTC/EUR…",
       verify: "Verificar",
       verifying: "Verificando…",
       save: "Usar este símbolo",
@@ -921,7 +925,7 @@ export const es = {
       noQuote: (symbol: string): string =>
         `Yahoo no devuelve precio para ${symbol}. Prueba otra plaza (.DE, .MI, .PA, .AS).`,
       noQuoteCrypto: (symbol: string, code: string): string =>
-        `Yahoo no devuelve precio para ${symbol}. Para una cripto, prueba ${code}-USD, que se valora con el tipo del BCE, o el ticker con el número que Yahoo añade cuando el código está repetido, como PEPE24478-USD. Un ticker repetido puede ser otra moneda con el mismo código: comprueba el nombre y el valor implícito antes de guardar.`,
+        `No hay precio para ${symbol}. Para una cripto, usa su par de Kraken, ${code}/EUR, o ${code}/USD si no tiene línea en euros, que se valora con el tipo del BCE. Comprueba el valor implícito antes de guardar.`,
       price: "Precio",
       impliedValue: "Valor implícito",
       quantity: "Unidades",
@@ -942,7 +946,7 @@ export const es = {
       noDailyHistory:
         "Yahoo no tiene histórico diario de este símbolo. Busca su ticker en una bolsa en euros (.DE, .AS…).",
       noDailyHistoryCrypto: (code: string): string =>
-        `Yahoo no tiene histórico diario de este símbolo. Para una cripto, prueba ${code}-USD, que se valora con el tipo del BCE, o el ticker con el número que Yahoo añade cuando el código está repetido, como PEPE24478-USD. Un ticker repetido puede ser otra moneda con el mismo código: comprueba el nombre y el valor implícito antes de guardar.`,
+        `No hay histórico diario de este símbolo. Para una cripto, usa su par de Kraken, ${code}/EUR, o ${code}/USD si no tiene línea en euros, que se valora con el tipo del BCE. Comprueba el valor implícito antes de guardar.`,
       hasHistory:
         "Este instrumento ya tiene precios guardados. Cambia su símbolo en la columna Símbolo de Instrumentos: allí se descarga el histórico nuevo antes de borrar el anterior.",
       pending: (count: number): string =>
@@ -998,7 +1002,7 @@ export const es = {
           ? "1 símbolo ha devuelto una cotización antigua: revisa la plaza."
           : `${count} símbolos han devuelto cotizaciones antiguas: revisa las plazas.`,
       unavailable: (names: string): string =>
-        `No se ha podido consultar Yahoo para ${names}. Inténtalo de nuevo con «Refrescar precios» en Cartera.`,
+        `No se ha podido consultar la fuente de precios de ${names}. Inténtalo de nuevo con «Refrescar precios» en Cartera.`,
     },
   },
   holdings: {
@@ -1081,7 +1085,7 @@ export const es = {
     noDailyHistory:
       "Este símbolo no tiene histórico diario. Vuelve a descargarlo o cambia el símbolo por su ticker en una bolsa en euros.",
     noDailyHistoryCrypto: (code: string): string =>
-      `Este símbolo no tiene histórico diario. Para una cripto, prueba ${code}-USD, que se valora con el tipo del BCE, o el ticker con el número que Yahoo añade cuando el código está repetido, como PEPE24478-USD. Un ticker repetido puede ser otra moneda con el mismo código: comprueba el nombre y el valor implícito antes de guardar.`,
+      `Este símbolo no tiene histórico diario. Para una cripto, usa su par de Kraken, ${code}/EUR, o ${code}/USD si no tiene línea en euros, que se valora con el tipo del BCE. Comprueba el valor implícito antes de guardar.`,
     obsoleteVenues:
       "Esta composición se importó con códigos de país antiguos y no se fusiona con otros fondos. Vuelve a soltar su archivo en esta fila.",
     resolves: RESOLVES_LABELS,
@@ -1092,7 +1096,7 @@ export const es = {
       redownload: (symbol: string): string => `${REDOWNLOAD} de ${symbol}`,
       range: "Histórico",
       confirmReplace: (symbol: string): string =>
-        `Se descargará el histórico diario de ${symbol} y la cotización de hoy. Si llegan velas, sustituyen a todos los precios guardados de este instrumento; si no llega ninguna, no se toca nada. Las operaciones no cambian.`,
+        `Se descargará el histórico diario de ${symbol} y la cotización de hoy. Si llegan velas, sustituyen a los precios guardados desde la primera; con el mismo símbolo, los anteriores se conservan, y con uno nuevo se borran. Si no llega ninguna, no se toca nada. Las operaciones no cambian.`,
       lost: (cutoff: string, earliest: string): string =>
         `Este rango empieza el ${cutoff} y tu histórico actual el ${earliest}: se perderán los precios anteriores al ${cutoff}.`,
       confirm: "Confirmar",
@@ -1100,16 +1104,18 @@ export const es = {
       running: "Descargando…",
       done: (count: number, first: string): string =>
         count === 1
-          ? `1 precio guardado desde el ${first}.`
-          : `${count} precios guardados desde el ${first}.`,
+          ? `1 precio descargado desde el ${first}.`
+          : `${count} precios descargados desde el ${first}.`,
+      total: (count: number, start: string): string =>
+        `En total, ${count} desde el ${start}.`,
       noLive:
-        "Yahoo no ha dado cotización de hoy: pulsa «Refrescar precios» en Cartera más tarde.",
+        "La fuente no ha dado cotización de hoy: pulsa «Refrescar precios» en Cartera más tarde.",
       noHistory: (symbol: string): string =>
-        `Yahoo no tiene histórico diario de ${symbol}. Busca su ticker en una bolsa en euros (.DE, .AS…). No se ha tocado nada.`,
+        `No hay histórico diario de ${symbol}. Para un fondo o una acción, busca su ticker en una bolsa en euros (.DE, .AS…); para una cripto, su par de Kraken, como BTC/EUR. No se ha tocado nada.`,
       failed: "La descarga ha fallado. No se ha tocado nada.",
       rebuild: "Rehacer todos los históricos",
       rebuildConfirm: (count: number): string =>
-        `Se volverá a descargar el histórico diario de ${count === 1 ? "1 instrumento" : `${count} instrumentos`} con símbolo, uno tras otro. Cada uno solo se sustituye si Yahoo devuelve velas, y las operaciones no se tocan. Si sales de esta pantalla se detiene; lo ya rehecho se queda.`,
+        `Se volverá a descargar el histórico diario de ${count === 1 ? "1 instrumento" : `${count} instrumentos`} con símbolo, uno tras otro. Cada uno solo se sustituye si su fuente devuelve velas, lo anterior a la primera vela se conserva y las operaciones no se tocan. Si sales de esta pantalla se detiene; lo ya rehecho se queda.`,
       rebuilding: (done: number, total: number): string =>
         `Rehaciendo ${done} de ${total}…`,
       rebuilt: (done: number, total: number): string =>
@@ -1139,7 +1145,7 @@ export const es = {
       problem: {
         "no-quote": "sin respuesta",
         stale: "cotización caducada",
-        unavailable: "no se ha podido consultar Yahoo",
+        unavailable: "no se ha podido consultar la fuente de precios",
         error: "error inesperado",
       },
       unmappedOpen: (count: number): string =>
@@ -1606,7 +1612,7 @@ export const es = {
     },
     gaps: (n: Omit<ExcludedNotice, "day">): string => {
       const one = n.count === 1;
-      return `${n.count} ${one ? "compra cae" : "compras caen"} en un hueco de más de una semana sin cierres de ${n.symbol} (${n.amount}). No ${one ? "compra" : "compran"} nada en el contrafactual. ${one ? "Sigue" : "Siguen"} contando en la cartera real, así que el diferencial la favorece en esa medida. Abre ${n.symbol} en ${n.instruments} y pulsa «${n.redownload}». Si el hueco sigue, Yahoo no tiene esas sesiones.`;
+      return `${n.count} ${one ? "compra cae" : "compras caen"} en un hueco de más de una semana sin cierres de ${n.symbol} (${n.amount}). No ${one ? "compra" : "compran"} nada en el contrafactual. ${one ? "Sigue" : "Siguen"} contando en la cartera real, así que el diferencial la favorece en esa medida. Abre ${n.symbol} en ${n.instruments} y pulsa «${n.redownload}». Si el hueco sigue, la fuente no tiene esas sesiones.`;
     },
     unpriced: (names: string): string =>
       `Sin precio utilizable: ${names}. Se excluyen de los dos lados, porque contar su coste sin su valor inventaría una pérdida.`,

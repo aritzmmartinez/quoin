@@ -114,7 +114,7 @@ const EXPOSURE_KIND_LABELS: Record<ExposureKind, string> = {
 export const en: Copy = {
   common: {
     close: "Close",
-    marketDataUnavailable: "Yahoo could not be reached. Try again.",
+    marketDataUnavailable: "The price source could not be reached. Try again.",
     halted: (cause: string): string =>
       `Stopped before finishing: ${cause.replace(/\.+$/, "")}. This is not a problem with one instrument, so the others were not tried.`,
     noRateExcluded: (names: readonly string[]): string => {
@@ -228,7 +228,11 @@ export const en: Copy = {
       noData: "No data yet",
       prices: {
         label: "Prices",
-        hint: "Yahoo Finance: open positions and the benchmark",
+        hint: "Yahoo Finance: open stocks and funds, and the benchmark",
+      },
+      cryptoPrices: {
+        label: "Crypto prices",
+        hint: "Market Data: Kraken. Open crypto assets with a Kraken pair",
       },
       inflation: { label: "CPI", hint: "INE: national and Bizkaia" },
       rates: {
@@ -892,10 +896,10 @@ export const en: Copy = {
     map: {
       title: "Quote symbols",
       intro:
-        "These instruments have no Yahoo symbol yet, so they cannot be valued. Map the euro-denominated line of the right venue and check the implied value before saving.",
+        "These instruments have no symbol yet, so they cannot be valued. For a fund or a stock, map the euro-denominated Yahoo line of the right venue; for a crypto asset, its Kraken pair, such as BTC/EUR. Check the implied value before saving.",
       warning:
         "Several venues quote in euros and are still a different fund tracking the same index, or the same fund with a different entitlement per unit. Compare the implied value against what your broker says: currency alone does not catch this, magnitude does.",
-      placeholder: "VWCE.DE, BTC-EUR…",
+      placeholder: "VWCE.DE, BTC/EUR…",
       verify: "Verify",
       verifying: "Verifying…",
       save: "Use this symbol",
@@ -905,7 +909,7 @@ export const en: Copy = {
       noQuote: (symbol: string): string =>
         `Yahoo returns no price for ${symbol}. Try another venue (.DE, .MI, .PA, .AS).`,
       noQuoteCrypto: (symbol: string, code: string): string =>
-        `Yahoo returns no price for ${symbol}. For a crypto asset, try ${code}-USD, valued at the ECB rate, or the ticker with the number Yahoo appends when the code is shared, such as PEPE24478-USD. A shared ticker can be another coin with the same code: check the name and the implied value before saving.`,
+        `There is no price for ${symbol}. For a crypto asset, use its Kraken pair, ${code}/EUR, or ${code}/USD where it has no euro line, valued at the ECB rate. Check the implied value before saving.`,
       price: "Price",
       impliedValue: "Implied value",
       quantity: "Units",
@@ -926,7 +930,7 @@ export const en: Copy = {
       noDailyHistory:
         "Yahoo has no daily history for this symbol. Look for its ticker on a euro exchange (.DE, .AS…).",
       noDailyHistoryCrypto: (code: string): string =>
-        `Yahoo has no daily history for this symbol. For a crypto asset, try ${code}-USD, valued at the ECB rate, or the ticker with the number Yahoo appends when the code is shared, such as PEPE24478-USD. A shared ticker can be another coin with the same code: check the name and the implied value before saving.`,
+        `There is no daily history for this symbol. For a crypto asset, use its Kraken pair, ${code}/EUR, or ${code}/USD where it has no euro line, valued at the ECB rate. Check the implied value before saving.`,
       hasHistory:
         "This instrument already has stored prices. Change its symbol in the Symbol column of Instruments: the new history is downloaded there before the old one is removed.",
       pending: (count: number): string =>
@@ -978,7 +982,7 @@ export const en: Copy = {
           ? "1 symbol returned an old quote: check the venue."
           : `${count} symbols returned old quotes: check the venues.`,
       unavailable: (names: string): string =>
-        `Yahoo could not be reached for ${names}. Try again with Refresh prices on Portfolio.`,
+        `The price source could not be reached for ${names}. Try again with Refresh prices on Portfolio.`,
     },
   },
   holdings: {
@@ -1061,7 +1065,7 @@ export const en: Copy = {
     noDailyHistory:
       "This symbol has no daily history. Download it again or change the symbol to its ticker on a euro exchange.",
     noDailyHistoryCrypto: (code: string): string =>
-      `This symbol has no daily history. For a crypto asset, try ${code}-USD, valued at the ECB rate, or the ticker with the number Yahoo appends when the code is shared, such as PEPE24478-USD. A shared ticker can be another coin with the same code: check the name and the implied value before saving.`,
+      `This symbol has no daily history. For a crypto asset, use its Kraken pair, ${code}/EUR, or ${code}/USD where it has no euro line, valued at the ECB rate. Check the implied value before saving.`,
     obsoleteVenues:
       "This composition was imported under obsolete country codes and does not merge with other funds. Drop its file on this row again.",
     resolves: RESOLVES_LABELS,
@@ -1073,7 +1077,7 @@ export const en: Copy = {
         `Download the history of ${symbol} again`,
       range: "History",
       confirmReplace: (symbol: string): string =>
-        `The daily history of ${symbol} and today's quote will be downloaded. If candles arrive, they replace every price stored for this instrument; if none arrive, nothing is touched. Trades do not change.`,
+        `The daily history of ${symbol} and today's quote will be downloaded. If candles arrive, they replace the stored prices from the first one on; with the same symbol the older ones stay, and with a new one they are deleted. If none arrive, nothing is touched. Trades do not change.`,
       lost: (cutoff: string, earliest: string): string =>
         `This range starts on ${cutoff} and your current history on ${earliest}: prices before ${cutoff} will be lost.`,
       confirm: "Confirm",
@@ -1081,16 +1085,18 @@ export const en: Copy = {
       running: "Downloading…",
       done: (count: number, first: string): string =>
         count === 1
-          ? `1 price saved from ${first}.`
-          : `${count} prices saved from ${first}.`,
+          ? `1 price downloaded from ${first}.`
+          : `${count} prices downloaded from ${first}.`,
+      total: (count: number, start: string): string =>
+        `In all, ${count} from ${start}.`,
       noLive:
-        "Yahoo returned no quote for today: press “Refresh prices” in Portfolio later.",
+        "The source returned no quote for today: press “Refresh prices” in Portfolio later.",
       noHistory: (symbol: string): string =>
-        `Yahoo has no daily history for ${symbol}. Look for its ticker on a euro exchange (.DE, .AS…). Nothing was changed.`,
+        `There is no daily history for ${symbol}. For a fund or a stock, look for its ticker on a euro exchange (.DE, .AS…); for a crypto asset, its Kraken pair, such as BTC/EUR. Nothing was changed.`,
       failed: "The download failed. Nothing was changed.",
       rebuild: "Rebuild all histories",
       rebuildConfirm: (count: number): string =>
-        `The daily history of ${count === 1 ? "1 instrument" : `${count} instruments`} with a symbol will be downloaded again, one after another. Each one is replaced only if Yahoo returns candles, and trades are not touched. Leaving this screen stops it; whatever was already rebuilt stays.`,
+        `The daily history of ${count === 1 ? "1 instrument" : `${count} instruments`} with a symbol will be downloaded again, one after another. Each one is replaced only if its source returns candles, whatever is older than the first candle stays, and trades are not touched. Leaving this screen stops it; whatever was already rebuilt stays.`,
       rebuilding: (done: number, total: number): string =>
         `Rebuilding ${done} of ${total}…`,
       rebuilt: (done: number, total: number): string =>
@@ -1120,7 +1126,7 @@ export const en: Copy = {
       problem: {
         "no-quote": "no answer",
         stale: "stale quote",
-        unavailable: "Yahoo could not be reached",
+        unavailable: "the price source could not be reached",
         error: "unexpected error",
       },
       unmappedOpen: (count: number): string =>
@@ -1594,7 +1600,7 @@ export const en: Copy = {
     },
     gaps: (n: Omit<ExcludedNotice, "day">): string => {
       const one = n.count === 1;
-      return `${n.count} ${one ? "purchase falls" : "purchases fall"} in a gap of more than a week with no ${n.symbol} close (${n.amount}). ${one ? "It buys" : "They buy"} nothing in the counterfactual. ${one ? "It still counts" : "They still count"} in the real portfolio, so the difference favours it by that much. Open ${n.symbol} in ${n.instruments} and use “${n.redownload}”. If the gap remains, Yahoo has no data for those sessions.`;
+      return `${n.count} ${one ? "purchase falls" : "purchases fall"} in a gap of more than a week with no ${n.symbol} close (${n.amount}). ${one ? "It buys" : "They buy"} nothing in the counterfactual. ${one ? "It still counts" : "They still count"} in the real portfolio, so the difference favours it by that much. Open ${n.symbol} in ${n.instruments} and use “${n.redownload}”. If the gap remains, the source has no data for those sessions.`;
     },
     unpriced: (names: string): string =>
       `No usable price: ${names}. They are excluded from both sides, because counting their cost without their value would invent a loss.`,

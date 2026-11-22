@@ -37,6 +37,7 @@ export interface InstrumentListItem {
   holdingsAsOf: string | null;
   obsoleteVenues: boolean;
   historyStart: string | null;
+  historyCount: number;
   coarseHistory: boolean;
   noDailyHistory: boolean;
 }
@@ -96,6 +97,7 @@ export function toInstrumentListItems(
       holdingsAsOf: blocks.get(instrument.id)?.asOf ?? null,
       obsoleteVenues: hasObsoleteVenue(composition),
       historyStart: times[0]?.toISOString() ?? null,
+      historyCount: times.length,
       coarseHistory: isCoarseSeries(times),
       noDailyHistory:
         instrument.quoteSymbol != null && !dailyHistoryIds.has(instrument.id),
@@ -116,4 +118,22 @@ export function needsMapping(
   return items.filter(
     (i) => !i.isExplicit && i.resolvesTo?.kind === "UNRESOLVED",
   );
+}
+
+export interface StoredSeries {
+  count: number;
+  start: string | null;
+}
+
+export function seriesAfterReplace(
+  before: StoredSeries,
+  outcome: { written: number; removed: number; first: string },
+): { count: number; start: string } {
+  const count = before.count - outcome.removed + outcome.written;
+  const older = before.start;
+  const keptOlder =
+    count > outcome.written &&
+    older !== null &&
+    new Date(older).getTime() < new Date(outcome.first).getTime();
+  return { count, start: keptOlder ? older : outcome.first };
 }

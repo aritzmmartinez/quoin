@@ -7,11 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Upgrading
+- Update every computer that syncs with this one before you change any crypto symbol to a Kraken pair. An older version that receives `BTC/EUR` through a sync deletes that instrument's prices, as it does for any new symbol, and then asks Yahoo for them, which knows no such symbol: the crypto stays without a price on that computer until it is updated, and the first price refresh after that fills it in from Kraken.
+- Nothing changes until you change a symbol: a crypto asset already mapped to Yahoo keeps being priced by Yahoo.
+
+### Added
+- Crypto prices from Kraken's public market data. A symbol written as a pair, `BTC/EUR`, is priced by Kraken; stocks and funds stay on Yahoo. The import wizard suggests the euro pair of each crypto asset, or the dollar pair where Kraken has no euro one (`USDG/USD`, valued at the ECB rate). To move a crypto asset already on Yahoo, change its symbol in the Symbol column of Instruments, or run `pnpm prices:map <CODE> <CODE>/EUR`. Kraken keeps only the last two years of daily closes, so the history before that is replaced too; the README lists what that means.
+- Settings: External data has a Crypto prices row, Market Data: Kraken, with its own refresh.
+
 ### Changed
 - Summary: the Allocation card classifies a stock as Stock and a crypto asset as Crypto when no exposure has been chosen for it, as the look-through already did. This replaces the rule that put every instrument without an exposure under Unclassified instead of inheriting the broker's type: that slice now measures only what the type cannot tell, the funds, which are what you have to classify. A category you choose always wins, and the automatic one is never saved or synced.
 - Instruments: an instrument with no exposure chosen shows the automatic one in the Exposure column, as Auto: Stock, or Unclassified when its type says nothing about what it holds. Choosing a category replaces it, and choosing the first option again goes back to it. The categories in that list are named in your language.
 
 ### Fixed
+- Instruments: downloading the history of a symbol again keeps the prices older than the first candle that arrives, instead of replacing everything. A source that reaches back less far, Kraken's two years or a Yahoo line whose history now starts later, no longer shortens what was stored. A new symbol still replaces the whole history.
 - Import: the summary counts operations in every figure, so its rows add up to the total. A Trade Republic saveback and the purchase it paid for were two in the total, and two set-aside or failed entries when the purchase could not be imported; they are one operation now, listed by the purchase with the saveback beneath it as the same operation.
 - Import: the summary names a row by its type in your language (Saveback, Card payment, Reward…) instead of the broker's own code, and a file with nothing that can be saved no longer says that every trade was already in the ledger.
 - Import: a purchase already in the ledger that only gains its missing saveback row is no longer counted as new. It is counted apart, as Completed, in a row the summary shows only when there is one.

@@ -7,6 +7,7 @@ import {
   type InstrumentListItem,
   lostHistoryBefore,
   rangeSince,
+  seriesAfterReplace,
   useCopy,
   useFormat,
 } from "~/lib";
@@ -52,9 +53,17 @@ export function SymbolPanel({ item }: { item: InstrumentListItem }) {
       return response.error;
     }
     if (response.step === "replace") {
+      const series = seriesAfterReplace(
+        { count: item.historyCount, start: item.historyStart },
+        response,
+      );
+      const done = copy.done(response.written, formatInstant(response.first));
       setResult({
         ok: true,
-        text: copy.done(response.written, formatInstant(response.first)),
+        text:
+          series.count === response.written
+            ? done
+            : `${done} ${copy.total(series.count, formatInstant(series.start))}`,
         note: response.live ? null : copy.noLive,
       });
       void revalidator.revalidate();
@@ -101,7 +110,7 @@ export function SymbolPanel({ item }: { item: InstrumentListItem }) {
       {pending && (
         <div className="mt-3 max-w-3xl rounded-md border border-border bg-surface px-3 py-2">
           <p>{copy.confirmReplace(pending)}</p>
-          {lost && earliest && (
+          {lost && earliest && pending !== item.quoteSymbol && (
             <p className="mt-1 text-negative">
               {copy.lost(
                 formatInstant(lost.toISOString()),
