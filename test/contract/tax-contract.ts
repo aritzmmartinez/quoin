@@ -84,12 +84,12 @@ const cases: (TaxInput & {
     years: [2025, 2026],
     byHand: {
       arithmetic:
-        "The March sale takes the January lot whole: 850 − 1000 = −150. Its window runs from 20 January to 20 May 2025; the 4 bought on 3 March are inside it, earlier, and still held after the sale, so before = 4 and the repurchase is min(4, 4) = 4 of 10: 0.4 of the loss, −60, is not computable and stays on those 4 units; −90 computes in 2025. The 2026 sale of those 4 for 360 gains 360 − 320 = 40; it carries −60, nothing is bought in its window, so the −60 integrates in 2026 as its own line: 40 − 60 = −20 computable. 2025 has no scale; 2026 does, but the base is negative, so the quota is 0.",
+        "The March sale takes the January lot whole: 850 − 1000 = −150. Its window runs from 20 January to 20 May 2025; the 4 bought on 3 March are inside it, earlier, and still held after the sale, so before = 4 and the repurchase is min(4, 4) = 4 of 10: 0.4 of the loss, −60, is not computable and stays on those 4 units; −90 computes in 2025. The 2026 sale of those 4 for 360 gains 360 − 320 = 40; it carries −60, nothing is bought in its window, so the −60 integrates in 2026 as its own line: 40 − 60 = −20 computable. Both years have a scale, but both bases are negative, so both quotas are 0.",
       figures: {
         "history.gains.0.realizedPnL": "-150",
         "history.gains.0.nonComputable": "-60",
         "history.gains.0.computablePnL": "-90",
-        "years.2025.view.quota": null,
+        "years.2025.view.quota": "0",
         "years.2026.taxYear.computableNet": "-20",
         "years.2026.view.integratedSum": "-60.00",
         "years.2026.view.quota": "0",
@@ -148,6 +148,14 @@ const cases: (TaxInput & {
       }),
     ],
     years: [2025],
+    byHand: {
+      arithmetic:
+        "The two gains the core computes, 80 on the coin given in the swap and 68 on the token sold in September, make a base of 148. 2025 has the scale before NF 2/2025, and 148 falls in its first bracket: 148 × 0.20 = 29.6.",
+      figures: {
+        "years.2025.view.netSavingsBase": "148",
+        "years.2025.view.quota": "29.6",
+      },
+    },
   },
   {
     name: "Four years of carryforward: a 2021 loss offsets later gains oldest first and is gone by 2026",
@@ -242,6 +250,28 @@ const cases: (TaxInput & {
       },
     },
   },
+  {
+    name: "A year before the first scale on file has none, and a year after the last keeps the one in force",
+    residence: "bizkaia",
+    instruments: [{ id: FUND, type: "ETF" }],
+    events: [
+      trade("BUY", FUND, "2024-01-10T09:00:00.000Z", "10", "1000"),
+      trade("SELL", FUND, "2024-06-03T09:00:00.000Z", "10", "1100"),
+    ],
+    years: [2024, 2027],
+    byHand: {
+      arithmetic:
+        "2024: 1100 − 1000 = 100 of base, but no scale is on file before 2025, so scale and quota are null. 2027 has no sale and a base of 0; the NF 2/2025 scale, in force from 1 January 2026 with no end date, is still the one that applies, so the quota is 0.",
+      figures: {
+        "years.2024.view.savingsBase": "100",
+        "years.2024.view.scale": null,
+        "years.2024.view.quota": null,
+        "years.2027.view.scale.source":
+          "Art. 76 NF 13/2013 de Bizkaia, redacción NF 2/2025, efectos 1-1-2026",
+        "years.2027.view.quota": "0",
+      },
+    },
+  },
 ];
 
 /** `buildTaxYearView` reads `today` only for the open-window date of each sale row, which the contract leaves out. */
@@ -310,7 +340,7 @@ export const TAX_CONTRACT_FILE = fileURLToPath(
 export function taxContractJson(): string {
   return contractJson(
     "tax",
-    "The Bizkaia foral tax view: FIFO, the Art. 43 repurchase rule (letter g for listed securities, letter i for crypto from 2025-01-01, a notice for a crypto loss before), deferred losses and where they integrate, four-year carryforward (Art. 66) and the savings-base quota. Shared with the mobile client: both implementations must reproduce every case. Events are LedgerEvents; an absent fxSource is IDENTITY and an absent funding is CASH. assetClasses comes from each instrument's type (ETF, STOCK listed-security; CRYPTO fungible-crypto; BOND, COMMODITY, CASH unclassified). history is computeTaxHistory over the whole ledger; years holds, per requested year, taxYearOf, carryforwardFrom, and the figures of buildTaxYearView (sums to two places, the scale in force and the quota: null when no scale is on file for that territory and year, never the nearest year's). The savings base has two pools, carried forward together as in carryforward.json: capital gains (netSavingsBase, the gains pool's final balance) and income from movable capital (savingsIncome: interest and cash dividends, gross in euros, in-kind dividends left out; count and gross are the year's own, finalNet the pool's balance after its carryforward). Bizkaia's cross limit is 0, so the pools never offset each other; savingsBase adds their positive final balances and the quota applies to it. withholdings.total is every withholding recorded on that income (cash dividends and interest; in-kind income keeps its own in inKindIncome), in euros at each row's rate, to two places: payments on account of the whole IRPF, never subtracted from the quota; interestWithoutWithholding is true when some interest of the year records 0, only for a notice. The repurchase rules, the swap valuation and the scales are tables both sides carry. Fiscal years and repurchase windows are Madrid calendar days. Instants are ISO strings; a calendar day is {year, month, day}. Pending deferrals list oldest acquisition first, then by buy id. expect is written by running the TypeScript core; byHand.figures, where a case has it, are worked out by hand, its arithmetic says how, and each key is a dotted path into expect.",
+    "The Bizkaia foral tax view: FIFO, the Art. 43 repurchase rule (letter g for listed securities, letter i for crypto from 2025-01-01, a notice for a crypto loss before), deferred losses and where they integrate, four-year carryforward (Art. 66) and the savings-base quota. Shared with the mobile client: both implementations must reproduce every case. Events are LedgerEvents; an absent fxSource is IDENTITY and an absent funding is CASH. assetClasses comes from each instrument's type (ETF, STOCK listed-security; CRYPTO fungible-crypto; BOND, COMMODITY, CASH unclassified). history is computeTaxHistory over the whole ledger; years holds, per requested year, taxYearOf, carryforwardFrom, and the figures of buildTaxYearView (sums to two places, the scale in force, the latest on file whose year is not after the requested one, and the quota: both null for a year before the first scale on file, because a scale never reaches back to a year before its own). The savings base has two pools, carried forward together as in carryforward.json: capital gains (netSavingsBase, the gains pool's final balance) and income from movable capital (savingsIncome: interest and cash dividends, gross in euros, in-kind dividends left out; count and gross are the year's own, finalNet the pool's balance after its carryforward). Bizkaia's cross limit is 0, so the pools never offset each other; savingsBase adds their positive final balances and the quota applies to it. withholdings.total is every withholding recorded on that income (cash dividends and interest; in-kind income keeps its own in inKindIncome), in euros at each row's rate, to two places: payments on account of the whole IRPF, never subtracted from the quota; interestWithoutWithholding is true when some interest of the year records 0, only for a notice. The repurchase rules, the swap valuation and the scales are tables both sides carry. Fiscal years and repurchase windows are Madrid calendar days. Instants are ISO strings; a calendar day is {year, month, day}. Pending deferrals list oldest acquisition first, then by buy id. expect is written by running the TypeScript core; byHand.figures, where a case has it, are worked out by hand, its arithmetic says how, and each key is a dotted path into expect.",
     cases.map(({ byHand, ...input }) => ({
       ...input,
       ...(byHand ? { byHand } : {}),

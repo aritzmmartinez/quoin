@@ -1,7 +1,7 @@
 {
   "contract": "tax",
   "version": 1,
-  "description": "The Bizkaia foral tax view: FIFO, the Art. 43 repurchase rule (letter g for listed securities, letter i for crypto from 2025-01-01, a notice for a crypto loss before), deferred losses and where they integrate, four-year carryforward (Art. 66) and the savings-base quota. Shared with the mobile client: both implementations must reproduce every case. Events are LedgerEvents; an absent fxSource is IDENTITY and an absent funding is CASH. assetClasses comes from each instrument's type (ETF, STOCK listed-security; CRYPTO fungible-crypto; BOND, COMMODITY, CASH unclassified). history is computeTaxHistory over the whole ledger; years holds, per requested year, taxYearOf, carryforwardFrom, and the figures of buildTaxYearView (sums to two places, the scale in force and the quota: null when no scale is on file for that territory and year, never the nearest year's). The savings base has two pools, carried forward together as in carryforward.json: capital gains (netSavingsBase, the gains pool's final balance) and income from movable capital (savingsIncome: interest and cash dividends, gross in euros, in-kind dividends left out; count and gross are the year's own, finalNet the pool's balance after its carryforward). Bizkaia's cross limit is 0, so the pools never offset each other; savingsBase adds their positive final balances and the quota applies to it. withholdings.total is every withholding recorded on that income (cash dividends and interest; in-kind income keeps its own in inKindIncome), in euros at each row's rate, to two places: payments on account of the whole IRPF, never subtracted from the quota; interestWithoutWithholding is true when some interest of the year records 0, only for a notice. The repurchase rules, the swap valuation and the scales are tables both sides carry. Fiscal years and repurchase windows are Madrid calendar days. Instants are ISO strings; a calendar day is {year, month, day}. Pending deferrals list oldest acquisition first, then by buy id. expect is written by running the TypeScript core; byHand.figures, where a case has it, are worked out by hand, its arithmetic says how, and each key is a dotted path into expect.",
+  "description": "The Bizkaia foral tax view: FIFO, the Art. 43 repurchase rule (letter g for listed securities, letter i for crypto from 2025-01-01, a notice for a crypto loss before), deferred losses and where they integrate, four-year carryforward (Art. 66) and the savings-base quota. Shared with the mobile client: both implementations must reproduce every case. Events are LedgerEvents; an absent fxSource is IDENTITY and an absent funding is CASH. assetClasses comes from each instrument's type (ETF, STOCK listed-security; CRYPTO fungible-crypto; BOND, COMMODITY, CASH unclassified). history is computeTaxHistory over the whole ledger; years holds, per requested year, taxYearOf, carryforwardFrom, and the figures of buildTaxYearView (sums to two places, the scale in force, the latest on file whose year is not after the requested one, and the quota: both null for a year before the first scale on file, because a scale never reaches back to a year before its own). The savings base has two pools, carried forward together as in carryforward.json: capital gains (netSavingsBase, the gains pool's final balance) and income from movable capital (savingsIncome: interest and cash dividends, gross in euros, in-kind dividends left out; count and gross are the year's own, finalNet the pool's balance after its carryforward). Bizkaia's cross limit is 0, so the pools never offset each other; savingsBase adds their positive final balances and the quota applies to it. withholdings.total is every withholding recorded on that income (cash dividends and interest; in-kind income keeps its own in inKindIncome), in euros at each row's rate, to two places: payments on account of the whole IRPF, never subtracted from the quota; interestWithoutWithholding is true when some interest of the year records 0, only for a notice. The repurchase rules, the swap valuation and the scales are tables both sides carry. Fiscal years and repurchase windows are Madrid calendar days. Instants are ISO strings; a calendar day is {year, month, day}. Pending deferrals list oldest acquisition first, then by buy id. expect is written by running the TypeScript core; byHand.figures, where a case has it, are worked out by hand, its arithmetic says how, and each key is a dotted path into expect.",
   "cases": [
     {
       "name": "FIFO over two lots with fees on every trade, a partial sale, in a year with a scale",
@@ -343,12 +343,12 @@
         2026
       ],
       "byHand": {
-        "arithmetic": "The March sale takes the January lot whole: 850 − 1000 = −150. Its window runs from 20 January to 20 May 2025; the 4 bought on 3 March are inside it, earlier, and still held after the sale, so before = 4 and the repurchase is min(4, 4) = 4 of 10: 0.4 of the loss, −60, is not computable and stays on those 4 units; −90 computes in 2025. The 2026 sale of those 4 for 360 gains 360 − 320 = 40; it carries −60, nothing is bought in its window, so the −60 integrates in 2026 as its own line: 40 − 60 = −20 computable. 2025 has no scale; 2026 does, but the base is negative, so the quota is 0.",
+        "arithmetic": "The March sale takes the January lot whole: 850 − 1000 = −150. Its window runs from 20 January to 20 May 2025; the 4 bought on 3 March are inside it, earlier, and still held after the sale, so before = 4 and the repurchase is min(4, 4) = 4 of 10: 0.4 of the loss, −60, is not computable and stays on those 4 units; −90 computes in 2025. The 2026 sale of those 4 for 360 gains 360 − 320 = 40; it carries −60, nothing is bought in its window, so the −60 integrates in 2026 as its own line: 40 − 60 = −20 computable. Both years have a scale, but both bases are negative, so both quotas are 0.",
         "figures": {
           "history.gains.0.realizedPnL": "-150",
           "history.gains.0.nonComputable": "-60",
           "history.gains.0.computablePnL": "-90",
-          "years.2025.view.quota": null,
+          "years.2025.view.quota": "0",
           "years.2026.taxYear.computableNet": "-20",
           "years.2026.view.integratedSum": "-60.00",
           "years.2026.view.quota": "0"
@@ -638,8 +638,37 @@
                 "finalNet": "0"
               },
               "savingsBase": "0",
-              "scale": null,
-              "quota": null,
+              "scale": {
+                "source": "Art. 76 NF 13/2013 de Bizkaia, redacción anterior a la NF 2/2025, vigente hasta 31-12-2025",
+                "brackets": [
+                  {
+                    "from": "0",
+                    "to": "2500",
+                    "rate": "0.20"
+                  },
+                  {
+                    "from": "2500",
+                    "to": "10000",
+                    "rate": "0.21"
+                  },
+                  {
+                    "from": "10000",
+                    "to": "15000",
+                    "rate": "0.22"
+                  },
+                  {
+                    "from": "15000",
+                    "to": "30000",
+                    "rate": "0.23"
+                  },
+                  {
+                    "from": "30000",
+                    "to": null,
+                    "rate": "0.25"
+                  }
+                ]
+              },
+              "quota": "0",
               "withholdings": {
                 "total": "0.00",
                 "interestWithoutWithholding": false
@@ -1361,8 +1390,37 @@
                 "finalNet": "0"
               },
               "savingsBase": "0",
-              "scale": null,
-              "quota": null,
+              "scale": {
+                "source": "Art. 76 NF 13/2013 de Bizkaia, redacción anterior a la NF 2/2025, vigente hasta 31-12-2025",
+                "brackets": [
+                  {
+                    "from": "0",
+                    "to": "2500",
+                    "rate": "0.20"
+                  },
+                  {
+                    "from": "2500",
+                    "to": "10000",
+                    "rate": "0.21"
+                  },
+                  {
+                    "from": "10000",
+                    "to": "15000",
+                    "rate": "0.22"
+                  },
+                  {
+                    "from": "15000",
+                    "to": "30000",
+                    "rate": "0.23"
+                  },
+                  {
+                    "from": "30000",
+                    "to": null,
+                    "rate": "0.25"
+                  }
+                ]
+              },
+              "quota": "0",
               "withholdings": {
                 "total": "0.00",
                 "interestWithoutWithholding": false
@@ -2013,8 +2071,37 @@
                 "finalNet": "0"
               },
               "savingsBase": "0",
-              "scale": null,
-              "quota": null,
+              "scale": {
+                "source": "Art. 76 NF 13/2013 de Bizkaia, redacción anterior a la NF 2/2025, vigente hasta 31-12-2025",
+                "brackets": [
+                  {
+                    "from": "0",
+                    "to": "2500",
+                    "rate": "0.20"
+                  },
+                  {
+                    "from": "2500",
+                    "to": "10000",
+                    "rate": "0.21"
+                  },
+                  {
+                    "from": "10000",
+                    "to": "15000",
+                    "rate": "0.22"
+                  },
+                  {
+                    "from": "15000",
+                    "to": "30000",
+                    "rate": "0.23"
+                  },
+                  {
+                    "from": "30000",
+                    "to": null,
+                    "rate": "0.25"
+                  }
+                ]
+              },
+              "quota": "0",
               "withholdings": {
                 "total": "0.00",
                 "interestWithoutWithholding": false
@@ -2107,6 +2194,13 @@
       "years": [
         2025
       ],
+      "byHand": {
+        "arithmetic": "The two gains the core computes, 80 on the coin given in the swap and 68 on the token sold in September, make a base of 148. 2025 has the scale before NF 2/2025, and 148 falls in its first bracket: 148 × 0.20 = 29.6.",
+        "figures": {
+          "years.2025.view.netSavingsBase": "148",
+          "years.2025.view.quota": "29.6"
+        }
+      },
       "expect": {
         "assetClasses": {
           "TESTCOIN": "fungible-crypto",
@@ -2282,8 +2376,37 @@
                 "finalNet": "0"
               },
               "savingsBase": "148",
-              "scale": null,
-              "quota": null,
+              "scale": {
+                "source": "Art. 76 NF 13/2013 de Bizkaia, redacción anterior a la NF 2/2025, vigente hasta 31-12-2025",
+                "brackets": [
+                  {
+                    "from": "0",
+                    "to": "2500",
+                    "rate": "0.20"
+                  },
+                  {
+                    "from": "2500",
+                    "to": "10000",
+                    "rate": "0.21"
+                  },
+                  {
+                    "from": "10000",
+                    "to": "15000",
+                    "rate": "0.22"
+                  },
+                  {
+                    "from": "15000",
+                    "to": "30000",
+                    "rate": "0.23"
+                  },
+                  {
+                    "from": "30000",
+                    "to": null,
+                    "rate": "0.25"
+                  }
+                ]
+              },
+              "quota": "29.6",
               "withholdings": {
                 "total": "0.00",
                 "interestWithoutWithholding": false
@@ -2664,8 +2787,37 @@
                 "finalNet": "0"
               },
               "savingsBase": "0",
-              "scale": null,
-              "quota": null,
+              "scale": {
+                "source": "Art. 76 NF 13/2013 de Bizkaia, redacción anterior a la NF 2/2025, vigente hasta 31-12-2025",
+                "brackets": [
+                  {
+                    "from": "0",
+                    "to": "2500",
+                    "rate": "0.20"
+                  },
+                  {
+                    "from": "2500",
+                    "to": "10000",
+                    "rate": "0.21"
+                  },
+                  {
+                    "from": "10000",
+                    "to": "15000",
+                    "rate": "0.22"
+                  },
+                  {
+                    "from": "15000",
+                    "to": "30000",
+                    "rate": "0.23"
+                  },
+                  {
+                    "from": "30000",
+                    "to": null,
+                    "rate": "0.25"
+                  }
+                ]
+              },
+              "quota": "0",
               "withholdings": {
                 "total": "0.00",
                 "interestWithoutWithholding": false
@@ -2988,8 +3140,37 @@
                 "finalNet": "0"
               },
               "savingsBase": "0",
-              "scale": null,
-              "quota": null,
+              "scale": {
+                "source": "Art. 76 NF 13/2013 de Bizkaia, redacción anterior a la NF 2/2025, vigente hasta 31-12-2025",
+                "brackets": [
+                  {
+                    "from": "0",
+                    "to": "2500",
+                    "rate": "0.20"
+                  },
+                  {
+                    "from": "2500",
+                    "to": "10000",
+                    "rate": "0.21"
+                  },
+                  {
+                    "from": "10000",
+                    "to": "15000",
+                    "rate": "0.22"
+                  },
+                  {
+                    "from": "15000",
+                    "to": "30000",
+                    "rate": "0.23"
+                  },
+                  {
+                    "from": "30000",
+                    "to": null,
+                    "rate": "0.25"
+                  }
+                ]
+              },
+              "quota": "0",
               "withholdings": {
                 "total": "0.00",
                 "interestWithoutWithholding": false
@@ -3632,6 +3813,327 @@
               "withholdings": {
                 "total": "12.00",
                 "interestWithoutWithholding": true
+              },
+              "inKindIncome": {
+                "count": 0,
+                "gross": "0.00",
+                "withheld": "0.00"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "A year before the first scale on file has none, and a year after the last keeps the one in force",
+      "residence": "bizkaia",
+      "instruments": [
+        {
+          "id": "IE00TEST0101",
+          "type": "ETF"
+        }
+      ],
+      "events": [
+        {
+          "id": "e-38",
+          "ts": "2024-01-10T09:00:00.000Z",
+          "type": "BUY",
+          "instrumentId": "IE00TEST0101",
+          "quantity": "10",
+          "price": "100",
+          "grossAmount": "1000",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-38"
+        },
+        {
+          "id": "e-39",
+          "ts": "2024-06-03T09:00:00.000Z",
+          "type": "SELL",
+          "instrumentId": "IE00TEST0101",
+          "quantity": "10",
+          "price": "110",
+          "grossAmount": "1100",
+          "fees": "0",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TEST",
+          "externalId": "x-39"
+        }
+      ],
+      "years": [
+        2024,
+        2027
+      ],
+      "byHand": {
+        "arithmetic": "2024: 1100 − 1000 = 100 of base, but no scale is on file before 2025, so scale and quota are null. 2027 has no sale and a base of 0; the NF 2/2025 scale, in force from 1 January 2026 with no end date, is still the one that applies, so the quota is 0.",
+        "figures": {
+          "years.2024.view.savingsBase": "100",
+          "years.2024.view.scale": null,
+          "years.2024.view.quota": null,
+          "years.2027.view.scale.source": "Art. 76 NF 13/2013 de Bizkaia, redacción NF 2/2025, efectos 1-1-2026",
+          "years.2027.view.quota": "0"
+        }
+      },
+      "expect": {
+        "assetClasses": {
+          "IE00TEST0101": "listed-security"
+        },
+        "history": {
+          "gains": [
+            {
+              "eventId": "e-39",
+              "ts": "2024-06-03T09:00:00.000Z",
+              "instrumentId": "IE00TEST0101",
+              "quantity": "10",
+              "grossAmount": "1100",
+              "fees": "0",
+              "costBasis": "1000",
+              "realizedPnL": "100",
+              "lots": [
+                {
+                  "buyEventId": "e-38",
+                  "acquiredAt": "2024-01-10T09:00:00.000Z",
+                  "quantity": "10",
+                  "unitCost": "100"
+                }
+              ],
+              "computablePnL": "100",
+              "nonComputable": "0",
+              "carriedOver": "0",
+              "washSale": null,
+              "repurchaseWindow": null,
+              "unlistedNotice": null
+            }
+          ],
+          "integrations": [],
+          "pendingByYear": {
+            "2024": []
+          }
+        },
+        "years": {
+          "2024": {
+            "taxYear": {
+              "year": 2024,
+              "territory": "bizkaia",
+              "gains": [
+                {
+                  "eventId": "e-39",
+                  "ts": "2024-06-03T09:00:00.000Z",
+                  "instrumentId": "IE00TEST0101",
+                  "quantity": "10",
+                  "grossAmount": "1100",
+                  "fees": "0",
+                  "costBasis": "1000",
+                  "realizedPnL": "100",
+                  "lots": [
+                    {
+                      "buyEventId": "e-38",
+                      "acquiredAt": "2024-01-10T09:00:00.000Z",
+                      "quantity": "10",
+                      "unitCost": "100"
+                    }
+                  ],
+                  "computablePnL": "100",
+                  "nonComputable": "0",
+                  "carriedOver": "0",
+                  "washSale": null,
+                  "repurchaseWindow": null,
+                  "unlistedNotice": null
+                }
+              ],
+              "integrations": [],
+              "pending": [],
+              "computableNet": "100"
+            },
+            "carryforward": {
+              "targetYear": 2024,
+              "steps": [
+                {
+                  "year": 2020,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2021,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2022,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2023,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2024,
+                  "ownNet": "100",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "100",
+                  "pendingLossRemaining": "0"
+                }
+              ],
+              "netSavingsBase": "100"
+            },
+            "view": {
+              "affectedCount": 0,
+              "ownNet": "100.00",
+              "nonComputableSum": "0.00",
+              "integratedSum": "0.00",
+              "computableNet": "100",
+              "pendingSum": "0.00",
+              "netSavingsBase": "100",
+              "savingsIncome": {
+                "count": 0,
+                "gross": "0.00",
+                "finalNet": "0"
+              },
+              "savingsBase": "100",
+              "scale": null,
+              "quota": null,
+              "withholdings": {
+                "total": "0.00",
+                "interestWithoutWithholding": false
+              },
+              "inKindIncome": {
+                "count": 0,
+                "gross": "0.00",
+                "withheld": "0.00"
+              }
+            }
+          },
+          "2027": {
+            "taxYear": {
+              "year": 2027,
+              "territory": "bizkaia",
+              "gains": [],
+              "integrations": [],
+              "pending": [],
+              "computableNet": "0"
+            },
+            "carryforward": {
+              "targetYear": 2027,
+              "steps": [
+                {
+                  "year": 2023,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2024,
+                  "ownNet": "100",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "100",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2025,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2026,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2027,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                }
+              ],
+              "netSavingsBase": "0"
+            },
+            "view": {
+              "affectedCount": 0,
+              "ownNet": "0.00",
+              "nonComputableSum": "0.00",
+              "integratedSum": "0.00",
+              "computableNet": "0",
+              "pendingSum": "0.00",
+              "netSavingsBase": "0",
+              "savingsIncome": {
+                "count": 0,
+                "gross": "0.00",
+                "finalNet": "0"
+              },
+              "savingsBase": "0",
+              "scale": {
+                "source": "Art. 76 NF 13/2013 de Bizkaia, redacción NF 2/2025, efectos 1-1-2026",
+                "brackets": [
+                  {
+                    "from": "0",
+                    "to": "7500",
+                    "rate": "0.19"
+                  },
+                  {
+                    "from": "7500",
+                    "to": "15000",
+                    "rate": "0.20"
+                  },
+                  {
+                    "from": "15000",
+                    "to": "30000",
+                    "rate": "0.22"
+                  },
+                  {
+                    "from": "30000",
+                    "to": "50000",
+                    "rate": "0.24"
+                  },
+                  {
+                    "from": "50000",
+                    "to": "90000",
+                    "rate": "0.255"
+                  },
+                  {
+                    "from": "90000",
+                    "to": "120000",
+                    "rate": "0.26"
+                  },
+                  {
+                    "from": "120000",
+                    "to": "240000",
+                    "rate": "0.265"
+                  },
+                  {
+                    "from": "240000",
+                    "to": "300000",
+                    "rate": "0.27"
+                  },
+                  {
+                    "from": "300000",
+                    "to": null,
+                    "rate": "0.28"
+                  }
+                ]
+              },
+              "quota": "0",
+              "withholdings": {
+                "total": "0.00",
+                "interestWithoutWithholding": false
               },
               "inKindIncome": {
                 "count": 0,

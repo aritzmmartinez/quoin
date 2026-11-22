@@ -7,6 +7,18 @@ describe("territoryRules", () => {
     expect(territoryRules("bizkaia")).toEqual({
       savingsScales: [
         {
+          year: 2025,
+          source:
+            "Art. 76 NF 13/2013 de Bizkaia, redacción anterior a la NF 2/2025, vigente hasta 31-12-2025",
+          brackets: [
+            { from: "0", to: "2500", rate: "0.20" },
+            { from: "2500", to: "10000", rate: "0.21" },
+            { from: "10000", to: "15000", rate: "0.22" },
+            { from: "15000", to: "30000", rate: "0.23" },
+            { from: "30000", to: null, rate: "0.25" },
+          ],
+        },
+        {
           year: 2026,
           source:
             "Art. 76 NF 13/2013 de Bizkaia, redacción NF 2/2025, efectos 1-1-2026",

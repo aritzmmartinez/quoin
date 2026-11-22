@@ -11,8 +11,18 @@ describe("getTaxScale", () => {
     expect(scale?.brackets).toHaveLength(9);
   });
 
-  it("returns null for a year with no recorded scale", () => {
-    expect(getTaxScale("bizkaia", 2030)).toBeNull();
+  it("finds the 2025 Bizkaia scale, the wording before NF 2/2025", () => {
+    const scale = getTaxScale("bizkaia", 2025);
+    expect(scale?.year).toBe(2025);
+    expect(scale?.source).toMatch(/anterior a la NF 2\/2025/);
+  });
+
+  it("keeps the NF 2/2025 scale in force after 2026: it has no end date", () => {
+    expect(getTaxScale("bizkaia", 2027)?.year).toBe(2026);
+  });
+
+  it("returns null for a year before the first scale on file", () => {
+    expect(getTaxScale("bizkaia", 2024)).toBeNull();
   });
 });
 

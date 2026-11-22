@@ -382,11 +382,11 @@ describe("buildTaxYearView", () => {
   it("states no scale and no quota for a year the scale table does not cover, but still the base", () => {
     const link = { linkId: "refid-1", linkKind: "swap" };
     const events = [
-      trade("BUY", "ETH", "10", "1000", { ts: "2025-01-05" }),
-      { ...trade("SELL", "ETH", "4", "480", { ts: "2025-03-10" }), ...link },
+      trade("BUY", "ETH", "10", "1000", { ts: "2024-01-05" }),
+      { ...trade("SELL", "ETH", "4", "480", { ts: "2024-03-10" }), ...link },
       {
         ...trade("BUY", "BTC", "0.0099", "465", {
-          ts: "2025-03-10",
+          ts: "2024-03-10",
           fees: "5",
         }),
         ...link,
@@ -398,7 +398,7 @@ describe("buildTaxYearView", () => {
         instrument("ETH", "Ether", "CRYPTO"),
         instrument("BTC", "Bitcoin", "CRYPTO"),
       ],
-      2025,
+      2024,
       BIZKAIA,
       today(MADRID, new Date()),
     );

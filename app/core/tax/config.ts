@@ -130,10 +130,12 @@ export function getTaxScale(
   territory: Territory,
   year: number,
 ): SavingsBaseTaxScale | null {
-  return (
-    territoryRules(territory).savingsScales.find((s) => s.year === year) ??
-    null
-  );
+  let inForce: SavingsBaseTaxScale | null = null;
+  for (const scale of territoryRules(territory).savingsScales) {
+    if (scale.year <= year && (inForce === null || scale.year > inForce.year))
+      inForce = scale;
+  }
+  return inForce;
 }
 
 

@@ -1216,10 +1216,12 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
 - **Everything the tax engine reads per territory is one `TerritoryRules`**
   (`core/tax/territory.ts`, `satisfies Record<Territory, …>`): savings scales, repurchase
   rules, swap valuation, carryforward years, the cross-pool offset limit and the unlisted
-  notice. Scales are per year;
-  a year not on file returns `null` from `getTaxScale` and the screen states the absence —
-  never fall back to the nearest year's brackets. A rate is data; a superseded scale is a
-  wrong number that looks right.
+  notice. A scale applies from its year until the next one on file: `getTaxScale` returns
+  the latest whose year is not after the one asked, so a scale with no end date (the NF
+  2/2025 one, from 2026) covers the years after it. A year before the first scale returns
+  `null` and the screen states the absence — a scale never reaches back. When a territory
+  publishes a new scale it must be added here the same day: until then the old one is
+  applied, and a superseded scale is a wrong number that looks right.
 - **The savings base has two pools, carried forward together** (`carryforwardPools`):
   capital gains and income from movable capital — interest and cash dividends, gross in
   euros (`savingsIncomeNetOf`); in-kind income stays out. Each carries its own losses for
