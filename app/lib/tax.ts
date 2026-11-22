@@ -11,12 +11,19 @@ import { dayOf, fiscalYearOf, toIsoDate } from "~/core/calendar";
 import { Money, isInKind, type DividendEvent } from "~/core/domain";
 import { baseOf, bookable, unconvertibleInstrumentIds } from "~/core/fx";
 import {
-  carryforwardFrom,
+  carryforwardPools,
   computeSavingsQuota,
   computeTaxHistory,
+  gainsNetOf,
   getTaxScale,
+  isSavingsIncome,
+  savingsIncomeCountOf,
+  savingsIncomeNetOf,
   taxYearOf,
-  type CarryforwardStep,
+  territoryRules,
+  withholdingsOf,
+  type PoolStep,
+  type Withholdings,
   type RealizedGainDetail,
   type RepurchaseAssetClass,
   type RepurchaseLetter,
@@ -31,6 +38,10 @@ import { REALIZED_VIEW_PARAM } from "./realized";
 
 function isSellTrade(event: LedgerEvent): event is TradeEvent {
   return event.type === "SELL";
+}
+
+function isDividendOrInterest(event: LedgerEvent): boolean {
+  return isSavingsIncome(event) || isInKindIncome(event);
 }
 
 function isInKindIncome(event: LedgerEvent): event is DividendEvent {
@@ -68,7 +79,7 @@ export function listTaxYears(
 ): number[] {
   const years = new Set(
     events
-      .filter((e) => isSellTrade(e) || isInKindIncome(e))
+      .filter((e) => isSellTrade(e) || isDividendOrInterest(e))
       .map((e) => fiscalYearOf(e.ts, zone)),
   );
   return [...years].sort((a, b) => b - a);
@@ -270,7 +281,14 @@ export function groupPendingBySale(
     );
 }
 
-export type TaxCarryforwardRow = CarryforwardStep;
+export type TaxCarryforwardRow = PoolStep;
+
+export interface TaxSavingsIncome {
+  count: number;
+  gross: string;
+  carryforward: TaxCarryforwardRow[];
+  finalNet: string;
+}
 
 export interface TaxInKindIncome {
   count: number;
@@ -320,8 +338,11 @@ export interface TaxYearView {
   pendingSum: string;
   carryforward: TaxCarryforwardRow[];
   netSavingsBase: string;
+  savingsIncome: TaxSavingsIncome;
+  savingsBase: string;
   scale: TaxScaleView | null;
   quota: string | null;
+  withholdings: Withholdings;
   inKindIncome: TaxInKindIncome;
 }
 
@@ -370,12 +391,21 @@ export function buildTaxYearView(
     })),
   }));
 
-  const carry = carryforwardFrom(history, year);
+  const rules = territoryRules(result.territory);
+  const incomeNetOf = savingsIncomeNetOf(events, jurisdiction.zone);
+  const {
+    pools: [gains, income],
+    savingsBase,
+  } = carryforwardPools(
+    [gainsNetOf(history), incomeNetOf],
+    year,
+    rules.lossCarryforwardYears,
+    rules.crossOffsetLimit,
+  );
   const scale = getTaxScale(result.territory, year);
-  const netBase = new Decimal(carry.netSavingsBase);
   const quota = scale
-    ? (netBase.gt(0)
-        ? computeSavingsQuota(Money.fromString(carry.netSavingsBase), scale)
+    ? (new Decimal(savingsBase).gt(0)
+        ? computeSavingsQuota(Money.fromString(savingsBase), scale)
         : Money.zero()
       ).toString()
     : null;
@@ -405,10 +435,18 @@ export function buildTaxYearView(
       pending.map((p) => p.amount),
       2,
     ),
-    carryforward: carry.steps,
-    netSavingsBase: carry.netSavingsBase,
+    carryforward: gains.steps,
+    netSavingsBase: gains.finalNet,
+    savingsIncome: {
+      count: savingsIncomeCountOf(events, year, jurisdiction.zone),
+      gross: incomeNetOf(year).toFixed(2),
+      carryforward: income.steps,
+      finalNet: income.finalNet,
+    },
+    savingsBase,
     scale: scale ? { source: scale.source, brackets: scale.brackets } : null,
     quota,
+    withholdings: withholdingsOf(events, year, jurisdiction.zone),
     inKindIncome: inKindIncomeOf(events, year, jurisdiction.zone),
   };
 }

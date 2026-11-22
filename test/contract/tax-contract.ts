@@ -29,6 +29,18 @@ const TOKEN = "TESTTOKEN";
 
 const { trade, dividend } = ledger();
 
+const interest = (n: number, ts: string, grossAmount: string, taxWithheld: string): Row => ({
+  id: `i-${n}`,
+  ts,
+  type: "INTEREST",
+  grossAmount,
+  taxWithheld,
+  currency: "EUR",
+  account: "test",
+  source: "TEST",
+  externalId: `xi-${n}`,
+});
+
 const cases: (TaxInput & {
   byHand?: { arithmetic: string; figures: Record<string, string | null> };
 })[] = [
@@ -181,6 +193,55 @@ const cases: (TaxInput & {
     ],
     years: [2025, 2026],
   },
+  {
+    name: "Savings income beside a capital loss: in Bizkaia the two pools never compensate each other",
+    residence: "bizkaia",
+    instruments: [{ id: FUND, type: "ETF" }, { id: STOCK, type: "STOCK" }],
+    events: [
+      trade("BUY", FUND, "2026-01-12T09:00:00.000Z", "10", "1000"),
+      trade("SELL", FUND, "2026-06-01T09:00:00.000Z", "10", "800"),
+      dividend(STOCK, "2026-04-10T09:00:00.000Z", "100", "19"),
+      interest(1, "2026-05-04T09:00:00.000Z", "50", "9.5"),
+    ],
+    years: [2026],
+    byHand: {
+      arithmetic:
+        "Gains: 800 − 1000 = −200, carried. Income: dividend 100 + interest 50 = 150 gross. The cross limit is 0, so the loss takes nothing from the income: base 0 + 150 = 150, quota 150 × 0.19 = 28.5. Withholdings 19 + 9.5 = 28.50 are shown apart and not subtracted.",
+      figures: {
+        "years.2026.view.netSavingsBase": "-200",
+        "years.2026.view.savingsIncome.gross": "150.00",
+        "years.2026.view.savingsBase": "150",
+        "years.2026.view.quota": "28.5",
+        "years.2026.view.withholdings.total": "28.50",
+      },
+    },
+  },
+  {
+    name: "A year with a foreign dividend and its withholding in dollars, and interest that records none",
+    residence: "bizkaia",
+    instruments: [{ id: STOCK, type: "STOCK" }],
+    events: [
+      dividend(STOCK, "2026-03-16T14:00:00.000Z", "100", "15", {
+        currency: "USD",
+        fxSource: "ECB",
+        fxRate: "1.25",
+        fxDirection: "QUOTE_PER_BASE",
+        fxDate: "2026-03-16",
+      }),
+      interest(2, "2026-07-01T09:00:00.000Z", "20", "0"),
+    ],
+    years: [2026],
+    byHand: {
+      arithmetic:
+        "The dividend reaches euros at its own row's rate: 100 / 1.25 = 80 gross, 15 / 1.25 = 12 withheld. Income 80 + 20 = 100, base 100, quota 100 × 0.19 = 19. Withholdings: 12, one figure with no split by origin. The interest records 0 withheld, so the notice is raised; it changes no figure.",
+      figures: {
+        "years.2026.view.savingsIncome.gross": "100.00",
+        "years.2026.view.savingsBase": "100",
+        "years.2026.view.quota": "19",
+        "years.2026.view.withholdings.total": "12.00",
+      },
+    },
+  },
 ];
 
 /** `buildTaxYearView` reads `today` only for the open-window date of each sale row, which the contract leaves out. */
@@ -224,8 +285,15 @@ export function evaluate(input: TaxInput) {
               computableNet: view.computableNet,
               pendingSum: view.pendingSum,
               netSavingsBase: view.netSavingsBase,
+              savingsIncome: {
+                count: view.savingsIncome.count,
+                gross: view.savingsIncome.gross,
+                finalNet: view.savingsIncome.finalNet,
+              },
+              savingsBase: view.savingsBase,
               scale: view.scale,
               quota: view.quota,
+              withholdings: view.withholdings,
               inKindIncome: view.inKindIncome,
             },
           },
@@ -242,7 +310,7 @@ export const TAX_CONTRACT_FILE = fileURLToPath(
 export function taxContractJson(): string {
   return contractJson(
     "tax",
-    "The Bizkaia foral tax view: FIFO, the Art. 43 repurchase rule (letter g for listed securities, letter i for crypto from 2025-01-01, a notice for a crypto loss before), deferred losses and where they integrate, four-year carryforward (Art. 66) and the savings-base quota. Shared with the mobile client: both implementations must reproduce every case. Events are LedgerEvents; an absent fxSource is IDENTITY and an absent funding is CASH. assetClasses comes from each instrument's type (ETF, STOCK listed-security; CRYPTO fungible-crypto; BOND, COMMODITY, CASH unclassified). history is computeTaxHistory over the whole ledger; years holds, per requested year, taxYearOf, carryforwardFrom, and the figures of buildTaxYearView (sums to two places, the scale in force and the quota: null when no scale is on file for that territory and year, never the nearest year's). The repurchase rules, the swap valuation and the scales are tables both sides carry. Fiscal years and repurchase windows are Madrid calendar days. Instants are ISO strings; a calendar day is {year, month, day}. Pending deferrals list oldest acquisition first, then by buy id. expect is written by running the TypeScript core; byHand.figures, where a case has it, are worked out by hand, its arithmetic says how, and each key is a dotted path into expect.",
+    "The Bizkaia foral tax view: FIFO, the Art. 43 repurchase rule (letter g for listed securities, letter i for crypto from 2025-01-01, a notice for a crypto loss before), deferred losses and where they integrate, four-year carryforward (Art. 66) and the savings-base quota. Shared with the mobile client: both implementations must reproduce every case. Events are LedgerEvents; an absent fxSource is IDENTITY and an absent funding is CASH. assetClasses comes from each instrument's type (ETF, STOCK listed-security; CRYPTO fungible-crypto; BOND, COMMODITY, CASH unclassified). history is computeTaxHistory over the whole ledger; years holds, per requested year, taxYearOf, carryforwardFrom, and the figures of buildTaxYearView (sums to two places, the scale in force and the quota: null when no scale is on file for that territory and year, never the nearest year's). The savings base has two pools, carried forward together as in carryforward.json: capital gains (netSavingsBase, the gains pool's final balance) and income from movable capital (savingsIncome: interest and cash dividends, gross in euros, in-kind dividends left out; count and gross are the year's own, finalNet the pool's balance after its carryforward). Bizkaia's cross limit is 0, so the pools never offset each other; savingsBase adds their positive final balances and the quota applies to it. withholdings.total is every withholding recorded on that income (cash dividends and interest; in-kind income keeps its own in inKindIncome), in euros at each row's rate, to two places: payments on account of the whole IRPF, never subtracted from the quota; interestWithoutWithholding is true when some interest of the year records 0, only for a notice. The repurchase rules, the swap valuation and the scales are tables both sides carry. Fiscal years and repurchase windows are Madrid calendar days. Instants are ISO strings; a calendar day is {year, month, day}. Pending deferrals list oldest acquisition first, then by buy id. expect is written by running the TypeScript core; byHand.figures, where a case has it, are worked out by hand, its arithmetic says how, and each key is a dotted path into expect.",
     cases.map(({ byHand, ...input }) => ({
       ...input,
       ...(byHand ? { byHand } : {}),
