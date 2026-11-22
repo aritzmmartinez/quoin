@@ -91,10 +91,12 @@ function memory(seed: Record<string, [string, string][]> = {}) {
     replaceHistory: async (
       id: string,
       snapshots: readonly PriceSnapshot[],
-      options: { keepAfter?: Date } = {},
+      options: { keepAfter?: Date; keepBefore?: Date } = {},
     ) => {
       const doomed = of(id).filter(
-        (r) => !options.keepAfter || r.asOf <= options.keepAfter,
+        (r) =>
+          (!options.keepAfter || r.asOf <= options.keepAfter) &&
+          (!options.keepBefore || r.asOf >= options.keepBefore),
       );
       for (const row of doomed) rows.splice(rows.indexOf(row), 1);
       for (const s of snapshots) rows.push({ ...s, id: `r${next++}` });
@@ -135,7 +137,7 @@ function yahoo(
   ranges: string[] = [],
 ): MarketDataProvider {
   return {
-    source: "YAHOO",
+    sourceOf: () => "YAHOO",
     getQuote: async (symbol) => live.find((x) => x.symbol === symbol) ?? null,
     getHistory: async (symbol, range) => {
       if (typeof range === "string") {
@@ -381,6 +383,7 @@ describe("syncInstrumentPrices — an instrument with no daily candle", () => {
 
     expect(sync.inserted).toBe(2);
     expect(view(ETF.id)).toEqual([
+      "2026-10-12T15:00 YAHOO_LIVE",
       "2026-10-13T07:00 YAHOO",
       "2026-10-14T07:00 YAHOO",
       "2026-10-15T08:00 YAHOO_LIVE",
@@ -452,7 +455,7 @@ describe("syncInstrumentPrices — an instrument with no daily candle", () => {
     const { prices, view } = memory();
     const marked: string[] = [];
     const provider: MarketDataProvider = {
-      source: "YAHOO",
+      sourceOf: () => "YAHOO",
       getQuote: async () => quote,
       getHistory: async (symbol) => {
         throw new MarketDataUnavailableError(symbol, 503);
@@ -697,7 +700,7 @@ describe("syncing instruments in turn", () => {
   it("names a provider that could not answer apart from any other error", async () => {
     const { prices } = memory();
     const busy: MarketDataProvider = {
-      source: "YAHOO",
+      sourceOf: () => "YAHOO",
       getQuote: async (symbol) => {
         throw new MarketDataUnavailableError(symbol, 429);
       },

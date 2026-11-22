@@ -551,3 +551,49 @@ describe("PrismaPriceRepository.dailyHistoryIds (integration)", () => {
     );
   });
 });
+
+describe("PrismaPriceRepository.replaceHistory (integration)", () => {
+  const ID = "XS00TEST0003";
+  const stored = async () =>
+    (
+      await prisma.priceSnapshot.findMany({
+        where: { instrumentId: ID },
+        orderBy: { asOf: "asc" },
+      })
+    ).map((row) => `${row.asOf.toISOString().slice(0, 10)} ${row.price}`);
+
+  it("keeps the rows before keepBefore and after keepAfter, replacing the rest", async () => {
+    for (const [day, price] of [
+      ["2026-09-01", "1"],
+      ["2026-10-01", "2"],
+      ["2026-10-02", "3"],
+      ["2026-10-09", "4"],
+    ] as const) {
+      await snapshot(ID, `${day}T00:00:00Z`, price, "2026-10-10T00:00:00Z");
+    }
+
+    const removed = await priceRepo.replaceHistory(
+      ID,
+      [
+        {
+          instrumentId: ID,
+          price: "20",
+          currency: "EUR",
+          asOf: new Date("2026-10-01T00:00:00Z"),
+          source: "TEST",
+        },
+      ],
+      {
+        keepBefore: new Date("2026-10-01T00:00:00Z"),
+        keepAfter: new Date("2026-10-05T00:00:00Z"),
+      },
+    );
+
+    expect(removed).toBe(2);
+    expect(await stored()).toEqual([
+      "2026-09-01 1",
+      "2026-10-01 20",
+      "2026-10-09 4",
+    ]);
+  });
+});

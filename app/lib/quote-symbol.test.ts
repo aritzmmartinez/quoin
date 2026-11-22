@@ -42,7 +42,7 @@ const SNAPSHOT: PriceSnapshot = {
 
 function quoting(currency: string | null): MarketDataProvider {
   return {
-    source: "FAKE",
+    sourceOf: () => "FAKE",
     getQuote: async (symbol) =>
       currency === null
         ? null
@@ -113,7 +113,7 @@ describe("assignQuoteSymbol", () => {
   it("stores nothing when Yahoo cannot be asked, and says so by throwing", async () => {
     const { calls, instruments, prices } = fakes(INSTRUMENT);
     const busy: MarketDataProvider = {
-      source: "FAKE",
+      sourceOf: () => "FAKE",
       getQuote: async (symbol) => {
         throw new MarketDataUnavailableError(symbol, 503);
       },

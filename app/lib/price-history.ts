@@ -125,12 +125,12 @@ export async function replaceQuoteHistory(
     source,
   });
   const snapshots: PriceSnapshot[] = [
-    ...history.map((quote) => snapshot(quote, provider.source)),
-    ...(live ? [snapshot(live, liveSource(provider.source))] : []),
+    ...history.map((quote) => snapshot(quote, provider.sourceOf(symbol))),
+    ...(live ? [snapshot(live, liveSource(provider.sourceOf(symbol)))] : []),
   ];
 
   const removed = await prices.replaceHistory(instrumentId, snapshots, {
-    ...(unchanged ? {} : { quoteSymbol: symbol }),
+    ...(unchanged ? { keepBefore: first.asOf } : { quoteSymbol: symbol }),
     ...(unchanged && !live ? { keepAfter: last.asOf } : {}),
   });
 

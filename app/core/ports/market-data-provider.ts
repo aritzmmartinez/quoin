@@ -40,7 +40,7 @@ export class MarketDataUnavailableError extends Error {
 }
 
 export interface MarketDataProvider {
-  readonly source: string;
+  sourceOf(symbol: string): string;
   getQuote(symbol: string): Promise<Quote | null>;
   getHistory(
     symbol: string,

@@ -11,7 +11,7 @@ import {
   type Broker,
   type MappedBatch,
 } from "~/adapters/ingestion";
-import { YahooMarketDataProvider } from "~/adapters/marketdata";
+import { MarketDataRouter } from "~/adapters/marketdata";
 import {
   PrismaInstrumentRepository,
   PrismaLedgerRepository,
@@ -167,7 +167,7 @@ export async function checkQuoteSymbol(
   symbol: string,
 ): Promise<SymbolCheck> {
   const check = await checkQuoteAgainstLedger(
-    new YahooMarketDataProvider(),
+    new MarketDataRouter(),
     await new PrismaLedgerRepository().list(),
     instrumentId,
     symbol,
@@ -190,7 +190,7 @@ export async function mapQuoteSymbol(
   const result = await assignQuoteSymbol(
     new PrismaInstrumentRepository(),
     new PrismaPriceRepository(),
-    new YahooMarketDataProvider(),
+    new MarketDataRouter(),
     instrumentId,
     symbol,
     ensureRatesNow,
@@ -229,7 +229,7 @@ export async function replaceHistory(
     {
       instruments: new PrismaInstrumentRepository(),
       prices: new PrismaPriceRepository(),
-      provider: new YahooMarketDataProvider(),
+      provider: new MarketDataRouter(),
       rates: ensureRatesNow,
       zone: (await loadResidence()).calendarZone,
     },
@@ -243,7 +243,7 @@ export async function fillPrices(
 ): Promise<PriceFillResult> {
   const instruments = new PrismaInstrumentRepository();
   const prices = new PrismaPriceRepository();
-  const provider = new YahooMarketDataProvider();
+  const provider = new MarketDataRouter();
   const checks = new PrismaPriceSyncRepository();
   const { calendarZone } = await loadResidence();
 

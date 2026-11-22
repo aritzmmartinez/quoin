@@ -2,7 +2,7 @@ import "dotenv/config";
 
 import { argv, exit } from "node:process";
 
-import { YahooMarketDataProvider } from "~/adapters/marketdata";
+import { MarketDataRouter } from "~/adapters/marketdata";
 import {
   PrismaInstrumentRepository,
   PrismaPriceRepository,
@@ -65,7 +65,7 @@ async function main(): Promise<void> {
 
   console.log(`Backfilling ${targets.length} instrument(s), range ${range}.\n`);
 
-  const provider = new YahooMarketDataProvider();
+  const provider = new MarketDataRouter();
   const repository = new PrismaPriceRepository();
   const { calendarZone } = await loadResidence();
   let total = 0;
@@ -101,7 +101,7 @@ async function main(): Promise<void> {
     }
 
     const weekly = report.weekly
-      ? "  ⚠ Yahoo returned weekly candles for this symbol; run prices:rebuild later or check the symbol"
+      ? "  ⚠ the source returned weekly candles for this symbol; run prices:rebuild later or check the symbol"
       : "";
     console.log(
       `  ${report.instrumentId}  (${report.symbol})  ${report.written} candle(s)  ${report.first?.slice(0, 10)} → ${report.last?.slice(0, 10)}  ${report.currency}${weekly}`,

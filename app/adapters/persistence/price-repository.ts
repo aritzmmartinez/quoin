@@ -158,13 +158,21 @@ export class PrismaPriceRepository implements PriceRepository {
     snapshots: readonly PriceSnapshot[],
     options: ReplaceHistoryOptions = {},
   ): Promise<number> {
-    const { quoteSymbol, keepAfter } = options;
+    const { quoteSymbol, keepAfter, keepBefore } = options;
     return prisma.$transaction(async (tx) => {
       await newSeriesVersion(tx, instrumentId);
       const { count } = await tx.priceSnapshot.deleteMany({
-        where: keepAfter
-          ? { instrumentId, asOf: { lte: keepAfter } }
-          : { instrumentId },
+        where: {
+          instrumentId,
+          ...(keepAfter || keepBefore
+            ? {
+                asOf: {
+                  ...(keepAfter ? { lte: keepAfter } : {}),
+                  ...(keepBefore ? { gte: keepBefore } : {}),
+                },
+              }
+            : {}),
+        },
       });
       if (snapshots.length > 0) {
         await tx.priceSnapshot.createMany({
