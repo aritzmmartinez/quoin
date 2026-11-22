@@ -1441,7 +1441,7 @@ export const es = {
       intro:
         "Mismas ventas, con criterio FIFO en vez de AVCO, que es el que exige la declaración foral de Bizkaia (NF 13/2013) y no el de la pestaña de Ventas. Las pérdidas con recompra en los dos meses anteriores o posteriores se difieren según el Art. 43 (letra g para valores homogéneos y, en las transmisiones desde el 1 de enero de 2025, letra i para criptoactivos del mismo tipo), en la proporción recomprada, y se integran cuando se transmiten los recomprados; la compensación con años anteriores sigue el Art. 66. La aritmética de la recompra sigue las consultas de la DGT V1403-21, V1117-21 y V3282-18 sobre la norma estatal paralela, que no vinculan a la Hacienda Foral.",
       yearLabel: "Año fiscal",
-      noYears: "No hay ventas registradas todavía en ningún año.",
+      noYears: "No hay ventas ni rendimientos registrados todavía en ningún año.",
       summary: {
         netBase: "Base liquidable del ahorro",
         gainsBalance: "Saldo de ganancias y pérdidas",
@@ -1555,6 +1555,8 @@ export const es = {
       empty: {
         title: "Sin ventas en este año",
         body: "Elige otro año fiscal en el desplegable.",
+        incomeBody:
+          "Este año no tiene ventas, pero sí rendimientos: sus cifras están en el resumen y más abajo.",
       },
       savingsIncome: {
         title: "Rendimientos del capital mobiliario",

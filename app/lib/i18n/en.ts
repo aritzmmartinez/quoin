@@ -1424,7 +1424,7 @@ export const en: Copy = {
       intro:
         "The same sales, on a FIFO basis instead of AVCO, which is what the Bizkaia foral tax return (NF 13/2013) requires and not what the Sales tab uses. A loss with a repurchase in the two months before or after is deferred under Art. 43 (letter g for homogeneous securities and, for transmissions from 1 January 2025, letter i for crypto assets of the same type), in the proportion repurchased, and computes when the repurchased units are transmitted; offsetting against earlier years follows Art. 66. The repurchase arithmetic follows the DGT rulings V1403-21, V1117-21 and V3282-18 on the parallel state rule, which do not bind the Hacienda Foral.",
       yearLabel: "Tax year",
-      noYears: "There are no sales recorded in any year yet.",
+      noYears: "There are no sales or income recorded in any year yet.",
       summary: {
         netBase: "Taxable savings base",
         gainsBalance: "Capital gains and losses balance",
@@ -1537,6 +1537,8 @@ export const en: Copy = {
       empty: {
         title: "No sales in this year",
         body: "Pick another tax year from the dropdown.",
+        incomeBody:
+          "This year has no sales, but it has income: its figures are in the summary and below.",
       },
       savingsIncome: {
         title: "Income from movable capital",

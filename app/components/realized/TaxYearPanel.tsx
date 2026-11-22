@@ -144,7 +144,9 @@ export function TaxYearPanel({
                   {copy.empty.title}
                 </div>
                 <p className="mx-auto mt-1.5 max-w-sm text-[13px] text-muted">
-                  {copy.empty.body}
+                  {view.savingsIncome.count > 0 || view.inKindIncome.count > 0
+                    ? copy.empty.incomeBody
+                    : copy.empty.body}
                 </p>
               </div>
             ) : (
