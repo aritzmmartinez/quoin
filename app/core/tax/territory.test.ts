@@ -68,6 +68,11 @@ describe("territoryRules", () => {
       ],
       lossCarryforwardYears: 4,
       crossOffsetLimit: "0",
+      dividendExemption: {
+        limit: "1500",
+        excludesCollectiveInvestment: true,
+        source: "Art. 9.24 NF 13/2013 de Bizkaia",
+      },
       unlistedNotice: { assetClass: "fungible-crypto", windowMonths: 12 },
     });
   });

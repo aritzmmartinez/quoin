@@ -16,6 +16,16 @@ export interface UnlistedNoticeRule {
   readonly windowMonths: number;
 }
 
+/**
+ * Dividends exempt up to `limit` euros a year. With `excludesCollectiveInvestment`,
+ * those of a fund or ETF are never exempt.
+ */
+export interface DividendExemptionRule {
+  readonly limit: string;
+  readonly excludesCollectiveInvestment: boolean;
+  readonly source: string;
+}
+
 /** Everything the tax engine reads that depends on the territory, and only that. */
 export interface TerritoryRules {
   readonly savingsScales: readonly SavingsBaseTaxScale[];
@@ -27,6 +37,7 @@ export interface TerritoryRules {
    * balance may offset, as a decimal string. Zero keeps the pools apart.
    */
   readonly crossOffsetLimit: string;
+  readonly dividendExemption: DividendExemptionRule | null;
   readonly unlistedNotice: UnlistedNoticeRule;
 }
 
@@ -115,6 +126,16 @@ const TERRITORY_RULES = {
     lossCarryforwardYears: 4,
     /** Art. 66.1 NF 13/2013 de Bizkaia: income and gains compensate only within their own pool. */
     crossOffsetLimit: "0",
+    /**
+     * Art. 9.24 NF 13/2013 de Bizkaia, over Art. 34.a and b. The exemption does
+     * not reach shares bought in the two months before the payment when
+     * homogeneous ones are sold in the two after; that is not applied.
+     */
+    dividendExemption: {
+      limit: "1500",
+      excludesCollectiveInvestment: true,
+      source: "Art. 9.24 NF 13/2013 de Bizkaia",
+    },
     /** Crypto before letter i: whether a one-year repurchase rule reached those sales is unsettled. */
     unlistedNotice: { assetClass: "fungible-crypto", windowMonths: 12 },
   },
