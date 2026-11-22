@@ -167,7 +167,10 @@ piece of the contract with the mobile client, which must assign the same days.
   - `sync-prices` — what `POST /v1/prices` answers for one instrument (`answerPrices`).
   - `sync-pairing` — the six digit pairing code; its cases were worked out with openssl.
   - `tax` — foral FIFO, Art. 43, deferred losses, carryforward, quota, and the figures of
-    `buildTaxYearView` (not `pendingBySale`: it breaks ties on names, by locale).
+    `buildTaxYearView` (not `pendingBySale`: it breaks ties on names, by locale): both
+    savings pools, the base and the withholdings.
+  - `carryforward` — `carryforwardPool` and `carryforwardPools` as pure functions over
+    each year's net: carry, expiry and the cross limit.
   - `realized` — AVCO realised gains per sale.
   - `returns` — TWR, MWR/XIRR, `periodReturns`, range and hero changes.
   - `series` — cost line, value against invested, the portfolio merge, prices in euros.
@@ -178,7 +181,7 @@ piece of the contract with the mobile client, which must assign the same days.
     for a crypto code and `quoteSourceOf`.
 
   Except `ingest`, `sync` and `sync-pairing`, results come from the core, and `byHand` figures in some
-  cases (a dotted path into `expect` for the last seven), worked out by hand and checked
+  cases (a dotted path into `expect` for the last eight), worked out by hand and checked
   against the core, are what stop a regenerated file from blessing a regression.
   **Any sort whose ties could reach a contract states its tie-break**: Dart's `List.sort`
   is not stable, so an order left to the engine is one the mobile client cannot reproduce
@@ -1212,10 +1215,26 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
   is still what enforces expiry.
 - **Everything the tax engine reads per territory is one `TerritoryRules`**
   (`core/tax/territory.ts`, `satisfies Record<Territory, …>`): savings scales, repurchase
-  rules, swap valuation, carryforward years and the unlisted notice. Scales are per year;
+  rules, swap valuation, carryforward years, the cross-pool offset limit and the unlisted
+  notice. Scales are per year;
   a year not on file returns `null` from `getTaxScale` and the screen states the absence —
   never fall back to the nearest year's brackets. A rate is data; a superseded scale is a
   wrong number that looks right.
+- **The savings base has two pools, carried forward together** (`carryforwardPools`):
+  capital gains and income from movable capital — interest and cash dividends, gross in
+  euros (`savingsIncomeNetOf`); in-kind income stays out. Each carries its own losses for
+  `lossCarryforwardYears`; a year's negative balance offsets the other pool's same-year
+  positive one up to `crossOffsetLimit` (0 in Bizkaia, Art. 66.1). The base adds the
+  positive final balances and the quota applies to it. `carryforwardFrom` is the gains
+  pool alone, unchanged. Bonds never reach the ledger (Trade Republic sets them aside), so
+  nothing yet produces negative income: the `carryforward` contract pins that branch.
+- **Withholdings are shown, never subtracted.** They pay on account of the whole IRPF, not
+  of the savings quota. `withholdingsOf` adds those recorded on the year's savings income,
+  with no split by origin: Trade Republic's single `tax` column cannot tell Spanish from
+  foreign. Interest carries `taxWithheld` only since it got its own schema; rows stored
+  before say 0 and nothing rewrites them (that would be a second `markInKind`, and the
+  sync's ledger merge sets any other difference aside). A year with interest at 0 shows a
+  notice, and that test decides no figure.
 - **The fiscal year is the calendar year in the residence's zone** (`fiscalYearOf`, Madrid
   for Bizkaia), same trap as `periodOf` — the last hours of 31 December are already the
   next year locally. The zone travels in `RepurchaseScope` beside the territory.
