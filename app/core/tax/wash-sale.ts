@@ -71,7 +71,6 @@ export interface UnlistedRepurchaseNotice {
 }
 
 export interface WashSaleAssessor {
-  assetClassOf(instrumentId: string): RepurchaseAssetClass;
   ruleFor(sale: FifoSale): RepurchaseRule | null;
   assess(sale: FifoSale, rule: RepurchaseRule): WashSaleAssessment;
   unlistedNotice(sale: FifoSale): UnlistedRepurchaseNotice | null;
@@ -198,7 +197,6 @@ export function createWashSaleAssessor(
   }
 
   return {
-    assetClassOf,
     ruleFor,
     assess,
     unlistedNotice: (sale) =>
