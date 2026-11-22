@@ -1206,9 +1206,10 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
 - **Nothing FIFO is persisted, and it is one pass.** `computeTaxHistory` walks the whole
   ledger once — a deferred loss can compute years after the sale that created it — and
   `taxYearOf` / `carryforwardFrom` are views over it. No lot table, no stored deferral, no
-  carryforward countdown. A deferred loss counts in the year it computes, so the four-year
-  window of Art. 66 starts there; restricting the walk to `[targetYear − 4, targetYear]` is
-  still what enforces expiry.
+  carryforward countdown. A deferred loss counts in the year it computes, so its
+  carryforward window starts there; restricting the walk to
+  `[targetYear − lossCarryforwardYears, targetYear]` (`TerritoryRules`; 4 in Bizkaia, Art. 66)
+  is still what enforces expiry.
 - **Everything the tax engine reads per territory is one `TerritoryRules`**
   (`core/tax/territory.ts`, `satisfies Record<Territory, …>`): savings scales, repurchase
   rules, swap valuation, carryforward years and the unlisted notice. Scales are per year;
