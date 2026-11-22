@@ -9,13 +9,13 @@ import {
 import { compareTrades, isInKind, type TradeEvent } from "../domain";
 
 import {
-  UNLISTED_NOTICE_WINDOW_MONTHS,
   repurchaseRuleFor,
   type RepurchaseAssetClass,
   type RepurchaseRule,
   type Jurisdiction,
 } from "./config";
 import type { FifoSale } from "./fifo";
+import { territoryRules, type UnlistedNoticeRule } from "./territory";
 
 export interface WashSaleWindow {
   start: CalendarDate;
@@ -71,7 +71,6 @@ export interface UnlistedRepurchaseNotice {
 }
 
 export interface WashSaleAssessor {
-  assetClassOf(instrumentId: string): RepurchaseAssetClass;
   ruleFor(sale: FifoSale): RepurchaseRule | null;
   assess(sale: FifoSale, rule: RepurchaseRule): WashSaleAssessment;
   unlistedNotice(sale: FifoSale): UnlistedRepurchaseNotice | null;
@@ -93,6 +92,7 @@ export function createWashSaleAssessor(
   const counts = (rule: RepurchaseRule, buy: TradeEvent): boolean =>
     rule.acquisitions === "all" || !isInKind(buy);
 
+  const notice = territoryRules(scope.territory).unlistedNotice;
   const ordered = [...trades].sort(compareTrades);
   const position = new Map(ordered.map((t, i) => [t.id, i]));
   const buysByInstrument = new Map<string, TradeEvent[]>();
@@ -197,17 +197,19 @@ export function createWashSaleAssessor(
   }
 
   return {
-    assetClassOf,
     ruleFor,
     assess,
     unlistedNotice: (sale) =>
-      findUnlistedRepurchase(
-        sale,
-        buysByInstrument.get(sale.trade.instrumentId) ?? [],
-        position,
-        position.get(sale.trade.id) ?? -1,
-        scope.zone,
-      ),
+      assetClassOf(sale.trade.instrumentId) === notice.assetClass
+        ? findUnlistedRepurchase(
+            sale,
+            buysByInstrument.get(sale.trade.instrumentId) ?? [],
+            position,
+            position.get(sale.trade.id) ?? -1,
+            scope.zone,
+            notice,
+          )
+        : null,
   };
 }
 
@@ -217,9 +219,10 @@ function findUnlistedRepurchase(
   position: ReadonlyMap<string, number>,
   saleAt: number,
   zone: string,
+  notice: UnlistedNoticeRule,
 ): UnlistedRepurchaseNotice | null {
   const start = toCalendarDate(sale.trade.ts, zone);
-  const end = addCalendarMonths(start, UNLISTED_NOTICE_WINDOW_MONTHS);
+  const end = addCalendarMonths(start, notice.windowMonths);
   const buy = buys.find(
     (b) =>
       (position.get(b.id) ?? 0) > saleAt &&

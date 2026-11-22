@@ -3,6 +3,8 @@ import Decimal from "decimal.js";
 import { toIsoDate, zoneOfResidence, type CalendarDate } from "../calendar";
 import { Money, type Residence } from "../domain";
 
+import { territoryRules } from "./territory";
+
 /** Spanish IRPF territories only (foral and común) — not a multi-country abstraction. */
 export type Territory = "bizkaia";
 
@@ -35,12 +37,11 @@ export type RepurchaseAssetClass =
 export type RepurchaseLetter = "g" | "i";
 
 /**
- * Art. 43 NF 13/2013 de Bizkaia — pérdidas patrimoniales no computables por
- * recompra. Each letter is one entry over one engine (wash-sale.ts,
- * deferred-loss.ts); the letters differ in the assets they cover, the window
- * either side of the transmission, what counts as the same asset and the
- * transmissions they govern, never in how a deferred loss is carried or
- * integrated.
+ * Pérdidas patrimoniales no computables por recompra. Each rule is one entry
+ * over one engine (wash-sale.ts, deferred-loss.ts); rules differ in the assets
+ * they cover, the window either side of the transmission, what counts as the
+ * same asset and the transmissions they govern, never in how a deferred loss
+ * is carried or integrated. A territory's rules live in `territoryRules`.
  *
  * - `homogeneity: "instrument"` is the same instrument id. For crypto that is
  *   the same asset at any broker, because every adapter takes a crypto
@@ -49,21 +50,17 @@ export type RepurchaseLetter = "g" | "i";
  *   "hubiera adquirido" literally, so units received in kind (a reward, a
  *   saveback) are an acquisition; "cash-only" leaves them out of the window
  *   and out of the recipients of the deferral.
- * - `from` / `to` are Madrid calendar days of the transmission, inclusive. The
- *   transmission decides: a purchase before `from` still counts as the
- *   repurchase of a sale on or after it.
+ * - `from` / `to` are calendar days of the transmission in the residence's
+ *   zone, inclusive. The transmission decides: a purchase before `from` still
+ *   counts as the repurchase of a sale on or after it.
  *
  * A sale no entry covers is assessed by nothing, and its loss computes whole.
  * No entry covers "unclassified": a bond held directly yields income from
- * movable capital, outside Art. 43, and a commodity held directly would fall
- * under a letter that is not modelled, so the app names such a sale instead.
- *
- * Letter i is letter g's mechanics with another homogeneity and another
- * start: fungible crypto of the same type, transmitted from 1 January 2025.
- * A crypto sale before that day has no rule and only its notice.
+ * movable capital, outside the repurchase rule, and a commodity held directly
+ * would fall under a letter that is not modelled, so the app names such a sale
+ * instead.
  */
 export interface RepurchaseRule {
-  territory: Territory;
   letter: RepurchaseLetter;
   assetClass: RepurchaseAssetClass;
   windowMonths: number;
@@ -74,43 +71,16 @@ export interface RepurchaseRule {
   source: string;
 }
 
-export const REPURCHASE_RULES: readonly RepurchaseRule[] = [
-  {
-    territory: "bizkaia",
-    letter: "g",
-    assetClass: "listed-security",
-    windowMonths: 2,
-    homogeneity: "instrument",
-    acquisitions: "all",
-    from: null,
-    to: null,
-    source: "Art. 43.g NF 13/2013 de Bizkaia",
-  },
-  {
-    territory: "bizkaia",
-    letter: "i",
-    assetClass: "fungible-crypto",
-    windowMonths: 2,
-    homogeneity: "instrument",
-    acquisitions: "all",
-    from: "2025-01-01",
-    to: null,
-    source:
-      "Art. 43.i NF 13/2013, redacción de la NF 6/2025, de 12 de diciembre (BOB 15/12/2025)",
-  },
-];
-
 export function repurchaseRuleFor(
   territory: Territory,
   assetClass: RepurchaseAssetClass,
   saleDay: CalendarDate,
-  rules: readonly RepurchaseRule[] = REPURCHASE_RULES,
+  rules: readonly RepurchaseRule[] = territoryRules(territory).repurchase,
 ): RepurchaseRule | null {
   const day = toIsoDate(saleDay);
   return (
     rules.find(
       (rule) =>
-        rule.territory === territory &&
         rule.assetClass === assetClass &&
         (rule.from === null || rule.from <= day) &&
         (rule.to === null || day <= rule.to),
@@ -119,62 +89,30 @@ export function repurchaseRuleFor(
 }
 
 /**
- * How the two legs of a swap are valued for tax, as data like a repurchase rule.
- * Bizkaia (NF 13/2013, consolidated at 01/01/2026, as given by Aritz): the value
- * of what is delivered is the greater of its market value and the gross value of
- * what is received (Art. 47.1.i, which NF 6/2025 does not modify and which
- * predates 2025), and that same value is the acquisition value of what is
- * received (Art. 45.1.a, real amount). Art. 47.1.p, introduced by NF 6/2025 with
- * effect from 1 January 2025 (Disposición Final Segunda, Primero.Dos), values
- * crypto-assets at market value, or the agreed price if higher. The norm does
- * not say "the greater" of the two legs in so many words; it is a reasoned
- * criterion, chosen so that one gain is not taxed twice, and `swapPairValue`
- * carries the reasoning.
- *
- * `from` / `to` are Madrid calendar days of the swap, inclusive; null is open,
- * which is what applies while no start date is settled. No entry in force
- * leaves each leg at its own market value.
+ * How the two legs of a swap are valued for tax, as data like a repurchase
+ * rule. `from` / `to` are calendar days of the swap in the residence's zone,
+ * inclusive; null is open, which is what applies while no start date is
+ * settled. No entry in force leaves each leg at its own market value.
  */
 export interface SwapValuationRule {
-  territory: Territory;
   from: string | null;
   to: string | null;
   source: string;
 }
 
-export const SWAP_VALUATION_RULES: readonly SwapValuationRule[] = [
-  {
-    territory: "bizkaia",
-    from: null,
-    to: null,
-    source:
-      "Arts. 47.1.i, 45.1 y 45.3 NF 13/2013 de Bizkaia; Art. 47.1.p, redacción de la NF 6/2025",
-  },
-];
-
 export function swapValuationRuleFor(
   territory: Territory,
   swapDay: string,
-  rules: readonly SwapValuationRule[] = SWAP_VALUATION_RULES,
+  rules: readonly SwapValuationRule[] = territoryRules(territory).swapValuation,
 ): SwapValuationRule | null {
   return (
     rules.find(
       (rule) =>
-        rule.territory === territory &&
         (rule.from === null || rule.from <= swapDay) &&
         (rule.to === null || swapDay <= rule.to),
     ) ?? null
   );
 }
-
-/**
- * How far after a crypto loss sale a new acquisition of the same asset is
- * pointed out, for a sale before letter i governs crypto. Informative only:
- * whether a one-year repurchase rule reached those sales is unsettled.
- */
-export const UNLISTED_NOTICE_WINDOW_MONTHS = 12;
-/** Art. 66 NF 13/2013 de Bizkaia — integración y compensación de rentas en la base imponible del ahorro (límite de cuatro años). */
-export const LOSS_CARRYFORWARD_YEARS = 4;
 
 export interface TaxBracket {
   from: string;
@@ -183,40 +121,21 @@ export interface TaxBracket {
 }
 
 export interface SavingsBaseTaxScale {
-  territory: Territory;
   year: number;
   source: string;
   brackets: TaxBracket[];
 }
-
-export const TAX_SCALES: readonly SavingsBaseTaxScale[] = [
-  {
-    territory: "bizkaia",
-    year: 2026,
-    source:
-      "Art. 76 NF 13/2013 de Bizkaia, redacción NF 2/2025, efectos 1-1-2026",
-    brackets: [
-      { from: "0", to: "7500", rate: "0.19" },
-      { from: "7500", to: "15000", rate: "0.20" },
-      { from: "15000", to: "30000", rate: "0.22" },
-      { from: "30000", to: "50000", rate: "0.24" },
-      { from: "50000", to: "90000", rate: "0.255" },
-      { from: "90000", to: "120000", rate: "0.26" },
-      { from: "120000", to: "240000", rate: "0.265" },
-      { from: "240000", to: "300000", rate: "0.27" },
-      { from: "300000", to: null, rate: "0.28" },
-    ],
-  },
-];
 
 export function getTaxScale(
   territory: Territory,
   year: number,
 ): SavingsBaseTaxScale | null {
   return (
-    TAX_SCALES.find((s) => s.territory === territory && s.year === year) ?? null
+    territoryRules(territory).savingsScales.find((s) => s.year === year) ??
+    null
   );
 }
+
 
 export function computeSavingsQuota(
   netBase: Money,

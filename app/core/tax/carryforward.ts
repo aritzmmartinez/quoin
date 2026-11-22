@@ -2,7 +2,7 @@ import Decimal from "decimal.js";
 
 import type { LedgerEvent } from "../domain";
 
-import { LOSS_CARRYFORWARD_YEARS } from "./config";
+import { territoryRules } from "./territory";
 import {
   computeTaxHistory,
   taxYearOf,
@@ -25,16 +25,17 @@ export interface CarryforwardResult {
 }
 
 /**
- * Nothing here is stored. Every call recomputes targetYear-4..targetYear
+ * Nothing here is stored. Every call recomputes targetYear-years..targetYear
  * straight from the ledger, over the same single pass `taxYearOf` reads. A
  * year's own net is its computable net: the deferred losses that compute in it
  * are already inside, so a year that ends negative because of one starts that
- * loss's four years in that year, not in the year of the sale that deferred it.
+ * loss's window in that year, not in the year of the sale that deferred it.
  *
  * Pending losses are consumed oldest-first, per the legal ordering, and a
- * loss can offset any year up to LOSS_CARRYFORWARD_YEARS after the one it
- * originated in; restricting the window to [targetYear - 4, targetYear]
- * enforces that expiry without tracking it separately.
+ * loss can offset any year up to the territory's `lossCarryforwardYears`
+ * after the one it originated in; restricting the window to
+ * [targetYear - years, targetYear] enforces that expiry without tracking it
+ * separately.
  */
 export function computeNetWithCarryforward(
   events: readonly LedgerEvent[],
@@ -51,7 +52,8 @@ export function carryforwardFrom(
   const pending: { year: number; remaining: Decimal }[] = [];
   const steps: CarryforwardStep[] = [];
 
-  for (let y = year - LOSS_CARRYFORWARD_YEARS; y <= year; y++) {
+  const { lossCarryforwardYears } = territoryRules(history.territory);
+  for (let y = year - lossCarryforwardYears; y <= year; y++) {
     const ownNet = new Decimal(taxYearOf(history, y).computableNet);
     let consumed = new Decimal(0);
     let finalNet = ownNet;
