@@ -75,7 +75,7 @@ Contents:
   again, which adds only what is missing because the legs dedup by `externalId`.
 - **The tax value of a swap is not stored.** `core/swap` computes it (`swapPairValue`, through
   `tradeAmounts`) from the two legs and the rule of the territory in force that day
-  (`SwapValuationRule`, beside `REPURCHASE_RULES`): FIFO, AVCO and the cost line all read it
+  (`SwapValuationRule`, in `territoryRules`): FIFO, AVCO and the cost line all read it
   there, so the tax engine and the cost of a position cannot disagree. A new consumer of a
   trade's `grossAmount` or `fees` goes through `tradeAmounts`, never through `baseOf`.
 - **A swap moves no money across the portfolio's edge.** Its legs (`isSwapLeg`) stay out of

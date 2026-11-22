@@ -1209,9 +1209,12 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
   carryforward countdown. A deferred loss counts in the year it computes, so the four-year
   window of Art. 66 starts there; restricting the walk to `[targetYear − 4, targetYear]` is
   still what enforces expiry.
-- **`TAX_SCALES` is keyed by `(territory, year)`.** A year not on file returns `null` from
-  `getTaxScale` and the screen states the absence — never fall back to the nearest year's
-  brackets. A rate is data; a superseded scale is a wrong number that looks right.
+- **Everything the tax engine reads per territory is one `TerritoryRules`**
+  (`core/tax/territory.ts`, `satisfies Record<Territory, …>`): savings scales, repurchase
+  rules, swap valuation, carryforward years and the unlisted notice. Scales are per year;
+  a year not on file returns `null` from `getTaxScale` and the screen states the absence —
+  never fall back to the nearest year's brackets. A rate is data; a superseded scale is a
+  wrong number that looks right.
 - **The fiscal year is the calendar year in the residence's zone** (`fiscalYearOf`, Madrid
   for Bizkaia), same trap as `periodOf` — the last hours of 31 December are already the
   next year locally. The zone travels in `RepurchaseScope` beside the territory.
