@@ -10,6 +10,7 @@ import {
   type LedgerEvent,
 } from "~/core/domain";
 import type { PriceSnapshot } from "~/core/ports";
+import { quoteSourceOf, type QuoteSource } from "~/core/prices";
 import { computePositions } from "~/core/projections";
 
 import {
@@ -25,11 +26,15 @@ import { DEFAULT_INFLATION_SERIES } from "./real.server";
 import { loadResidence } from "./residence.server";
 import { openInstrumentIds } from "./unrated";
 
+export interface PriceSource {
+  status: SourceStatus;
+  syncTargets: { id: string; name: string }[];
+}
+
 export interface ExternalData {
-  prices: SourceStatus;
+  prices: Record<QuoteSource, PriceSource>;
   inflation: SourceStatus;
   rates: SourceStatus & { currencies: string[] };
-  syncTargets: { id: string; name: string }[];
   unmapped: { open: number; closed: number };
 }
 
@@ -44,9 +49,9 @@ export async function loadExternalData(
     openInstrumentIds(computePositions(events, jurisdiction)),
   );
   const benchmark = findBenchmark(instruments, benchmarkSymbol);
-  const relevant = instruments
-    .filter((i) => i.quoteSymbol && (open.has(i.id) || i.id === benchmark?.id))
-    .map(({ id, name }) => ({ id, name }));
+  const relevant = instruments.filter(
+    (i) => i.quoteSymbol && (open.has(i.id) || i.id === benchmark?.id),
+  );
 
   const fx = new PrismaFxRepository();
   const inflation = new PrismaInflationRepository();
@@ -69,19 +74,26 @@ export async function loadExternalData(
   );
 
   const { targets, unmapped } = toSyncTargets(instruments);
+  const pricedBy = (source: QuoteSource): PriceSource => {
+    const from = (i: { quoteSymbol?: string | null }) =>
+      i.quoteSymbol != null && quoteSourceOf(i.quoteSymbol) === source;
+    return {
+      status: pricesStatus({
+        relevant: relevant.filter(from).map(({ id, name }) => ({ id, name })),
+        latest,
+        checked,
+        zone: jurisdiction.zone,
+      }),
+      syncTargets: targets.filter(from).map(({ id, name }) => ({ id, name })),
+    };
+  };
   return {
-    prices: pricesStatus({
-      relevant,
-      latest,
-      checked,
-      zone: jurisdiction.zone,
-    }),
+    prices: { YAHOO: pricedBy("YAHOO"), KRAKEN: pricedBy("KRAKEN") },
     inflation: inflationStatus(
       InflationIndex.from(DEFAULT_INFLATION_SERIES, points).latestPeriod(),
       inflationChecked,
     ),
     rates: { ...ratesStatus(series), currencies },
-    syncTargets: targets.map(({ id, name }) => ({ id, name })),
     unmapped: splitUnmapped(unmapped, open),
   };
 }

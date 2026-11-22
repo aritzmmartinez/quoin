@@ -3,7 +3,11 @@ import { describe, expect, it } from "vitest";
 import type { Instrument } from "~/core/domain";
 import type { MarketValue, Position } from "~/core/projections";
 
-import { needsMapping, toInstrumentListItems } from "./instruments";
+import {
+  needsMapping,
+  seriesAfterReplace,
+  toInstrumentListItems,
+} from "./instruments";
 
 const instrument = (over: Partial<Instrument> = {}): Instrument => ({
   id: "IE00BK5BQT80",
@@ -179,6 +183,7 @@ describe("toInstrumentListItems history", () => {
 
     expect(byId.get("M")).toMatchObject({
       historyStart: "2025-01-01T07:00:00.000Z",
+      historyCount: monthly.length,
       coarseHistory: true,
     });
     expect(byId.get("D")).toMatchObject({
@@ -310,5 +315,34 @@ describe("the category an instrument is shown under", () => {
     expect(item?.exposure).toEqual({ kind: "COMMODITY", source: "user" });
     expect(item?.exposureKind).toBe("COMMODITY");
     expect(item?.isExplicit).toBe(true);
+  });
+});
+
+describe("seriesAfterReplace", () => {
+  it("counts the older prices the same symbol kept, from the first of them", () => {
+    expect(
+      seriesAfterReplace(
+        { count: 720, start: "2024-12-01T00:00:00.000Z" },
+        { written: 365, removed: 365, first: "2025-11-22T00:00:00.000Z" },
+      ),
+    ).toEqual({ count: 720, start: "2024-12-01T00:00:00.000Z" });
+  });
+
+  it("is just what arrived when a new symbol cleared the series", () => {
+    expect(
+      seriesAfterReplace(
+        { count: 900, start: "2022-01-03T00:00:00.000Z" },
+        { written: 365, removed: 900, first: "2025-11-22T00:00:00.000Z" },
+      ),
+    ).toEqual({ count: 365, start: "2025-11-22T00:00:00.000Z" });
+  });
+
+  it("is just what arrived on an empty series", () => {
+    expect(
+      seriesAfterReplace(
+        { count: 0, start: null },
+        { written: 12, removed: 0, first: "2026-11-01T00:00:00.000Z" },
+      ),
+    ).toEqual({ count: 12, start: "2026-11-01T00:00:00.000Z" });
   });
 });

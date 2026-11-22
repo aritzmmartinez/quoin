@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import {
   ArrowLeftRight,
+  Bitcoin,
   ChartLine,
   Coins,
   Gauge,
@@ -103,7 +104,14 @@ export default function Settings({ loaderData }: Route.ComponentProps) {
   const t = useCopy();
   const s = t.settings;
   const d = s.externalData;
-  const prices = usePriceRefresh(external.syncTargets, external.unmapped);
+  const prices = usePriceRefresh(
+    external.prices.YAHOO.syncTargets,
+    external.unmapped,
+  );
+  const cryptoPrices = usePriceRefresh(external.prices.KRAKEN.syncTargets, {
+    open: 0,
+    closed: 0,
+  });
   const inflation = useIpcRefresh();
   const rates = useFxRefresh();
 
@@ -161,9 +169,17 @@ export default function Settings({ loaderData }: Route.ComponentProps) {
           icon={ChartLine}
           label={d.prices.label}
           hint={d.prices.hint}
-          status={external.prices}
+          status={external.prices.YAHOO.status}
           refresh={prices.refresh}
           busy={prices.busy}
+        />
+        <ExternalDataSource
+          icon={Bitcoin}
+          label={d.cryptoPrices.label}
+          hint={d.cryptoPrices.hint}
+          status={external.prices.KRAKEN.status}
+          refresh={cryptoPrices.refresh}
+          busy={cryptoPrices.busy}
         />
         <ExternalDataSource
           icon={Percent}

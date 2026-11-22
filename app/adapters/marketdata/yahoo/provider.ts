@@ -58,12 +58,14 @@ export function historyUrl(
 }
 
 export class YahooMarketDataProvider implements MarketDataProvider {
-  readonly source = "YAHOO";
-
   private readonly timeoutMs: number;
 
   constructor(options: YahooOptions = {}) {
     this.timeoutMs = options.timeoutMs ?? YAHOO_TIMEOUT_MS;
+  }
+
+  sourceOf(): string {
+    return "YAHOO";
   }
 
   async getQuote(symbol: string): Promise<Quote | null> {

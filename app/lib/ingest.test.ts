@@ -304,15 +304,13 @@ describe("suggestedQuoteSymbol", () => {
     thesis: "CORE",
   });
 
-  it("proposes the euro line of a crypto asset", () => {
-    expect(suggestedQuoteSymbol(instrument("ETH", "CRYPTO"))).toBe("ETH-EUR");
-    expect(suggestedQuoteSymbol(instrument("USDG", "CRYPTO"))).toBe("USDG-EUR");
+  it("proposes the Kraken euro pair of a crypto asset", () => {
+    expect(suggestedQuoteSymbol(instrument("ETH", "CRYPTO"))).toBe("ETH/EUR");
+    expect(suggestedQuoteSymbol(instrument("PEPE", "CRYPTO"))).toBe("PEPE/EUR");
   });
 
-  it("takes a verified exception instead, where Yahoo has no euro line", () => {
-    expect(suggestedQuoteSymbol(instrument("PEPE", "CRYPTO"))).toBe(
-      "PEPE24478-USD",
-    );
+  it("takes the dollar pair where Kraken has no euro one", () => {
+    expect(suggestedQuoteSymbol(instrument("USDG", "CRYPTO"))).toBe("USDG/USD");
   });
 
   it("proposes nothing for anything that is not crypto", () => {
@@ -320,7 +318,7 @@ describe("suggestedQuoteSymbol", () => {
   });
 });
 
-describe("the hint when Yahoo has no price", () => {
+describe("the hint when a symbol has no price", () => {
   const t = copyFor("es");
 
   it("points a fund at another venue", () => {
@@ -330,13 +328,13 @@ describe("the hint when Yahoo has no price", () => {
     expect(noDailyHistoryMessage(t, null)).toBe(t.ingest.map.noDailyHistory);
   });
 
-  it("points a crypto asset at its dollar line and warns about shared tickers", () => {
+  it("points a crypto asset at its Kraken pairs", () => {
     const message = noQuoteMessage(t, "DOGE", "DOGE-EUR");
-    expect(message).toContain("DOGE-USD");
-    expect(message).toContain("PEPE24478-USD");
+    expect(message).toContain("DOGE/EUR");
+    expect(message).toContain("DOGE/USD");
     expect(message).not.toContain(".MI");
     expect(noDailyHistoryMessage(copyFor("en"), "DOGE")).toContain(
-      "another coin",
+      "DOGE/USD",
     );
   });
 

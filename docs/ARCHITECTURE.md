@@ -57,7 +57,7 @@ Three decisions worth keeping:
 ### adapters
 - `ingestion/`   `TradeRepublicCsvAdapter` + `KrakenCsvAdapter` (CSV -> events; filter card spending / non-BTC crypto; dedup by transaction id) and `holdings/`, one issuer-agnostic parser for fund compositions
 - `persistence/` Prisma 7 + SQLite (schema, generated client, and the repositories behind every port: ledger, instrument, price, holdings, identity, inflation and target)
-- `marketdata/`  `YahooMarketDataProvider` behind the `MarketDataProvider` port; `quoteSymbol` per instrument (local DB only)
+- `marketdata/`  `YahooMarketDataProvider` (stocks and funds) and `KrakenMarketDataProvider` (crypto, `OHLC` daily candles and the last trade, one request a second for the whole process) behind the `MarketDataProvider` port; `MarketDataRouter` sends each `quoteSymbol` to the provider `quoteSourceOf` names (a `BASE/QUOTE` pair is Kraken's, anything else Yahoo's). How a Kraken answer becomes quotes is pure, in `core/prices/kraken.ts`, and pinned by the `kraken` contract for the mobile client
 - `identity/`    `OpenFigiIdentityResolver` behind the `SecurityIdentityResolver` port; maps an ISIN or a ticker to a share-class FIGI
 - `inflation/`   `ine/`, the consumer price index from INE's Tempus3 API (national and Bizkaia), parsed pure and separately from the fetch that feeds it
 - `fx/`          (planned) exchange rates for non-EUR quotes

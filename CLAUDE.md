@@ -174,9 +174,11 @@ piece of the contract with the mobile client, which must assign the same days.
   - `analysis` — opportunity cost, weighted TER, rebalance.
   - `exposure-default` — the category an instrument is shown under: the user's, else
     derived from `Instrument.type` (`effectiveExposure`), else none.
+  - `kraken` — Kraken's OHLC and Trades answers read into quotes, the pair suggested
+    for a crypto code and `quoteSourceOf`.
 
   Except `ingest`, `sync` and `sync-pairing`, results come from the core, and `byHand` figures in some
-  cases (a dotted path into `expect` for the last six), worked out by hand and checked
+  cases (a dotted path into `expect` for the last seven), worked out by hand and checked
   against the core, are what stop a regenerated file from blessing a regression.
   **Any sort whose ties could reach a contract states its tie-break**: Dart's `List.sort`
   is not stable, so an order left to the engine is one the mobile client cannot reproduce
@@ -268,10 +270,25 @@ This has caused misdirected generation more than once:
   good symbol. Callers keep going past one: sync reports `unavailable`, the wizard's fill
   and "Rebuild all histories" carry on and name it, `api/ingest` answers 503 and logs it.
   The port is `getQuote(symbol)`, one symbol, because no caller ever asked for two.
+  Kraken answers an unknown pair with a 200 and `EQuery:Unknown asset pair` or
+  `EQuery:Invalid asset pair` (measured 2026-11-21): empty; any other entry in `error`
+  throws, whatever the status.
+- **The symbol decides who prices it, in `quoteSourceOf` and nowhere else.** Yahoo never
+  uses «/»; a symbol with «/» is a Kraken pair, `BASE/QUOTE`, and its currency is what
+  follows the «/». `MarketDataRouter` switches over every `QuoteSource` exhaustively, and
+  a row is stored with `sourceOf(symbol)` (`KRAKEN`, `KRAKEN_LIVE`). Kraken was measured
+  on 2026-11-21: a daily candle is dated 00:00 UTC and carries the close of 24:00, like
+  Yahoo's, so `candleKnownAt` holds; the newest candle is the day still trading, and
+  anything after `result.last` is dropped; `since` older than 720 daily candles (about
+  two years) is ignored, so nothing earlier exists; Ticker has no time, so today's quote
+  is the last trade (`Trades?count=1`), dated by it. Kraken asks for about one public
+  request a second: one queue for the process leaves `KRAKEN_SPACING_MS` between them.
+  Its data may be fetched, not redistributed, and is credited as «Market Data: Kraken».
 - **Every request to a provider goes through `withTimeout` in `adapters/http`**, which
   bounds the whole request, body included, and fails it as that provider's unavailable
   error with the `TimeoutError` as `cause`. Each adapter has its own constant, set from a
-  measurement made on 2026-10-21: Yahoo 15 s (a `max` history 0.46–0.88 s), INE 20 s
+  measurement made on 2026-10-21: Yahoo 15 s (a `max` history 0.46–0.88 s), Kraken 15 s
+  (720 daily candles in 50–155 ms, 2026-11-21), INE 20 s
   (0.24–0.58 s), ECB 60 s (41–52 s for the whole history), OpenFIGI 30 s for ten jobs
   (7.4–8.6 s for ten large-cap ISINs) and 120 s for a hundred, which is extrapolated: no
   key was used to measure it. The timer is a `setTimeout`, not `AbortSignal.timeout`, so
@@ -342,8 +359,8 @@ This has caused misdirected generation more than once:
   information. "Day" is `dayOf` in `core/calendar`, in the calendar zone, like `periodOf`.
 - **Deleting an instrument's snapshots happens in two places, both atomic:** `saveDaily`
   above, and `PriceRepository.replaceHistory`. One transaction deletes the
-  instrument's rows (all of them, or only those at or before `keepAfter`), writes the new
-  ones and, if asked, sets `quoteSymbol`. A failed write rolls back the delete and the
+  instrument's rows (all of them, or only those at or before `keepAfter` and at or after
+  `keepBefore`), writes the new ones and, if asked, sets `quoteSymbol`. A failed write rolls back the delete and the
   symbol together — an integration test pins that. Two symbols' prices must never share
   a series, so a symbol change only ever goes through it.
 - **`replaceQuoteHistory` fetches everything before it writes anything.** Daily candles
@@ -354,7 +371,9 @@ This has caused misdirected generation more than once:
   kept only if fresh, in the history's own currency and newer than the last candle,
   because the newest daily candle can arrive without a close. If that quote is missing and the symbol is unchanged, rows newer than the last
   candle are kept (`keepAfter`), so `latest()` never moves back. On a symbol change it
-  may: the old rows belong to another security.
+  may: the old rows belong to another security. With the same symbol, rows older than
+  the first candle are kept too (`keepBefore`): Kraken reaches back two years, and a
+  rebuild must not cut a series to what the source still serves.
 - **A rate is used two ways, and `core/fx/rates.ts` keeps them apart.** `bookingRate`
   books a ledger row: the rate of its own TARGET day (`rateDayFor`, a weekend or closing
   day falls back to the last business day) or nothing, never an older one, because a

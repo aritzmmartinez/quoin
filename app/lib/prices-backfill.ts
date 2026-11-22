@@ -147,7 +147,7 @@ export async function backfillInstrument(
     price: quote.price,
     currency: quote.currency,
     asOf: quote.asOf,
-    source: provider.source,
+    source: provider.sourceOf(target.quoteSymbol),
   }));
 
   return reportOf(target, quotes, await prices.saveMany(snapshots));

@@ -336,7 +336,7 @@ describe("checkQuoteAgainstLedger", () => {
     return {
       asked,
       provider: {
-        source: "FAKE",
+        sourceOf: () => "FAKE",
         getQuote: async () => live,
         getHistory: async (_symbol, range) => {
           asked.push(range);

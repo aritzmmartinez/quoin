@@ -1,4 +1,4 @@
-import { YahooMarketDataProvider } from "~/adapters/marketdata";
+import { MarketDataRouter } from "~/adapters/marketdata";
 import {
   PrismaInstrumentRepository,
   PrismaPriceRepository,
@@ -19,7 +19,7 @@ export async function defaultDeps(): Promise<SyncDeps> {
   return {
     instruments: new PrismaInstrumentRepository(),
     prices: new PrismaPriceRepository(),
-    provider: new YahooMarketDataProvider(),
+    provider: new MarketDataRouter(),
     rates: ensureRatesNow,
     checks: new PrismaPriceSyncRepository(),
     zone: calendarZone,

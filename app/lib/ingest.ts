@@ -5,6 +5,7 @@ import type {
 } from "~/adapters/ingestion";
 import { writesLedger } from "~/adapters/ingestion/ingest";
 import type { Instrument } from "~/core/domain";
+import { krakenSymbolFor } from "~/core/prices";
 
 import type { RateConflict } from "./fx-sync";
 import type { Copy } from "./i18n";
@@ -18,18 +19,6 @@ export interface PendingMapping {
   suggested: string | null;
   cryptoCode: string | null;
 }
-
-/**
- * Yahoo quotes a crypto asset as `<CODE>-EUR`, except where the code is shared
- * and Yahoo appends its own number, or no euro line exists. Each exception is
- * checked by hand before it goes in; the symbol check still decides.
- *
- * - PEPE: `PEPE24478-EUR` answers 404 and `PEPE24478-USD` has daily history
- *   (measured 2026-10-22); the dollar line is valued at the ECB rate.
- */
-const CRYPTO_SYMBOLS: Readonly<Record<string, string>> = {
-  PEPE: "PEPE24478-USD",
-};
 
 export function cryptoCodeOf(instrument: Instrument): string | null {
   return instrument.type === "CRYPTO" ? instrument.id : null;
@@ -56,7 +45,7 @@ export function noDailyHistoryMessage(
 
 export function suggestedQuoteSymbol(instrument: Instrument): string | null {
   if (instrument.type !== "CRYPTO") return null;
-  return CRYPTO_SYMBOLS[instrument.id] ?? `${instrument.id}-EUR`;
+  return krakenSymbolFor(instrument.id);
 }
 
 export interface IngestPreview {

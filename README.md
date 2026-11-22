@@ -133,7 +133,7 @@ The same work, and everything around it, is also available from the command line
 ```bash
 pnpm ingest --broker=trade-republic path/to/export.csv   # CSV -> ledger (idempotent)
 pnpm ingest --broker=kraken path/to/ledgers.csv
-pnpm prices:map <ISIN> <SYMBOL> [range]   # set a Yahoo symbol (e.g. VWCE.DE) and replace the history
+pnpm prices:map <ISIN> <SYMBOL> [range]   # set a symbol (VWCE.DE on Yahoo, BTC/EUR on Kraken) and replace the history
 pnpm prices:sync                  # fill missing daily closes and store today’s quote, one price per day
 pnpm prices:backfill [ISIN] [1y|2y|5y|10y|max]   # daily price history (default 5y)
 pnpm prices:rebuild [ISIN]        # download every mapped history again, daily
@@ -172,6 +172,24 @@ the repo), so a public clone never discloses your holdings. A symbol quoted in a
 currency is accepted as long as the European Central Bank publishes reference rates for
 it, and is valued in euros at that rate. Use the exchange ticker, not the ISIN: Yahoo
 answers `<ISIN>.SG` with a current price but no daily history.
+
+Stocks and funds are priced by Yahoo Finance, crypto assets by Kraken's public market
+data (Market Data: Kraken). The symbol says which: a Kraken pair is written
+`BASE/QUOTE`, such as `BTC/EUR`, and a Yahoo symbol never has a `/`. The import wizard
+suggests the euro pair of each crypto asset, or the dollar pair where Kraken has none
+(`USDG/USD`, valued at the ECB rate). A crypto asset mapped to Yahoo before 0.17.0
+keeps its symbol until you change it in the Symbol column of **Instruments**, one at a
+time, or with `prices:map <CODE> <CODE>/EUR`. Each price request tells Kraken, like
+Yahoo, which pair you hold.
+
+Kraken serves only the last 720 daily candles, about two years. Changing a symbol to a
+Kraken pair replaces the whole history, so anything older is gone; later downloads of
+the same pair keep what is already stored. When an instrument's prices start after its
+first trade, nothing warns about it: today's value only needs the latest price and an
+instrument's own returns use its trade prices, but the charts carry the last trade
+price flat until the first close and then jump to it, the portfolio's time-weighted
+return books that jump on the first day with a close instead of across the gap, and a
+Kraken reward without a dollar value from that stretch cannot be valued on import.
 
 The opportunity-cost screen replays every contribution into a benchmark ETF, `VWCE.DE`
 by default. Pick another under *Benchmark index* in `/settings` — the list offers

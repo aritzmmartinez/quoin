@@ -4,7 +4,7 @@ import { argv, exit } from "node:process";
 
 import Decimal from "decimal.js";
 
-import { YahooMarketDataProvider } from "~/adapters/marketdata";
+import { MarketDataRouter } from "~/adapters/marketdata";
 import {
   PrismaInstrumentRepository,
   PrismaLedgerRepository,
@@ -30,7 +30,7 @@ const USAGE = `Usage:
 async function preview(symbol: string, instrumentId: string): Promise<void> {
   try {
     const check = await checkQuoteAgainstLedger(
-      new YahooMarketDataProvider(),
+      new MarketDataRouter(),
       await new PrismaLedgerRepository().list(),
       instrumentId,
       symbol,
@@ -135,7 +135,7 @@ async function main(): Promise<void> {
     {
       instruments: repo,
       prices,
-      provider: new YahooMarketDataProvider(),
+      provider: new MarketDataRouter(),
       rates: ensureRatesNow,
       zone: (await loadResidence()).calendarZone,
     },
@@ -149,7 +149,7 @@ async function main(): Promise<void> {
         : outcome.reason === "rates-unavailable"
           ? `history is in ${outcome.currency} and the ECB could not be reached`
           : outcome.reason === "unavailable"
-            ? "Yahoo could not be reached"
+            ? "the price source could not be reached"
             : "no daily history returned";
     console.error(`
 ${symbolArg}: ${why}. Nothing was changed.`);

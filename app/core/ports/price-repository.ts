@@ -9,6 +9,7 @@ export interface PriceSnapshot {
 export interface ReplaceHistoryOptions {
   quoteSymbol?: string | null;
   keepAfter?: Date;
+  keepBefore?: Date;
 }
 
 export interface DailyWriteCount {
