@@ -239,6 +239,29 @@ pnpm test               # Vitest (pure domain / projection / mapper tests)
 pnpm run test:integration   # migrations against a temporary SQLite database
 ```
 
+### Opening it from another machine
+
+Quoin has no login, so by default it answers only on the machine it runs on.
+
+- **`pnpm start` listens on `127.0.0.1`.** Set `QUOIN_HOST` to listen elsewhere,
+  `QUOIN_HOST=0.0.0.0` for every interface. `HOST` is ignored, so one exported by your
+  shell cannot open it by accident. The image listens on every interface inside the
+  container, and `-p` decides what reaches it.
+- **Only localhost and IP addresses are answered.** Any other name in the address bar is
+  refused with a 403 unless it is listed in `QUOIN_ALLOWED_HOSTS`, separated by commas,
+  without a port: `QUOIN_ALLOWED_HOSTS=nas.local,quoin.example.org` (with Docker,
+  `-e QUOIN_ALLOWED_HOSTS=…`). This is what stops a page on another site that points its
+  own name at your computer from reading the portfolio.
+- **Behind a reverse proxy**, list the name the proxy sends in `Host`. That is the public
+  name with Caddy, or with nginx and `proxy_set_header Host $host`; nginx without it
+  sends the upstream's, such as `quoin`. A refused request is logged with the host it
+  carried, so the log says what to add.
+- **Changes are refused from any other site**, whatever the address: a page open in
+  another tab cannot write to Quoin.
+
+Exposing it on your network puts the portfolio, with no login, in front of everyone who
+can reach that address. It is your decision and your responsibility.
+
 ### Syncing with the phone
 
 The mobile app keeps a copy of the portfolio and syncs it with this computer over the

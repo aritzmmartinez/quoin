@@ -597,10 +597,33 @@ every dependency injected.
   phone would download everything every day. Anything new that deletes or rewrites old
   `PriceSnapshot` rows changes it too. The first request assigns one in the sync's
   transaction; it never travels in an exchange.
-- **`/api/devices` refuses `Sec-Fetch-Site: cross-site`**: approving a phone is not
-  something another site may do. It is a resource route, polled while a pairing is open
-  and every 15 s for the list, because revalidating Settings reloads its prices and
-  ledger. Its lists are built field by field, so a token's hash never reaches the browser.
+- **`/api/devices` is a resource route**, polled while a pairing is open and every 15 s
+  for the list, because revalidating Settings reloads its prices and ledger. Its lists
+  are built field by field, so a token's hash never reaches the browser. Cross-site
+  requests are refused by the request guard, like every other write.
+
+## Request guard
+
+The web UI has no login, so every request goes through one check: `decideRequest`
+(`app/lib/request-guard.ts`, pure), run by the `middleware` in `root.tsx`. It covers
+documents, `.data` requests and resource routes; static assets and `/__manifest` carry
+no data. A refusal is a 403 `{ error: "forbidden-host" | "cross-site" }` and a
+`Refused request` log line naming the host. Never copy the check into a route.
+
+- **The Host header decides, on every method, reads included.** DNS rebinding makes
+  `evil.com` same-origin for the browser, so `Sec-Fetch-Site` cannot see it; only `Host`
+  does. Allowed: `localhost`, any IP literal (rebinding needs a name), and the names in
+  `QUOIN_ALLOWED_HOSTS`. The port is ignored: it varies legitimately (`-p 8080:3000`,
+  5173) and an attacker gains nothing from it. No normalisation: `localhost.` is refused.
+  Read the header itself, never `request.url`'s host or `X-Forwarded-Host`, which a
+  same-origin page can set.
+- **A write refuses `Sec-Fetch-Site` `cross-site` and `same-site`**: on localhost every
+  port is the same site. Without the header, an `Origin` must match `Host`; with neither
+  (curl), it passes.
+- **`pnpm start` is `scripts/serve.mjs`**, which sets `HOST` from `QUOIN_HOST` (default
+  `127.0.0.1`) and runs `react-router-serve`. An inherited `HOST` is overwritten on
+  purpose: a shell's own would expose the UI without anyone choosing it. The image sets
+  `QUOIN_HOST=0.0.0.0` and runs the same file.
 
 ## Privacy and the no-clobber rule
 

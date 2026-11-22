@@ -18,12 +18,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Summary: the Allocation card classifies a stock as Stock and a crypto asset as Crypto when no exposure has been chosen for it, as the look-through already did. This replaces the rule that put every instrument without an exposure under Unclassified instead of inheriting the broker's type: that slice now measures only what the type cannot tell, the funds, which are what you have to classify. A category you choose always wins, and the automatic one is never saved or synced.
 - Instruments: an instrument with no exposure chosen shows the automatic one in the Exposure column, as Auto: Stock, or Unclassified when its type says nothing about what it holds. Choosing a category replaces it, and choosing the first option again goes back to it. The categories in that list are named in your language.
+- `pnpm start` listens on 127.0.0.1 by default, instead of every interface, and ignores `HOST`: set `QUOIN_HOST` to listen elsewhere, `QUOIN_HOST=0.0.0.0` for every interface. The Docker image still listens on every interface inside the container, and `-p` still decides what reaches it.
+- Quoin answers only requests addressed to localhost or to an IP address. Opening it through any other name, a NAS's or a reverse proxy's, needs that name in `QUOIN_ALLOWED_HOSTS`, separated by commas; without it the request gets a 403. This stops a page on another site that points its own name at your computer from reading the portfolio.
 
 ### Fixed
 - Instruments: downloading the history of a symbol again keeps the prices older than the first candle that arrives, instead of replacing everything. A source that reaches back less far, Kraken's two years or a Yahoo line whose history now starts later, no longer shortens what was stored. A new symbol still replaces the whole history.
 - Import: the summary counts operations in every figure, so its rows add up to the total. A Trade Republic saveback and the purchase it paid for were two in the total, and two set-aside or failed entries when the purchase could not be imported; they are one operation now, listed by the purchase with the saveback beneath it as the same operation.
 - Import: the summary names a row by its type in your language (Saveback, Card payment, Reward…) instead of the broker's own code, and a file with nothing that can be saved no longer says that every trade was already in the ledger.
 - Import: a purchase already in the ledger that only gains its missing saveback row is no longer counted as new. It is counted apart, as Completed, in a row the summary shows only when there is one.
+
+### Security
+- A page open in the browser on another site can no longer send changes to Quoin: every request that writes is refused with a 403 when the browser says it comes from another site, and not only the ones to Devices (#141).
 
 ## [0.16.0] - 2026-11-10
 

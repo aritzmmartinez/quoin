@@ -20,8 +20,11 @@ import { useCopy } from "~/lib/i18n";
 import { parseLocale } from "~/lib/locale";
 import { isUnsupportedResidence } from "~/lib/residence";
 import { loadResidence } from "~/lib/residence.server";
+import { requestGuard } from "~/lib/request-guard.server";
 import { parseTheme, resolveTheme, THEME_SCRIPT } from "~/lib/theme";
 import "./app.css";
+
+export const middleware: Route.MiddlewareFunction[] = [requestGuard];
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
