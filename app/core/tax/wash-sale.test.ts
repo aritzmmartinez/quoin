@@ -5,11 +5,8 @@ import type { TradeEvent } from "../domain";
 
 import { calendarDate, toIsoDate } from "../calendar";
 
-import {
-  REPURCHASE_RULES,
-  repurchaseRuleFor,
-  type RepurchaseRule,
-} from "./config";
+import { repurchaseRuleFor, type RepurchaseRule } from "./config";
+import { territoryRules } from "./territory";
 import {
   createWashSaleAssessor,
   washSaleWindow,
@@ -328,6 +325,21 @@ describe("assessWashSales — scope and allocation", () => {
 
     expect(assess([buy, sell], ["BTC"]).notices.has(sell.id)).toBe(false);
   });
+
+  it("points out only the asset class the territory names", () => {
+    const buy = trade("BUY", "GOLD", "1", "2000", { ts: "2024-01-10" });
+    const sell = trade("SELL", "GOLD", "1", "1500", { ts: "2024-05-08" });
+    const rebuy = trade("BUY", "GOLD", "1", "1600", { ts: "2024-05-20" });
+    const assessor = createWashSaleAssessor([buy, sell, rebuy], {
+      territory: "bizkaia",
+      zone: MADRID,
+      assetClasses: new Map([["GOLD", "unclassified"]]),
+    });
+    const [sale] = walkFifo([buy, sell, rebuy], BIZKAIA).sales;
+
+    expect(assessor.ruleFor(sale!)).toBeNull();
+    expect(assessor.unlistedNotice(sale!)).toBeNull();
+  });
 });
 
 function tripsOn(saleTs: string, rebuyTs: string): boolean {
@@ -482,7 +494,7 @@ describe("repurchase rules", () => {
 });
 
 describe("acquisitions received in kind", () => {
-  const cashOnly = REPURCHASE_RULES.map((rule): RepurchaseRule => ({
+  const cashOnly = territoryRules("bizkaia").repurchase.map((rule): RepurchaseRule => ({
     ...rule,
     acquisitions: "cash-only",
   }));

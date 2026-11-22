@@ -106,11 +106,7 @@ export function walkDeferredLosses(
     let notice: UnlistedRepurchaseNotice | null = null;
     const rule = assessor.ruleFor(sale);
     if (rule === null) {
-      notice =
-        isLoss &&
-        assessor.assetClassOf(sale.trade.instrumentId) === "fungible-crypto"
-          ? assessor.unlistedNotice(sale)
-          : null;
+      notice = isLoss ? assessor.unlistedNotice(sale) : null;
     } else if (isLoss || carriedIn.length > 0) {
       assessment = assessor.assess(sale, rule);
     }
