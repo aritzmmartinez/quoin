@@ -4,6 +4,7 @@ import {
   dividendEventSchema,
   cashEventSchema,
   instrumentSchema,
+  interestEventSchema,
   tradeEventSchema,
   type Instrument,
   type InstrumentType,
@@ -162,7 +163,12 @@ export function mapRow(row: TradeRepublicRow): MappedItem {
       return {
         kind: "domain",
         instrument: null,
-        event: toCash(row, "INTEREST"),
+        event: interestEventSchema.parse({
+          ...base(row),
+          type: "INTEREST",
+          grossAmount: abs(row.amount),
+          taxWithheld: absOrZero(row.tax),
+        }),
       };
 
     case "CASH|CUSTOMER_INPAYMENT":
@@ -250,7 +256,7 @@ export function mapSavebackPurchase(
 
 function toCash(
   row: TradeRepublicRow,
-  type: "DEPOSIT" | "WITHDRAWAL" | "INTEREST",
+  type: "DEPOSIT" | "WITHDRAWAL",
 ): LedgerEvent {
   return cashEventSchema.parse({
     ...base(row),

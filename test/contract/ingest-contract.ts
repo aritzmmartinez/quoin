@@ -119,6 +119,12 @@ const cases: Case[] = [
     ),
   },
   {
+    name: "Trade Republic interest with its withholding: gross amount and tax withheld, both kept",
+    csv: tr(
+      `2026-02-01T09:00:00Z,CASH,INTEREST_PAYMENT,,,,,,10,,-1.9,EUR,i1`,
+    ),
+  },
+  {
     name: "Trade Republic, re-imported: rows already in the ledger are duplicates",
     csv: tr(
       `2025-01-10T09:00:00Z,TRADING,BUY,FUND,Test Fund,${FUND},1,100,-100,,,EUR,t1`,
