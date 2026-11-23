@@ -18,10 +18,11 @@ import {
   getTaxScale,
   isSavingsIncome,
   savingsIncomeCountOf,
-  savingsIncomeNetOf,
+  savingsIncomeOf,
   taxYearOf,
   territoryRules,
   withholdingsOf,
+  type DividendExemption,
   type PoolStep,
   type Withholdings,
   type RealizedGainDetail,
@@ -286,6 +287,10 @@ export type TaxCarryforwardRow = PoolStep;
 export interface TaxSavingsIncome {
   count: number;
   gross: string;
+  /** Dividends exempt under the territory's rule, already out of the pool. */
+  exempt: string;
+  /** The citation of that rule; null where the territory has none. */
+  exemptSource: string | null;
   carryforward: TaxCarryforwardRow[];
   finalNet: string;
 }
@@ -315,6 +320,17 @@ export function inKindIncomeOf(
       received.map((e) => baseOf(e, "taxWithheld").toString()),
       2,
     ),
+  };
+}
+
+/** Only an ETF is a fund here: Trade Republic stores funds as ETF. An instrument not on file is never exempt. */
+export function isCollectiveInvestment(
+  instruments: readonly Instrument[],
+): (instrumentId: string) => boolean {
+  const byId = new Map(instruments.map((i) => [i.id, i.type]));
+  return (id) => {
+    const type = byId.get(id);
+    return type === undefined || type === "ETF";
   };
 }
 
@@ -394,12 +410,16 @@ export function buildTaxYearView(
   }));
 
   const rules = territoryRules(result.territory);
-  const incomeNetOf = savingsIncomeNetOf(events, jurisdiction.zone);
+  const exemption: DividendExemption | null = rules.dividendExemption && {
+    rule: rules.dividendExemption,
+    isCollective: isCollectiveInvestment(instruments),
+  };
+  const incomeOf = savingsIncomeOf(events, jurisdiction.zone, exemption);
   const {
     pools: [gains, income],
     savingsBase,
   } = carryforwardPools(
-    [gainsNetOf(history), incomeNetOf],
+    [gainsNetOf(history), incomeOf.netOf],
     year,
     rules.lossCarryforwardYears,
     rules.crossOffsetLimit,
@@ -441,7 +461,9 @@ export function buildTaxYearView(
     netSavingsBase: gains.finalNet,
     savingsIncome: {
       count: savingsIncomeCountOf(events, year, jurisdiction.zone),
-      gross: incomeNetOf(year).toFixed(2),
+      gross: incomeOf.grossOf(year).toFixed(2),
+      exempt: incomeOf.exemptOf(year).toFixed(2),
+      exemptSource: rules.dividendExemption?.source ?? null,
       carryforward: income.steps,
       finalNet: income.finalNet,
     },

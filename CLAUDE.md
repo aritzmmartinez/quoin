@@ -1226,12 +1226,20 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
   compared in the web view only; the contract carries no such field).
 - **The savings base has two pools, carried forward together** (`carryforwardPools`):
   capital gains and income from movable capital — interest and cash dividends, gross in
-  euros (`savingsIncomeNetOf`); in-kind income stays out. Each carries its own losses for
+  euros (`savingsIncomeOf`); in-kind income stays out. Each carries its own losses for
   `lossCarryforwardYears`; a year's negative balance offsets the other pool's same-year
   positive one up to `crossOffsetLimit` (0 in Bizkaia, Art. 66.1). The base adds the
   positive final balances and the quota applies to it. `carryforwardFrom` is the gains
   pool alone, unchanged. Bonds never reach the ledger (Trade Republic sets them aside), so
   nothing yet produces negative income: the `carryforward` contract pins that branch.
+- **Dividends are exempt up to `dividendExemption.limit` a year** (1500 €, Art. 9.24 NF
+  13/2013; none in régimen común since 2015), gross in euros, before the income pool.
+  Never an ETF's (`isCollectiveInvestment`: Trade Republic stores funds as ETF), nor an
+  instrument missing from the list. Their withholdings still count: they pay on account.
+  **Known limitation:** the exemption does not reach shares bought in the two months
+  before the payment when homogeneous ones are sold in the two after, and nothing applies
+  that. The repurchase evaluator cannot tell: it only opens windows around sales at a
+  loss, never around a dividend, and this rule bites on gains too.
 - **Withholdings are shown, never subtracted.** They pay on account of the whole IRPF, not
   of the savings quota. `withholdingsOf` adds those recorded on the year's savings income,
   with no split by origin: Trade Republic's single `tax` column cannot tell Spanish from

@@ -10,6 +10,7 @@ import {
 import { baseOf, bookable } from "../fx";
 
 import type { NetOf } from "./carryforward";
+import type { DividendExemptionRule } from "./territory";
 
 /**
  * Income from movable capital in the savings base: interest and dividends paid
@@ -28,22 +29,52 @@ function inYear(events: readonly LedgerEvent[], year: number, zone: string) {
   return bookable(events).filter((e) => fiscalYearOf(e.ts, zone) === year);
 }
 
-export function savingsIncomeNetOf(
+export interface DividendExemption {
+  readonly rule: DividendExemptionRule;
+  /** A fund or ETF: its dividends are never exempt when the rule excludes them. */
+  readonly isCollective: (instrumentId: string) => boolean;
+}
+
+export interface SavingsIncomeOf {
+  /** The year's income, gross in euros. */
+  grossOf: NetOf;
+  /** The part of it exempt as dividends, up to the year's limit. */
+  exemptOf: NetOf;
+  /** What enters the income pool: gross less exempt. */
+  netOf: NetOf;
+}
+
+export function savingsIncomeOf(
   events: readonly LedgerEvent[],
   zone: string,
-): NetOf {
-  const byYear = new Map<number, Decimal>();
+  exemption: DividendExemption | null,
+): SavingsIncomeOf {
+  const gross = new Map<number, Decimal>();
+  const eligible = new Map<number, Decimal>();
+  const add = (map: Map<number, Decimal>, year: number, amount: string) =>
+    map.set(year, (map.get(year) ?? new Decimal(0)).plus(amount));
+
   for (const e of bookable(events)) {
     if (!isSavingsIncome(e)) continue;
     const year = fiscalYearOf(e.ts, zone);
-    byYear.set(
-      year,
-      (byYear.get(year) ?? new Decimal(0)).plus(
-        baseOf(e, "grossAmount").toString(),
-      ),
-    );
+    const amount = baseOf(e, "grossAmount").toString();
+    add(gross, year, amount);
+    if (exemption && e.type === "DIVIDEND" && isExemptible(e, exemption)) {
+      add(eligible, year, amount);
+    }
   }
-  return (year) => byYear.get(year) ?? new Decimal(0);
+
+  const zero = new Decimal(0);
+  const grossOf: NetOf = (year) => gross.get(year) ?? zero;
+  const exemptOf: NetOf = (year) =>
+    exemption
+      ? Decimal.min(eligible.get(year) ?? zero, exemption.rule.limit)
+      : zero;
+  return { grossOf, exemptOf, netOf: (year) => grossOf(year).minus(exemptOf(year)) };
+}
+
+function isExemptible(e: DividendEvent, { rule, isCollective }: DividendExemption) {
+  return !(rule.excludesCollectiveInvestment && isCollective(e.instrumentId));
 }
 
 export interface Withholdings {

@@ -4,6 +4,7 @@ import {
   instrumentTypeSchema,
   type DividendEvent,
   type Instrument,
+  type LedgerEvent,
   type TradeEvent,
 } from "~/core/domain";
 import { computeTaxHistory } from "~/core/tax";
@@ -929,5 +930,59 @@ describe("a repurchase window still open", () => {
     );
 
     expect(view.sales[0]!.windowOpenUntil).toBeNull();
+  });
+});
+
+describe("the dividend exemption", () => {
+  function cash(instrumentId: string, ts: string, grossAmount: string, taxWithheld = "0") {
+    const income: DividendEvent = {
+      id: `evt-${seq++}`,
+      ts: new Date(ts),
+      type: "DIVIDEND",
+      instrumentId,
+      grossAmount,
+      taxWithheld,
+      funding: "CASH",
+      currency: "EUR",
+      account: "test",
+      source: "TEST",
+    };
+    return income;
+  }
+
+  const instruments = [
+    instrument("S1", "Stock one"),
+    instrument("S2", "Stock two"),
+    instrument("F", "Fund", "ETF"),
+  ];
+  const view = (events: readonly LedgerEvent[], year: number) =>
+    buildTaxYearView(events, instruments, year, BIZKAIA, "2026-12-31");
+
+  it("exempts a stock's dividends up to 1500 a year, never a fund's or an unknown instrument's", () => {
+    const v = view(
+      [
+        cash("S1", "2026-03-01T10:00:00Z", "1000", "190"),
+        cash("S2", "2026-06-01T10:00:00Z", "800", "152"),
+        cash("F", "2026-07-01T10:00:00Z", "200", "38"),
+        cash("GONE", "2026-08-01T10:00:00Z", "50"),
+      ],
+      2026,
+    );
+    expect(v.savingsIncome.gross).toBe("2050.00");
+    expect(v.savingsIncome.exempt).toBe("1500.00");
+    expect(v.savingsIncome.exemptSource).toBe("Art. 9.24 NF 13/2013 de Bizkaia");
+    expect(v.savingsIncome.finalNet).toBe("550");
+    expect(v.savingsBase).toBe("550");
+    expect(v.withholdings.total).toBe("380.00");
+  });
+
+  it("starts again each Madrid fiscal year", () => {
+    const events = [
+      cash("S1", "2025-12-31T23:30:00Z", "1200"),
+      cash("S1", "2025-06-01T10:00:00Z", "1000"),
+    ];
+    expect(view(events, 2025).savingsIncome.exempt).toBe("1000.00");
+    expect(view(events, 2026).savingsIncome.exempt).toBe("1200.00");
+    expect(view(events, 2026).savingsIncome.finalNet).toBe("0");
   });
 });
