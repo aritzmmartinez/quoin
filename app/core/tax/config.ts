@@ -10,6 +10,8 @@ export type Territory = "bizkaia" | "comun";
 
 const TERRITORIES: Record<Residence, Territory> = {
   bizkaia: "bizkaia",
+  comun: "comun",
+  canarias: "comun",
 };
 
 export function territoryOfResidence(residence: Residence): Territory {

@@ -8,6 +8,7 @@ import type {
   ExposureKind,
   InstrumentType,
   LeafKind,
+  Residence,
   Thesis,
 } from "~/core/domain";
 import type { RepurchaseAssetClass, Territory } from "~/core/tax";
@@ -223,6 +224,24 @@ export const es = {
         hint: "Convierte todos los importes a esta divisa",
       },
       language: { label: "Idioma" },
+    },
+    tax: {
+      title: "Fiscalidad",
+      desc: "Qué reglas del IRPF aplica la vista Fiscal de Realizado.",
+      residence: {
+        label: "Residencia fiscal",
+        options: {
+          bizkaia: { label: "Bizkaia", desc: "Régimen foral, NF 13/2013" },
+          comun: {
+            label: "Régimen común",
+            desc: "Península, Baleares, Ceuta y Melilla",
+          },
+          canarias: { label: "Canarias", desc: "Régimen común, hora canaria" },
+        } satisfies Record<Residence, { label: string; desc: string }>,
+        help: "Cambia la escala del ahorro, la regla de recompra, la compensación entre bolsas y la exención de dividendos, y también el día y el año en que cae cada operación y la hora que se muestra. Lo ya guardado no se recalcula: los días de entrada en vigor de los planes, el día de cada precio y los tipos de cambio ya aplicados se quedan como estaban.",
+        ceutaMelilla:
+          "La deducción por rentas obtenidas en Ceuta y Melilla no se calcula.",
+      },
     },
     portfolio: {
       title: "Cartera",

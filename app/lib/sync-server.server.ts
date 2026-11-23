@@ -22,14 +22,13 @@ import { listen } from "~/adapters/sync-server/listener";
 import { today } from "~/core/calendar";
 
 import { describeFailure } from "./describe-failure";
+import { backupZoneOf } from "./residence";
 import { describeListener, isPortInUse } from "./sync-notice";
 import type { RunEffect } from "./sync";
 import { defaultServerName, inDocker, runEffect } from "./sync.server";
 import { AuthThrottle, handleSyncRequest } from "./sync-api";
 import { EffectQueue } from "./sync-effects";
 import { PairingRegistry } from "./sync-pairing";
-
-const BACKUP_ZONE = "Europe/Madrid";
 
 const report = (error: unknown) => {
   console.error(`quoin sync: ${describeFailure(error)}`);
@@ -89,11 +88,11 @@ export async function startSyncServer(
             prices: { read: readStoredPrices },
             pairing: options.pairing,
             throttle: options.throttle,
-            beforeApply: () => {
+            beforeApply: (residence) => {
               backupBeforeSync(
                 databaseFile,
                 join(dataDirectory, "backups", "sync"),
-                today(BACKUP_ZONE, now()),
+                today(backupZoneOf(residence), now()),
               );
             },
             effects,

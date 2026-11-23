@@ -7,6 +7,7 @@ import type {
   ExposureKind,
   InstrumentType,
   LeafKind,
+  Residence,
   Thesis,
 } from "~/core/domain";
 import type { RepurchaseAssetClass, Territory } from "~/core/tax";
@@ -195,6 +196,27 @@ export const en: Copy = {
         hint: "Converts every amount into this currency",
       },
       language: { label: "Language" },
+    },
+    tax: {
+      title: "Tax",
+      desc: "Which income tax rules the Tax view of Realized applies.",
+      residence: {
+        label: "Tax residence",
+        options: {
+          bizkaia: { label: "Bizkaia", desc: "Foral regime, NF 13/2013" },
+          comun: {
+            label: "Common regime",
+            desc: "Mainland, Balearic Islands, Ceuta and Melilla",
+          },
+          canarias: {
+            label: "Canary Islands",
+            desc: "Common regime, Canary time",
+          },
+        } satisfies Record<Residence, { label: string; desc: string }>,
+        help: "Changes the savings scale, the repurchase rule, the offsetting between pools and the dividend exemption, and also the day and year each operation falls in and the time shown. What is already stored is not recalculated: the days plans take effect, the day of each price and the exchange rates already applied stay as they were.",
+        ceutaMelilla:
+          "The deduction for income obtained in Ceuta and Melilla is not calculated.",
+      },
     },
     portfolio: {
       title: "Portfolio",

@@ -44,7 +44,7 @@ export function exportState(
 
 export interface ApplyDeps {
   store: SyncStore;
-  beforeApply?: () => void;
+  beforeApply?: (residence: string) => void;
   settled?: (
     tx: SyncTx,
     outcome: { status: "up-to-date" | "applied"; counts: PlanCounts },
@@ -102,7 +102,7 @@ export async function applyState(
     }
     if (options.dryRun) return { status: "dry-run" as const, plan, counts };
 
-    deps.beforeApply?.();
+    deps.beforeApply?.(state.settings.residence);
     tx.apply(plan.apply, sender, nowMs);
     deps.settled?.(tx, { status: "applied", counts });
     return { status: "applied" as const, plan, counts };
