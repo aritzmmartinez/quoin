@@ -130,14 +130,14 @@ function dailyCandles(): Quote[] {
 }
 
 const provider: MarketDataProvider = {
-  source: "FAKE",
+  sourceOf: () => "FAKE",
   getQuote: async () => null,
   getHistory: async (symbol: string, _range: HistoryRange) =>
     symbol === "BTC-EUR" ? dailyCandles() : [],
 };
 
 const btcQuote: MarketDataProvider = {
-  source: "FAKE",
+  sourceOf: () => "FAKE",
   getQuote: async () => ({
     symbol: "BTC-EUR",
     price: "90000",
@@ -339,7 +339,7 @@ function candles(
 
 function providerOf(quotes: Quote[]): MarketDataProvider {
   return {
-    source: "FAKE",
+    sourceOf: () => "FAKE",
     getQuote: async () => null,
     getHistory: async (symbol: string) => (symbol === "BTC-EUR" ? quotes : []),
   };
@@ -497,13 +497,15 @@ describe("candle spacing and the 7-day lookup (integration)", () => {
 describe("the summary counts operations, like the file and the discards (integration)", () => {
   const accounted = (summary: {
     imported: number;
+    completed: number;
     duplicates: number;
-    errors: readonly unknown[];
+    failed: number;
     discarded: Partial<Record<string, number>>;
   }) =>
     summary.imported +
+    summary.completed +
     summary.duplicates +
-    summary.errors.length +
+    summary.failed +
     Object.values(summary.discarded).reduce(
       (sum: number, n) => sum + (n ?? 0),
       0,

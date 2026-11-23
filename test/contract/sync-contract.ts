@@ -1103,6 +1103,432 @@ const device = (deviceId: string, other: string, state: Row) => ({
 });
 const at = (minutes: number) => T + minutes * MIN;
 
+/**
+ * Three devices: PC A, PC B and the phone (C), which is the only one that talks
+ * to both. They converge when they hold the same values, the same deletions and
+ * the same rows set aside. Marks may differ only on a field whose value is the
+ * same, on purpose: after a `keep` on the phone, the PC the kept value came from
+ * already holds it, so `merge` skips the field and that PC keeps its own older
+ * mark. The mark is its own and the others have seen it, so it decides nothing;
+ * the second scenario edits that field from each device to show it.
+ *
+ * A row is set aside only against a peer whose version differs. A and the phone
+ * hold the same R2, so A never lists it: it never sees B's version.
+ */
+const R2_APART = ["KRAKEN_CSV::R2", "KRAKEN_CSV::R2:income"];
+const TER = { kind: "instrument", id: FUND, field: "ter" };
+const peers = (seen: Record<string, string>) =>
+  Object.entries(seen).map(([deviceId, mark]) => ({ deviceId, seen: mark }));
+const editTer = (deviceId: string, minutes: number, ter: string) => ({
+  edit: deviceId,
+  nowMs: at(minutes),
+  apply: {
+    instruments: { update: [{ id: FUND, patch: { ter } }] },
+    restamp: [TER],
+  },
+});
+const terTaken = (ter: string, terHlc: string) => ({
+  instruments: { update: [{ id: FUND, patch: { ter, terHlc } }] },
+});
+
+const r2Here = [reward("R2", "2.10", "1.05"), rewardIncome("R2", "1.05")];
+const r2There = [reward("R2", "2.12", "1.06"), rewardIncome("R2", "1.06")];
+const krakenBuy = buy("t-9", { ...kraken, instrumentId: COIN });
+const v1Buried = {
+  entity: "PortfolioTarget",
+  key: "v1",
+  hlc: m(B, at(20), 3),
+};
+const composition = block("2026-09-30", false, m(A, at(1), 1));
+const fundCreated = fund({ ter: "0.0025", terHlc: m(A, at(2)) });
+const fromA = {
+  ter: "0.0035",
+  terHlc: m(A, at(21)),
+  thesis: "CONVICTION",
+  thesisHlc: m(A, at(21), 1),
+  hedgedToBase: true,
+  hedgedToBaseHlc: m(A, at(21), 2),
+};
+const fromB = {
+  exposureKind: "COMMODITY",
+  exposureLeafId: "XAU",
+  exposureHlc: m(B, at(20), 2),
+  thesis: "TACTICAL",
+  thesisHlc: m(B, at(20), 1),
+};
+
+const held = (
+  deviceId: string,
+  seen: Record<string, string>,
+  ter: string,
+  terHlc: string,
+  apartFrom: Record<string, string[]>,
+) => ({
+  setAside: apartFrom,
+  state: {
+    deviceId,
+    peers: peers(seen),
+    ledger: [...(deviceId === B ? r2There : r2Here), krakenBuy, buy("t-1")],
+    instruments: [
+      fund({
+        ...fromB,
+        ter,
+        terHlc,
+        hedgedToBase: true,
+        hedgedToBaseHlc: m(A, at(21), 2),
+      }),
+      coin(),
+    ],
+    targets: [target("v2", "2026-12-01")],
+    tombstones: [v1Buried],
+    holdings: [composition],
+  },
+});
+const afterKeep = {
+  [A]: held(A, { [B]: m(B, at(37)), [C]: m(C, at(40)) }, "0.0035", m(A, at(21)), {
+    [C]: [],
+  }),
+  [B]: held(B, { [A]: m(A, at(35)), [C]: m(C, at(38)) }, "0.0035", m(C, at(33)), {
+    [C]: R2_APART,
+  }),
+  [C]: held(C, { [A]: m(A, at(39)), [B]: m(B, at(37)) }, "0.0035", m(C, at(33)), {
+    [A]: [],
+    [B]: R2_APART,
+  }),
+};
+const afterEdits = {
+  [A]: held(A, { [B]: m(B, at(63)), [C]: m(C, at(72)) }, "0.0050", m(C, at(70)), {
+    [C]: [],
+  }),
+  [B]: held(B, { [A]: m(A, at(71)), [C]: m(C, at(74)) }, "0.0050", m(C, at(70)), {
+    [C]: R2_APART,
+  }),
+  [C]: held(C, { [A]: m(A, at(71)), [B]: m(B, at(73)) }, "0.0050", m(C, at(70)), {
+    [A]: [],
+    [B]: R2_APART,
+  }),
+};
+
+const threeDevices = [
+  {
+    name: "Three devices: two PCs that only the phone talks to end with the same values, deletions and rows set aside",
+    devices: {
+      [A]: { lastHlc: null, state: { deviceId: A } },
+      [B]: {
+        lastHlc: null,
+        state: {
+          deviceId: B,
+          ledger: [...r2There, krakenBuy],
+          instruments: [coin()],
+        },
+      },
+      [C]: { lastHlc: null, state: { deviceId: C } },
+    },
+    steps: [
+      {
+        edit: A,
+        nowMs: at(1),
+        apply: {
+          ledger: { insert: [...r2Here, buy("t-1")] },
+          instruments: { insert: [fund({ ter: "0.0020" }), coin()] },
+          targets: {
+            insert: [target("v1", "2026-11-01"), target("v2", "2026-12-01")],
+          },
+          holdings: [block("2026-09-30", false, null)],
+          restamp: [TER, { kind: "holdings", instrumentId: FUND }],
+        },
+      },
+      editTer(A, 2, "0.0025"),
+      { from: A, to: C, nowMs: at(10), status: "applied" },
+      {
+        from: C,
+        to: A,
+        nowMs: at(11),
+        status: "up-to-date",
+        apply: { peers: peers({ [C]: m(C, at(11)) }) },
+      },
+      {
+        from: B,
+        to: C,
+        nowMs: at(12),
+        status: "applied",
+        setAside: R2_APART,
+        apply: {
+          ledger: { insert: [krakenBuy] },
+          peers: peers({ [A]: m(A, at(10)), [B]: m(B, at(12)) }),
+        },
+      },
+      {
+        from: C,
+        to: B,
+        nowMs: at(13),
+        status: "applied",
+        setAside: R2_APART,
+        apply: {
+          ledger: { insert: [buy("t-1")] },
+          instruments: { insert: [fundCreated] },
+          targets: {
+            insert: [target("v1", "2026-11-01"), target("v2", "2026-12-01")],
+          },
+          holdings: [composition],
+          peers: peers({ [A]: m(A, at(10)), [C]: m(C, at(13)) }),
+        },
+      },
+      {
+        edit: B,
+        nowMs: at(20),
+        apply: {
+          instruments: {
+            update: [
+              {
+                id: FUND,
+                patch: {
+                  ter: "0.0030",
+                  thesis: "TACTICAL",
+                  exposureKind: "COMMODITY",
+                  exposureLeafId: "XAU",
+                },
+              },
+            ],
+          },
+          targets: { delete: ["v1"] },
+          restamp: [
+            TER,
+            { kind: "instrument", id: FUND, field: "thesis" },
+            { kind: "instrument", id: FUND, field: "exposure" },
+            { kind: "tombstone", key: "v1" },
+          ],
+        },
+      },
+      {
+        edit: A,
+        nowMs: at(21),
+        apply: {
+          instruments: {
+            update: [
+              {
+                id: FUND,
+                patch: {
+                  ter: "0.0035",
+                  thesis: "CONVICTION",
+                  hedgedToBase: true,
+                },
+              },
+            ],
+          },
+          restamp: [
+            TER,
+            { kind: "instrument", id: FUND, field: "thesis" },
+            { kind: "instrument", id: FUND, field: "hedgedToBase" },
+          ],
+        },
+      },
+      {
+        from: A,
+        to: C,
+        nowMs: at(30),
+        status: "applied",
+        apply: {
+          instruments: { update: [{ id: FUND, patch: fromA }] },
+          peers: peers({ [A]: m(A, at(30)), [B]: m(B, at(12)) }),
+        },
+      },
+      {
+        from: C,
+        to: A,
+        nowMs: at(31),
+        status: "applied",
+        apply: {
+          ledger: { insert: [krakenBuy] },
+          peers: peers({ [B]: m(B, at(12)), [C]: m(C, at(31)) }),
+        },
+      },
+      {
+        from: B,
+        to: C,
+        nowMs: at(32),
+        status: "conflicts",
+        conflicts: [`instrument:${FUND}:ter`, `instrument:${FUND}:thesis`],
+        setAside: R2_APART,
+      },
+      {
+        from: B,
+        to: C,
+        nowMs: at(33),
+        resolutions: {
+          [`instrument:${FUND}:ter`]: "keep",
+          [`instrument:${FUND}:thesis`]: "take",
+        },
+        status: "applied",
+        setAside: R2_APART,
+        apply: {
+          instruments: { update: [{ id: FUND, patch: fromB }] },
+          targets: { delete: ["v1"] },
+          tombstones: [v1Buried],
+          restamp: [TER],
+          peers: peers({ [A]: m(A, at(30)), [B]: m(B, at(33)) }),
+        },
+      },
+      {
+        from: C,
+        to: B,
+        nowMs: at(34),
+        status: "applied",
+        setAside: R2_APART,
+        apply: {
+          instruments: {
+            update: [
+              {
+                id: FUND,
+                patch: {
+                  ter: "0.0035",
+                  terHlc: m(C, at(33)),
+                  hedgedToBase: true,
+                  hedgedToBaseHlc: m(A, at(21), 2),
+                },
+              },
+            ],
+          },
+          peers: peers({ [A]: m(A, at(30)), [C]: m(C, at(34)) }),
+        },
+      },
+      {
+        from: A,
+        to: C,
+        nowMs: at(35),
+        status: "up-to-date",
+        apply: { peers: peers({ [A]: m(A, at(35)), [B]: m(B, at(33)) }) },
+      },
+      {
+        from: C,
+        to: A,
+        nowMs: at(36),
+        status: "applied",
+        apply: {
+          instruments: { update: [{ id: FUND, patch: fromB }] },
+          targets: { delete: ["v1"] },
+          tombstones: [v1Buried],
+          peers: peers({ [B]: m(B, at(33)), [C]: m(C, at(36)) }),
+        },
+      },
+      {
+        from: B,
+        to: C,
+        nowMs: at(37),
+        status: "up-to-date",
+        setAside: R2_APART,
+        apply: { peers: peers({ [A]: m(A, at(35)), [B]: m(B, at(37)) }) },
+      },
+      {
+        from: C,
+        to: B,
+        nowMs: at(38),
+        status: "up-to-date",
+        setAside: R2_APART,
+        apply: { peers: peers({ [A]: m(A, at(35)), [C]: m(C, at(38)) }) },
+      },
+      {
+        from: A,
+        to: C,
+        nowMs: at(39),
+        status: "up-to-date",
+        apply: { peers: peers({ [A]: m(A, at(39)), [B]: m(B, at(37)) }) },
+      },
+      {
+        from: C,
+        to: A,
+        nowMs: at(40),
+        status: "up-to-date",
+        apply: { peers: peers({ [B]: m(B, at(37)), [C]: m(C, at(40)) }) },
+      },
+    ],
+    end: afterKeep,
+  },
+  {
+    name: "Three devices, afterwards: the field whose mark differs on A is edited on B, on A and on the phone, and each edit reaches the other two with no conflict",
+    devices: {
+      [A]: { lastHlc: m(A, at(39)), state: afterKeep[A].state },
+      [B]: { lastHlc: m(B, at(37)), state: afterKeep[B].state },
+      [C]: { lastHlc: m(C, at(40)), state: afterKeep[C].state },
+    },
+    steps: [
+      editTer(B, 50, "0.0040"),
+      {
+        from: B,
+        to: C,
+        nowMs: at(51),
+        status: "applied",
+        setAside: R2_APART,
+        apply: terTaken("0.0040", m(B, at(50))),
+      },
+      {
+        from: C,
+        to: B,
+        nowMs: at(52),
+        status: "up-to-date",
+        setAside: R2_APART,
+      },
+      { from: A, to: C, nowMs: at(53), status: "up-to-date" },
+      {
+        from: C,
+        to: A,
+        nowMs: at(54),
+        status: "applied",
+        apply: terTaken("0.0040", m(B, at(50))),
+      },
+      editTer(A, 60, "0.0045"),
+      {
+        from: A,
+        to: C,
+        nowMs: at(61),
+        status: "applied",
+        apply: terTaken("0.0045", m(A, at(60))),
+      },
+      { from: C, to: A, nowMs: at(62), status: "up-to-date" },
+      {
+        from: B,
+        to: C,
+        nowMs: at(63),
+        status: "up-to-date",
+        setAside: R2_APART,
+      },
+      {
+        from: C,
+        to: B,
+        nowMs: at(64),
+        status: "applied",
+        setAside: R2_APART,
+        apply: terTaken("0.0045", m(A, at(60))),
+      },
+      editTer(C, 70, "0.0050"),
+      { from: A, to: C, nowMs: at(71), status: "up-to-date" },
+      {
+        from: C,
+        to: A,
+        nowMs: at(72),
+        status: "applied",
+        apply: terTaken("0.0050", m(C, at(70))),
+      },
+      {
+        from: B,
+        to: C,
+        nowMs: at(73),
+        status: "up-to-date",
+        setAside: R2_APART,
+      },
+      {
+        from: C,
+        to: B,
+        nowMs: at(74),
+        status: "applied",
+        setAside: R2_APART,
+        apply: terTaken("0.0050", m(C, at(70))),
+      },
+    ],
+    end: afterEdits,
+  },
+];
+
 const scenarios = [
   {
     name: "A field resolved once stays resolved: the next syncs both ways are up to date",
@@ -1278,9 +1704,9 @@ export function syncContractJson(): string {
       contract: "sync",
       version: 1,
       description:
-        'How two devices\' user states merge, and which exchange files are refused. Shared with the mobile client: both implementations must reproduce every case. Omitted in a case: empty collections, peers [], settings { residence: bizkaia, residenceHlc: null }, schemaVersion 1 and deviceName null on the incoming file, and every optional row column (null; fees and taxWithheld "0", fxSource IDENTITY, funding CASH, hedgedToBase false, thesis CORE). A merge may carry resolutions, keyed by conflictKey; an expected error means merge throws. An expected plan compares apply and effects only when it lists no conflicts, unless compareApply is true; apply.peers is compared only when the case lists it; setAside is always compared. A scenario replays syncs between devices: each step exports `from` at nowMs (exportDevice), merges it into `to` with the step\'s resolutions, and then: with conflicts nothing changes; with no data to change (changesData false) only the peers are written and the status is up-to-date; otherwise applyPlan at nowMs. converged: the two user states (all but deviceId and peers) end equal.',
+        'How two devices\' user states merge, and which exchange files are refused. Shared with the mobile client: both implementations must reproduce every case. Omitted in a case: empty collections, peers [], settings { residence: bizkaia, residenceHlc: null }, schemaVersion 1 and deviceName null on the incoming file, and every optional row column (null; fees and taxWithheld "0", fxSource IDENTITY, funding CASH, hedgedToBase false, thesis CORE). A merge may carry resolutions, keyed by conflictKey; an expected error means merge throws. An expected plan compares apply and effects only when it lists no conflicts, unless compareApply is true; apply.peers is compared only when the case lists it; setAside is always compared. A scenario replays syncs between devices: each step exports `from` at nowMs (exportDevice), merges it into `to` with the step\'s resolutions, and then: with conflicts nothing changes; with no data to change (changesData false) only the peers are written and the status is up-to-date; otherwise applyPlan at nowMs. converged: the two user states (all but deviceId and peers) end equal. A scenario may hold more than two devices and three optional keys. A step { edit, nowMs, apply } is a change made on that device: applyPlan of that plan at nowMs with the device\'s peers left as they are, so a value in a patch gets its mark from a restamp. A sync step may carry apply, the plan merge must return, compared like a merge\'s expected.apply (whole, and peers only when listed). end gives, per device, its whole final state, peers included, and setAside: per peer it merged from, the ledger keys set aside in the last merge from that peer; a scenario with end states no converged. Devices that converge hold the same values, deletions and rows set aside; a mark may differ only on a field whose value is the same (after a keep, the device the kept value came from keeps its own older mark, which decides nothing). A row is set aside only against a peer whose version differs, so a device whose only peer holds its own version never lists it.',
       merges: [...merges, ...resolutions],
-      scenarios,
+      scenarios: [...scenarios, ...threeDevices],
       refusals,
     },
     null,

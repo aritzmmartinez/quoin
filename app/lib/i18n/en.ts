@@ -7,9 +7,10 @@ import type {
   ExposureKind,
   InstrumentType,
   LeafKind,
+  Residence,
   Thesis,
 } from "~/core/domain";
-import type { RepurchaseLetter } from "~/core/tax";
+import type { RepurchaseAssetClass, Territory } from "~/core/tax";
 
 import type { ExcludedNotice } from "./es";
 import type { Copy } from "./types";
@@ -114,7 +115,7 @@ const EXPOSURE_KIND_LABELS: Record<ExposureKind, string> = {
 export const en: Copy = {
   common: {
     close: "Close",
-    marketDataUnavailable: "Yahoo could not be reached. Try again.",
+    marketDataUnavailable: "The price source could not be reached. Try again.",
     halted: (cause: string): string =>
       `Stopped before finishing: ${cause.replace(/\.+$/, "")}. This is not a problem with one instrument, so the others were not tried.`,
     noRateExcluded: (names: readonly string[]): string => {
@@ -123,8 +124,8 @@ export const en: Copy = {
     },
     noRateTax: (names: string): string =>
       `No exchange rate: ${names}. Their trades could not be converted to euros and are not part of this calculation. Check them before using these figures in a tax return.`,
-    unclassifiedTax: (names: string): string =>
-      `No repurchase rule: ${names}. Its type (bond, commodity or cash) is neither a listed security nor a crypto asset: a bond held directly yields income from movable capital, to which Art. 43 does not apply, and a commodity held directly would have a rule of its own, which Quoin does not model. Its sales are computed with no repurchase rule. Check them before using these figures in a tax return.`,
+    unclassifiedTax: (names: string, citation: string): string =>
+      `No repurchase rule: ${names}. Its type (bond, commodity or cash) is neither a listed security nor a crypto asset: a bond held directly yields income from movable capital, to which the repurchase rule (${citation}) does not apply, and a commodity held directly would have a rule of its own, which Quoin does not model. Its sales are computed with no repurchase rule. Check them before using these figures in a tax return.`,
   },
   notFound: {
     title: "Page not found",
@@ -196,6 +197,27 @@ export const en: Copy = {
       },
       language: { label: "Language" },
     },
+    tax: {
+      title: "Tax",
+      desc: "Which income tax rules the Tax view of Realized applies.",
+      residence: {
+        label: "Tax residence",
+        options: {
+          bizkaia: { label: "Bizkaia", desc: "Foral regime, NF 13/2013" },
+          comun: {
+            label: "Common regime",
+            desc: "Mainland, Balearic Islands, Ceuta and Melilla",
+          },
+          canarias: {
+            label: "Canary Islands",
+            desc: "Common regime, Canary time",
+          },
+        } satisfies Record<Residence, { label: string; desc: string }>,
+        help: "Changes the savings scale, the repurchase rule, the offsetting between pools and the dividend exemption, and also the day and year each operation falls in and the time shown. What is already stored is not recalculated: the days plans take effect, the day of each price and the exchange rates already applied stay as they were.",
+        ceutaMelilla:
+          "The deduction for income obtained in Ceuta and Melilla is not calculated.",
+      },
+    },
     portfolio: {
       title: "Portfolio",
       desc: "Parameters used by the Allocation and Opportunity cost analyses.",
@@ -228,7 +250,11 @@ export const en: Copy = {
       noData: "No data yet",
       prices: {
         label: "Prices",
-        hint: "Yahoo Finance: open positions and the benchmark",
+        hint: "Yahoo Finance: open stocks and funds, and the benchmark",
+      },
+      cryptoPrices: {
+        label: "Crypto prices",
+        hint: "Market Data: Kraken. Open crypto assets with a Kraken pair",
       },
       inflation: { label: "CPI", hint: "INE: national and Bizkaia" },
       rates: {
@@ -816,6 +842,27 @@ export const en: Copy = {
     summary: {
       total: "Trades in the file",
       imported: "New",
+      completed: "Completed",
+      sameOperation: "same operation",
+      rowTypes: {
+        interest: "Interest",
+        deposit: "Deposit",
+        withdrawal: "Withdrawal",
+        transferIn: "Transfer in",
+        transferOut: "Transfer out",
+        transfer: "Transfer",
+        directDebit: "Direct debit",
+        saveback: "Saveback",
+        cardPayment: "Card payment",
+        cardPaymentAbroad: "International card payment",
+        reward: "Reward",
+        earn: "Earn",
+        earnWithdrawal: "Earn withdrawal",
+        spend: "Spend",
+        receive: "Receive",
+        trade: "Trade",
+      },
+      completedHelp: "Already imported; the missing part was added",
       duplicates: "Duplicates",
       instruments: "Instruments",
       discarded: "Discarded",
@@ -841,6 +888,8 @@ export const en: Copy = {
     },
     nothingNew:
       "Nothing new to import: every trade in this file was already in the ledger.",
+    nothingToSave:
+      "Nothing to import: no trade in this file can be saved. The reasons are above.",
     confirmPending: "Continue to value the rewards and swaps",
     confirmCount: (count: number): string =>
       count === 1 ? "Import 1 trade" : `Import ${count} trades`,
@@ -869,10 +918,10 @@ export const en: Copy = {
     map: {
       title: "Quote symbols",
       intro:
-        "These instruments have no Yahoo symbol yet, so they cannot be valued. Map the euro-denominated line of the right venue and check the implied value before saving.",
+        "These instruments have no symbol yet, so they cannot be valued. For a fund or a stock, map the euro-denominated Yahoo line of the right venue; for a crypto asset, its Kraken pair, such as BTC/EUR. Check the implied value before saving.",
       warning:
         "Several venues quote in euros and are still a different fund tracking the same index, or the same fund with a different entitlement per unit. Compare the implied value against what your broker says: currency alone does not catch this, magnitude does.",
-      placeholder: "VWCE.DE, BTC-EUR…",
+      placeholder: "VWCE.DE, BTC/EUR…",
       verify: "Verify",
       verifying: "Verifying…",
       save: "Use this symbol",
@@ -882,7 +931,7 @@ export const en: Copy = {
       noQuote: (symbol: string): string =>
         `Yahoo returns no price for ${symbol}. Try another venue (.DE, .MI, .PA, .AS).`,
       noQuoteCrypto: (symbol: string, code: string): string =>
-        `Yahoo returns no price for ${symbol}. For a crypto asset, try ${code}-USD, valued at the ECB rate, or the ticker with the number Yahoo appends when the code is shared, such as PEPE24478-USD. A shared ticker can be another coin with the same code: check the name and the implied value before saving.`,
+        `There is no price for ${symbol}. For a crypto asset, use its Kraken pair, ${code}/EUR, or ${code}/USD where it has no euro line, valued at the ECB rate. Check the implied value before saving.`,
       price: "Price",
       impliedValue: "Implied value",
       quantity: "Units",
@@ -903,7 +952,7 @@ export const en: Copy = {
       noDailyHistory:
         "Yahoo has no daily history for this symbol. Look for its ticker on a euro exchange (.DE, .AS…).",
       noDailyHistoryCrypto: (code: string): string =>
-        `Yahoo has no daily history for this symbol. For a crypto asset, try ${code}-USD, valued at the ECB rate, or the ticker with the number Yahoo appends when the code is shared, such as PEPE24478-USD. A shared ticker can be another coin with the same code: check the name and the implied value before saving.`,
+        `There is no daily history for this symbol. For a crypto asset, use its Kraken pair, ${code}/EUR, or ${code}/USD where it has no euro line, valued at the ECB rate. Check the implied value before saving.`,
       hasHistory:
         "This instrument already has stored prices. Change its symbol in the Symbol column of Instruments: the new history is downloaded there before the old one is removed.",
       pending: (count: number): string =>
@@ -955,7 +1004,7 @@ export const en: Copy = {
           ? "1 symbol returned an old quote: check the venue."
           : `${count} symbols returned old quotes: check the venues.`,
       unavailable: (names: string): string =>
-        `Yahoo could not be reached for ${names}. Try again with Refresh prices on Portfolio.`,
+        `The price source could not be reached for ${names}. Try again with Refresh prices on Portfolio.`,
     },
   },
   holdings: {
@@ -1024,7 +1073,7 @@ export const en: Copy = {
     hedgedShort: "Hedged",
     thesisHint:
       "The thesis says why you hold the instrument, not what it is: that is what the exposure says. It changes when your reasoning changes, so it lives here and not on the trade that bought it.",
-    defaultOption: "(default for the type)",
+    autoOption: (kind: string): string => `Auto: ${kind}`,
     leafPlaceholder: "XAU, BTC…",
     leafRequired: "This kind needs a leaf (e.g. XAU).",
     terInvalid:
@@ -1038,7 +1087,7 @@ export const en: Copy = {
     noDailyHistory:
       "This symbol has no daily history. Download it again or change the symbol to its ticker on a euro exchange.",
     noDailyHistoryCrypto: (code: string): string =>
-      `This symbol has no daily history. For a crypto asset, try ${code}-USD, valued at the ECB rate, or the ticker with the number Yahoo appends when the code is shared, such as PEPE24478-USD. A shared ticker can be another coin with the same code: check the name and the implied value before saving.`,
+      `This symbol has no daily history. For a crypto asset, use its Kraken pair, ${code}/EUR, or ${code}/USD where it has no euro line, valued at the ECB rate. Check the implied value before saving.`,
     obsoleteVenues:
       "This composition was imported under obsolete country codes and does not merge with other funds. Drop its file on this row again.",
     resolves: RESOLVES_LABELS,
@@ -1050,7 +1099,7 @@ export const en: Copy = {
         `Download the history of ${symbol} again`,
       range: "History",
       confirmReplace: (symbol: string): string =>
-        `The daily history of ${symbol} and today's quote will be downloaded. If candles arrive, they replace every price stored for this instrument; if none arrive, nothing is touched. Trades do not change.`,
+        `The daily history of ${symbol} and today's quote will be downloaded. If candles arrive, they replace the stored prices from the first one on; with the same symbol the older ones stay, and with a new one they are deleted. If none arrive, nothing is touched. Trades do not change.`,
       lost: (cutoff: string, earliest: string): string =>
         `This range starts on ${cutoff} and your current history on ${earliest}: prices before ${cutoff} will be lost.`,
       confirm: "Confirm",
@@ -1058,16 +1107,18 @@ export const en: Copy = {
       running: "Downloading…",
       done: (count: number, first: string): string =>
         count === 1
-          ? `1 price saved from ${first}.`
-          : `${count} prices saved from ${first}.`,
+          ? `1 price downloaded from ${first}.`
+          : `${count} prices downloaded from ${first}.`,
+      total: (count: number, start: string): string =>
+        `In all, ${count} from ${start}.`,
       noLive:
-        "Yahoo returned no quote for today: press “Refresh prices” in Portfolio later.",
+        "The source returned no quote for today: press “Refresh prices” in Portfolio later.",
       noHistory: (symbol: string): string =>
-        `Yahoo has no daily history for ${symbol}. Look for its ticker on a euro exchange (.DE, .AS…). Nothing was changed.`,
+        `There is no daily history for ${symbol}. For a fund or a stock, look for its ticker on a euro exchange (.DE, .AS…); for a crypto asset, its Kraken pair, such as BTC/EUR. Nothing was changed.`,
       failed: "The download failed. Nothing was changed.",
       rebuild: "Rebuild all histories",
       rebuildConfirm: (count: number): string =>
-        `The daily history of ${count === 1 ? "1 instrument" : `${count} instruments`} with a symbol will be downloaded again, one after another. Each one is replaced only if Yahoo returns candles, and trades are not touched. Leaving this screen stops it; whatever was already rebuilt stays.`,
+        `The daily history of ${count === 1 ? "1 instrument" : `${count} instruments`} with a symbol will be downloaded again, one after another. Each one is replaced only if its source returns candles, whatever is older than the first candle stays, and trades are not touched. Leaving this screen stops it; whatever was already rebuilt stays.`,
       rebuilding: (done: number, total: number): string =>
         `Rebuilding ${done} of ${total}…`,
       rebuilt: (done: number, total: number): string =>
@@ -1097,7 +1148,7 @@ export const en: Copy = {
       problem: {
         "no-quote": "no answer",
         stale: "stale quote",
-        unavailable: "Yahoo could not be reached",
+        unavailable: "the price source could not be reached",
         error: "unexpected error",
       },
       unmappedOpen: (count: number): string =>
@@ -1362,7 +1413,7 @@ export const en: Copy = {
     views: {
       label: "View",
       sales: "Sales",
-      tax: "Tax (Bizkaia)",
+      tax: (territory: string): string => `Tax (${territory})`,
     },
     intro:
       "Every closed sale, with the cost it consumed at the moment of selling. Purchase fees are already inside the cost and sale fees are subtracted from the gross.",
@@ -1392,20 +1443,49 @@ export const en: Copy = {
     },
     fiscal: {
       about: "About the tax basis",
-      intro:
-        "The same sales, on a FIFO basis instead of AVCO, which is what the Bizkaia foral tax return (NF 13/2013) requires and not what the Sales tab uses. A loss with a repurchase in the two months before or after is deferred under Art. 43 (letter g for homogeneous securities and, for transmissions from 1 January 2025, letter i for crypto assets of the same type), in the proportion repurchased, and computes when the repurchased units are transmitted; offsetting against earlier years follows Art. 66. The repurchase arithmetic follows the DGT rulings V1403-21, V1117-21 and V3282-18 on the parallel state rule, which do not bind the Hacienda Foral.",
+      territoryName: {
+        bizkaia: "Bizkaia",
+        comun: "common regime",
+      } satisfies Record<Territory, string>,
+      residenceName: {
+        bizkaia: "Bizkaia",
+        comun: "common regime",
+        canarias: "common regime · Canary Islands",
+      } satisfies Record<Residence, string>,
+      intro: {
+        bizkaia:
+          "The same sales, on a FIFO basis instead of AVCO, which is what the Bizkaia foral tax return (NF 13/2013) requires and not what the Sales tab uses. A loss with a repurchase in the two months before or after is deferred under Art. 43 (letter g for homogeneous securities and, for transmissions from 1 January 2025, letter i for crypto assets of the same type), in the proportion repurchased, and computes when the repurchased units are transmitted; offsetting against earlier years follows Art. 66. The repurchase arithmetic follows the DGT rulings V1403-21, V1117-21 and V3282-18 on the parallel state rule, which do not bind the Hacienda Foral.",
+        comun:
+          "The same sales, on a FIFO basis instead of AVCO, which is what income tax (Ley 35/2006) requires and not what the Sales tab uses; for crypto, FIFO per asset (DGT V1604-18 and V0975-22). A loss on a stock or ETF with a repurchase in the two months before or after does not compute under art. 33.5.f, in the proportion repurchased, and computes when the repurchased units are transmitted. That is the rule for securities admitted to trading on a regulated EEA market or an equivalent one (the US included, DGT V0778-25); those not admitted have one year (art. 33.5.g), and Quoin does not know which market each security trades on. Crypto has no repurchase rule: its loss counts in full. Swaps are valued at the greater of the two values (art. 37.1.h, DGT V0999-18). Offsetting between the pools and against earlier years follows art. 49. The repurchase arithmetic follows the DGT rulings V1403-21, V1117-21 and V3282-18.",
+      } satisfies Record<Territory, string>,
       yearLabel: "Tax year",
-      noYears: "There are no sales recorded in any year yet.",
+      noYears: "There are no sales or income recorded in any year yet.",
       summary: {
         netBase: "Taxable savings base",
+        gainsBalance: "Capital gains and losses balance",
+        incomeBalance: "Income from movable capital balance",
+        pools: {
+          bizkaia:
+            "Income from movable capital and capital gains and losses compensate only within their own pool (Art. 66.1): the base is the sum of the positive balances.",
+          comun:
+            "Income from movable capital and capital gains and losses are each integrated in their own pool. One pool's negative balance offsets the other's positive one up to 25% of it, and so do earlier years' pending losses its own pool does not absorb, within the same 25% for the whole year (art. 49): the base is the sum of the positive balances.",
+        } satisfies Record<Territory, string>,
         quota: "Resulting tax",
-        scale: (source: string): string => `Scale applied: ${source}`,
+        withheld: "Recorded withholdings",
+        withheldNote:
+          "Withholdings are payments on account of the whole income tax, not only of the savings base, and are not subtracted from the tax. This adds up what was withheld this year on interest and dividends paid in cash and on Trade Republic's saveback, with no split between Spanish and foreign withholdings.",
+        interestWithoutWithholding:
+          "Some interest this year has no recorded withholding. Interest imported before this version may lack its withholding even if it had one: check it against the broker's statement.",
+        scale: (source: string): string => `Scale applied: ${source}.`,
+        scaleInForce: (year: number, territory: string): string =>
+          `The ${territory} scale in force since ${year} applies. If a new one is approved for this year, the tax will change.`,
         noScale:
           "No tax scale on file for this year. The tax cannot be computed.",
       },
       net: {
         own: "Own result of the year's sales",
-        nonComputable: "Not computable for repurchase (Art. 43)",
+        nonComputable: (citation: string): string =>
+          `Not computable for repurchase (${citation})`,
         integrated: "Deferred losses that compute this year",
         computable: "Computable net for the year",
         counts: (sales: number, affected: number): string =>
@@ -1433,11 +1513,11 @@ export const en: Copy = {
         unitCost: "Unit cost",
       },
       washSaleReason: (
-        letter: RepurchaseLetter,
+        source: string,
         repurchased: string,
         sold: string,
       ): string =>
-        `Art. 43.${letter}: ${repurchased} of the ${sold} units sold were repurchased.`,
+        `${source}: ${repurchased} of the ${sold} units sold were repurchased.`,
       ownDeferredReason: (share: string, amount: string): string =>
         `${share} of the loss (${amount}) does not compute this year: it stays deferred on the repurchased units and computes when they are sold.`,
       minorDeferralReason: (share: string, cent: string): string =>
@@ -1446,13 +1526,18 @@ export const en: Copy = {
         `The units sold carried deferred loss from earlier sales; ${amount} moves on to the new repurchased units, even when this sale is at a gain. Its own gain is never held back.`,
       windowOpenReason: (date: string): string =>
         `Repurchase window open until ${date}: a purchase of the same asset up to that day can still defer this loss, so the year's figure may change.`,
-      unlistedReason: (date: string): string =>
-        `Crypto sold before 2025: the repurchase rule for crypto assets (Art. 43.i) governs transmissions from 1 January 2025, so the loss counts in full. There is a new purchase on ${date}; some doctrine would apply the one-year repurchase rule. This is unsettled and changes no figures.`,
+      unlistedReason: {
+        bizkaia: (date: string): string =>
+          `Crypto sold before 2025: the repurchase rule for crypto assets (Art. 43.i) governs transmissions from 1 January 2025, so the loss counts in full. There is a new purchase on ${date}; some doctrine would apply the one-year repurchase rule. This is unsettled and changes no figures.`,
+        comun: (date: string): string =>
+          `Crypto sold at a loss and bought again on ${date}. The common regime has no specific repurchase rule for crypto assets. Art. 33.5.e (repurchase of the same asset within the following year) could apply, but the DGT has not settled it. Quoin does not defer the loss: it counts in full.`,
+      } satisfies Record<Territory, (date: string) => string>,
       breakdown: {
         title: {
-          g: "Repurchase of homogeneous securities (Art. 43.g)",
-          i: "Repurchase of crypto assets of the same type (Art. 43.i)",
-        },
+          "listed-security": "Repurchase of homogeneous securities",
+          "fungible-crypto": "Repurchase of crypto assets of the same type",
+          unclassified: "Repurchase",
+        } satisfies Record<RepurchaseAssetClass, string>,
         before: (months: number): string =>
           `Acquired in the ${months} months before`,
         remainingAfter: "Position left after the sale",
@@ -1471,8 +1556,8 @@ export const en: Copy = {
         },
       },
       integrationsTitle: "Deferred losses that compute this year",
-      integrationsBody:
-        "The repurchased units were sold with no new repurchase in their window, so the deferred loss computes now, as a line apart from the sale's own result (Art. 43).",
+      integrationsBody: (citation: string): string =>
+        `The repurchased units were sold with no new repurchase in their window, so the deferred loss computes now, as a line apart from the sale's own result (${citation}).`,
       integrationsColumns: {
         t: "Sale",
         name: "Instrument",
@@ -1481,8 +1566,8 @@ export const en: Copy = {
       },
       pendingTitle: (year: number): string =>
         `Deferred losses pending at 31 December ${year}`,
-      pendingBody:
-        "Still attached to units held. They count in no year until those units are sold with no new repurchase (Art. 43).",
+      pendingBody: (citation: string): string =>
+        `Still attached to units held. They count in no year until those units are sold with no new repurchase (${citation}).`,
       pendingGroupColumns: {
         saleDate: "Sale of",
         name: "Instrument",
@@ -1499,19 +1584,42 @@ export const en: Copy = {
       empty: {
         title: "No sales in this year",
         body: "Pick another tax year from the dropdown.",
+        incomeBody:
+          "This year has no sales, but it has income: its figures are in the summary and below.",
+      },
+      savingsIncome: {
+        title: "Income from movable capital",
+        body: {
+          bizkaia:
+            "Interest and dividends paid in cash, and Trade Republic's saveback, which the broker declares as account income. Gross amounts. They compensate only among themselves, and a negative balance is carried to the following years (Art. 66.1.a).",
+          comun:
+            "Interest and dividends paid in cash, and Trade Republic's saveback, which the broker declares as account income. Gross amounts. A negative balance offsets capital gains up to 25% of their positive balance, and what is left is carried to the following years (art. 49.1.a).",
+        } satisfies Record<Territory, string>,
+        count: "Payments",
+        gross: "Gross this year",
+        exempt: "Exempt dividends",
+        decemberInterest:
+          "December's interest is paid on 1 January and counts for this year.",
+        exemptNote: (source: string, limit: string) =>
+          `A stock's dividends are exempt up to ${limit} a year; an ETF's or a fund's are not (${source}). They leave the balance, but their withholdings still count among those recorded. The two-month rule is not checked.`,
+        finalNet: "Balance after carryforward",
       },
       inKind: {
         title: "Income received in kind",
-        body: "Kraken rewards and Trade Republic saveback, received as units. Tax classification pending verification: none of it is added to any figure in this view.",
+        body: "Income received as units that does not enter the income pool (such as crypto rewards). Tax classification pending verification: none of it is added to any figure in this view.",
         count: "Receipts",
         gross: "Value on receipt",
         withheld: "Withheld",
       },
-      carryforwardTitle: "Loss carryforward, last 4 years (Art. 66)",
+      carryforwardTitle: (years: number, citation: string) =>
+        `Capital loss carryforward, last ${years} years (${citation})`,
       carryforwardColumns: {
         year: "Year",
         ownNet: "Own net",
         consumedFromCarryforward: "Consumed from carryforward",
+        crossOffset: "Same-year cross with income",
+        absorbedFromOther: "Pending income losses absorbed",
+        crossedToOther: "Pending offset against income",
         finalNet: "Final net",
         pendingLossRemaining: "Pending loss",
       },
@@ -1571,7 +1679,7 @@ export const en: Copy = {
     },
     gaps: (n: Omit<ExcludedNotice, "day">): string => {
       const one = n.count === 1;
-      return `${n.count} ${one ? "purchase falls" : "purchases fall"} in a gap of more than a week with no ${n.symbol} close (${n.amount}). ${one ? "It buys" : "They buy"} nothing in the counterfactual. ${one ? "It still counts" : "They still count"} in the real portfolio, so the difference favours it by that much. Open ${n.symbol} in ${n.instruments} and use “${n.redownload}”. If the gap remains, Yahoo has no data for those sessions.`;
+      return `${n.count} ${one ? "purchase falls" : "purchases fall"} in a gap of more than a week with no ${n.symbol} close (${n.amount}). ${one ? "It buys" : "They buy"} nothing in the counterfactual. ${one ? "It still counts" : "They still count"} in the real portfolio, so the difference favours it by that much. Open ${n.symbol} in ${n.instruments} and use “${n.redownload}”. If the gap remains, the source has no data for those sessions.`;
     },
     unpriced: (names: string): string =>
       `No usable price: ${names}. They are excluded from both sides, because counting their cost without their value would invent a loss.`,

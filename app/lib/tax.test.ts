@@ -1,9 +1,12 @@
+import Decimal from "decimal.js";
 import { describe, expect, it } from "vitest";
 
 import {
   instrumentTypeSchema,
   type DividendEvent,
   type Instrument,
+  type InterestEvent,
+  type LedgerEvent,
   type TradeEvent,
 } from "~/core/domain";
 import { computeTaxHistory } from "~/core/tax";
@@ -382,11 +385,11 @@ describe("buildTaxYearView", () => {
   it("states no scale and no quota for a year the scale table does not cover, but still the base", () => {
     const link = { linkId: "refid-1", linkKind: "swap" };
     const events = [
-      trade("BUY", "ETH", "10", "1000", { ts: "2025-01-05" }),
-      { ...trade("SELL", "ETH", "4", "480", { ts: "2025-03-10" }), ...link },
+      trade("BUY", "ETH", "10", "1000", { ts: "2024-01-05" }),
+      { ...trade("SELL", "ETH", "4", "480", { ts: "2024-03-10" }), ...link },
       {
         ...trade("BUY", "BTC", "0.0099", "465", {
-          ts: "2025-03-10",
+          ts: "2024-03-10",
           fees: "5",
         }),
         ...link,
@@ -398,7 +401,7 @@ describe("buildTaxYearView", () => {
         instrument("ETH", "Ether", "CRYPTO"),
         instrument("BTC", "Bitcoin", "CRYPTO"),
       ],
-      2025,
+      2024,
       BIZKAIA,
       today(MADRID, new Date()),
     );
@@ -407,6 +410,21 @@ describe("buildTaxYearView", () => {
     expect(view.netSavingsBase).toBe("75");
     expect(view.scale).toBeNull();
     expect(view.quota).toBeNull();
+  });
+
+  it("names the year the applied scale starts in, so a later year can say it is carried over", () => {
+    const events = [trade("BUY", "ETF", "1", "100", { ts: "2026-01-12" })];
+    const view = (year: number) =>
+      buildTaxYearView(
+        events,
+        [instrument("ETF", "Fund", "ETF")],
+        year,
+        BIZKAIA,
+        today(MADRID, new Date()),
+      );
+    expect(view(2026).scaleYear).toBe(2026);
+    expect(view(2027).scaleYear).toBe(2026);
+    expect(view(2024).scaleYear).toBeNull();
   });
 
   it("shows a deferred loss with its breakdown and the units that carry it", () => {
@@ -531,7 +549,7 @@ describe("buildTaxYearView", () => {
     );
 
     expect(view.sales[0]!.washSale).toMatchObject({
-      letter: "i",
+      assetClass: "fungible-crypto",
       windowMonths: 2,
       repurchased: "1",
     });
@@ -914,5 +932,162 @@ describe("a repurchase window still open", () => {
     );
 
     expect(view.sales[0]!.windowOpenUntil).toBeNull();
+  });
+});
+
+describe("the dividend exemption", () => {
+  function cash(instrumentId: string, ts: string, grossAmount: string, taxWithheld = "0") {
+    const income: DividendEvent = {
+      id: `evt-${seq++}`,
+      ts: new Date(ts),
+      type: "DIVIDEND",
+      instrumentId,
+      grossAmount,
+      taxWithheld,
+      funding: "CASH",
+      currency: "EUR",
+      account: "test",
+      source: "TEST",
+    };
+    return income;
+  }
+
+  const instruments = [
+    instrument("S1", "Stock one"),
+    instrument("S2", "Stock two"),
+    instrument("F", "Fund", "ETF"),
+  ];
+  const view = (events: readonly LedgerEvent[], year: number) =>
+    buildTaxYearView(events, instruments, year, BIZKAIA, "2026-12-31");
+
+  it("exempts a stock's dividends up to 1500 a year, never a fund's or an unknown instrument's", () => {
+    const v = view(
+      [
+        cash("S1", "2026-03-01T10:00:00Z", "1000", "190"),
+        cash("S2", "2026-06-01T10:00:00Z", "800", "152"),
+        cash("F", "2026-07-01T10:00:00Z", "200", "38"),
+        cash("GONE", "2026-08-01T10:00:00Z", "50"),
+      ],
+      2026,
+    );
+    expect(v.savingsIncome.gross).toBe("2050.00");
+    expect(v.savingsIncome.exempt).toBe("1500.00");
+    expect(v.savingsIncome.exemptSource).toBe("Art. 9.24 NF 13/2013 de Bizkaia");
+    expect(v.savingsIncome.finalNet).toBe("550");
+    expect(v.savingsBase).toBe("550");
+    expect(v.withholdings.total).toBe("380.00");
+  });
+
+  it("starts again each Madrid fiscal year", () => {
+    const events = [
+      cash("S1", "2025-12-31T23:30:00Z", "1200"),
+      cash("S1", "2025-06-01T10:00:00Z", "1000"),
+    ];
+    expect(view(events, 2025).savingsIncome.exempt).toBe("1000.00");
+    expect(view(events, 2026).savingsIncome.exempt).toBe("1200.00");
+    expect(view(events, 2026).savingsIncome.finalNet).toBe("0");
+  });
+});
+
+describe("Trade Republic interest", () => {
+  function interest(ts: string, grossAmount: string, source: string) {
+    const income: InterestEvent = {
+      id: `evt-${seq++}`,
+      ts: new Date(ts),
+      type: "INTEREST",
+      grossAmount,
+      taxWithheld: new Decimal(grossAmount).times("0.19").toFixed(2),
+      currency: "EUR",
+      account: "test",
+      source,
+    };
+    return income;
+  }
+  const view = (events: readonly LedgerEvent[], year: number) =>
+    buildTaxYearView(events, [], year, BIZKAIA, "2026-12-31");
+
+  it("paid on 1 January in Madrid counts for the year before, withholding and count included", () => {
+    const events = [
+      interest("2025-12-31T23:30:00Z", "20", "TR_CSV"),
+      interest("2026-01-02T09:00:00Z", "10", "TR_CSV"),
+    ];
+    expect(view(events, 2025).savingsIncome).toMatchObject({
+      count: 1,
+      gross: "20.00",
+    });
+    expect(view(events, 2025).withholdings.total).toBe("3.80");
+    expect(view(events, 2026).savingsIncome.gross).toBe("10.00");
+    expect(listTaxYears(events, MADRID)).toEqual([2026, 2025]);
+  });
+
+  it("from another source keeps the year of its own day", () => {
+    const events = [interest("2026-01-01T09:00:00Z", "20", "TEST")];
+    expect(view(events, 2026).savingsIncome.gross).toBe("20.00");
+    expect(view(events, 2025).savingsIncome.gross).toBe("0.00");
+  });
+});
+
+describe("Trade Republic saveback", () => {
+  function inKind(source: string, grossAmount: string, taxWithheld: string) {
+    const income: DividendEvent = {
+      id: `evt-${seq++}`,
+      ts: new Date("2026-05-04T10:00:00Z"),
+      type: "DIVIDEND",
+      instrumentId: "S",
+      grossAmount,
+      taxWithheld,
+      funding: "IN_KIND",
+      currency: "EUR",
+      account: "test",
+      source,
+    };
+    return income;
+  }
+  const instruments = [instrument("S", "Stock")];
+
+  it("enters the income pool at its value on receipt, never exempt, its withholding recorded; a Kraken reward stays out", () => {
+    const v = buildTaxYearView(
+      [inKind("TR_CSV", "10", "1.9"), inKind("KRAKEN_CSV", "4", "0")],
+      instruments,
+      2026,
+      BIZKAIA,
+      "2026-12-31",
+    );
+    expect(v.savingsIncome).toMatchObject({
+      count: 1,
+      gross: "10.00",
+      exempt: "0.00",
+      finalNet: "10",
+    });
+    expect(v.withholdings.total).toBe("1.90");
+    expect(v.inKindIncome).toEqual({ count: 1, gross: "4.00", withheld: "0.00" });
+  });
+});
+
+describe("the notice of interest without withholding", () => {
+  function interest(source: string, taxWithheld: string) {
+    const income: InterestEvent = {
+      id: `evt-${seq++}`,
+      ts: new Date("2026-05-04T10:00:00Z"),
+      type: "INTEREST",
+      grossAmount: "10",
+      taxWithheld,
+      currency: "EUR",
+      account: "test",
+      source,
+    };
+    return income;
+  }
+  const notice = (events: readonly LedgerEvent[]) =>
+    buildTaxYearView(events, [], 2026, BIZKAIA, "2026-12-31").withholdings
+      .interestWithoutWithholding;
+
+  it("is raised by Trade Republic interest at 0, the old import's gap", () => {
+    expect(notice([interest("TR_CSV", "0")])).toBe(true);
+    expect(notice([interest("TR_CSV", "1.9")])).toBe(false);
+  });
+
+  it("is not raised by interest from another source at 0, which is legitimate", () => {
+    expect(notice([interest("KRAKEN_CSV", "0"), interest("TEST", "0")])).toBe(false);
   });
 });

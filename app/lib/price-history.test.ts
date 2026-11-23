@@ -27,7 +27,10 @@ const MADRID = "Europe/Madrid";
 
 const NOW = new Date("2026-10-08T15:00:00.000Z");
 
-const NO_RATES: EnsureRates = async () => ({ book: new Map(), unavailable: [] });
+const NO_RATES: EnsureRates = async () => ({
+  book: new Map(),
+  unavailable: [],
+});
 
 function ratesFor(currency: string, days: string[]) {
   const asked: [string, string][] = [];
@@ -98,10 +101,12 @@ function store(rows: PriceSnapshot[], stored: Instrument | null = INSTRUMENT) {
     ) => {
       state.replaced += 1;
       const before = state.rows.length;
-      const keepAfter = options.keepAfter;
-      state.rows = keepAfter
-        ? state.rows.filter((r) => r.asOf.getTime() > keepAfter.getTime())
-        : [];
+      const { keepAfter, keepBefore } = options;
+      state.rows = state.rows.filter(
+        (r) =>
+          (keepAfter !== undefined && r.asOf > keepAfter) ||
+          (keepBefore !== undefined && r.asOf < keepBefore),
+      );
       const removed = before - state.rows.length;
       state.rows.push(...snapshots);
       if (options.quoteSymbol !== undefined) state.symbol = options.quoteSymbol;
@@ -118,7 +123,7 @@ function provider(
   live: Quote[] = [],
 ): MarketDataProvider {
   return {
-    source: "YAHOO",
+    sourceOf: () => "YAHOO",
     getQuote: async (symbol) => live.find((q) => q.symbol === symbol) ?? null,
     getHistory: async (symbol: string, _range: HistoryRange) => {
       const answer = history[symbol] ?? [];
@@ -349,10 +354,19 @@ describe("replaceQuoteHistory", () => {
     );
 
     expect(latest()!.asOf.getTime()).toBeGreaterThanOrEqual(before.getTime());
-    expect(state.rows).toHaveLength(4);
+    expect(state.rows.map((r) => r.price)).toEqual([
+      "90",
+      "95",
+      "97",
+      "96",
+      "100",
+      "101",
+      "102",
+      "103",
+    ]);
   });
 
-  it("keeps the rows newer than the last candle when today's quote is stale and the symbol is unchanged", async () => {
+  it("keeps the rows older than the first candle and newer than the last when the symbol is unchanged and today's quote is stale", async () => {
     const newer = snap(day("2026-10-08", 9), "104");
     const { state, instruments, prices, latest } = store([
       ...COARSE_OLD,
@@ -379,6 +393,10 @@ describe("replaceQuoteHistory", () => {
       "101",
       "102",
       "104",
+      "90",
+      "95",
+      "96",
+      "97",
       "99",
     ]);
   });
@@ -522,9 +540,9 @@ describe("replaceFailureMessage", () => {
 
   it("says that nothing was touched and why", () => {
     expect(replaceFailureMessage(es, failure("no-history"))).toContain("AAA");
-    expect(
-      replaceFailureMessage(es, failure("no-rate-series", "XYZ")),
-    ).toBe(es.fx.noRateSeriesHistory("AAA", "XYZ"));
+    expect(replaceFailureMessage(es, failure("no-rate-series", "XYZ"))).toBe(
+      es.fx.noRateSeriesHistory("AAA", "XYZ"),
+    );
     expect(replaceFailureMessage(es, failure("rates-unavailable", "USD"))).toBe(
       es.fx.sync.unavailable,
     );

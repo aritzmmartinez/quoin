@@ -96,9 +96,11 @@ jobs:
 
       # A build proves nothing about what the image imports at run time: tsx runs
       # scripts/ with no tsconfig, so a `~/` import fails only when db-backup runs.
-      - name: Start on a fresh volume and back up
+      # The GET goes through the published port, as a user's browser does: an image
+      # listening on 127.0.0.1 inside the container still logs that it started.
+      - name: Start on a fresh volume, answer through the published port and back up
         run: |
-          docker run -d --name quoin-smoke -v quoin-smoke:/app/data quoin:scan
+          docker run -d --name quoin-smoke -p 127.0.0.1:3000:3000 -v quoin-smoke:/app/data quoin:scan
           for _ in $(seq 180); do
             docker logs quoin-smoke 2>&1 | grep -q '\[react-router-serve\]' && break
             [ "$(docker inspect -f '{{.State.Running}}' quoin-smoke)" = true ] || break
@@ -106,6 +108,7 @@ jobs:
           done
           docker logs quoin-smoke
           docker logs quoin-smoke 2>&1 | grep -q '\[react-router-serve\]'
+          curl -fsS -o /dev/null --retry 5 --retry-connrefused --retry-delay 1 http://127.0.0.1:3000/
           docker exec quoin-smoke db-backup
 
       - name: Scan

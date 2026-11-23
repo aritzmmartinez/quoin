@@ -12,6 +12,7 @@ import {
 import {
   KINDS_NEEDING_LEAF,
   exposureKindSchema,
+  effectiveExposure,
   resolveIntrinsic,
   type ExposureKind,
 } from "~/core/domain";
@@ -52,14 +53,16 @@ async function describe(id: string): Promise<void> {
   if (!instrument) return;
 
   const [leaf] = resolveIntrinsic(instrument);
-  const source = instrument.exposureKind
-    ? "explicit"
-    : `default from type=${instrument.type}`;
+  const { kind, source } = effectiveExposure(instrument);
+  const origin =
+    source === "user"
+      ? "explicit"
+      : source === "derived"
+        ? `default from type=${instrument.type}`
+        : `type=${instrument.type} has no default`;
 
   console.log(`${instrument.id}  ${instrument.name}`);
-  console.log(
-    `  exposureKind: ${instrument.exposureKind ?? "(none)"}  (${source})`,
-  );
+  console.log(`  exposureKind: ${kind ?? "(none)"}  (${origin})`);
   console.log(`  resolves to:  ${leaf?.leaf.kind}:${leaf?.leaf.id}`);
 
   // The sanity check that prices:map lacks: on a closed position every derived
@@ -86,12 +89,12 @@ async function main(): Promise<void> {
     const unmapped: string[] = [];
     for (const instrument of instruments) {
       const [leaf] = resolveIntrinsic(instrument);
-      const mark = instrument.exposureKind ? " " : "·";
+      const mark = effectiveExposure(instrument).source === "user" ? " " : "·";
       const resolved = leaf ? `${leaf.leaf.kind}:${leaf.leaf.id}` : "—";
       console.log(
         `${mark} ${instrument.id.padEnd(14)} ${resolved.padEnd(28)} ${instrument.name}`,
       );
-      if (leaf?.leaf.kind === "UNRESOLVED" && !instrument.exposureKind) {
+      if (effectiveExposure(instrument).source === "none") {
         unmapped.push(instrument.id);
       }
     }

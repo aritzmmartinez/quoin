@@ -79,11 +79,17 @@ export function rowToEvent(row: LedgerEntryRow): LedgerEvent {
       });
     case "DEPOSIT":
     case "WITHDRAWAL":
-    case "INTEREST":
       return ledgerEventSchema.parse({
         ...base,
         type: row.type,
         grossAmount: row.grossAmount,
+      });
+    case "INTEREST":
+      return ledgerEventSchema.parse({
+        ...base,
+        type: "INTEREST",
+        grossAmount: row.grossAmount,
+        taxWithheld: row.taxWithheld,
       });
     default:
       throw new Error(`Unknown ledger entry type: "${row.type}"`);
@@ -148,7 +154,7 @@ export function eventToCreateData(event: LedgerEvent): LedgerEntryCreateData {
         price: null,
         grossAmount: event.grossAmount,
         fees: "0",
-        taxWithheld: "0",
+        taxWithheld: event.type === "INTEREST" ? event.taxWithheld : "0",
         funding: "CASH",
       };
   }

@@ -6,6 +6,7 @@ import { planWithRates } from "./ingest-rates";
 
 const batch = (needed: [string, string][], total: number): MappedBatch => ({
   total,
+  failed: 0,
   instruments: [],
   events: [],
   operationOf: [],

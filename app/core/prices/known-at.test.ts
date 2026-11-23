@@ -27,4 +27,19 @@ describe("when a stored price became information", () => {
       ),
     ).toEqual(new Date("2025-11-25T14:00:00Z"));
   });
+
+  it("the same for Kraken's candle and live trade", () => {
+    expect(
+      snapshotKnownAt({
+        asOf: new Date("2026-11-20T00:00:00Z"),
+        source: "KRAKEN",
+      }),
+    ).toBe(new Date("2026-11-21T00:00:00Z").getTime());
+    expect(
+      snapshotKnownAt({
+        asOf: new Date("2026-11-21T01:40:11Z"),
+        source: "KRAKEN_LIVE",
+      }),
+    ).toBe(new Date("2026-11-21T01:40:11Z").getTime());
+  });
 });

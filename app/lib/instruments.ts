@@ -1,7 +1,9 @@
 import Decimal from "decimal.js";
 
 import {
+  effectiveExposure,
   resolveIntrinsic,
+  type EffectiveExposure,
   type ExposureKind,
   type Instrument,
   type InstrumentType,
@@ -20,6 +22,7 @@ export interface InstrumentListItem {
   type: InstrumentType;
   quoteSymbol: string | null;
   exposureKind: ExposureKind | null;
+  exposure: EffectiveExposure;
   exposureLeafId: string | null;
   ter: string | null;
   hedgedToBase: boolean;
@@ -34,6 +37,7 @@ export interface InstrumentListItem {
   holdingsAsOf: string | null;
   obsoleteVenues: boolean;
   historyStart: string | null;
+  historyCount: number;
   coarseHistory: boolean;
   noDailyHistory: boolean;
 }
@@ -62,6 +66,7 @@ export function toInstrumentListItems(
 
   const items = instruments.map((instrument) => {
     const [leaf] = resolveIntrinsic(instrument);
+    const exposure = effectiveExposure(instrument);
     const quantity = held.get(instrument.id) ?? new Decimal(0);
     const value = valued.get(instrument.id);
     const composition = holdings.get(instrument.id) ?? [];
@@ -77,12 +82,13 @@ export function toInstrumentListItems(
       type: instrument.type,
       quoteSymbol: instrument.quoteSymbol ?? null,
       exposureKind: instrument.exposureKind ?? null,
+      exposure,
       exposureLeafId: instrument.exposureLeafId ?? null,
       ter: instrument.ter ?? null,
       hedgedToBase: instrument.hedgedToBase ?? false,
       thesis: instrument.thesis,
       resolvesTo: leaf ? leaf.leaf : null,
-      isExplicit: Boolean(instrument.exposureKind),
+      isExplicit: exposure.source === "user",
       quantity: quantity.toFixed(),
       isClosed: quantity.isZero(),
       value: value ? value.toFixed(2) : null,
@@ -91,6 +97,7 @@ export function toInstrumentListItems(
       holdingsAsOf: blocks.get(instrument.id)?.asOf ?? null,
       obsoleteVenues: hasObsoleteVenue(composition),
       historyStart: times[0]?.toISOString() ?? null,
+      historyCount: times.length,
       coarseHistory: isCoarseSeries(times),
       noDailyHistory:
         instrument.quoteSymbol != null && !dailyHistoryIds.has(instrument.id),
@@ -111,4 +118,22 @@ export function needsMapping(
   return items.filter(
     (i) => !i.isExplicit && i.resolvesTo?.kind === "UNRESOLVED",
   );
+}
+
+export interface StoredSeries {
+  count: number;
+  start: string | null;
+}
+
+export function seriesAfterReplace(
+  before: StoredSeries,
+  outcome: { written: number; removed: number; first: string },
+): { count: number; start: string } {
+  const count = before.count - outcome.removed + outcome.written;
+  const older = before.start;
+  const keptOlder =
+    count > outcome.written &&
+    older !== null &&
+    new Date(older).getTime() < new Date(outcome.first).getTime();
+  return { count, start: keptOlder ? older : outcome.first };
 }

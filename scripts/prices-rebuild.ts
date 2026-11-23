@@ -2,7 +2,7 @@ import "dotenv/config";
 
 import { argv, exit } from "node:process";
 
-import { YahooMarketDataProvider } from "~/adapters/marketdata";
+import { MarketDataRouter } from "~/adapters/marketdata";
 import {
   PrismaInstrumentRepository,
   PrismaPriceRepository,
@@ -52,7 +52,7 @@ async function main(): Promise<void> {
     {
       instruments,
       prices,
-      provider: new YahooMarketDataProvider(),
+      provider: new MarketDataRouter(),
       rates: ensureRatesNow,
       zone: (await loadResidence()).calendarZone,
     },

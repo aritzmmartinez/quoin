@@ -4,6 +4,7 @@ import type {
   DiscardDetails,
   NoticeDetails,
 } from "~/adapters/ingestion/ingest";
+import { BROKER_ROW_TYPES, type Broker } from "~/adapters/ingestion/detect";
 import {
   AFFECTS_POSITION,
   DISCARD_REASONS,
@@ -12,6 +13,7 @@ import {
   type FileErrorReason,
   type NoticeReason,
   type RowRef,
+  type RowTypeKey,
 } from "~/adapters/ingestion/discard";
 
 import type { Copy } from "./i18n";
@@ -80,14 +82,26 @@ export function noticeGroups(summary: {
   });
 }
 
-export function discardTypeLabel(t: Copy, type: string): string {
-  const types: Readonly<Record<string, string>> = t.movements.types;
-  return Object.hasOwn(types, type) ? (types[type] ?? type) : type;
+export function rowTypeLabel(
+  t: Copy,
+  broker: Broker | null,
+  type: string,
+): string {
+  const own: Readonly<Record<string, RowTypeKey>> =
+    broker === null ? {} : BROKER_ROW_TYPES[broker];
+  const key = Object.hasOwn(own, type) ? own[type] : undefined;
+  if (key !== undefined) return t.ingest.summary.rowTypes[key];
+  const ledger: Readonly<Record<string, string>> = t.movements.types;
+  return Object.hasOwn(ledger, type) ? (ledger[type] ?? type) : type;
 }
 
-export function describeRow(t: Copy, row: RowRef): string {
+export function describeRow(
+  t: Copy,
+  broker: Broker | null,
+  row: RowRef,
+): string {
   return [
-    row.type === null ? null : discardTypeLabel(t, row.type),
+    row.type === null ? null : rowTypeLabel(t, broker, row.type),
     row.date,
     row.externalId ??
       (row.position === null ? null : t.ingest.summary.rowNumber(row.position)),
@@ -98,6 +112,7 @@ export function describeRow(t: Copy, row: RowRef): string {
 
 export function fileErrorMessage(
   t: Copy,
+  broker: Broker | null,
   error: {
     reason: FileErrorReason;
     column: string | null;
@@ -114,7 +129,7 @@ export function fileErrorMessage(
     case "invalid-number":
     case "wrong-field-count":
       return t.ingest.rowRejected(
-        error.row ? describeRow(t, error.row) : "",
+        error.row ? describeRow(t, broker, error.row) : "",
         t.ingest.summary.rowErrors[error.reason],
       );
   }

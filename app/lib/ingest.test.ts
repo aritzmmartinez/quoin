@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import type { ImportSummary } from "~/adapters/ingestion";
+import { operationsToWrite } from "~/adapters/ingestion/ingest";
 import type { Instrument } from "~/core/domain";
 
 import { copyFor } from "./i18n";
+import { en } from "./i18n/en";
+import { es } from "./i18n/es";
 
 import {
   earliestUnpriced,
@@ -29,8 +32,10 @@ const reward = (date: string) => ({
 const summary = (over: Partial<ImportSummary> = {}): ImportSummary => ({
   total: 6,
   imported: 2,
+  completed: 0,
   duplicates: 0,
   discarded: {},
+  failed: 0,
   discardedDetails: {},
   noticed: {},
   errors: [],
@@ -260,6 +265,22 @@ describe("importAction", () => {
     expect(importAction({ ...first, imported: 2 })).toBe("import");
   });
 
+  it("imports when the file only completes an operation already stored, and the button counts it", () => {
+    const completedOnly = summary({ imported: 0, completed: 1, duplicates: 4 });
+    expect(importAction(completedOnly)).toBe("import");
+    const count = operationsToWrite(completedOnly);
+    expect(es.ingest.confirmCount(count)).toBe("Importar 1 operación");
+    expect(en.ingest.confirmCount(count)).toBe("Import 1 trade");
+    expect(es.ingest.confirmCount(3)).toBe("Importar 3 operaciones");
+    expect(en.ingest.confirmCount(3)).toBe("Import 3 trades");
+  });
+
+  it("leaves the button off when every operation is a duplicate", () => {
+    expect(
+      importAction(summary({ imported: 0, completed: 0, duplicates: 4 })),
+    ).toBe("nothing");
+  });
+
   it("offers to value the rewards when nothing is new but some still lack a price", () => {
     expect(importAction({ ...first, imported: 0, duplicates: 8 })).toBe(
       "value-unpriced",
@@ -283,15 +304,13 @@ describe("suggestedQuoteSymbol", () => {
     thesis: "CORE",
   });
 
-  it("proposes the euro line of a crypto asset", () => {
-    expect(suggestedQuoteSymbol(instrument("ETH", "CRYPTO"))).toBe("ETH-EUR");
-    expect(suggestedQuoteSymbol(instrument("USDG", "CRYPTO"))).toBe("USDG-EUR");
+  it("proposes the Kraken euro pair of a crypto asset", () => {
+    expect(suggestedQuoteSymbol(instrument("ETH", "CRYPTO"))).toBe("ETH/EUR");
+    expect(suggestedQuoteSymbol(instrument("PEPE", "CRYPTO"))).toBe("PEPE/EUR");
   });
 
-  it("takes a verified exception instead, where Yahoo has no euro line", () => {
-    expect(suggestedQuoteSymbol(instrument("PEPE", "CRYPTO"))).toBe(
-      "PEPE24478-USD",
-    );
+  it("takes the dollar pair where Kraken has no euro one", () => {
+    expect(suggestedQuoteSymbol(instrument("USDG", "CRYPTO"))).toBe("USDG/USD");
   });
 
   it("proposes nothing for anything that is not crypto", () => {
@@ -299,7 +318,7 @@ describe("suggestedQuoteSymbol", () => {
   });
 });
 
-describe("the hint when Yahoo has no price", () => {
+describe("the hint when a symbol has no price", () => {
   const t = copyFor("es");
 
   it("points a fund at another venue", () => {
@@ -309,13 +328,13 @@ describe("the hint when Yahoo has no price", () => {
     expect(noDailyHistoryMessage(t, null)).toBe(t.ingest.map.noDailyHistory);
   });
 
-  it("points a crypto asset at its dollar line and warns about shared tickers", () => {
+  it("points a crypto asset at its Kraken pairs", () => {
     const message = noQuoteMessage(t, "DOGE", "DOGE-EUR");
-    expect(message).toContain("DOGE-USD");
-    expect(message).toContain("PEPE24478-USD");
+    expect(message).toContain("DOGE/EUR");
+    expect(message).toContain("DOGE/USD");
     expect(message).not.toContain(".MI");
     expect(noDailyHistoryMessage(copyFor("en"), "DOGE")).toContain(
-      "another coin",
+      "DOGE/USD",
     );
   });
 

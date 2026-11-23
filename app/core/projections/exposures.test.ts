@@ -484,3 +484,40 @@ describe("one contribution per instrument", () => {
     expect(leafTotal(exposures[0]!)).toBe("1600");
   });
 });
+
+describe("a leaf id stored without a category", () => {
+  const coins = (exposureKind: Instrument["exposureKind"]) =>
+    ["TESTCOINA", "TESTCOINB"].map((id) =>
+      instrument({
+        id,
+        name: id,
+        type: "CRYPTO",
+        assetClass: "crypto",
+        exposureKind,
+        exposureLeafId: "TESTCOIN",
+      }),
+    );
+
+  const exposuresOf = (instruments: Instrument[]) =>
+    computeExposures(
+      instruments.map((i) => position(i.id)),
+      new Map(instruments.map((i) => priced(i.id, "100.00"))),
+      new Map(instruments.map((i) => [i.id, resolveIntrinsic(i)])),
+      new Map(instruments.map((i) => [i.id, i.name])),
+    );
+
+  it("keeps two instruments sharing it apart, each on its own id", () => {
+    expect(exposuresOf(coins(null)).map((e) => e.leaf)).toEqual([
+      { kind: "CRYPTO", id: "TESTCOINA" },
+      { kind: "CRYPTO", id: "TESTCOINB" },
+    ]);
+  });
+
+  it("merges them once the user chooses the category", () => {
+    const exposures = exposuresOf(coins("CRYPTO"));
+    expect(exposures.map((e) => e.leaf)).toEqual([
+      { kind: "CRYPTO", id: "TESTCOIN" },
+    ]);
+    expect(leafTotal(exposures[0]!)).toBe("200");
+  });
+});

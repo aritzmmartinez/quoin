@@ -35,6 +35,27 @@ export const NOTICE_REASONS = [
 
 export type NoticeReason = (typeof NOTICE_REASONS)[number];
 
+export const ROW_TYPE_KEYS = [
+  "interest",
+  "deposit",
+  "withdrawal",
+  "transferIn",
+  "transferOut",
+  "transfer",
+  "directDebit",
+  "saveback",
+  "cardPayment",
+  "cardPaymentAbroad",
+  "reward",
+  "earn",
+  "earnWithdrawal",
+  "spend",
+  "receive",
+  "trade",
+] as const;
+
+export type RowTypeKey = (typeof ROW_TYPE_KEYS)[number];
+
 export interface DiscardDetail {
   date: string;
   type: string;
@@ -42,6 +63,7 @@ export interface DiscardDetail {
   instrument: string | null;
   unpriced?: string[];
   affectsPosition?: boolean;
+  rows?: DiscardDetail[];
 }
 
 export const ROW_ERROR_REASONS = [
@@ -63,6 +85,7 @@ export interface RowRef {
 
 export interface RowError extends RowRef {
   reason: RowErrorReason;
+  rows?: RowError[];
 }
 
 export const FILE_ERROR_REASONS = [

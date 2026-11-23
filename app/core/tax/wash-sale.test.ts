@@ -5,11 +5,8 @@ import type { TradeEvent } from "../domain";
 
 import { calendarDate, toIsoDate } from "../calendar";
 
-import {
-  REPURCHASE_RULES,
-  repurchaseRuleFor,
-  type RepurchaseRule,
-} from "./config";
+import { repurchaseRuleFor, type RepurchaseRule } from "./config";
+import { territoryRules } from "./territory";
 import {
   createWashSaleAssessor,
   washSaleWindow,
@@ -328,6 +325,21 @@ describe("assessWashSales — scope and allocation", () => {
 
     expect(assess([buy, sell], ["BTC"]).notices.has(sell.id)).toBe(false);
   });
+
+  it("points out only the asset class the territory names", () => {
+    const buy = trade("BUY", "GOLD", "1", "2000", { ts: "2024-01-10" });
+    const sell = trade("SELL", "GOLD", "1", "1500", { ts: "2024-05-08" });
+    const rebuy = trade("BUY", "GOLD", "1", "1600", { ts: "2024-05-20" });
+    const assessor = createWashSaleAssessor([buy, sell, rebuy], {
+      territory: "bizkaia",
+      zone: MADRID,
+      assetClasses: new Map([["GOLD", "unclassified"]]),
+    });
+    const [sale] = walkFifo([buy, sell, rebuy], BIZKAIA).sales;
+
+    expect(assessor.ruleFor(sale!)).toBeNull();
+    expect(assessor.unlistedNotice(sale!)).toBeNull();
+  });
 });
 
 function tripsOn(saleTs: string, rebuyTs: string): boolean {
@@ -445,7 +457,7 @@ describe("repurchase rules", () => {
       expect(
         repurchaseRuleFor("bizkaia", "listed-security", day),
       ).toMatchObject({
-        letter: "g",
+        assetClass: "listed-security",
         windowMonths: 2,
         homogeneity: "instrument",
         acquisitions: "all",
@@ -465,7 +477,7 @@ describe("repurchase rules", () => {
       expect(
         repurchaseRuleFor("bizkaia", "fungible-crypto", day),
       ).toMatchObject({
-        letter: "i",
+        assetClass: "fungible-crypto",
         windowMonths: 2,
         homogeneity: "instrument",
         acquisitions: "all",
@@ -477,12 +489,12 @@ describe("repurchase rules", () => {
     const buy = trade("BUY", "X", "10", "1000", { ts: "2025-01-01" });
     const sell = trade("SELL", "X", "10", "700", { ts: "2025-03-01" });
 
-    expect(assess([buy, sell]).bySale.get(sell.id)?.rule.letter).toBe("g");
+    expect(assess([buy, sell]).bySale.get(sell.id)?.rule.assetClass).toBe("listed-security");
   });
 });
 
 describe("acquisitions received in kind", () => {
-  const cashOnly = REPURCHASE_RULES.map((rule): RepurchaseRule => ({
+  const cashOnly = territoryRules("bizkaia").repurchase.map((rule): RepurchaseRule => ({
     ...rule,
     acquisitions: "cash-only",
   }));
@@ -533,7 +545,7 @@ describe("Art. 43.i — fungible crypto from 1 January 2025", () => {
     const after = trade("BUY", "BTC", "1", "52000", { ts: "2025-07-10" });
 
     const assessment = assessed([lot, sell, after]);
-    expect(assessment?.rule.letter).toBe("i");
+    expect(assessment?.rule.assetClass).toBe("fungible-crypto");
     expect(assessment?.repurchased.toFixed()).toBe("1");
   });
 

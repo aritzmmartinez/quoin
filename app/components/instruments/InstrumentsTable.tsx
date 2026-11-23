@@ -10,6 +10,7 @@ import {
 } from "~/core/domain";
 import {
   DASH,
+  exposureKindLabel,
   type InstrumentListItem,
   terInputMatches,
   terToPercentInput,
@@ -73,7 +74,8 @@ export function InstrumentsTable({ items }: { items: InstrumentListItem[] }) {
 
 function InstrumentRow({ item }: { item: InstrumentListItem }) {
   const { formatMoney } = useFormat();
-  const { instruments: copy, labels } = useCopy();
+  const allCopy = useCopy();
+  const { instruments: copy, labels } = allCopy;
   const fetcher = useFetcher<{ ok: boolean; error?: string }>();
 
   const [kind, setKind] = useState<string>(item.exposureKind ?? "");
@@ -141,8 +143,19 @@ function InstrumentRow({ item }: { item: InstrumentListItem }) {
             value={kind}
             onChange={setKind}
             options={[
-              { value: "", label: copy.defaultOption },
-              ...KINDS.map((k) => ({ value: k, label: k })),
+              {
+                value: "",
+                label:
+                  item.exposure.source === "derived" && item.exposure.kind
+                    ? copy.autoOption(
+                        exposureKindLabel(allCopy, item.exposure.kind),
+                      )
+                    : labels.exposureKindFallback,
+              },
+              ...KINDS.map((k) => ({
+                value: k,
+                label: exposureKindLabel(allCopy, k),
+              })),
             ]}
             className="w-full"
           />

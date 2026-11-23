@@ -1,9 +1,11 @@
 import Decimal from "decimal.js";
 
 import {
+  TRADE_REPUBLIC_SOURCE,
   dividendEventSchema,
   cashEventSchema,
   instrumentSchema,
+  interestEventSchema,
   tradeEventSchema,
   type Instrument,
   type InstrumentType,
@@ -70,7 +72,7 @@ function base(row: TradeRepublicRow) {
     currency: row.currency,
     ...originals(row),
     account: "trade-republic",
-    source: "TR_CSV",
+    source: TRADE_REPUBLIC_SOURCE,
     externalId: row.transaction_id,
     note: null,
   };
@@ -162,7 +164,12 @@ export function mapRow(row: TradeRepublicRow): MappedItem {
       return {
         kind: "domain",
         instrument: null,
-        event: toCash(row, "INTEREST"),
+        event: interestEventSchema.parse({
+          ...base(row),
+          type: "INTEREST",
+          grossAmount: abs(row.amount),
+          taxWithheld: absOrZero(row.tax),
+        }),
       };
 
     case "CASH|CUSTOMER_INPAYMENT":
@@ -250,7 +257,7 @@ export function mapSavebackPurchase(
 
 function toCash(
   row: TradeRepublicRow,
-  type: "DEPOSIT" | "WITHDRAWAL" | "INTEREST",
+  type: "DEPOSIT" | "WITHDRAWAL",
 ): LedgerEvent {
   return cashEventSchema.parse({
     ...base(row),

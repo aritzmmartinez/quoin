@@ -132,7 +132,7 @@ describe("a swap and Art. 43.i", () => {
     );
     const gain = history.gains.find((g) => g.eventId === LOSS.sell.id)!;
     expect(gain.realizedPnL).toBe("-45");
-    expect(gain.washSale?.letter).toBe("i");
+    expect(gain.washSale?.assetClass).toBe("fungible-crypto");
     expect(gain.nonComputable).toBe("-33.75");
     expect(gain.computablePnL).toBe("-11.25");
     expect(gain.washSale?.recipients.map((r) => r.buyEventId)).toEqual([

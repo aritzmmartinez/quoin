@@ -117,15 +117,23 @@ export const dividendEventSchema = baseEventSchema.extend({
 export type DividendEvent = z.infer<typeof dividendEventSchema>;
 
 export const cashEventSchema = baseEventSchema.extend({
-  type: z.enum(["DEPOSIT", "WITHDRAWAL", "INTEREST"]),
+  type: z.enum(["DEPOSIT", "WITHDRAWAL"]),
   grossAmount: decimalString,
 });
 export type CashEvent = z.infer<typeof cashEventSchema>;
+
+export const interestEventSchema = baseEventSchema.extend({
+  type: z.literal("INTEREST"),
+  grossAmount: decimalString,
+  taxWithheld: decimalString,
+});
+export type InterestEvent = z.infer<typeof interestEventSchema>;
 
 export const ledgerEventSchema = z.discriminatedUnion("type", [
   tradeEventSchema,
   dividendEventSchema,
   cashEventSchema,
+  interestEventSchema,
 ]);
 export type LedgerEvent = z.infer<typeof ledgerEventSchema>;
 
@@ -213,6 +221,9 @@ export const ledgerEventWriteSchema = ledgerEventSchema.superRefine(
     }
   },
 );
+
+/** The source Trade Republic's adapter stamps on every row it maps. */
+export const TRADE_REPUBLIC_SOURCE = "TR_CSV";
 
 export function isInKind(event: LedgerEvent): boolean {
   return "funding" in event && event.funding === "IN_KIND";

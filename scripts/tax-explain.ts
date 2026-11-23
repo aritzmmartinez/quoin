@@ -8,18 +8,16 @@ import {
   prisma,
 } from "~/adapters/persistence";
 import { dayOf, toIsoDate, today } from "~/core/calendar";
-import { Money } from "~/core/domain";
 import {
-  carryforwardFrom,
-  computeSavingsQuota,
   computeTaxHistory,
-  getTaxScale,
   taxYearOf,
+  territoryRules,
   type Jurisdiction,
   type RealizedGainDetail,
 } from "~/core/tax";
 import { loadResidence } from "~/lib/residence.server";
 import {
+  buildTaxYearView,
   taxExclusions,
   taxOptionsFor,
   unclassifiedSales,
@@ -51,9 +49,9 @@ function day(t: Date): string {
 function printSale(gain: RealizedGainDetail, names: Map<string, string>): void {
   const name = names.get(gain.instrumentId) ?? gain.instrumentId;
   const flag = gain.washSale
-    ? "  <-- ART. 43 REPURCHASE"
+    ? "  <-- REPURCHASE"
     : gain.unlistedNotice
-      ? "  <-- NOTE (unlisted)"
+      ? "  <-- NOTE (no repurchase rule)"
       : "";
   console.log(
     `  ${day(gain.ts)}  ${gain.instrumentId.padEnd(14)} qty ${gain.quantity.padStart(12)}` +
@@ -71,7 +69,7 @@ function printSale(gain: RealizedGainDetail, names: Map<string, string>): void {
   const ws = gain.washSale;
   if (ws) {
     console.log(
-      `      window: [${toIsoDate(ws.window.start)} .. ${toIsoDate(ws.window.end)}]  (Art. 43.${ws.letter}, sale ± ${ws.windowMonths}m, Madrid)`,
+      `      window: [${toIsoDate(ws.window.start)} .. ${toIsoDate(ws.window.end)}]  (${ws.source}, sale ± ${ws.windowMonths}m, ${JURISDICTION.zone})`,
     );
     console.log(
       `      before ${ws.before}  R ${ws.remainingAfter}  repurchase_before ${ws.repurchaseBefore}` +
@@ -93,7 +91,7 @@ function printSale(gain: RealizedGainDetail, names: Map<string, string>): void {
   }
   if (gain.unlistedNotice) {
     console.log(
-      `      outside Art. 43 (not admitted to trading); acquired again ${day(gain.unlistedNotice.buyTs)}` +
+      `      no repurchase rule covers this sale; acquired again ${day(gain.unlistedNotice.buyTs)}` +
         ` (${gain.unlistedNotice.buyEventId}) — informative only, nothing changes`,
     );
   }
@@ -169,12 +167,13 @@ async function main(): Promise<void> {
   const nonComputable = sum(result.gains.map((g) => g.nonComputable));
   const integrated = sum(result.integrations.map((i) => i.amount));
   const affected = result.gains.filter((g) => g.washSale).length;
+  const repurchase = territoryRules(result.territory).citations.repurchase;
 
   console.log(
     `\nOwn-year result of the sales:            ${eur(ownNet)}` +
-      `  (${result.gains.length} sales, ${affected} with an Art. 43 repurchase)`,
+      `  (${result.gains.length} sales, ${affected} with a repurchase, ${repurchase})`,
   );
-  console.log(`Non-computable, deferred (Art. 43):      ${eur(nonComputable)}`);
+  console.log(`Non-computable, deferred:                ${eur(nonComputable)}`);
   console.log(`Deferred losses computing this year:     ${eur(integrated)}`);
   console.log(
     `Computable net for the year:             ${eur(result.computableNet)}\n`,
@@ -193,37 +192,40 @@ async function main(): Promise<void> {
     console.log("");
   }
 
-  const carry = carryforwardFrom(history, YEAR);
-  console.log(
-    `Carryforward chain, ${carry.steps[0]!.year}..${YEAR} (max 4 prior years):\n`,
+  const view = buildTaxYearView(
+    events,
+    instruments,
+    YEAR,
+    JURISDICTION,
+    TODAY,
   );
   console.log(
-    "year   ownNet          consumedFromCarry   finalNet        pendingLossRemaining",
+    `Capital gains carryforward, ${view.carryforward[0]!.year}..${YEAR}` +
+      ` (${territoryRules(result.territory).citations.gainsCarryforward}):\n`,
   );
-  for (const step of carry.steps) {
+  console.log(
+    "year   ownNet          crossOffset     consumedFromCarry   absorbedFromOther   crossedToOther   finalNet        pendingLossRemaining",
+  );
+  for (const step of view.carryforward) {
     console.log(
-      `${step.year}  ${eur(step.ownNet)}   ${eur(step.consumedFromCarryforward)}` +
-        `      ${eur(step.finalNet)}   ${eur(step.pendingLossRemaining)}`,
+      `${step.year}  ${eur(step.ownNet)}   ${eur(step.crossOffset)}   ${eur(step.consumedFromCarryforward)}` +
+        `        ${eur(step.absorbedFromOther)}        ${eur(step.crossedToOther)}     ${eur(step.finalNet)}   ${eur(step.pendingLossRemaining)}`,
     );
   }
 
-  console.log(`\nNet savings base for ${YEAR}: ${eur(carry.netSavingsBase)}`);
+  console.log(`\nCapital gains balance:          ${eur(view.netSavingsBase)}`);
+  console.log(`Income from movable capital:    ${eur(view.savingsIncome.finalNet)}`);
+  console.log(`Savings base for ${YEAR}:          ${eur(view.savingsBase)}`);
 
-  const scale = getTaxScale(result.territory, YEAR);
-  if (!scale) {
+  if (!view.scale || view.quota === null) {
     console.log(
       `\nNo tax scale on file for ${result.territory} ${YEAR} — cannot compute quota.`,
     );
     return;
   }
 
-  const netBase = new Decimal(carry.netSavingsBase);
-  const quota = netBase.gt(0)
-    ? computeSavingsQuota(Money.fromString(carry.netSavingsBase), scale)
-    : Money.zero();
-
-  console.log(`Scale in force: ${scale.source}`);
-  console.log(`Quota: ${eur(quota.toString())} EUR`);
+  console.log(`Scale in force: ${view.scale.source}`);
+  console.log(`Quota: ${eur(view.quota)} EUR`);
 }
 
 main()

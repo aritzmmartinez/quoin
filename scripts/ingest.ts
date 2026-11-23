@@ -15,6 +15,8 @@ import {
   previewBatch,
   BROKERS,
   type Broker,
+  nothingToImport,
+  writesLedger,
   type ImportSummary,
 } from "~/adapters/ingestion";
 import {
@@ -66,12 +68,17 @@ ECB rates differ from the stored ones; ${currencies.join(", ")} not updated`,
   );
 }
 
+let broker: Broker | null = null;
+
 function printSummary(title: string, summary: ImportSummary): void {
   const groups = discardGroups(summary);
   const discarded = groups.reduce((sum, group) => sum + group.count, 0);
   console.log(`\n${title}`);
   console.log(`  total transactions : ${summary.total}`);
   console.log(`  to import (new)    : ${summary.imported}`);
+  if (summary.completed > 0) {
+    console.log(`  completed          : ${summary.completed}`);
+  }
   console.log(`  duplicates (skip)  : ${summary.duplicates}`);
   console.log(`  discarded          : ${discarded || "none"}`);
   for (const group of groups) {
@@ -100,11 +107,16 @@ function printSummary(title: string, summary: ImportSummary): void {
     console.log(`  ${copy.notices[reason]}: ${details.length}`);
     console.log(`        ${copy.noticeHelp[reason]}`);
   }
-  console.log(`  errors             : ${summary.errors.length || "none"}`);
+  console.log(`  errors             : ${summary.failed || "none"}`);
   for (const error of summary.errors) {
     console.log(
-      `  !     ${copy.rowErrors[error.reason]}: ${describeRow(t, error)}`,
+      `  !     ${copy.rowErrors[error.reason]}: ${describeRow(t, broker, error)}`,
     );
+    for (const other of error.rows ?? []) {
+      console.log(
+        `          ${copy.sameOperation}: ${describeRow(t, broker, other)}`,
+      );
+    }
   }
   console.log(`  instruments        : ${summary.instruments}`);
 }
@@ -178,13 +190,14 @@ async function main(): Promise<void> {
     allowPositionals: true,
   });
 
-  const broker = values.broker;
+  const named = values.broker;
   const file = positionals[0];
 
-  if (!broker || !BROKERS.includes(broker as Broker) || !file) {
+  if (!named || !BROKERS.includes(named as Broker) || !file) {
     console.error(USAGE);
     exit(1);
   }
+  broker = named as Broker;
 
   const instruments = new PrismaInstrumentRepository();
   const ledger = new PrismaLedgerRepository();
@@ -215,8 +228,12 @@ async function main(): Promise<void> {
   printSummary(`Preview (${broker})`, preview);
   printRateConflicts(rateConflicts);
 
-  if (preview.imported === 0 && unpricedEntries(preview) === 0) {
-    console.log("\nNothing new to import.");
+  if (!writesLedger(preview) && unpricedEntries(preview) === 0) {
+    console.log(
+      nothingToImport(preview) === "already-stored"
+        ? "\nNothing new to import."
+        : "\nNothing to import: no operation in this file can be saved.",
+    );
     return;
   }
 
@@ -235,7 +252,7 @@ main()
     console.error(
       "\nImport failed:",
       error instanceof CsvFileError
-        ? fileErrorMessage(t, error)
+        ? fileErrorMessage(t, broker, error)
         : error instanceof Error
           ? error.message
           : error,

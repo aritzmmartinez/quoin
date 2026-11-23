@@ -2,14 +2,16 @@ import type {
   DiscardReason,
   NoticeReason,
   RowErrorReason,
+  RowTypeKey,
 } from "~/adapters/ingestion/discard";
 import type {
   ExposureKind,
   InstrumentType,
   LeafKind,
+  Residence,
   Thesis,
 } from "~/core/domain";
-import type { RepurchaseLetter } from "~/core/tax";
+import type { RepurchaseAssetClass, Territory } from "~/core/tax";
 
 export interface ExcludedNotice {
   symbol: string;
@@ -28,6 +30,25 @@ const REFRESH_NOW = "Actualizar ahora";
 const REDOWNLOAD = "Volver a descargar el histórico";
 const REFRESH_RATES = `pulsa «${REFRESH_NOW}» en los tipos de cambio de ${EXTERNAL_DATA} (${SETTINGS})`;
 const REFRESH_CPI = `pulsa «${REFRESH_NOW}» en el IPC de ${EXTERNAL_DATA} (${SETTINGS})`;
+
+const ROW_TYPE_LABELS: Record<RowTypeKey, string> = {
+  interest: "Intereses",
+  deposit: "Ingreso",
+  withdrawal: "Retirada",
+  transferIn: "Transferencia recibida",
+  transferOut: "Transferencia enviada",
+  transfer: "Transferencia",
+  directDebit: "Adeudo domiciliado",
+  saveback: "Saveback",
+  cardPayment: "Pago con tarjeta",
+  cardPaymentAbroad: "Pago con tarjeta en el extranjero",
+  reward: "Recompensa",
+  earn: "Earn",
+  earnWithdrawal: "Retirada de Earn",
+  spend: "Entrega",
+  receive: "Recepción",
+  trade: "Operación",
+};
 
 const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
   "swap-unpriced": "Intercambios entre criptos sin precio",
@@ -122,7 +143,7 @@ export const es = {
   common: {
     close: "Cerrar",
     marketDataUnavailable:
-      "No se ha podido consultar Yahoo. Inténtalo de nuevo.",
+      "No se ha podido consultar la fuente de precios. Inténtalo de nuevo.",
     halted: (cause: string): string =>
       `Se ha detenido sin terminar: ${cause.replace(/\.+$/, "")}. No es un fallo de un instrumento concreto, así que no se ha seguido con los demás.`,
     noRateExcluded: (names: readonly string[]): string => {
@@ -131,8 +152,8 @@ export const es = {
     },
     noRateTax: (names: string): string =>
       `Sin tipo de cambio: ${names}. Sus operaciones no se han podido convertir a euros y no entran en este cálculo. Revísalo antes de usar estas cifras en la declaración.`,
-    unclassifiedTax: (names: string): string =>
-      `Sin regla de recompra: ${names}. Su tipo (bono, materia prima o efectivo) no es un valor cotizado ni un criptoactivo: un bono directo da rendimiento del capital mobiliario, al que el Art. 43 no se aplica, y una materia prima directa tendría su propia regla, que Quoin no modela. Sus ventas se calculan sin regla de recompra. Revísalas antes de usar estas cifras en la declaración.`,
+    unclassifiedTax: (names: string, citation: string): string =>
+      `Sin regla de recompra: ${names}. Su tipo (bono, materia prima o efectivo) no es un valor cotizado ni un criptoactivo: un bono directo da rendimiento del capital mobiliario, al que la regla de recompra (${citation}) no se aplica, y una materia prima directa tendría su propia regla, que Quoin no modela. Sus ventas se calculan sin regla de recompra. Revísalas antes de usar estas cifras en la declaración.`,
   },
   notFound: {
     title: "Página no encontrada",
@@ -204,6 +225,24 @@ export const es = {
       },
       language: { label: "Idioma" },
     },
+    tax: {
+      title: "Fiscalidad",
+      desc: "Qué reglas del IRPF aplica la vista Fiscal de Realizado.",
+      residence: {
+        label: "Residencia fiscal",
+        options: {
+          bizkaia: { label: "Bizkaia", desc: "Régimen foral, NF 13/2013" },
+          comun: {
+            label: "Régimen común",
+            desc: "Península, Baleares, Ceuta y Melilla",
+          },
+          canarias: { label: "Canarias", desc: "Régimen común, hora canaria" },
+        } satisfies Record<Residence, { label: string; desc: string }>,
+        help: "Cambia la escala del ahorro, la regla de recompra, la compensación entre bolsas y la exención de dividendos, y también el día y el año en que cae cada operación y la hora que se muestra. Lo ya guardado no se recalcula: los días de entrada en vigor de los planes, el día de cada precio y los tipos de cambio ya aplicados se quedan como estaban.",
+        ceutaMelilla:
+          "La deducción por rentas obtenidas en Ceuta y Melilla no se calcula.",
+      },
+    },
     portfolio: {
       title: "Cartera",
       desc: "Parámetros que usan los análisis de Asignación y Coste de oportunidad.",
@@ -236,7 +275,11 @@ export const es = {
       noData: "Sin datos todavía",
       prices: {
         label: "Precios",
-        hint: "Yahoo Finance: posiciones abiertas e índice de referencia",
+        hint: "Yahoo Finance: acciones y fondos abiertos e índice de referencia",
+      },
+      cryptoPrices: {
+        label: "Precios de cripto",
+        hint: "Market Data: Kraken. Cripto abiertas con un par de Kraken",
       },
       inflation: { label: "IPC", hint: "INE: nacional y Bizkaia" },
       rates: {
@@ -828,6 +871,11 @@ export const es = {
     summary: {
       total: "Operaciones en el fichero",
       imported: "Nuevas",
+      completed: "Completadas",
+      sameOperation: "misma operación",
+      rowTypes: ROW_TYPE_LABELS,
+      completedHelp:
+        "Ya estaban importadas; se ha añadido la parte que faltaba",
       duplicates: "Duplicadas",
       instruments: "Instrumentos",
       discarded: "Descartadas",
@@ -853,6 +901,8 @@ export const es = {
     },
     nothingNew:
       "Nada nuevo que importar: todas las operaciones de este fichero ya estaban en el registro.",
+    nothingToSave:
+      "Nada que importar: ninguna operación de este fichero se puede guardar. Arriba se explica por qué.",
     confirmPending: "Continuar para valorar las recompensas y los intercambios",
     confirmCount: (count: number): string =>
       count === 1 ? "Importar 1 operación" : `Importar ${count} operaciones`,
@@ -881,10 +931,10 @@ export const es = {
     map: {
       title: "Símbolos de cotización",
       intro:
-        "Estos instrumentos no tienen aún símbolo de Yahoo, así que no se pueden valorar. Mapea la línea en euros de la plaza correcta y comprueba el valor implícito antes de guardar.",
+        "Estos instrumentos no tienen aún símbolo, así que no se pueden valorar. Para un fondo o una acción, mapea la línea de Yahoo en euros de la plaza correcta; para una cripto, su par de Kraken, como BTC/EUR. Comprueba el valor implícito antes de guardar.",
       warning:
         "Varias plazas cotizan en euros y aun así son otro fondo que replica el mismo índice, o el mismo fondo con otra proporción por participación. Compara el valor implícito con lo que dice tu bróker: la divisa sola no lo detecta, la magnitud sí.",
-      placeholder: "VWCE.DE, BTC-EUR…",
+      placeholder: "VWCE.DE, BTC/EUR…",
       verify: "Verificar",
       verifying: "Verificando…",
       save: "Usar este símbolo",
@@ -894,7 +944,7 @@ export const es = {
       noQuote: (symbol: string): string =>
         `Yahoo no devuelve precio para ${symbol}. Prueba otra plaza (.DE, .MI, .PA, .AS).`,
       noQuoteCrypto: (symbol: string, code: string): string =>
-        `Yahoo no devuelve precio para ${symbol}. Para una cripto, prueba ${code}-USD, que se valora con el tipo del BCE, o el ticker con el número que Yahoo añade cuando el código está repetido, como PEPE24478-USD. Un ticker repetido puede ser otra moneda con el mismo código: comprueba el nombre y el valor implícito antes de guardar.`,
+        `No hay precio para ${symbol}. Para una cripto, usa su par de Kraken, ${code}/EUR, o ${code}/USD si no tiene línea en euros, que se valora con el tipo del BCE. Comprueba el valor implícito antes de guardar.`,
       price: "Precio",
       impliedValue: "Valor implícito",
       quantity: "Unidades",
@@ -915,7 +965,7 @@ export const es = {
       noDailyHistory:
         "Yahoo no tiene histórico diario de este símbolo. Busca su ticker en una bolsa en euros (.DE, .AS…).",
       noDailyHistoryCrypto: (code: string): string =>
-        `Yahoo no tiene histórico diario de este símbolo. Para una cripto, prueba ${code}-USD, que se valora con el tipo del BCE, o el ticker con el número que Yahoo añade cuando el código está repetido, como PEPE24478-USD. Un ticker repetido puede ser otra moneda con el mismo código: comprueba el nombre y el valor implícito antes de guardar.`,
+        `No hay histórico diario de este símbolo. Para una cripto, usa su par de Kraken, ${code}/EUR, o ${code}/USD si no tiene línea en euros, que se valora con el tipo del BCE. Comprueba el valor implícito antes de guardar.`,
       hasHistory:
         "Este instrumento ya tiene precios guardados. Cambia su símbolo en la columna Símbolo de Instrumentos: allí se descarga el histórico nuevo antes de borrar el anterior.",
       pending: (count: number): string =>
@@ -971,7 +1021,7 @@ export const es = {
           ? "1 símbolo ha devuelto una cotización antigua: revisa la plaza."
           : `${count} símbolos han devuelto cotizaciones antiguas: revisa las plazas.`,
       unavailable: (names: string): string =>
-        `No se ha podido consultar Yahoo para ${names}. Inténtalo de nuevo con «Refrescar precios» en Cartera.`,
+        `No se ha podido consultar la fuente de precios de ${names}. Inténtalo de nuevo con «Refrescar precios» en Cartera.`,
     },
   },
   holdings: {
@@ -1040,7 +1090,7 @@ export const es = {
     hedgedShort: "Cubierta",
     thesisHint:
       "La tesis dice por qué tienes el instrumento, no qué es: eso lo dice la exposición. Cambia cuando cambia tu razonamiento, así que vive aquí y no en la operación que lo compró.",
-    defaultOption: "(por defecto del tipo)",
+    autoOption: (kind: string): string => `Auto: ${kind}`,
     leafPlaceholder: "XAU, BTC…",
     leafRequired: "Esta clase necesita una hoja (p. ej. XAU).",
     terInvalid:
@@ -1054,7 +1104,7 @@ export const es = {
     noDailyHistory:
       "Este símbolo no tiene histórico diario. Vuelve a descargarlo o cambia el símbolo por su ticker en una bolsa en euros.",
     noDailyHistoryCrypto: (code: string): string =>
-      `Este símbolo no tiene histórico diario. Para una cripto, prueba ${code}-USD, que se valora con el tipo del BCE, o el ticker con el número que Yahoo añade cuando el código está repetido, como PEPE24478-USD. Un ticker repetido puede ser otra moneda con el mismo código: comprueba el nombre y el valor implícito antes de guardar.`,
+      `Este símbolo no tiene histórico diario. Para una cripto, usa su par de Kraken, ${code}/EUR, o ${code}/USD si no tiene línea en euros, que se valora con el tipo del BCE. Comprueba el valor implícito antes de guardar.`,
     obsoleteVenues:
       "Esta composición se importó con códigos de país antiguos y no se fusiona con otros fondos. Vuelve a soltar su archivo en esta fila.",
     resolves: RESOLVES_LABELS,
@@ -1065,7 +1115,7 @@ export const es = {
       redownload: (symbol: string): string => `${REDOWNLOAD} de ${symbol}`,
       range: "Histórico",
       confirmReplace: (symbol: string): string =>
-        `Se descargará el histórico diario de ${symbol} y la cotización de hoy. Si llegan velas, sustituyen a todos los precios guardados de este instrumento; si no llega ninguna, no se toca nada. Las operaciones no cambian.`,
+        `Se descargará el histórico diario de ${symbol} y la cotización de hoy. Si llegan velas, sustituyen a los precios guardados desde la primera; con el mismo símbolo, los anteriores se conservan, y con uno nuevo se borran. Si no llega ninguna, no se toca nada. Las operaciones no cambian.`,
       lost: (cutoff: string, earliest: string): string =>
         `Este rango empieza el ${cutoff} y tu histórico actual el ${earliest}: se perderán los precios anteriores al ${cutoff}.`,
       confirm: "Confirmar",
@@ -1073,16 +1123,18 @@ export const es = {
       running: "Descargando…",
       done: (count: number, first: string): string =>
         count === 1
-          ? `1 precio guardado desde el ${first}.`
-          : `${count} precios guardados desde el ${first}.`,
+          ? `1 precio descargado desde el ${first}.`
+          : `${count} precios descargados desde el ${first}.`,
+      total: (count: number, start: string): string =>
+        `En total, ${count} desde el ${start}.`,
       noLive:
-        "Yahoo no ha dado cotización de hoy: pulsa «Refrescar precios» en Cartera más tarde.",
+        "La fuente no ha dado cotización de hoy: pulsa «Refrescar precios» en Cartera más tarde.",
       noHistory: (symbol: string): string =>
-        `Yahoo no tiene histórico diario de ${symbol}. Busca su ticker en una bolsa en euros (.DE, .AS…). No se ha tocado nada.`,
+        `No hay histórico diario de ${symbol}. Para un fondo o una acción, busca su ticker en una bolsa en euros (.DE, .AS…); para una cripto, su par de Kraken, como BTC/EUR. No se ha tocado nada.`,
       failed: "La descarga ha fallado. No se ha tocado nada.",
       rebuild: "Rehacer todos los históricos",
       rebuildConfirm: (count: number): string =>
-        `Se volverá a descargar el histórico diario de ${count === 1 ? "1 instrumento" : `${count} instrumentos`} con símbolo, uno tras otro. Cada uno solo se sustituye si Yahoo devuelve velas, y las operaciones no se tocan. Si sales de esta pantalla se detiene; lo ya rehecho se queda.`,
+        `Se volverá a descargar el histórico diario de ${count === 1 ? "1 instrumento" : `${count} instrumentos`} con símbolo, uno tras otro. Cada uno solo se sustituye si su fuente devuelve velas, lo anterior a la primera vela se conserva y las operaciones no se tocan. Si sales de esta pantalla se detiene; lo ya rehecho se queda.`,
       rebuilding: (done: number, total: number): string =>
         `Rehaciendo ${done} de ${total}…`,
       rebuilt: (done: number, total: number): string =>
@@ -1112,7 +1164,7 @@ export const es = {
       problem: {
         "no-quote": "sin respuesta",
         stale: "cotización caducada",
-        unavailable: "no se ha podido consultar Yahoo",
+        unavailable: "no se ha podido consultar la fuente de precios",
         error: "error inesperado",
       },
       unmappedOpen: (count: number): string =>
@@ -1374,7 +1426,7 @@ export const es = {
     views: {
       label: "Vista",
       sales: "Ventas",
-      tax: "Fiscal (Bizkaia)",
+      tax: (territory: string): string => `Fiscal (${territory})`,
     },
     intro:
       "Cada venta cerrada, con el coste que consumió en el momento de venderla. Las comisiones de compra ya van dentro del coste y las de venta se restan del bruto.",
@@ -1405,20 +1457,49 @@ export const es = {
     },
     fiscal: {
       about: "Sobre el criterio fiscal",
-      intro:
-        "Mismas ventas, con criterio FIFO en vez de AVCO, que es el que exige la declaración foral de Bizkaia (NF 13/2013) y no el de la pestaña de Ventas. Las pérdidas con recompra en los dos meses anteriores o posteriores se difieren según el Art. 43 (letra g para valores homogéneos y, en las transmisiones desde el 1 de enero de 2025, letra i para criptoactivos del mismo tipo), en la proporción recomprada, y se integran cuando se transmiten los recomprados; la compensación con años anteriores sigue el Art. 66. La aritmética de la recompra sigue las consultas de la DGT V1403-21, V1117-21 y V3282-18 sobre la norma estatal paralela, que no vinculan a la Hacienda Foral.",
+      territoryName: {
+        bizkaia: "Bizkaia",
+        comun: "régimen común",
+      } satisfies Record<Territory, string>,
+      residenceName: {
+        bizkaia: "Bizkaia",
+        comun: "régimen común",
+        canarias: "régimen común · Canarias",
+      } satisfies Record<Residence, string>,
+      intro: {
+        bizkaia:
+          "Mismas ventas, con criterio FIFO en vez de AVCO, que es el que exige la declaración foral de Bizkaia (NF 13/2013) y no el de la pestaña de Ventas. Las pérdidas con recompra en los dos meses anteriores o posteriores se difieren según el Art. 43 (letra g para valores homogéneos y, en las transmisiones desde el 1 de enero de 2025, letra i para criptoactivos del mismo tipo), en la proporción recomprada, y se integran cuando se transmiten los recomprados; la compensación con años anteriores sigue el Art. 66. La aritmética de la recompra sigue las consultas de la DGT V1403-21, V1117-21 y V3282-18 sobre la norma estatal paralela, que no vinculan a la Hacienda Foral.",
+        comun:
+          "Mismas ventas, con criterio FIFO en vez de AVCO, que es el que exige el IRPF (Ley 35/2006) y no el de la pestaña de Ventas; en criptomonedas, FIFO por activo (DGT V1604-18 y V0975-22). Las pérdidas de acciones y ETF con recompra en los dos meses anteriores o posteriores no computan según el art. 33.5.f, en la proporción recomprada, y se integran cuando se transmiten los recomprados. Esa es la regla de los valores admitidos a negociación en un mercado regulado del EEE o equivalente (EE. UU. incluido, DGT V0778-25); los no admitidos tienen un año (art. 33.5.g), y Quoin no sabe en qué mercado cotiza cada valor. Las criptomonedas no tienen regla de recompra: su pérdida computa entera. Las permutas se valoran por el mayor de los dos valores (art. 37.1.h, DGT V0999-18). La compensación entre bolsas y con años anteriores sigue el art. 49. La aritmética de la recompra sigue las consultas de la DGT V1403-21, V1117-21 y V3282-18.",
+      } satisfies Record<Territory, string>,
       yearLabel: "Año fiscal",
-      noYears: "No hay ventas registradas todavía en ningún año.",
+      noYears: "No hay ventas ni rendimientos registrados todavía en ningún año.",
       summary: {
         netBase: "Base liquidable del ahorro",
+        gainsBalance: "Saldo de ganancias y pérdidas",
+        incomeBalance: "Saldo de rendimientos del capital mobiliario",
+        pools: {
+          bizkaia:
+            "Los rendimientos del capital mobiliario y las ganancias y pérdidas se compensan solo dentro de su propia bolsa (Art. 66.1): la base es la suma de los saldos positivos.",
+          comun:
+            "Los rendimientos del capital mobiliario y las ganancias y pérdidas se integran cada uno en su bolsa. El saldo negativo de una compensa el positivo de la otra hasta el 25 % de ese positivo, y lo pendiente de años anteriores que su propia bolsa no absorba también, con el mismo límite del 25 % para todo el año (art. 49): la base es la suma de los saldos positivos.",
+        } satisfies Record<Territory, string>,
         quota: "Cuota resultante",
-        scale: (source: string): string => `Escala aplicada: ${source}`,
+        withheld: "Retenciones registradas",
+        withheldNote:
+          "Las retenciones son pagos a cuenta de todo el IRPF, no solo de la base del ahorro, y no se restan de la cuota. Suma lo retenido este año en intereses y dividendos cobrados en efectivo y en el saveback de Trade Republic, sin separar retenciones españolas y extranjeras.",
+        interestWithoutWithholding:
+          "Algún interés de este año no tiene retención registrada. Los intereses importados antes de esta versión pueden no traer su retención aunque la tuvieran: compruébalos con el extracto del bróker.",
+        scale: (source: string): string => `Escala aplicada: ${source}.`,
+        scaleInForce: (year: number, territory: string): string =>
+          `Se aplica la escala vigente desde ${year} en ${territory}. Si se aprueba una nueva para este año, la cuota cambiará.`,
         noScale:
           "Sin escala fiscal cargada para este año. No se puede calcular la cuota.",
       },
       net: {
         own: "Resultado propio de las ventas del año",
-        nonComputable: "No computable por recompra (Art. 43)",
+        nonComputable: (citation: string): string =>
+          `No computable por recompra (${citation})`,
         integrated: "Pérdidas diferidas que se integran este año",
         computable: "Neto computable del año",
         counts: (sales: number, affected: number): string =>
@@ -1446,11 +1527,11 @@ export const es = {
         unitCost: "Coste unitario",
       },
       washSaleReason: (
-        letter: RepurchaseLetter,
+        source: string,
         repurchased: string,
         sold: string,
       ): string =>
-        `Art. 43.${letter}: se recompraron ${repurchased} de las ${sold} uds vendidas.`,
+        `${source}: se recompraron ${repurchased} de las ${sold} uds vendidas.`,
       ownDeferredReason: (share: string, amount: string): string =>
         `El ${share} de la pérdida (${amount}) no computa este año: queda diferida en las uds recompradas y se integrará cuando se vendan.`,
       minorDeferralReason: (share: string, cent: string): string =>
@@ -1459,13 +1540,18 @@ export const es = {
         `Las uds vendidas traían pérdida diferida de ventas anteriores; ${amount} pasa a las nuevas uds recompradas, aunque esta venta sea con ganancia. La ganancia propia no se bloquea.`,
       windowOpenReason: (date: string): string =>
         `Ventana de recompra abierta hasta el ${date}: una compra del mismo activo hasta ese día todavía puede diferir esta pérdida, así que la cifra del año puede cambiar.`,
-      unlistedReason: (date: string): string =>
-        `Criptomoneda vendida antes de 2025: la regla de recompra de criptoactivos (Art. 43.i) rige para las transmisiones desde el 1 de enero de 2025, así que la pérdida computa entera. Hay una nueva compra el ${date}; parte de la doctrina aplicaría la regla de recompra en el año siguiente. No está resuelto y no cambia ninguna cifra.`,
+      unlistedReason: {
+        bizkaia: (date: string): string =>
+          `Criptomoneda vendida antes de 2025: la regla de recompra de criptoactivos (Art. 43.i) rige para las transmisiones desde el 1 de enero de 2025, así que la pérdida computa entera. Hay una nueva compra el ${date}; parte de la doctrina aplicaría la regla de recompra en el año siguiente. No está resuelto y no cambia ninguna cifra.`,
+        comun: (date: string): string =>
+          `Criptomoneda vendida con pérdida y comprada de nuevo el ${date}. En régimen común no hay regla de recompra específica para criptoactivos. Podría aplicarse el art. 33.5.e (recompra del mismo activo en el año siguiente), pero la DGT no lo ha resuelto. Quoin no difiere la pérdida: computa entera.`,
+      } satisfies Record<Territory, (date: string) => string>,
       breakdown: {
         title: {
-          g: "Recompra de valores homogéneos (Art. 43.g)",
-          i: "Recompra de criptoactivos del mismo tipo (Art. 43.i)",
-        } satisfies Record<RepurchaseLetter, string>,
+          "listed-security": "Recompra de valores homogéneos",
+          "fungible-crypto": "Recompra de criptoactivos del mismo tipo",
+          unclassified: "Recompra",
+        } satisfies Record<RepurchaseAssetClass, string>,
         before: (months: number): string =>
           `Adquiridas en los ${months} meses anteriores`,
         remainingAfter: "Posición que queda tras la venta",
@@ -1485,8 +1571,8 @@ export const es = {
         },
       },
       integrationsTitle: "Pérdidas diferidas que se integran este año",
-      integrationsBody:
-        "Se vendieron las uds recompradas sin nueva recompra en su ventana, así que la pérdida diferida computa ahora, como línea aparte del resultado de la venta (Art. 43).",
+      integrationsBody: (citation: string): string =>
+        `Se vendieron las uds recompradas sin nueva recompra en su ventana, así que la pérdida diferida computa ahora, como línea aparte del resultado de la venta (${citation}).`,
       integrationsColumns: {
         t: "Venta",
         name: "Instrumento",
@@ -1495,8 +1581,8 @@ export const es = {
       },
       pendingTitle: (year: number): string =>
         `Pérdidas diferidas pendientes a 31 de diciembre de ${year}`,
-      pendingBody:
-        "Siguen ligadas a uds en cartera. No cuentan en ningún año hasta que esas uds se vendan sin nueva recompra (Art. 43).",
+      pendingBody: (citation: string): string =>
+        `Siguen ligadas a uds en cartera. No cuentan en ningún año hasta que esas uds se vendan sin nueva recompra (${citation}).`,
       pendingGroupColumns: {
         saleDate: "Venta del",
         name: "Instrumento",
@@ -1513,19 +1599,42 @@ export const es = {
       empty: {
         title: "Sin ventas en este año",
         body: "Elige otro año fiscal en el desplegable.",
+        incomeBody:
+          "Este año no tiene ventas, pero sí rendimientos: sus cifras están en el resumen y más abajo.",
+      },
+      savingsIncome: {
+        title: "Rendimientos del capital mobiliario",
+        body: {
+          bizkaia:
+            "Intereses y dividendos cobrados en efectivo, y el saveback de Trade Republic, que el bróker declara como rendimiento de cuenta. Importes en bruto. Se compensan solo entre sí, y un saldo negativo se arrastra a los años siguientes (Art. 66.1.a).",
+          comun:
+            "Intereses y dividendos cobrados en efectivo, y el saveback de Trade Republic, que el bróker declara como rendimiento de cuenta. Importes en bruto. Un saldo negativo compensa las ganancias patrimoniales hasta el 25 % de su saldo positivo, y lo que quede se arrastra a los años siguientes (art. 49.1.a).",
+        } satisfies Record<Territory, string>,
+        count: "Cobros",
+        gross: "Bruto del año",
+        exempt: "Dividendos exentos",
+        decemberInterest:
+          "Los intereses de diciembre se cobran el 1 de enero y cuentan para este año.",
+        exemptNote: (source: string, limit: string) =>
+          `Los dividendos de acciones están exentos hasta ${limit} al año; los de ETF y fondos, no (${source}). Salen del saldo, pero sus retenciones siguen en las registradas. No se comprueba la regla de los dos meses.`,
+        finalNet: "Saldo tras el arrastre",
       },
       inKind: {
         title: "Ingresos en especie",
-        body: "Recompensas de Kraken y saveback de Trade Republic recibidos en participaciones. Clasificación fiscal pendiente de verificar: no se suman a ninguna cifra de esta vista.",
+        body: "Ingresos recibidos en participaciones que no entran en la bolsa de rendimientos (como las recompensas de cripto). Clasificación fiscal pendiente de verificar: no se suman a ninguna cifra de esta vista.",
         count: "Recepciones",
         gross: "Valor al recibirlas",
         withheld: "Retenido",
       },
-      carryforwardTitle: "Arrastre de pérdidas, últimos 4 años (Art. 66)",
+      carryforwardTitle: (years: number, citation: string) =>
+        `Arrastre de pérdidas patrimoniales, últimos ${years} años (${citation})`,
       carryforwardColumns: {
         year: "Año",
         ownNet: "Neto propio",
         consumedFromCarryforward: "Consumido del arrastre",
+        crossOffset: "Cruce del año con rendimientos",
+        absorbedFromOther: "Pendiente de rendimientos absorbido",
+        crossedToOther: "Pendiente compensado con rendimientos",
         finalNet: "Neto final",
         pendingLossRemaining: "Pérdida pendiente",
       },
@@ -1579,7 +1688,7 @@ export const es = {
     },
     gaps: (n: Omit<ExcludedNotice, "day">): string => {
       const one = n.count === 1;
-      return `${n.count} ${one ? "compra cae" : "compras caen"} en un hueco de más de una semana sin cierres de ${n.symbol} (${n.amount}). No ${one ? "compra" : "compran"} nada en el contrafactual. ${one ? "Sigue" : "Siguen"} contando en la cartera real, así que el diferencial la favorece en esa medida. Abre ${n.symbol} en ${n.instruments} y pulsa «${n.redownload}». Si el hueco sigue, Yahoo no tiene esas sesiones.`;
+      return `${n.count} ${one ? "compra cae" : "compras caen"} en un hueco de más de una semana sin cierres de ${n.symbol} (${n.amount}). No ${one ? "compra" : "compran"} nada en el contrafactual. ${one ? "Sigue" : "Siguen"} contando en la cartera real, así que el diferencial la favorece en esa medida. Abre ${n.symbol} en ${n.instruments} y pulsa «${n.redownload}». Si el hueco sigue, la fuente no tiene esas sesiones.`;
     },
     unpriced: (names: string): string =>
       `Sin precio utilizable: ${names}. Se excluyen de los dos lados, porque contar su coste sin su valor inventaría una pérdida.`,

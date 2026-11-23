@@ -71,7 +71,7 @@ export async function importSync(
   options: {
     dryRun: boolean;
     resolutions?: Resolutions;
-    beforeApply?: () => void;
+    beforeApply?: (residence: string) => void;
   },
 ): Promise<ImportResult> {
   const store = new SqliteSyncStore();

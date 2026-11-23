@@ -1,11 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { Money, type LedgerEvent, type TradeEvent } from "../domain";
-import {
-  SWAP_VALUATION_RULES,
-  swapValuationRuleFor,
-  type SwapValuationRule,
-} from "../tax/config";
+import { swapValuationRuleFor, type SwapValuationRule } from "../tax/config";
+import { territoryRules } from "../tax/territory";
 
 import { swapPairValue, tradeAmounts } from "./values";
 import { jurisdictionOf } from "~/core/tax";
@@ -13,7 +10,7 @@ import { jurisdictionOf } from "~/core/tax";
 const BIZKAIA = jurisdictionOf("bizkaia");
 
 const eur = Money.fromString;
-const RULE = SWAP_VALUATION_RULES[0]!;
+const RULE = territoryRules("bizkaia").swapValuation[0]!;
 
 function leg(
   type: "BUY" | "SELL",
@@ -118,7 +115,7 @@ describe("swapPairValue", () => {
 
 describe("swapValuationRuleFor", () => {
   const rules: SwapValuationRule[] = [
-    { territory: "bizkaia", from: "2025-01-01", to: "2026-12-31", source: "t" },
+    { from: "2025-01-01", to: "2026-12-31", source: "t" },
   ];
 
   it("is chosen by the Madrid day of the swap, both ends inclusive", () => {
@@ -187,7 +184,7 @@ describe("tradeAmounts", () => {
   it("keeps each leg at its own market value when no rule is in force that day", () => {
     const amountsOf = tradeAmounts([sell, buy], BIZKAIA, {
       rules: [
-        { territory: "bizkaia", from: "2030-01-01", to: null, source: "t" },
+        { from: "2030-01-01", to: null, source: "t" },
       ],
     });
     expect(amountsOf(sell).gross.toString()).toBe("480");

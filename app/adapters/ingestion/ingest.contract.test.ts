@@ -62,6 +62,32 @@ describe("ingest contract", () => {
     });
   });
 
+  it("accounts for every operation exactly once, with one error per failed operation", () => {
+    const summaries = contract.cases.flatMap((c) => {
+      const parsed = z
+        .object({
+          total: z.number(),
+          imported: z.number(),
+          completed: z.number(),
+          duplicates: z.number(),
+          discarded: z.record(z.string(), z.number()),
+          failed: z.number(),
+          errors: z.array(z.unknown()),
+        })
+        .safeParse(c.expect);
+      return parsed.success ? [{ name: c.name, ...parsed.data }] : [];
+    });
+    expect(summaries.length).toBeGreaterThan(0);
+    for (const s of summaries) {
+      const discarded = Object.values(s.discarded).reduce((a, n) => a + n, 0);
+      expect(
+        s.imported + s.completed + s.duplicates + discarded + s.failed,
+        s.name,
+      ).toBe(s.total);
+      expect(s.failed, s.name).toBe(s.errors.length);
+    }
+  });
+
   it("covers every way a file is refused and every row error", () => {
     const outcomes = contract.cases.map((c) =>
       z

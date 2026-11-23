@@ -11,15 +11,23 @@ import { dayOf, fiscalYearOf, toIsoDate } from "~/core/calendar";
 import { Money, isInKind, type DividendEvent } from "~/core/domain";
 import { baseOf, bookable, unconvertibleInstrumentIds } from "~/core/fx";
 import {
-  carryforwardFrom,
+  carryforwardPools,
   computeSavingsQuota,
   computeTaxHistory,
+  gainsNetOf,
   getTaxScale,
+  incomeYearOf,
+  isSavingsIncome,
+  savingsIncomeCountOf,
+  savingsIncomeOf,
   taxYearOf,
-  type CarryforwardStep,
+  territoryRules,
+  withholdingsOf,
+  type DividendExemption,
+  type PoolStep,
+  type Withholdings,
   type RealizedGainDetail,
   type RepurchaseAssetClass,
-  type RepurchaseLetter,
   type TaxBracket,
   type Jurisdiction,
   type TaxOptions,
@@ -33,8 +41,12 @@ function isSellTrade(event: LedgerEvent): event is TradeEvent {
   return event.type === "SELL";
 }
 
+function isDividendOrInterest(event: LedgerEvent): boolean {
+  return isSavingsIncome(event) || isInKindIncome(event);
+}
+
 function isInKindIncome(event: LedgerEvent): event is DividendEvent {
-  return event.type === "DIVIDEND" && isInKind(event);
+  return event.type === "DIVIDEND" && isInKind(event) && !isSavingsIncome(event);
 }
 
 export function taxExclusions(
@@ -68,8 +80,10 @@ export function listTaxYears(
 ): number[] {
   const years = new Set(
     events
-      .filter((e) => isSellTrade(e) || isInKindIncome(e))
-      .map((e) => fiscalYearOf(e.ts, zone)),
+      .filter((e) => isSellTrade(e) || isDividendOrInterest(e))
+      .map((e) =>
+        isSavingsIncome(e) ? incomeYearOf(e, zone) : fiscalYearOf(e.ts, zone),
+      ),
   );
   return [...years].sort((a, b) => b - a);
 }
@@ -157,7 +171,8 @@ export interface TaxRecipientRow {
 }
 
 export interface TaxWashSaleRow {
-  letter: RepurchaseLetter;
+  source: string;
+  assetClass: RepurchaseAssetClass;
   windowMonths: number;
   before: string;
   remainingAfter: string;
@@ -270,7 +285,18 @@ export function groupPendingBySale(
     );
 }
 
-export type TaxCarryforwardRow = CarryforwardStep;
+export type TaxCarryforwardRow = PoolStep;
+
+export interface TaxSavingsIncome {
+  count: number;
+  gross: string;
+  /** Dividends exempt under the territory's rule, already out of the pool. */
+  exempt: string;
+  /** The citation of that rule; null where the territory has none. */
+  exemptSource: string | null;
+  carryforward: TaxCarryforwardRow[];
+  finalNet: string;
+}
 
 export interface TaxInKindIncome {
   count: number;
@@ -300,6 +326,17 @@ export function inKindIncomeOf(
   };
 }
 
+/** Only an ETF is a fund here: Trade Republic stores funds as ETF. An instrument not on file is never exempt. */
+export function isCollectiveInvestment(
+  instruments: readonly Instrument[],
+): (instrumentId: string) => boolean {
+  const byId = new Map(instruments.map((i) => [i.id, i.type]));
+  return (id) => {
+    const type = byId.get(id);
+    return type === undefined || type === "ETF";
+  };
+}
+
 export interface TaxScaleView {
   source: string;
   brackets: TaxBracket[];
@@ -320,8 +357,13 @@ export interface TaxYearView {
   pendingSum: string;
   carryforward: TaxCarryforwardRow[];
   netSavingsBase: string;
+  savingsIncome: TaxSavingsIncome;
+  savingsBase: string;
   scale: TaxScaleView | null;
+  /** The year the applied scale starts in; earlier than `year` when no newer one is on file. */
+  scaleYear: number | null;
   quota: string | null;
+  withholdings: Withholdings;
   inKindIncome: TaxInKindIncome;
 }
 
@@ -370,12 +412,25 @@ export function buildTaxYearView(
     })),
   }));
 
-  const carry = carryforwardFrom(history, year);
+  const rules = territoryRules(result.territory);
+  const exemption: DividendExemption | null = rules.dividendExemption && {
+    rule: rules.dividendExemption,
+    isCollective: isCollectiveInvestment(instruments),
+  };
+  const incomeOf = savingsIncomeOf(events, jurisdiction.zone, exemption);
+  const {
+    pools: [gains, income],
+    savingsBase,
+  } = carryforwardPools(
+    [gainsNetOf(history), incomeOf.netOf],
+    year,
+    rules.lossCarryforwardYears,
+    rules.crossOffsetLimit,
+  );
   const scale = getTaxScale(result.territory, year);
-  const netBase = new Decimal(carry.netSavingsBase);
   const quota = scale
-    ? (netBase.gt(0)
-        ? computeSavingsQuota(Money.fromString(carry.netSavingsBase), scale)
+    ? (new Decimal(savingsBase).gt(0)
+        ? computeSavingsQuota(Money.fromString(savingsBase), scale)
         : Money.zero()
       ).toString()
     : null;
@@ -405,10 +460,21 @@ export function buildTaxYearView(
       pending.map((p) => p.amount),
       2,
     ),
-    carryforward: carry.steps,
-    netSavingsBase: carry.netSavingsBase,
+    carryforward: gains.steps,
+    netSavingsBase: gains.finalNet,
+    savingsIncome: {
+      count: savingsIncomeCountOf(events, year, jurisdiction.zone),
+      gross: incomeOf.grossOf(year).toFixed(2),
+      exempt: incomeOf.exemptOf(year).toFixed(2),
+      exemptSource: rules.dividendExemption?.source ?? null,
+      carryforward: income.steps,
+      finalNet: income.finalNet,
+    },
+    savingsBase,
     scale: scale ? { source: scale.source, brackets: scale.brackets } : null,
+    scaleYear: scale?.year ?? null,
     quota,
+    withholdings: withholdingsOf(events, year, jurisdiction.zone),
     inKindIncome: inKindIncomeOf(events, year, jurisdiction.zone),
   };
 }
@@ -443,7 +509,8 @@ function toSaleRow(
     nonComputable: gain.nonComputable,
     carriedOver: gain.carriedOver,
     washSale: gain.washSale && {
-      letter: gain.washSale.letter,
+      source: gain.washSale.source,
+      assetClass: gain.washSale.assetClass,
       windowMonths: gain.washSale.windowMonths,
       before: gain.washSale.before,
       remainingAfter: gain.washSale.remainingAfter,

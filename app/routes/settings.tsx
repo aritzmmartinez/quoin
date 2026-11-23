@@ -1,10 +1,12 @@
 import type { ReactNode } from "react";
 import {
   ArrowLeftRight,
+  Bitcoin,
   ChartLine,
   Coins,
   Gauge,
   Globe,
+  Landmark,
   Moon,
   Percent,
   TrendingUp,
@@ -12,10 +14,13 @@ import {
 
 import type { Route } from "./+types/settings";
 
+import { data } from "react-router";
+
 import {
   PrismaInstrumentRepository,
   PrismaLedgerRepository,
   PrismaPriceRepository,
+  PrismaSettingsRepository,
 } from "~/adapters/persistence";
 import {
   BenchmarkSetting,
@@ -25,11 +30,13 @@ import {
 } from "~/components";
 import { DevicesSection } from "~/components/settings/DevicesSection";
 import { ExternalDataSource } from "~/components/settings/ExternalDataSource";
+import { ResidenceSetting } from "~/components/settings/ResidenceSetting";
 import { SettingRow as Row } from "~/components/settings/SettingRow";
 import { useFxRefresh } from "~/components/settings/use-fx-refresh";
 import { useIpcRefresh } from "~/components/settings/use-ipc-refresh";
 import { usePriceRefresh } from "~/components/settings/use-price-refresh";
 import { Select } from "~/components/ui/Select";
+import { residenceSchema } from "~/core/domain";
 import {
   benchmarkCandidates,
   convertibleStarts,
@@ -60,7 +67,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   const cookie = request.headers.get("Cookie");
   const benchmark = parseBenchmark(cookie);
   const prices = new PrismaPriceRepository();
-  const [instruments, events, latest, { calendarZone }] = await Promise.all([
+  const [instruments, events, latest, { calendarZone, residence }] =
+    await Promise.all([
     new PrismaInstrumentRepository().list(),
     new PrismaLedgerRepository().list(),
     prices.latest(),
@@ -79,6 +87,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   ]);
 
   return {
+    residence,
     threshold: parseThreshold(cookie),
     benchmark,
     candidates: benchmarkCandidates(
@@ -91,6 +100,19 @@ export async function loader({ request }: Route.LoaderArgs) {
   };
 }
 
+export async function action({ request }: Route.ActionArgs) {
+  const form = await request.formData();
+  if (form.get("intent") !== "residence") {
+    throw data({ error: "unknown-intent" }, { status: 400 });
+  }
+  const parsed = residenceSchema.safeParse(form.get("residence"));
+  if (!parsed.success) {
+    throw data({ error: "unknown-residence" }, { status: 400 });
+  }
+  await new PrismaSettingsRepository().setResidence(parsed.data);
+  return { ok: true };
+}
+
 const CURRENCIES = [
   { value: "EUR", label: "EUR", desc: "Euro" },
   { value: "USD", label: "USD", desc: "Dólar estadounidense" },
@@ -99,11 +121,19 @@ const CURRENCIES = [
 ] as const;
 
 export default function Settings({ loaderData }: Route.ComponentProps) {
-  const { threshold, benchmark, candidates, external, devices } = loaderData;
+  const { residence, threshold, benchmark, candidates, external, devices } =
+    loaderData;
   const t = useCopy();
   const s = t.settings;
   const d = s.externalData;
-  const prices = usePriceRefresh(external.syncTargets, external.unmapped);
+  const prices = usePriceRefresh(
+    external.prices.YAHOO.syncTargets,
+    external.unmapped,
+  );
+  const cryptoPrices = usePriceRefresh(external.prices.KRAKEN.syncTargets, {
+    open: 0,
+    closed: 0,
+  });
   const inflation = useIpcRefresh();
   const rates = useFxRefresh();
 
@@ -139,6 +169,25 @@ export default function Settings({ loaderData }: Route.ComponentProps) {
         </Row>
       </Section>
 
+      <Section title={s.tax.title} desc={s.tax.desc}>
+        <Row
+          icon={Landmark}
+          label={s.tax.residence.label}
+          detail={
+            <>
+              <span className="text-[11px] text-muted">
+                {s.tax.residence.help}
+              </span>
+              <span className="text-[11px] text-muted">
+                {s.tax.residence.ceutaMelilla}
+              </span>
+            </>
+          }
+        >
+          <ResidenceSetting residence={residence} />
+        </Row>
+      </Section>
+
       <Section title={s.portfolio.title} desc={s.portfolio.desc}>
         <Row
           icon={Gauge}
@@ -161,9 +210,17 @@ export default function Settings({ loaderData }: Route.ComponentProps) {
           icon={ChartLine}
           label={d.prices.label}
           hint={d.prices.hint}
-          status={external.prices}
+          status={external.prices.YAHOO.status}
           refresh={prices.refresh}
           busy={prices.busy}
+        />
+        <ExternalDataSource
+          icon={Bitcoin}
+          label={d.cryptoPrices.label}
+          hint={d.cryptoPrices.hint}
+          status={external.prices.KRAKEN.status}
+          refresh={cryptoPrices.refresh}
+          busy={cryptoPrices.busy}
         />
         <ExternalDataSource
           icon={Percent}

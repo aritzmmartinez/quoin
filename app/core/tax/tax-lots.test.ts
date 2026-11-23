@@ -437,7 +437,7 @@ describe("computeTaxLots", () => {
 
     const result = year(events, 2026, ["BTC"]);
     const gain = result.gains[0]!;
-    expect(gain.washSale?.letter).toBe("i");
+    expect(gain.washSale?.assetClass).toBe("fungible-crypto");
     expect(gain.nonComputable).toBe("-10000");
     expect(gain.computablePnL).toBe("0");
     expect(gain.unlistedNotice).toBeNull();

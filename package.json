@@ -1,12 +1,12 @@
 {
   "name": "quoin",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "react-router build",
     "dev": "react-router dev",
-    "start": "react-router-serve ./build/server/index.js",
+    "start": "node scripts/serve.mjs",
     "typecheck": "react-router typegen && tsc",
     "lint": "eslint .",
     "db:generate": "prisma generate",

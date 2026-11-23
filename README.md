@@ -25,9 +25,9 @@ An open-source portfolio tracker: allocation analysis, true look-through exposur
 ---
 
 Quoin tracks a buy-and-hold portfolio (broad-index ETFs plus a few single
-names): allocation analysis, true look-through exposure, and support for the
-Bizkaia foral tax regime that off-the-shelf trackers ignore. It's not built
-for trading. It's built to understand a portfolio, and it doubles as a
+names): allocation analysis, true look-through exposure, and support for
+Spanish income tax, the Bizkaia foral regime and régimen común, that
+off-the-shelf trackers ignore. It's not built for trading. It's built to understand a portfolio, and it doubles as a
 learning project.
 
 ![Quoin — Summary screen](docs/summary_dark_en.png)
@@ -37,16 +37,17 @@ learning project.
 > canonical identity, not by name, so a holding counts once whether you bought
 > it directly or it arrived inside an index. Returns are time-weighted and
 > money-weighted, adjustable to today's purchasing power. Realised gains follow
-> the Bizkaia *foral* regime (FIFO, wash-sale rule, loss carryforward) as a
-> separate projection from the portfolio's average-cost view.
+> the tax residence's rules, Bizkaia *foral* or régimen común (FIFO, wash-sale rule, loss
+> carryforward, the savings base and its quota), as a separate projection from the
+> portfolio's average-cost view.
 
 ## Why
 
 Existing trackers do charts and dividends well, but none of them:
 
-- model the **Bizkaia *foral* IRPF rules** — FIFO by lot, the short-term repurchase
-  exclusion, four-year loss carryforward — as a capital-gains projection kept separate
-  from the portfolio's average-cost view;
+- model **Spanish IRPF, foral (Bizkaia) and común** — FIFO by lot, the short-term
+  repurchase exclusion, four-year loss carryforward, the savings base with its two pools —
+  as a projection kept separate from the portfolio's average-cost view;
 - compute **true look-through exposure** — your real single-name weight counting holdings
   inside each ETF, not just direct positions;
 - stay **local-first and self-hosted** with zero recurring cost, so the data you own
@@ -89,6 +90,15 @@ columns. Importing the same file again adds nothing.
   `data/backups/` inside the same volume, so copy them off it to protect against losing
   the volume: `docker cp quoin:/app/data/backups ./quoin-backups`.
 - **OpenFIGI key:** pass `-e OPENFIGI_API_KEY=…` to `docker run` if you have one.
+- **Opening it by a name other than localhost or an IP address**, a NAS's or a reverse
+  proxy's, needs `-e QUOIN_ALLOWED_HOSTS=…`: see
+  [Opening it from another machine](#opening-it-from-another-machine). `QUOIN_HOST` is not
+  needed in Docker: the image listens on every interface inside the container, and `-p`
+  decides what reaches it.
+- **Choose your tax residence** in **Settings → Tax** before you import, if it is not
+  Bizkaia: Bizkaia, Régimen común (mainland, Balearic Islands, Ceuta and Melilla) or
+  Canarias. It decides the tax rules and the zone every day and fiscal year is read in, and
+  changing it later recalculates nothing already stored.
 
 Everything else runs from the app's screens. Apart from `db-backup`, the CLI commands
 below are not in the image: with Docker, the wizard is the way to import.
@@ -109,7 +119,8 @@ volumes:
   quoin-data:
 ```
 
-To update, see *Updating* below.
+To open it by another name, add `environment:` with
+`- QUOIN_ALLOWED_HOSTS=nas.local` under the service. To update, see *Updating* below.
 
 ### From source
 
@@ -133,7 +144,7 @@ The same work, and everything around it, is also available from the command line
 ```bash
 pnpm ingest --broker=trade-republic path/to/export.csv   # CSV -> ledger (idempotent)
 pnpm ingest --broker=kraken path/to/ledgers.csv
-pnpm prices:map <ISIN> <SYMBOL> [range]   # set a Yahoo symbol (e.g. VWCE.DE) and replace the history
+pnpm prices:map <ISIN> <SYMBOL> [range]   # set a symbol (VWCE.DE on Yahoo, BTC/EUR on Kraken) and replace the history
 pnpm prices:sync                  # fill missing daily closes and store today’s quote, one price per day
 pnpm prices:backfill [ISIN] [1y|2y|5y|10y|max]   # daily price history (default 5y)
 pnpm prices:rebuild [ISIN]        # download every mapped history again, daily
@@ -172,6 +183,24 @@ the repo), so a public clone never discloses your holdings. A symbol quoted in a
 currency is accepted as long as the European Central Bank publishes reference rates for
 it, and is valued in euros at that rate. Use the exchange ticker, not the ISIN: Yahoo
 answers `<ISIN>.SG` with a current price but no daily history.
+
+Stocks and funds are priced by Yahoo Finance, crypto assets by Kraken's public market
+data (Market Data: Kraken). The symbol says which: a Kraken pair is written
+`BASE/QUOTE`, such as `BTC/EUR`, and a Yahoo symbol never has a `/`. The import wizard
+suggests the euro pair of each crypto asset, or the dollar pair where Kraken has none
+(`USDG/USD`, valued at the ECB rate). A crypto asset mapped to Yahoo before 0.17.0
+keeps its symbol until you change it in the Symbol column of **Instruments**, one at a
+time, or with `prices:map <CODE> <CODE>/EUR`. Each price request tells Kraken, like
+Yahoo, which pair you hold.
+
+Kraken serves only the last 720 daily candles, about two years. Changing a symbol to a
+Kraken pair replaces the whole history, so anything older is gone; later downloads of
+the same pair keep what is already stored. When an instrument's prices start after its
+first trade, nothing warns about it: today's value only needs the latest price and an
+instrument's own returns use its trade prices, but the charts carry the last trade
+price flat until the first close and then jump to it, the portfolio's time-weighted
+return books that jump on the first day with a close instead of across the gap, and a
+Kraken reward without a dollar value from that stretch cannot be valued on import.
 
 The opportunity-cost screen replays every contribution into a benchmark ETF, `VWCE.DE`
 by default. Pick another under *Benchmark index* in `/settings` — the list offers
@@ -215,11 +244,34 @@ pnpm run db:studio      # Prisma Studio (GUI to inspect the data)
 pnpm run db:backup      # VACUUM INTO data/backups/, keeping the last 30
 pnpm run db:seed        # synthetic portfolio -> the scratch database
 pnpm twr:explain        # audit the portfolio TWR chain link by link, worst first
-pnpm tax:explain        # replay the Bizkaia foral FIFO year by year against the real ledger
+pnpm tax:explain        # replay the residence's FIFO year by year, and the year's base and quota
 pnpm projection:converge    # how much the projected range moves between seeds, per simulation count
 pnpm test               # Vitest (pure domain / projection / mapper tests)
 pnpm run test:integration   # migrations against a temporary SQLite database
 ```
+
+### Opening it from another machine
+
+Quoin has no login, so by default it answers only on the machine it runs on.
+
+- **`pnpm start` listens on `127.0.0.1`.** Set `QUOIN_HOST` to listen elsewhere,
+  `QUOIN_HOST=0.0.0.0` for every interface. `HOST` is ignored, so one exported by your
+  shell cannot open it by accident. The image listens on every interface inside the
+  container, and `-p` decides what reaches it.
+- **Only localhost and IP addresses are answered.** Any other name in the address bar is
+  refused with a 403 unless it is listed in `QUOIN_ALLOWED_HOSTS`, separated by commas,
+  without a port: `QUOIN_ALLOWED_HOSTS=nas.local,quoin.example.org` (with Docker,
+  `-e QUOIN_ALLOWED_HOSTS=…`). This is what stops a page on another site that points its
+  own name at your computer from reading the portfolio.
+- **Behind a reverse proxy**, list the name the proxy sends in `Host`. That is the public
+  name with Caddy, or with nginx and `proxy_set_header Host $host`; nginx without it
+  sends the upstream's, such as `quoin`. A refused request is logged with the host it
+  carried, so the log says what to add.
+- **Changes are refused from any other site**, whatever the address: a page open in
+  another tab cannot write to Quoin.
+
+Exposing it on your network puts the portfolio, with no login, in front of everyone who
+can reach that address. It is your decision and your responsibility.
 
 ### Syncing with the phone
 
@@ -307,6 +359,14 @@ Then the same `docker run` as above, with the sync port if a phone is paired (se
   not start if that backup fails.
 - **Going back to an earlier version needs that backup.** An older image cannot open a
   database migrated by a newer one: see [Restoring a backup](#restoring-a-backup).
+- **Update the phone and every other computer that syncs with this one together.** A
+  device left on an older version keeps what it receives, but may not be able to read it
+  (a residence other than Bizkaia, a Kraken symbol) until it is updated too.
+- **A new tax residence applies from the moment it is saved.** Days already stored (when a
+  plan took effect, the day of each price, the rate each operation was booked at) keep the
+  old residence's zone; nothing is recalculated.
+- **Read the *Upgrading* notes** of each version you skip in the
+  [CHANGELOG](CHANGELOG.md).
 
 From source, pull the new version, then migrate:
 
@@ -426,6 +486,7 @@ on with decimal.js; data and secrets are never committed.
 - [x] Kraken: every asset against fiat, and swaps between crypto assets (0.14.0)
 - [x] Sync-ready: one calendar zone everywhere, and a merge engine between installations (0.15.0)
 - [x] Sync server: pair a phone by QR and sync over the local network (0.16.0)
+- [x] Régimen común and Canarias, savings income in the tax base, crypto prices from Kraken (0.17.0)
 - [ ] Mobile app
 
 ## License

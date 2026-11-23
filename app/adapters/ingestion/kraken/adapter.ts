@@ -85,7 +85,7 @@ export class KrakenCsvAdapter {
         instrument: row.asset || null,
       });
     }
-    const batch = builder.build(groups.size);
+    const batch = builder.build();
     return { ...batch, instruments: await this.keepNames(batch.instruments) };
   }
 

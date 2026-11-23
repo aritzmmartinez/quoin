@@ -67,7 +67,8 @@ ENV NODE_ENV=production \
     CHECKPOINT_DISABLE=1 \
     PRISMA_HIDE_UPDATE_MESSAGE=1 \
     DOTENV_QUIET=true \
-    QUOIN_RUNTIME=docker
+    QUOIN_RUNTIME=docker \
+    QUOIN_HOST=0.0.0.0
 
 WORKDIR /app
 COPY --from=prod-deps /app/node_modules ./node_modules
@@ -76,7 +77,7 @@ COPY --from=build /app/build ./build
 # script is shipped: the other CLI commands have a button in the app.
 COPY package.json prisma.config.ts ./
 COPY prisma ./prisma
-COPY scripts/db-backup.ts ./scripts/
+COPY scripts/db-backup.ts scripts/serve.mjs ./scripts/
 COPY scripts/lib/db-target.ts ./scripts/lib/
 COPY app/adapters/persistence/backup.ts app/adapters/persistence/backup-names.ts app/adapters/persistence/backup-verify.ts app/adapters/persistence/database-target.ts ./app/adapters/persistence/
 COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/
@@ -88,4 +89,4 @@ VOLUME /app/data
 EXPOSE 3000 3443
 
 ENTRYPOINT ["tini", "--", "docker-entrypoint.sh"]
-CMD ["node_modules/.bin/react-router-serve", "build/server/index.js"]
+CMD ["node", "scripts/serve.mjs"]

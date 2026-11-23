@@ -29,47 +29,48 @@ import {
   merge,
   SameDeviceError,
   UnknownResolutionError,
+  type MergePlan,
   type Resolution,
 } from "./merge";
 
 const SETTINGS = { residence: "bizkaia", residenceHlc: null };
 
-const expectedSchema = z.object({
-  apply: z
+const applySchema = z.object({
+  ledger: z
     .object({
-      ledger: z
-        .object({
-          insert: z.array(ledgerRowSchema).default([]),
-          markInKind: z.array(z.string()).default([]),
-        })
-        .prefault({}),
-      instruments: z
-        .object({
-          insert: z.array(instrumentRowSchema).default([]),
-          update: z
-            .array(
-              z.object({
-                id: z.string(),
-                patch: z.record(z.string(), z.unknown()),
-              }),
-            )
-            .default([]),
-        })
-        .prefault({}),
-      targets: z
-        .object({
-          insert: z.array(targetRowSchema).default([]),
-          delete: z.array(z.string()).default([]),
-        })
-        .prefault({}),
-      tombstones: z.array(tombstoneSchema).default([]),
-      holdings: z.array(holdingsBlockSchema).default([]),
-      identities: z.array(identityRowSchema).default([]),
-      settings: settingsRowSchema.partial().nullable().default(null),
-      restamp: z.array(z.unknown()).default([]),
-      peers: z.array(peerSchema).optional(),
+      insert: z.array(ledgerRowSchema).default([]),
+      markInKind: z.array(z.string()).default([]),
     })
     .prefault({}),
+  instruments: z
+    .object({
+      insert: z.array(instrumentRowSchema).default([]),
+      update: z
+        .array(
+          z.object({
+            id: z.string(),
+            patch: z.record(z.string(), z.unknown()),
+          }),
+        )
+        .default([]),
+    })
+    .prefault({}),
+  targets: z
+    .object({
+      insert: z.array(targetRowSchema).default([]),
+      delete: z.array(z.string()).default([]),
+    })
+    .prefault({}),
+  tombstones: z.array(tombstoneSchema).default([]),
+  holdings: z.array(holdingsBlockSchema).default([]),
+  identities: z.array(identityRowSchema).default([]),
+  settings: settingsRowSchema.partial().nullable().default(null),
+  restamp: z.array(z.unknown()).default([]),
+  peers: z.array(peerSchema).optional(),
+});
+
+const expectedSchema = z.object({
+  apply: applySchema.prefault({}),
   conflicts: z.array(z.unknown()).default([]),
   setAside: z.array(z.unknown()).default([]),
   error: z.literal("unknown-resolution").optional(),
@@ -84,6 +85,10 @@ const resolutionsSchema = z
     (value) => new Map(Object.entries(value)) as Map<string, Resolution>,
   );
 
+const stateSchema = syncStateSchema.extend({
+  settings: settingsRowSchema.default(SETTINGS),
+});
+
 const contract = loadContract(
   "sync",
   z.object({
@@ -93,9 +98,7 @@ const contract = loadContract(
       .array(
         z.object({
           name: z.string(),
-          local: syncStateSchema.extend({
-            settings: settingsRowSchema.default(SETTINGS),
-          }),
+          local: stateSchema,
           incoming: z.record(z.string(), z.unknown()),
           resolutions: resolutionsSchema,
           expected: expectedSchema,
@@ -110,23 +113,38 @@ const contract = loadContract(
             z.string(),
             z.object({
               lastHlc: z.string().nullable(),
-              state: syncStateSchema.extend({
-                settings: settingsRowSchema.default(SETTINGS),
-              }),
+              state: stateSchema,
             }),
           ),
           steps: z.array(
-            z.object({
-              from: z.string(),
-              to: z.string(),
-              nowMs: z.number(),
-              resolutions: resolutionsSchema,
-              status: z.enum(["conflicts", "applied", "up-to-date"]),
-              conflicts: z.array(z.string()).default([]),
-              setAside: z.array(z.string()).default([]),
-            }),
+            z.union([
+              z.object({
+                edit: z.string(),
+                nowMs: z.number(),
+                apply: applySchema,
+              }),
+              z.object({
+                from: z.string(),
+                to: z.string(),
+                nowMs: z.number(),
+                resolutions: resolutionsSchema,
+                status: z.enum(["conflicts", "applied", "up-to-date"]),
+                conflicts: z.array(z.string()).default([]),
+                setAside: z.array(z.string()).default([]),
+                apply: applySchema.optional(),
+              }),
+            ]),
           ),
-          converged: z.boolean(),
+          converged: z.boolean().optional(),
+          end: z
+            .record(
+              z.string(),
+              z.object({
+                setAside: z.record(z.string(), z.array(z.string())),
+                state: stateSchema,
+              }),
+            )
+            .optional(),
         }),
       )
       .min(1),
@@ -196,7 +214,7 @@ describe("sync contract", () => {
 
   describe.each(contract.scenarios)(
     "$name",
-    ({ devices, steps, converged }) => {
+    ({ devices, steps, converged, end }) => {
       it("goes through every step as on file", () => {
         const held = new Map<string, LocalDevice>(Object.entries(devices));
         const get = (id: string) => {
@@ -204,7 +222,23 @@ describe("sync contract", () => {
           if (!found) throw new Error(`No device ${id} in the scenario`);
           return found;
         };
+        const apart = new Map<string, Record<string, string[]>>();
         for (const [i, step] of steps.entries()) {
+          if ("edit" in step) {
+            const device = get(step.edit);
+            held.set(
+              step.edit,
+              applyPlan(
+                device,
+                {
+                  ...step.apply,
+                  peers: device.state.peers,
+                } as MergePlan["apply"],
+                step.nowMs,
+              ),
+            );
+            continue;
+          }
           const sent = exportDevice(get(step.from), step.nowMs);
           held.set(step.from, sent.device);
           const receiver = get(step.to);
@@ -217,6 +251,16 @@ describe("sync contract", () => {
             plan.setAside.map((row) => row.key),
             label,
           ).toEqual(step.setAside);
+          apart.set(step.to, {
+            ...apart.get(step.to),
+            [step.from]: plan.setAside.map((row) => row.key),
+          });
+          if (step.apply) {
+            const { peers, ...apply } = step.apply;
+            const { peers: planned, ...rest } = plan.apply;
+            expect(rest, label).toEqual(apply);
+            if (peers) expect(planned, label).toEqual(peers);
+          }
           if (plan.conflicts.length > 0) {
             expect("conflicts", label).toBe(step.status);
           } else if (!changesData(plan)) {
@@ -234,6 +278,17 @@ describe("sync contract", () => {
           const { deviceId: _d, peers: _p, ...rest } = state;
           return rest;
         };
+        if (end) {
+          expect([...held.keys()]).toEqual(Object.keys(end));
+          for (const [id, expected] of Object.entries(end)) {
+            expect(get(id).state, id).toEqual(expected.state);
+            expect(apart.get(id), id).toEqual(expected.setAside);
+          }
+        }
+        if (converged === undefined) {
+          if (!end) throw new Error("A scenario states converged or end");
+          return;
+        }
         const [first, second] = [...held.values()];
         if (!first || !second) throw new Error("A scenario needs two devices");
         if (converged) expect(userState(first)).toEqual(userState(second));

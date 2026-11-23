@@ -57,7 +57,7 @@ export interface SyncApiDeps {
   };
   pairing: PairingRegistry;
   throttle: AuthThrottle;
-  beforeApply: () => void;
+  beforeApply: (residence: string) => void;
   effects: {
     enqueue(deviceId: string, effects: readonly Effect[]): void;
     pending(): ReadonlySet<string>;

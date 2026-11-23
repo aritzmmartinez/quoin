@@ -18,9 +18,11 @@ import {
 } from "./tax-columns";
 
 export function PendingDeferralsCard({
+  citation,
   year,
   groups,
 }: {
+  citation: string;
   year: number;
   groups: readonly TaxPendingGroup[];
 }) {
@@ -30,7 +32,7 @@ export function PendingDeferralsCard({
     <Card>
       <div className="border-b border-border px-gutter py-4">
         <h2 className="text-[14px] font-semibold">{copy.pendingTitle(year)}</h2>
-        <p className="mt-1 text-[11.5px] text-muted">{copy.pendingBody}</p>
+        <p className="mt-1 text-[11.5px] text-muted">{copy.pendingBody(citation)}</p>
       </div>
       <div className={TABLE_SCROLL}>
         <div className={TAX_PENDING_MIN_WIDTH}>

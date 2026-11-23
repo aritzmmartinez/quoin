@@ -25,7 +25,10 @@ const MADRID = "Europe/Madrid";
 
 const day = (iso: string) => new Date(`${iso}T07:00:00.000Z`);
 
-const NO_RATES: EnsureRates = async () => ({ book: new Map(), unavailable: [] });
+const NO_RATES: EnsureRates = async () => ({
+  book: new Map(),
+  unavailable: [],
+});
 
 function fakeProvider(history: Record<string, Quote[]>): {
   provider: MarketDataProvider;
@@ -33,7 +36,7 @@ function fakeProvider(history: Record<string, Quote[]>): {
 } {
   const asked: string[] = [];
   const provider: MarketDataProvider = {
-    source: "FAKE",
+    sourceOf: () => "FAKE",
     getQuote: async () => null,
     getHistory: async (symbol: string, _range: HistoryRange) => {
       asked.push(symbol);
@@ -116,7 +119,13 @@ describe("backfillInstruments", () => {
       asked.push(...needs);
       return {
         book: rateBookFrom([
-          { source: "ECB", base: "EUR", quote: "USD", day: "2026-01-05", rate: "1.1" },
+          {
+            source: "ECB",
+            base: "EUR",
+            quote: "USD",
+            day: "2026-01-05",
+            rate: "1.1",
+          },
         ]),
         unavailable: [],
       };
@@ -271,7 +280,10 @@ describe("backfillInstruments", () => {
       MADRID,
     );
 
-    expect(first).toMatchObject({ written: 0, unavailable: expect.stringContaining("429") });
+    expect(first).toMatchObject({
+      written: 0,
+      unavailable: expect.stringContaining("429"),
+    });
     expect(second).toMatchObject({ written: 1, unavailable: null });
   });
 
@@ -288,7 +300,11 @@ describe("backfillInstruments", () => {
       MADRID,
     );
 
-    expect(report).toMatchObject({ written: 0, first: null, unavailable: null });
+    expect(report).toMatchObject({
+      written: 0,
+      first: null,
+      unavailable: null,
+    });
   });
 });
 
@@ -302,8 +318,7 @@ describe("isHistoryRange", () => {
 
 describe("rangeCovering", () => {
   const now = new Date("2026-10-07T12:00:00.000Z");
-  const daysAgo = (days: number) =>
-    new Date(now.getTime() - days * 86_400_000);
+  const daysAgo = (days: number) => new Date(now.getTime() - days * 86_400_000);
 
   it("picks the smallest range that reaches the date with a week to spare", () => {
     expect(rangeCovering(daysAgo(30), now)).toBe("1y");
@@ -320,8 +335,7 @@ describe("rangeCovering", () => {
 
 describe("rangeSince", () => {
   const now = new Date("2026-10-07T12:00:00.000Z");
-  const daysAgo = (days: number) =>
-    new Date(now.getTime() - days * 86_400_000);
+  const daysAgo = (days: number) => new Date(now.getTime() - days * 86_400_000);
 
   it("never asks for less than the default range", () => {
     expect(rangeSince(daysAgo(30), now)).toBe("5y");

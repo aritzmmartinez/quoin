@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 
 import type { ImportSummary } from "~/adapters/ingestion";
 import { CsvFileError, decodeCsv } from "~/adapters/ingestion/decode";
+import { operationsToWrite } from "~/adapters/ingestion/ingest";
 import type {
   IngestPreview,
   PendingMapping,
@@ -69,7 +70,7 @@ export function IngestStepper({
     onStatusChange?.({
       imported: summary !== null,
       atDone: stage === "done",
-      importedCount: summary?.imported ?? 0,
+      importedCount: summary ? operationsToWrite(summary) : 0,
     });
   }, [summary, stage, onStatusChange]);
 
@@ -83,7 +84,7 @@ export function IngestStepper({
       setBusy(null);
       setError(
         error instanceof CsvFileError
-          ? fileErrorMessage(t, error)
+          ? fileErrorMessage(t, null, error)
           : copy.unreadable,
       );
       return;
@@ -225,6 +226,7 @@ export function IngestStepper({
 
         {stage === "done" && summary && (
           <DoneStep
+            broker={preview?.broker ?? null}
             summary={summary}
             fill={fill}
             unmapped={unmapped}

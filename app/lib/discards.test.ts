@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   describeRow,
   discardGroups,
-  discardTypeLabel,
   fileErrorMessage,
+  rowTypeLabel,
 } from "./discards";
 import { en } from "./i18n/en";
 import { es } from "./i18n/es";
@@ -74,22 +74,55 @@ describe("discardGroups", () => {
   });
 });
 
-describe("discardTypeLabel", () => {
+describe("rowTypeLabel", () => {
   it.each([
     [es, "BUY", "Compra"],
     [es, "DEPOSIT", "Ingreso"],
     [en, "BUY", "Buy"],
     [en, "DIVIDEND", "Dividend"],
   ])("labels a ledger type as Movements does", (copy, type, label) => {
-    expect(discardTypeLabel(copy, type)).toBe(label);
+    expect(rowTypeLabel(copy, null, type)).toBe(label);
+    expect(rowTypeLabel(copy, "trade-republic", type)).toBe(label);
   });
 
-  it.each(["receive", "staking", "BENEFITS_SAVEBACK", "toString"])(
-    "keeps a broker's own type %s as it came",
-    (type) => {
-      expect(discardTypeLabel(es, type)).toBe(type);
+  it.each([
+    [es, "trade-republic", "BENEFITS_SAVEBACK", "Saveback"],
+    [en, "trade-republic", "CARD_TRANSACTION", "Card payment"],
+    [es, "kraken", "receive", "Recepción"],
+    [en, "kraken", "hybridearnwithdrawal", "Earn withdrawal"],
+  ] as const)(
+    "labels a broker's own type through that broker's map",
+    (copy, broker, type, label) => {
+      expect(rowTypeLabel(copy, broker, type)).toBe(label);
     },
   );
+
+  it("never reads one broker's code through another broker's map", () => {
+    expect(rowTypeLabel(es, "kraken", "BENEFITS_SAVEBACK")).toBe(
+      "BENEFITS_SAVEBACK",
+    );
+    expect(rowTypeLabel(es, "trade-republic", "deposit")).toBe("deposit");
+    expect(rowTypeLabel(es, null, "receive")).toBe("receive");
+  });
+
+  it.each(["staking", "SOMETHING_NEW", "toString", "hasOwnProperty"])(
+    "keeps a type it does not know, %s, as it came",
+    (type) => {
+      expect(rowTypeLabel(es, "kraken", type)).toBe(type);
+      expect(rowTypeLabel(es, "trade-republic", type)).toBe(type);
+    },
+  );
+
+  it("names a row with an error by the same label", () => {
+    expect(
+      describeRow(es, "trade-republic", {
+        externalId: "s1",
+        position: null,
+        date: "2025-12-01T08:00:00Z",
+        type: "BENEFITS_SAVEBACK",
+      }),
+    ).toBe("Saveback · 2025-12-01T08:00:00Z · s1");
+  });
 });
 
 describe("a row-level warning", () => {
@@ -110,26 +143,34 @@ describe("a row-level warning", () => {
 describe("describeRow", () => {
   it("names a row by its type, date and id, or by its position when it has no id", () => {
     const row = { date: "2025-01-04T10:00:00Z", type: "BUY" };
-    expect(describeRow(en, { ...row, externalId: "t1", position: null })).toBe(
-      "Buy · 2025-01-04T10:00:00Z · t1",
-    );
-    expect(describeRow(es, { ...row, externalId: null, position: 4 })).toBe(
-      "Compra · 2025-01-04T10:00:00Z · fila 4",
-    );
+    expect(
+      describeRow(en, "trade-republic", {
+        ...row,
+        externalId: "t1",
+        position: null,
+      }),
+    ).toBe("Buy · 2025-01-04T10:00:00Z · t1");
+    expect(
+      describeRow(es, "trade-republic", {
+        ...row,
+        externalId: null,
+        position: 4,
+      }),
+    ).toBe("Compra · 2025-01-04T10:00:00Z · fila 4");
   });
 });
 
 describe("fileErrorMessage", () => {
   it("names the column, or the row and why it cannot be read", () => {
     expect(
-      fileErrorMessage(en, {
+      fileErrorMessage(en, null, {
         reason: "missing-column",
         column: "asset_class",
         row: null,
       }),
     ).toContain("asset_class");
     expect(
-      fileErrorMessage(en, {
+      fileErrorMessage(en, "kraken", {
         reason: "invalid-number",
         column: null,
         row: {
@@ -139,6 +180,6 @@ describe("fileErrorMessage", () => {
           type: "deposit",
         },
       }),
-    ).toContain("D1: Invalid number");
+    ).toContain("(Deposit · 2026-01-05 10:00:00 · D1: Invalid number)");
   });
 });

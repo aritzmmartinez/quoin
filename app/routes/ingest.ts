@@ -150,7 +150,7 @@ export async function action({ request }: Route.ActionArgs) {
     if (error instanceof IngestError) return fail(error.message);
     if (error instanceof MarketDataUnavailableError) {
       console.error(
-        "Yahoo could not be reached",
+        "The price source could not be reached",
         error.symbol,
         error.status,
         error.cause,

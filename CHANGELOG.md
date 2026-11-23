@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-11-23
+
+### Upgrading
+- Update the mobile app together with this computer, and every other computer that syncs with them, before you choose a residence other than Bizkaia. A device on an earlier version keeps the new residence when it arrives through a sync, but cannot read it, and asks to be updated until it is. The tax figures also change in this version (the savings income, the dividend exemption, the 2025 scale), so a phone left behind shows different ones.
+- Import Trade Republic files only after every device that syncs is updated. A device on an earlier version records the interest's tax withheld as 0, and the next sync sets that row aside.
+- If you open Quoin through a name other than localhost or an IP address (a NAS, a reverse proxy), add that name to `QUOIN_ALLOWED_HOSTS` before updating, or every request gets a 403. If you run `pnpm start` and open it from another machine, set `QUOIN_HOST`, because it now listens on 127.0.0.1 only. The Docker image is not affected.
+- Trade Republic interest imported before this version has no tax withheld recorded, so the year's withholdings leave it out. Importing the file again does not fill it in, because rows already in the ledger are not rewritten; the tax view says so in every year that has such interest.
+- Changing the residence recalculates nothing already stored. The day a plan version takes effect, the day each price was stored under and the exchange rate each operation was booked at stay as the old residence's zone set them; from then on, every screen reads the new zone and the new rules. Between Bizkaia or the mainland and the Canary Islands that is one hour, so it only shows near midnight. If you are not resident in Bizkaia, choose the residence in Settings → Tax before you import or record a plan; every database that already exists has Bizkaia.
+- Update every computer that syncs with this one before you change any crypto symbol to a Kraken pair. A computer still on 0.16.0 that receives `BTC/EUR` through a sync deletes that instrument's prices, as it does for any new symbol, and then asks Yahoo for them, which knows no such symbol: the crypto stays without a price on that computer until it is updated, and the first price refresh after that fills it in from Kraken. Nothing changes until you change a symbol: a crypto asset already mapped to Yahoo keeps being priced by Yahoo.
+- No migration in this version: the database opens as it is.
+
+### Régimen común and Canarias
+- Settings → Tax: a tax residence. Bizkaia keeps the foral rules; Régimen común covers the mainland, the Balearic Islands, Ceuta and Melilla; Canarias is régimen común on Canary time. Changing it changes the savings scale, the repurchase rule, the offsetting between pools, the dividend exemption, and the day and year each operation falls in. The Ceuta and Melilla deduction is not calculated, and Settings says so.
+- Realized, tax view in régimen común: the savings scale from 2025 (no quota for earlier years), the two-month repurchase rule for stocks and ETFs (Quoin does not know which market each security trades on, so it applies two months to all of them; a security listed only outside the EEA and the markets declared equivalent, the United States among them, would have one year), no repurchase rule for crypto (a loss rebought within a year computes whole and gets a notice, because whether art. 33.5.e applies is unsettled), swaps at the greater value and no dividend exemption.
+- Realized, tax view in régimen común: a negative balance in one pool offsets the other's positive balance up to 25 %, and so do earlier years' losses that their own pool cannot absorb, within the same yearly 25 %. The carryforward table shows those offsets.
+- Realized: the tax tab is named after the residence, and every article it cites comes from that territory's rules.
+- `pnpm tax:explain` follows the residence: it cites its rules, prints the zone, both savings pools, the base and the quota the tax view shows, instead of a quota over capital gains alone, and no longer attributes a crypto notice to assets not admitted to trading.
+
+### Savings income
+- Realized, tax view: interest and dividends paid in cash enter the savings base as income from movable capital, a pool of their own beside capital gains. In Bizkaia the two never compensate each other, and each carries a negative balance for four years. The quota now applies to the sum of their positive balances, so a year with interest or dividends shows a higher base and quota than before. A year with income and no sales shows it, instead of only pointing to another year.
+- Realized, tax view: in Bizkaia a stock's cash dividends are exempt up to 1500 € a year and leave the savings base; an ETF's or a fund's never are. The income block shows the exempt amount with its article, and their withholdings still count among those recorded. Shares bought in the two months before a dividend and sold in the two after lose the exemption, and Quoin does not check that yet.
+- Realized, tax view: Trade Republic interest counts for the month it was earned, as Trade Republic declares it: the interest paid on 1 January belongs to the year before. The current year says so in the income block.
+- Realized, tax view: Trade Republic's saveback counts as income from movable capital at its value on receipt, with its withholding, as Trade Republic declares it among bank accounts. It is not a dividend, so the exemption never reaches it, and it leaves the Income received in kind block. That block lists the income received in units that does not enter the income pool, such as crypto rewards, with the same generic text as the mobile app.
+- Realized, tax view: the year's recorded withholdings on that income, shown beside the quota and never subtracted from it, because they are payments on account of the whole income tax. Spanish and foreign withholdings are one figure.
+- Import: Trade Republic interest keeps the tax withheld on it, and Movements shows that interest net of it, as it already did for dividends.
+- Realized, tax view: Bizkaia's savings scale for 2025, Art. 76 as worded before NF 2/2025, so 2025 has a quota of its own. A scale stays in force until the next one: a year with no scale of its own takes the latest earlier one, and the citation says so and that the quota will change if a new scale is approved for that year. A year before the first scale still shows no quota.
+
+### Crypto prices from Kraken
+- Crypto prices from Kraken's public market data. A symbol written as a pair, `BTC/EUR`, is priced by Kraken; stocks and funds stay on Yahoo. The import wizard suggests the euro pair of each crypto asset, or the dollar pair where Kraken has no euro one (`USDG/USD`, valued at the ECB rate). To move a crypto asset already on Yahoo, change its symbol in the Symbol column of Instruments, or run `pnpm prices:map <CODE> <CODE>/EUR`. Kraken keeps only the last two years of daily closes, so the history before that is replaced too; the README lists what that means.
+- Settings: External data has a Crypto prices row, Market Data: Kraken, with its own refresh.
+- Instruments: downloading the history of a symbol again keeps the prices older than the first candle that arrives, instead of replacing everything. A source that reaches back less far, Kraken's two years or a Yahoo line whose history now starts later, no longer shortens what was stored. A new symbol still replaces the whole history.
+
+### Default category
+- Summary: the Allocation card classifies a stock as Stock and a crypto asset as Crypto when no exposure has been chosen for it, as the look-through already did. This replaces the rule that put every instrument without an exposure under Unclassified instead of inheriting the broker's type: that slice now measures only what the type cannot tell, the funds, which are what you have to classify. A category you choose always wins, and the automatic one is never saved or synced.
+- Instruments: an instrument with no exposure chosen shows the automatic one in the Exposure column, as Auto: Stock, or Unclassified when its type says nothing about what it holds. Choosing a category replaces it, and choosing the first option again goes back to it. The categories in that list are named in your language.
+
+### Security
+- A page open in the browser on another site can no longer send changes to Quoin: every request that writes is refused with a 403 when the browser says it comes from another site, and not only the ones to Devices (#141).
+- Quoin answers only requests addressed to localhost or to an IP address. Opening it through any other name, a NAS's or a reverse proxy's, needs that name in `QUOIN_ALLOWED_HOSTS`, separated by commas; without it the request gets a 403. This stops a page on another site that points its own name at your computer from reading the portfolio.
+- `pnpm start` listens on 127.0.0.1 by default, instead of every interface, and ignores `HOST`: set `QUOIN_HOST` to listen elsewhere, `QUOIN_HOST=0.0.0.0` for every interface. The Docker image still listens on every interface inside the container, and `-p` still decides what reaches it.
+- A dependency of Prisma's configuration loader, effect, is pinned to 3.22.5.
+
+### Fixed
+- Import: the summary counts operations in every figure, so its rows add up to the total. A Trade Republic saveback and the purchase it paid for were two in the total, and two set-aside or failed entries when the purchase could not be imported; they are one operation now, listed by the purchase with the saveback beneath it as the same operation.
+- Import: the summary names a row by its type in your language (Saveback, Card payment, Reward…) instead of the broker's own code, and a file with nothing that can be saved no longer says that every trade was already in the ledger.
+- Import: a purchase already in the ledger that only gains its missing saveback row is no longer counted as new. It is counted apart, as Completed, in a row the summary shows only when there is one.
+
 ## [0.16.0] - 2026-11-10
 
 ### Upgrading
@@ -529,7 +576,8 @@ fund holdings must be supplied as CSV rather than the Excel most issuers publish
 Design rationale lives beside the code it explains, in `docs/ARCHITECTURE.md` and in the
 commit history — not here.
 
-[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.16.0...HEAD
+[Unreleased]: https://github.com/aritzmmartinez/quoin/compare/v0.17.0...HEAD
+[0.17.0]: https://github.com/aritzmmartinez/quoin/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/aritzmmartinez/quoin/compare/v0.15.2...v0.16.0
 [0.15.2]: https://github.com/aritzmmartinez/quoin/compare/v0.15.1...v0.15.2
 [0.15.1]: https://github.com/aritzmmartinez/quoin/compare/v0.15.0...v0.15.1

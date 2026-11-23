@@ -79,7 +79,7 @@ pnpm projection:converge              # seed-to-seed spread of p10/p50/p90 at se
 pnpm projection:converge [--sims=1000,3000] [--seeds=8] [--horizon=240] [--contribution=…]
 pnpm twr:explain [--top=N]            # print the portfolio TWR chain, worst link first
 pnpm twr:explain --around=YYYY-MM-DD  # open one link: holdings and implied prices at both ends
-pnpm tax:explain [YYYY|--year=YYYY]   # replay the Bizkaia foral FIFO, lot by lot
+pnpm tax:explain [YYYY|--year=YYYY]   # replay the residence's FIFO, lot by lot, and the year's base
 pnpm sync:export <file>.quoin.json    # whole user state of DATABASE_URL, for another device
 pnpm sync:import <file> [--dry-run]   # merge an export into DATABASE_URL; backs the ledger up first
 ```
@@ -125,18 +125,24 @@ and nowhere else**: `dayOf`, `periodOf`, `fiscalYearOf`, `today(zone, now)`,
 piece of the contract with the mobile client, which must assign the same days.
 
 - **The zone comes from the residence setting, resolved in one place.** `Settings` has
-  one row (`CHECK id = 1`); `residence` (today only `bizkaia`) has no CHECK — the
+  one row (`CHECK id = 1`); `residence` (`bizkaia`, `comun`, `canarias`) has no CHECK — the
   vocabulary grows, `residenceSchema` validates at write. A value this version does not
   know can still arrive from a newer device through a sync, which stores it untouched so
   nothing is lost; its read throws `UnsupportedResidenceError`, and `loadResidence()`
   turns that into a 409 carrying `unsupported-residence`, because an `Error` reaches the
   browser sanitised and a code does not. Both boundaries then ask to update Quoin and
   never offer to reset to Bizkaia: the reset would sync back to that device. Core maps it two
-  ways, `territoryOfResidence` and `zoneOfResidence`, and they are separate because the
-  régimen común will be one territory in two zones (Canarias). `loadResidence()` is the
+  ways, `territoryOfResidence` and `zoneOfResidence`, and they are separate because
+  régimen común is one territory in two zones (`comun` in Madrid, `canarias` in
+  Atlantic/Canary). `loadResidence()` is the
   server's only reader: it yields the `Jurisdiction` (territory + zone, what AVCO, FIFO
   and the swap rule take), the **calendar zone** and the **display zone** — the same zone
   today, two decisions. The root loader hands both to the client.
+- **Changing the residence recalculates nothing stored.** It is set in Settings, synced like
+  any setting, and every read takes the new zone and rules. The days already written in
+  the old zone stay as they are: a plan's `activeFrom`, the day `saveDaily` grouped a
+  price under and the rate a ledger row was booked at. They are facts written once, and
+  rewriting them would move a frozen booked amount.
 - **`toCalendarDate` caches by `(zone, UTC minute)`, bounded LRU, from 1980.** Not by
   quarter-hour: offsets since 1980 are multiples of 15 minutes, but Goose Bay and St
   John's switched at 00:01 local until 2011 and Casey did in 2020–2022, so one UTC
@@ -166,15 +172,23 @@ piece of the contract with the mobile client, which must assign the same days.
   - `sync` — `merge`; its expectations are written by hand, never by running it.
   - `sync-prices` — what `POST /v1/prices` answers for one instrument (`answerPrices`).
   - `sync-pairing` — the six digit pairing code; its cases were worked out with openssl.
-  - `tax` — foral FIFO, Art. 43, deferred losses, carryforward, quota, and the figures of
-    `buildTaxYearView` (not `pendingBySale`: it breaks ties on names, by locale).
+  - `tax` — FIFO by residence (Bizkaia, común, Canarias), the repurchase rule, deferred
+    losses, carryforward, quota, and the figures of `buildTaxYearView` (not
+    `pendingBySale`: it breaks ties on names, by locale): both savings pools, the base
+    and the withholdings.
+  - `carryforward` — `carryforwardPool` and `carryforwardPools` as pure functions over
+    each year's net: carry, expiry and the cross limit.
   - `realized` — AVCO realised gains per sale.
   - `returns` — TWR, MWR/XIRR, `periodReturns`, range and hero changes.
   - `series` — cost line, value against invested, the portfolio merge, prices in euros.
   - `analysis` — opportunity cost, weighted TER, rebalance.
+  - `exposure-default` — the category an instrument is shown under: the user's, else
+    derived from `Instrument.type` (`effectiveExposure`), else none.
+  - `kraken` — Kraken's OHLC and Trades answers read into quotes, the pair suggested
+    for a crypto code and `quoteSourceOf`.
 
   Except `ingest`, `sync` and `sync-pairing`, results come from the core, and `byHand` figures in some
-  cases (a dotted path into `expect` for the last five), worked out by hand and checked
+  cases (a dotted path into `expect` for the last eight), worked out by hand and checked
   against the core, are what stop a regenerated file from blessing a regression.
   **Any sort whose ties could reach a contract states its tie-break**: Dart's `List.sort`
   is not stable, so an order left to the engine is one the mobile client cannot reproduce
@@ -266,10 +280,25 @@ This has caused misdirected generation more than once:
   good symbol. Callers keep going past one: sync reports `unavailable`, the wizard's fill
   and "Rebuild all histories" carry on and name it, `api/ingest` answers 503 and logs it.
   The port is `getQuote(symbol)`, one symbol, because no caller ever asked for two.
+  Kraken answers an unknown pair with a 200 and `EQuery:Unknown asset pair` or
+  `EQuery:Invalid asset pair` (measured 2026-11-21): empty; any other entry in `error`
+  throws, whatever the status.
+- **The symbol decides who prices it, in `quoteSourceOf` and nowhere else.** Yahoo never
+  uses «/»; a symbol with «/» is a Kraken pair, `BASE/QUOTE`, and its currency is what
+  follows the «/». `MarketDataRouter` switches over every `QuoteSource` exhaustively, and
+  a row is stored with `sourceOf(symbol)` (`KRAKEN`, `KRAKEN_LIVE`). Kraken was measured
+  on 2026-11-21: a daily candle is dated 00:00 UTC and carries the close of 24:00, like
+  Yahoo's, so `candleKnownAt` holds; the newest candle is the day still trading, and
+  anything after `result.last` is dropped; `since` older than 720 daily candles (about
+  two years) is ignored, so nothing earlier exists; Ticker has no time, so today's quote
+  is the last trade (`Trades?count=1`), dated by it. Kraken asks for about one public
+  request a second: one queue for the process leaves `KRAKEN_SPACING_MS` between them.
+  Its data may be fetched, not redistributed, and is credited as «Market Data: Kraken».
 - **Every request to a provider goes through `withTimeout` in `adapters/http`**, which
   bounds the whole request, body included, and fails it as that provider's unavailable
   error with the `TimeoutError` as `cause`. Each adapter has its own constant, set from a
-  measurement made on 2026-10-21: Yahoo 15 s (a `max` history 0.46–0.88 s), INE 20 s
+  measurement made on 2026-10-21: Yahoo 15 s (a `max` history 0.46–0.88 s), Kraken 15 s
+  (720 daily candles in 50–155 ms, 2026-11-21), INE 20 s
   (0.24–0.58 s), ECB 60 s (41–52 s for the whole history), OpenFIGI 30 s for ten jobs
   (7.4–8.6 s for ten large-cap ISINs) and 120 s for a hundred, which is extrapolated: no
   key was used to measure it. The timer is a `setTimeout`, not `AbortSignal.timeout`, so
@@ -340,8 +369,8 @@ This has caused misdirected generation more than once:
   information. "Day" is `dayOf` in `core/calendar`, in the calendar zone, like `periodOf`.
 - **Deleting an instrument's snapshots happens in two places, both atomic:** `saveDaily`
   above, and `PriceRepository.replaceHistory`. One transaction deletes the
-  instrument's rows (all of them, or only those at or before `keepAfter`), writes the new
-  ones and, if asked, sets `quoteSymbol`. A failed write rolls back the delete and the
+  instrument's rows (all of them, or only those at or before `keepAfter` and at or after
+  `keepBefore`), writes the new ones and, if asked, sets `quoteSymbol`. A failed write rolls back the delete and the
   symbol together — an integration test pins that. Two symbols' prices must never share
   a series, so a symbol change only ever goes through it.
 - **`replaceQuoteHistory` fetches everything before it writes anything.** Daily candles
@@ -352,7 +381,9 @@ This has caused misdirected generation more than once:
   kept only if fresh, in the history's own currency and newer than the last candle,
   because the newest daily candle can arrive without a close. If that quote is missing and the symbol is unchanged, rows newer than the last
   candle are kept (`keepAfter`), so `latest()` never moves back. On a symbol change it
-  may: the old rows belong to another security.
+  may: the old rows belong to another security. With the same symbol, rows older than
+  the first candle are kept too (`keepBefore`): Kraken reaches back two years, and a
+  rebuild must not cut a series to what the source still serves.
 - **A rate is used two ways, and `core/fx/rates.ts` keeps them apart.** `bookingRate`
   books a ledger row: the rate of its own TARGET day (`rateDayFor`, a weekend or closing
   day falls back to the last business day) or nothing, never an older one, because a
@@ -435,7 +466,9 @@ ledger while that rule is in force. Useful, but do not mistake it for a sandbox.
   `sync:import` and the sync server. A row-count mismatch is taken again once, because a
   write between `VACUUM INTO` and the count is not corruption; a failed
   `integrity_check` never is. Two snapshots in the same minute get `-01`…`-99`. The sync
-  server's go to `data/backups/sync/quoin-sync-YYYY-MM-DD.sqlite`, one per Madrid day,
+  server's go to `data/backups/sync/quoin-sync-YYYY-MM-DD.sqlite`, one per day in the
+  stored residence's zone (`backupZoneOf`; UTC for a residence this version does not
+  know, so the backup is never skipped),
   before the first apply that brings changes, keeping 14 in a window of their own so a
   phone's syncs never rotate out the 30 in `data/backups/`.
 - **Every script that opens the database calls `announceDatabase()` first**, on stderr:
@@ -489,6 +522,13 @@ the scripts only parse and print.
   `SyncPeer.seen`; news to the sender likewise against the peers list in the file. A taken
   value keeps its origin's mark — restamping it locally makes the next exchange an echo
   conflict. Both new, or neither new with different values (two NULL marks), is a conflict.
+- **Devices converge when they hold the same values, deletions and rows set aside; marks
+  may differ only on a field whose value is the same, on purpose.** `merge` skips a field
+  whose values agree, so after a `keep` on the phone the PC the kept value came from keeps
+  its own older mark while the others hold the phone's. That mark is its own and already
+  seen, so it decides nothing; do not "fix" it by adopting marks on equal values. The
+  three-device scenarios in `test/contract/sync.json` pin it through `end`, each device's
+  whole final state, and a row is set aside only against a peer whose version differs.
 - **Copying the `.sqlite` copies `SyncDevice.deviceId`**, and an import refuses a file
   carrying its own id. Restore a backup on another machine and it is the same device.
 - **An open conflict writes nothing; a resolved one applies the whole plan.** Every
@@ -569,10 +609,33 @@ every dependency injected.
   phone would download everything every day. Anything new that deletes or rewrites old
   `PriceSnapshot` rows changes it too. The first request assigns one in the sync's
   transaction; it never travels in an exchange.
-- **`/api/devices` refuses `Sec-Fetch-Site: cross-site`**: approving a phone is not
-  something another site may do. It is a resource route, polled while a pairing is open
-  and every 15 s for the list, because revalidating Settings reloads its prices and
-  ledger. Its lists are built field by field, so a token's hash never reaches the browser.
+- **`/api/devices` is a resource route**, polled while a pairing is open and every 15 s
+  for the list, because revalidating Settings reloads its prices and ledger. Its lists
+  are built field by field, so a token's hash never reaches the browser. Cross-site
+  requests are refused by the request guard, like every other write.
+
+## Request guard
+
+The web UI has no login, so every request goes through one check: `decideRequest`
+(`app/lib/request-guard.ts`, pure), run by the `middleware` in `root.tsx`. It covers
+documents, `.data` requests and resource routes; static assets and `/__manifest` carry
+no data. A refusal is a 403 `{ error: "forbidden-host" | "cross-site" }` and a
+`Refused request` log line naming the host. Never copy the check into a route.
+
+- **The Host header decides, on every method, reads included.** DNS rebinding makes
+  `evil.com` same-origin for the browser, so `Sec-Fetch-Site` cannot see it; only `Host`
+  does. Allowed: `localhost`, any IP literal (rebinding needs a name), and the names in
+  `QUOIN_ALLOWED_HOSTS`. The port is ignored: it varies legitimately (`-p 8080:3000`,
+  5173) and an attacker gains nothing from it. No normalisation: `localhost.` is refused.
+  Read the header itself, never `request.url`'s host or `X-Forwarded-Host`, which a
+  same-origin page can set.
+- **A write refuses `Sec-Fetch-Site` `cross-site` and `same-site`**: on localhost every
+  port is the same site. Without the header, an `Origin` must match `Host`; with neither
+  (curl), it passes.
+- **`pnpm start` is `scripts/serve.mjs`**, which sets `HOST` from `QUOIN_HOST` (default
+  `127.0.0.1`) and runs `react-router-serve`. An inherited `HOST` is overwritten on
+  purpose: a shell's own would expose the UI without anyone choosing it. The image sets
+  `QUOIN_HOST=0.0.0.0` and runs the same file.
 
 ## Privacy and the no-clobber rule
 
@@ -647,6 +710,12 @@ picks up that currency's moves), and always sanity-check the price magnitude.
 - **What cannot be decomposed is reported, not spread.** A fund with no holdings data
   resolves to a single `UNRESOLVED` leaf carrying its own value. Pro-rating it across the
   known leaves would invent a concentration that isn't there. Same rule as `unpricedCount`.
+- **The category shown is `effectiveExposure`, derived at read and never written.** The
+  user's `exposureKind` wins; with none, `STOCK` is `COMPANY` and `CRYPTO` is `CRYPTO`
+  (stablecoins too: Kraken's `subclass` is not stored); any other type stays unclassified.
+  Distribution, look-through and Instruments read it; the sync, the write paths and the
+  Instruments select carry only the user's. Never store the derived one in `exposureKind`:
+  it would sync as a choice and outrank a later decision on another device.
 - **`Instrument.type` cannot classify a fund.** Trade Republic maps both `FUND` and
   `SYNTHETIC` to `"ETF"`, so a physical-gold ETC is stored as an ETF and is
   indistinguishable from an index fund. The information is not in the CSV — a human sets it
@@ -1098,7 +1167,23 @@ manual aliasing was abandoned — 726 confirmations is not a system.
 
 ## Fiscal
 
-Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never régimen común.
+Two territories, chosen by the residence: the **Bizkaia foral regime** (NF 13/2013) and
+**régimen común** (Ley 35/2006, LIRPF), which covers the peninsula, the Balearic Islands,
+Ceuta, Melilla and, in its own zone, the Canary Islands. There is no autonomous community:
+the savings scale does not depend on one. Every rule, citation and text that differs
+between them comes from `TerritoryRules` (`citations` for what the screens and
+`tax:explain` cite) or from a `Record<Territory, …>` in the copy, never from an
+`if (territory === …)`. A repurchase is cited by its rule's `source`, never by its letter:
+`g` is two months in Bizkaia and one year in común.
+
+- **Régimen común, as modelled.** Scale of arts. 66.1 and 76 LIRPF from 2025 (none
+  before; art. 76 alone is the regional half). Repurchase: art. 33.5.f, two months, for
+  STOCK and ETF; letter g gives one year to securities not admitted to trading, and Quoin
+  does not know the market, so it never applies it. Crypto has no repurchase rule: FIFO
+  per asset (DGT V1604-18, V0975-22), the loss computes whole, and a repurchase within a
+  year raises the notice for art. 33.5.e, unsettled by the DGT. Swaps at the greater value
+  (art. 37.1.h, V0999-18). No dividend exemption. The Ceuta and Melilla deduction (art.
+  68.4) is not calculated, and Settings says so.
 
 - **Never cite an NF 13/2013 article number without a verifiable source for it.** Two
   were fabricated during initial development (`Art. 47.2` for the wash-sale rule, `Art.
@@ -1145,16 +1230,64 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
   `compareTrades` (`core/domain/ledger.ts`) drives `walkFifo`, the rule, AVCO, the cost
   line, an instrument's TWR and the opportunity cost; the repository's `orderBy` sorts by
   `ts` alone and SQLite breaks ties however it likes. Before/after a sale is by instant, never by
-  calendar day — the window itself is Madrid calendar days (`washSaleWindow`).
+  calendar day — the window itself is calendar days in the residence's zone (`washSaleWindow`).
 - **Nothing FIFO is persisted, and it is one pass.** `computeTaxHistory` walks the whole
   ledger once — a deferred loss can compute years after the sale that created it — and
-  `taxYearOf` / `carryforwardFrom` are views over it. No lot table, no stored deferral, no
-  carryforward countdown. A deferred loss counts in the year it computes, so the four-year
-  window of Art. 66 starts there; restricting the walk to `[targetYear − 4, targetYear]` is
-  still what enforces expiry.
-- **`TAX_SCALES` is keyed by `(territory, year)`.** A year not on file returns `null` from
-  `getTaxScale` and the screen states the absence — never fall back to the nearest year's
-  brackets. A rate is data; a superseded scale is a wrong number that looks right.
+  `taxYearOf` and the two pools of `carryforwardPools` are views over it. No lot table, no stored deferral, no
+  carryforward countdown. A deferred loss counts in the year it computes, so its
+  carryforward window starts there; restricting the walk to
+  `[targetYear − lossCarryforwardYears, targetYear]` (`TerritoryRules`; 4 in both, Art. 66
+  NF 13/2013 and art. 49 LIRPF)
+  is still what enforces expiry.
+- **Everything the tax engine reads per territory is one `TerritoryRules`**
+  (`core/tax/territory.ts`, `satisfies Record<Territory, …>`): savings scales, repurchase
+  rules, swap valuation, carryforward years, the cross-pool offset limit and the unlisted
+  notice. A scale applies from its year until the next one on file: `getTaxScale` returns
+  the latest whose year is not after the one asked, so a scale with no end date (the NF
+  2/2025 one, from 2026) covers the years after it. A year before the first scale returns
+  `null` and the screen states the absence — a scale never reaches back. When a territory
+  publishes a new scale it must be added here the same day: until then the old one is
+  applied, and a superseded scale is a wrong number that looks right. The tax view says
+  so beside the citation whenever the scale starts before the year shown (`scaleYear`,
+  compared in the web view only; the contract carries no such field).
+- **The savings base has two pools, carried forward together** (`carryforwardPools`):
+  capital gains and income from movable capital — interest and cash dividends, gross in
+  euros (`savingsIncomeOf`), plus Trade Republic's saveback (below); other in-kind income
+  stays out. Each carries its own losses for
+  `lossCarryforwardYears`. Each year, in order: a pool's negative balance offsets the
+  other's positive one up to `crossOffsetLimit` of it; each positive remainder absorbs its
+  own pool's pending losses without limit; then what one pool still has pending offsets
+  what the other has left, within the same limit, which is one per year and receiving pool,
+  over its positive own net (art. 49 LIRPF and the AEAT manual). The limit is 0 in Bizkaia
+  (Art. 66.1), which keeps the pools apart, and 0.25 in común. The base adds the positive
+  final balances and the quota applies to it. One walk, `consumePending`, serves both
+  steps; `carryforwardPool` is it with an empty second pool. The tax view, its table,
+  `tax.json` and `tax:explain` all read the gains pool of that walk, never a gains-only
+  walk, which in común would disagree. Bonds never reach the ledger (Trade Republic sets
+  them aside), so nothing yet produces negative income: the `carryforward` contract pins
+  that branch.
+- **Trade Republic interest counts on the day before its payment** (`incomeYearOf`, in the
+  residence's zone):
+  TR pays on the 1st the interest of the month before and declares it in that month, so a
+  payment on 1 January belongs to the year before. A rule of the tax calculation, by
+  `source` (`TRADE_REPUBLIC_SOURCE`); the stored `ts` is never moved. The current year's
+  income block says so.
+- **Dividends are exempt up to `dividendExemption.limit` a year** (1500 €, Art. 9.24 NF
+  13/2013; none in régimen común since 2015), gross in euros, before the income pool.
+  Never an ETF's (`isCollectiveInvestment`: Trade Republic stores funds as ETF), nor an
+  instrument missing from the list. Their withholdings still count: they pay on account.
+  **Known limitation:** the exemption does not reach shares bought in the two months
+  before the payment when homogeneous ones are sold in the two after, and nothing applies
+  that. The repurchase evaluator cannot tell: it only opens windows around sales at a
+  loss, never around a dividend, and this rule bites on gains too.
+- **Withholdings are shown, never subtracted.** They pay on account of the whole IRPF, not
+  of the savings quota. `withholdingsOf` adds those recorded on the year's savings income,
+  with no split by origin: Trade Republic's single `tax` column cannot tell Spanish from
+  foreign. Interest carries `taxWithheld` only since it got its own schema; rows stored
+  before say 0 and nothing rewrites them (that would be a second `markInKind`, and the
+  sync's ledger merge sets any other difference aside). A year with Trade Republic interest at
+  0 shows a notice, and that test decides no figure; interest at 0 from any other source is
+  legitimate and raises nothing.
 - **The fiscal year is the calendar year in the residence's zone** (`fiscalYearOf`, Madrid
   for Bizkaia), same trap as `periodOf` — the last hours of 31 December are already the
   next year locally. The zone travels in `RepurchaseScope` beside the territory.
@@ -1201,9 +1334,10 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
   "Recompensa" on screen and keeps the BUY out of contributions. The notes stay for
   `symbol-check`, which excludes the BUY because its price came from a history.
 - **No tax figure reads this income, and its classification is pending.** `/tax` lists the
-  year's `IN_KIND` dividends in their own block, "pendiente de verificar", added to nothing;
-  a test pins that `computeTaxHistory` and `buildTaxYearView` are unchanged by them. Do not
-  write a classification into a comment or a total until it is verified.
+  year's Kraken rewards in their own block, "pendiente de verificar", added to nothing; a
+  test pins that `computeTaxHistory` and `buildTaxYearView` are unchanged by them. Do not
+  write a classification into a comment or a total until it is verified. Trade Republic's
+  saveback is not in that block: see below.
 
 ## Trade Republic saveback
 
@@ -1224,6 +1358,11 @@ amount alone decides there.
 - **A pair is one operation in two rows**, like a Kraken reward: the purchase as `IN_KIND`,
   and the saveback as an `IN_KIND` `DIVIDEND` in that fund, carrying the retention from
   whichever row holds it. Movements then nets each pair to exactly the cash that moved.
+- **For tax, the saveback is account income, not a dividend.** Trade Republic declares it
+  among bank accounts, in money, at 19%, so its `IN_KIND` `DIVIDEND` (source
+  `TRADE_REPUBLIC_SOURCE`) enters the income pool at its value on receipt with its
+  withholding, and the Art. 9.24 exemption never reaches it. Only the classification moves:
+  the rows stay `IN_KIND`, out of contributions.
 - **The only write that changes a stored ledger row is `markInKind`.** Saveback rows were
   discarded before this existed, so past purchases sit in the ledger as `CASH` and only a
   re-import can mark them; `append` skips existing rows, so `persistBatch` calls

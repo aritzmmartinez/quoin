@@ -1,5 +1,6 @@
 import { type ReactNode, useState } from "react";
 
+import type { Territory } from "~/core/tax";
 import {
   DASH,
   type TaxSaleRow,
@@ -22,7 +23,13 @@ import {
 const BADGE =
   "shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide";
 
-export function TaxSaleItem({ sale }: { sale: TaxSaleRow }) {
+export function TaxSaleItem({
+  sale,
+  territory,
+}: {
+  sale: TaxSaleRow;
+  territory: Territory;
+}) {
   const {
     formatMoney,
     formatQuantity,
@@ -83,7 +90,7 @@ export function TaxSaleItem({ sale }: { sale: TaxSaleRow }) {
           {washSale && material && (
             <div className="mt-0.5 text-[11.5px] leading-snug text-negative">
               {copy.washSaleReason(
-                washSale.letter,
+                washSale.source,
                 formatQuantity(washSale.repurchased),
                 formatQuantity(sale.quantity),
               )}
@@ -103,7 +110,9 @@ export function TaxSaleItem({ sale }: { sale: TaxSaleRow }) {
           )}
           {sale.unlistedRepurchaseAt && (
             <div className="mt-0.5 text-[11.5px] leading-snug text-muted">
-              {copy.unlistedReason(formatInstant(sale.unlistedRepurchaseAt))}
+              {copy.unlistedReason[territory](
+                formatInstant(sale.unlistedRepurchaseAt),
+              )}
             </div>
           )}
         </div>
@@ -198,7 +207,7 @@ function WashSaleBreakdown({
   return (
     <div className="mb-4">
       <div className="mb-2 text-[11px] uppercase tracking-[0.08em] text-muted">
-        {copy.title[washSale.letter]}
+        {copy.title[washSale.assetClass]}
       </div>
       {rows.map(([label, value]) => (
         <div

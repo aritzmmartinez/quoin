@@ -144,11 +144,19 @@ export async function syncInstrumentPrices(
   let live: PriceSnapshot | null = null;
   if (!quote) problem = "no-quote";
   else if (!isFreshQuote(quote, now)) problem = "stale";
-  else live = toSnapshot(target.id, quote, liveSource(provider.source));
+  else {
+    live = toSnapshot(
+      target.id,
+      quote,
+      liveSource(provider.sourceOf(target.quoteSymbol)),
+    );
+  }
 
   const written = await deps.prices.saveDaily(
     target.id,
-    candles.map((c) => toSnapshot(target.id, c, provider.source)),
+    candles.map((c) =>
+      toSnapshot(target.id, c, provider.sourceOf(target.quoteSymbol)),
+    ),
     live,
     deps.zone,
   );
