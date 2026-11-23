@@ -1447,6 +1447,11 @@ export const en: Copy = {
         bizkaia: "Bizkaia",
         comun: "common regime",
       } satisfies Record<Territory, string>,
+      residenceName: {
+        bizkaia: "Bizkaia",
+        comun: "common regime",
+        canarias: "common regime · Canary Islands",
+      } satisfies Record<Residence, string>,
       intro: {
         bizkaia:
           "The same sales, on a FIFO basis instead of AVCO, which is what the Bizkaia foral tax return (NF 13/2013) requires and not what the Sales tab uses. A loss with a repurchase in the two months before or after is deferred under Art. 43 (letter g for homogeneous securities and, for transmissions from 1 January 2025, letter i for crypto assets of the same type), in the proportion repurchased, and computes when the repurchased units are transmitted; offsetting against earlier years follows Art. 66. The repurchase arithmetic follows the DGT rulings V1403-21, V1117-21 and V3282-18 on the parallel state rule, which do not bind the Hacienda Foral.",
@@ -1471,7 +1476,7 @@ export const en: Copy = {
           "Withholdings are payments on account of the whole income tax, not only of the savings base, and are not subtracted from the tax. This adds up what was withheld this year on interest and dividends paid in cash and on Trade Republic's saveback, with no split between Spanish and foreign withholdings.",
         interestWithoutWithholding:
           "Some interest this year has no recorded withholding. Interest imported before this version may lack its withholding even if it had one: check it against the broker's statement.",
-        scale: (source: string): string => `Scale applied: ${source}`,
+        scale: (source: string): string => `Scale applied: ${source}.`,
         scaleInForce: (year: number, territory: string): string =>
           `The ${territory} scale in force since ${year} applies. If a new one is approved for this year, the tax will change.`,
         noScale:

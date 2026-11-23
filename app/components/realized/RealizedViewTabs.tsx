@@ -1,6 +1,6 @@
 import { useSearchParams } from "react-router";
 
-import type { Territory } from "~/core/tax";
+import type { Residence } from "~/core/domain";
 import {
   REALIZED_VIEWS,
   type RealizedView,
@@ -12,10 +12,10 @@ import { PillLinks } from "../ui/Segmented";
 
 export function RealizedViewTabs({
   value,
-  territory,
+  residence,
 }: {
   value: RealizedView;
-  territory: Territory;
+  residence: Residence;
 }) {
   const t = useCopy();
   const [params] = useSearchParams();
@@ -29,7 +29,7 @@ export function RealizedViewTabs({
         key: view,
         label:
           view === "tax"
-            ? copy.tax(t.realized.fiscal.territoryName[territory])
+            ? copy.tax(t.realized.fiscal.residenceName[residence])
             : copy[view],
         href: realizedViewHref(params, view),
       }))}

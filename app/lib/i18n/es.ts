@@ -1461,6 +1461,11 @@ export const es = {
         bizkaia: "Bizkaia",
         comun: "régimen común",
       } satisfies Record<Territory, string>,
+      residenceName: {
+        bizkaia: "Bizkaia",
+        comun: "régimen común",
+        canarias: "régimen común · Canarias",
+      } satisfies Record<Residence, string>,
       intro: {
         bizkaia:
           "Mismas ventas, con criterio FIFO en vez de AVCO, que es el que exige la declaración foral de Bizkaia (NF 13/2013) y no el de la pestaña de Ventas. Las pérdidas con recompra en los dos meses anteriores o posteriores se difieren según el Art. 43 (letra g para valores homogéneos y, en las transmisiones desde el 1 de enero de 2025, letra i para criptoactivos del mismo tipo), en la proporción recomprada, y se integran cuando se transmiten los recomprados; la compensación con años anteriores sigue el Art. 66. La aritmética de la recompra sigue las consultas de la DGT V1403-21, V1117-21 y V3282-18 sobre la norma estatal paralela, que no vinculan a la Hacienda Foral.",
@@ -1485,7 +1490,7 @@ export const es = {
           "Las retenciones son pagos a cuenta de todo el IRPF, no solo de la base del ahorro, y no se restan de la cuota. Suma lo retenido este año en intereses y dividendos cobrados en efectivo y en el saveback de Trade Republic, sin separar retenciones españolas y extranjeras.",
         interestWithoutWithholding:
           "Algún interés de este año no tiene retención registrada. Los intereses importados antes de esta versión pueden no traer su retención aunque la tuvieran: compruébalos con el extracto del bróker.",
-        scale: (source: string): string => `Escala aplicada: ${source}`,
+        scale: (source: string): string => `Escala aplicada: ${source}.`,
         scaleInForce: (year: number, territory: string): string =>
           `Se aplica la escala vigente desde ${year} en ${territory}. Si se aprueba una nueva para este año, la cuota cambiará.`,
         noScale:
