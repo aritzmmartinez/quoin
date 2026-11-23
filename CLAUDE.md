@@ -1251,8 +1251,9 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
   with no split by origin: Trade Republic's single `tax` column cannot tell Spanish from
   foreign. Interest carries `taxWithheld` only since it got its own schema; rows stored
   before say 0 and nothing rewrites them (that would be a second `markInKind`, and the
-  sync's ledger merge sets any other difference aside). A year with interest at 0 shows a
-  notice, and that test decides no figure.
+  sync's ledger merge sets any other difference aside). A year with Trade Republic interest at
+  0 shows a notice, and that test decides no figure; interest at 0 from any other source is
+  legitimate and raises nothing.
 - **The fiscal year is the calendar year in the residence's zone** (`fiscalYearOf`, Madrid
   for Bizkaia), same trap as `periodOf` — the last hours of 31 December are already the
   next year locally. The zone travels in `RepurchaseScope` beside the territory.

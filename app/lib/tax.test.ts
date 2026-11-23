@@ -1063,3 +1063,31 @@ describe("Trade Republic saveback", () => {
     expect(v.inKindIncome).toEqual({ count: 1, gross: "4.00", withheld: "0.00" });
   });
 });
+
+describe("the notice of interest without withholding", () => {
+  function interest(source: string, taxWithheld: string) {
+    const income: InterestEvent = {
+      id: `evt-${seq++}`,
+      ts: new Date("2026-05-04T10:00:00Z"),
+      type: "INTEREST",
+      grossAmount: "10",
+      taxWithheld,
+      currency: "EUR",
+      account: "test",
+      source,
+    };
+    return income;
+  }
+  const notice = (events: readonly LedgerEvent[]) =>
+    buildTaxYearView(events, [], 2026, BIZKAIA, "2026-12-31").withholdings
+      .interestWithoutWithholding;
+
+  it("is raised by Trade Republic interest at 0, the old import's gap", () => {
+    expect(notice([interest("TR_CSV", "0")])).toBe(true);
+    expect(notice([interest("TR_CSV", "1.9")])).toBe(false);
+  });
+
+  it("is not raised by interest from another source at 0, which is legitimate", () => {
+    expect(notice([interest("KRAKEN_CSV", "0"), interest("TEST", "0")])).toBe(false);
+  });
+});

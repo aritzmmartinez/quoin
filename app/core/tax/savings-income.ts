@@ -111,7 +111,7 @@ function isExemptible(e: DividendEvent, { rule, isCollective }: DividendExemptio
 export interface Withholdings {
   /** The withholdings recorded on the year's savings income, in euros: payments on account of the whole IRPF, never subtracted from the savings quota. In-kind income shows its own. */
   total: string;
-  /** Some interest of the year records no withholding: rows imported before interest carried it say 0. Only for a notice. */
+  /** Some Trade Republic interest of the year records no withholding: its rows imported before interest carried it say 0. Interest from another source at 0 is taken as it is. Only for a notice. */
   interestWithoutWithholding: boolean;
 }
 
@@ -129,7 +129,10 @@ export function withholdingsOf(
       )
       .toFixed(2),
     interestWithoutWithholding: withheld.some(
-      (e) => e.type === "INTEREST" && new Decimal(e.taxWithheld).isZero(),
+      (e) =>
+        e.type === "INTEREST" &&
+        e.source === TRADE_REPUBLIC_SOURCE &&
+        new Decimal(e.taxWithheld).isZero(),
     ),
   };
 }
