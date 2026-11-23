@@ -1616,7 +1616,7 @@ export const es = {
       },
       inKind: {
         title: "Ingresos en especie",
-        body: "Recompensas de Kraken recibidas en participaciones. Clasificación fiscal pendiente de verificar: no se suman a ninguna cifra de esta vista.",
+        body: "Ingresos recibidos en participaciones que no entran en la bolsa de rendimientos (como las recompensas de cripto). Clasificación fiscal pendiente de verificar: no se suman a ninguna cifra de esta vista.",
         count: "Recepciones",
         gross: "Valor al recibirlas",
         withheld: "Retenido",

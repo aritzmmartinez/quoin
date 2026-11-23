@@ -1601,7 +1601,7 @@ export const en: Copy = {
       },
       inKind: {
         title: "Income received in kind",
-        body: "Kraken rewards, received as units. Tax classification pending verification: none of it is added to any figure in this view.",
+        body: "Income received as units that does not enter the income pool (such as crypto rewards). Tax classification pending verification: none of it is added to any figure in this view.",
         count: "Receipts",
         gross: "Value on receipt",
         withheld: "Withheld",
