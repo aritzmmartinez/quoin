@@ -1547,6 +1547,9 @@ export const en: Copy = {
         body: "Interest and dividends paid in cash, gross. They compensate only among themselves, and a negative balance is carried to the following years (Art. 66.1.a).",
         count: "Payments",
         gross: "Gross this year",
+        exempt: "Exempt dividends",
+        exemptNote: (source: string) =>
+          `A stock's dividends are exempt up to the yearly limit; an ETF's or a fund's are not (${source}). They leave the balance, but their withholdings still count among those recorded. The two-month rule is not checked.`,
         finalNet: "Balance after carryforward",
       },
       inKind: {

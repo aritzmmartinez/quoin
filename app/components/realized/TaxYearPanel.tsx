@@ -300,8 +300,16 @@ function SavingsIncomeCard({ income }: { income: TaxSavingsIncome }) {
       figures={[
         { label: copy.count, value: String(income.count) },
         { label: copy.gross, value: formatMoney(income.gross) },
+        ...(income.exemptSource !== null
+          ? [{ label: copy.exempt, value: formatMoney(income.exempt) }]
+          : []),
         { label: copy.finalNet, value: formatMoney(income.finalNet) },
       ]}
+      note={
+        income.exemptSource !== null
+          ? copy.exemptNote(income.exemptSource)
+          : undefined
+      }
     />
   );
 }
@@ -326,16 +334,20 @@ function FiguresCard({
   title,
   body,
   figures,
+  note,
 }: {
   title: string;
   body: string;
   figures: { label: string; value: string }[];
+  note?: string;
 }) {
   return (
     <Card className="p-6">
       <h2 className="text-[14px] font-semibold">{title}</h2>
       <p className="mt-1 mb-4 text-[11.5px] text-muted">{body}</p>
-      <dl className="grid gap-4 sm:grid-cols-3">
+      <dl
+        className={`grid gap-4 ${figures.length > 3 ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}
+      >
         {figures.map((f) => (
           <div key={f.label}>
             <dt className="text-[11px] uppercase tracking-[0.08em] text-muted">
@@ -347,6 +359,7 @@ function FiguresCard({
           </div>
         ))}
       </dl>
+      {note && <p className="mt-4 text-[11.5px] text-muted">{note}</p>}
     </Card>
   );
 }

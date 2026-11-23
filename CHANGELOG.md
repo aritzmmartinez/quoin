@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Settings: External data has a Crypto prices row, Market Data: Kraken, with its own refresh.
 - Realized, tax view: interest and dividends paid in cash enter the savings base as income from movable capital, a pool of their own beside capital gains. In Bizkaia the two never compensate each other, and each carries a negative balance for four years. The quota now applies to the sum of their positive balances, so a year with interest or dividends shows a higher base and quota than before.
 - Realized, tax view: the year's recorded withholdings on that income, shown beside the quota and never subtracted from it, because they are payments on account of the whole income tax. Spanish and foreign withholdings are one figure.
+- Realized, tax view: in Bizkaia a stock's cash dividends are exempt up to 1500 € a year and leave the savings base; an ETF's or a fund's never are. The income block shows the exempt amount with its article, and their withholdings still count among those recorded. Shares bought in the two months before a dividend and sold in the two after lose the exemption, and Quoin does not check that yet.
 - Import: Trade Republic interest keeps the tax withheld on it. Interest imported earlier stays at zero, and the tax view says so when a year has some.
 
 ### Changed

@@ -1565,6 +1565,9 @@ export const es = {
         body: "Intereses y dividendos cobrados en efectivo, en bruto. Se compensan solo entre sí, y un saldo negativo se arrastra a los años siguientes (Art. 66.1.a).",
         count: "Cobros",
         gross: "Bruto del año",
+        exempt: "Dividendos exentos",
+        exemptNote: (source: string) =>
+          `Los dividendos de acciones están exentos hasta el límite anual; los de ETF y fondos, no (${source}). Salen del saldo, pero sus retenciones siguen en las registradas. No se comprueba la regla de los dos meses.`,
         finalNet: "Saldo tras el arrastre",
       },
       inKind: {
