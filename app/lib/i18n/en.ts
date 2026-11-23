@@ -1544,7 +1544,7 @@ export const en: Copy = {
       },
       savingsIncome: {
         title: "Income from movable capital",
-        body: "Interest and dividends paid in cash, gross. They compensate only among themselves, and a negative balance is carried to the following years (Art. 66.1.a).",
+        body: "Interest and dividends paid in cash, and Trade Republic's saveback, which it declares as account income; gross. They compensate only among themselves, and a negative balance is carried to the following years (Art. 66.1.a).",
         count: "Payments",
         gross: "Gross this year",
         exempt: "Exempt dividends",
@@ -1556,7 +1556,7 @@ export const en: Copy = {
       },
       inKind: {
         title: "Income received in kind",
-        body: "Kraken rewards and Trade Republic saveback, received as units. Tax classification pending verification: none of it is added to any figure in this view.",
+        body: "Kraken rewards, received as units. Tax classification pending verification: none of it is added to any figure in this view.",
         count: "Receipts",
         gross: "Value on receipt",
         withheld: "Withheld",

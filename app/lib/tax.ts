@@ -47,7 +47,7 @@ function isDividendOrInterest(event: LedgerEvent): boolean {
 }
 
 function isInKindIncome(event: LedgerEvent): event is DividendEvent {
-  return event.type === "DIVIDEND" && isInKind(event);
+  return event.type === "DIVIDEND" && isInKind(event) && !isSavingsIncome(event);
 }
 
 export function taxExclusions(

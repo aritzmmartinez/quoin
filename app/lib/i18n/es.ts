@@ -1562,7 +1562,7 @@ export const es = {
       },
       savingsIncome: {
         title: "Rendimientos del capital mobiliario",
-        body: "Intereses y dividendos cobrados en efectivo, en bruto. Se compensan solo entre sí, y un saldo negativo se arrastra a los años siguientes (Art. 66.1.a).",
+        body: "Intereses y dividendos cobrados en efectivo, y el saveback de Trade Republic, que declara como rendimiento de cuenta; en bruto. Se compensan solo entre sí, y un saldo negativo se arrastra a los años siguientes (Art. 66.1.a).",
         count: "Cobros",
         gross: "Bruto del año",
         exempt: "Dividendos exentos",
@@ -1574,7 +1574,7 @@ export const es = {
       },
       inKind: {
         title: "Ingresos en especie",
-        body: "Recompensas de Kraken y saveback de Trade Republic recibidos en participaciones. Clasificación fiscal pendiente de verificar: no se suman a ninguna cifra de esta vista.",
+        body: "Recompensas de Kraken recibidas en participaciones. Clasificación fiscal pendiente de verificar: no se suman a ninguna cifra de esta vista.",
         count: "Recepciones",
         gross: "Valor al recibirlas",
         withheld: "Retenido",

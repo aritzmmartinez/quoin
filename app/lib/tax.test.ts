@@ -1026,3 +1026,40 @@ describe("Trade Republic interest", () => {
     expect(view(events, 2025).savingsIncome.gross).toBe("0.00");
   });
 });
+
+describe("Trade Republic saveback", () => {
+  function inKind(source: string, grossAmount: string, taxWithheld: string) {
+    const income: DividendEvent = {
+      id: `evt-${seq++}`,
+      ts: new Date("2026-05-04T10:00:00Z"),
+      type: "DIVIDEND",
+      instrumentId: "S",
+      grossAmount,
+      taxWithheld,
+      funding: "IN_KIND",
+      currency: "EUR",
+      account: "test",
+      source,
+    };
+    return income;
+  }
+  const instruments = [instrument("S", "Stock")];
+
+  it("enters the income pool at its value on receipt, never exempt, its withholding recorded; a Kraken reward stays out", () => {
+    const v = buildTaxYearView(
+      [inKind("TR_CSV", "10", "1.9"), inKind("KRAKEN_CSV", "4", "0")],
+      instruments,
+      2026,
+      BIZKAIA,
+      "2026-12-31",
+    );
+    expect(v.savingsIncome).toMatchObject({
+      count: 1,
+      gross: "10.00",
+      exempt: "0.00",
+      finalNet: "10",
+    });
+    expect(v.withholdings.total).toBe("1.90");
+    expect(v.inKindIncome).toEqual({ count: 1, gross: "4.00", withheld: "0.00" });
+  });
+});

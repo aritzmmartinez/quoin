@@ -1226,7 +1226,8 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
   compared in the web view only; the contract carries no such field).
 - **The savings base has two pools, carried forward together** (`carryforwardPools`):
   capital gains and income from movable capital — interest and cash dividends, gross in
-  euros (`savingsIncomeOf`); in-kind income stays out. Each carries its own losses for
+  euros (`savingsIncomeOf`), plus Trade Republic's saveback (below); other in-kind income
+  stays out. Each carries its own losses for
   `lossCarryforwardYears`; a year's negative balance offsets the other pool's same-year
   positive one up to `crossOffsetLimit` (0 in Bizkaia, Art. 66.1). The base adds the
   positive final balances and the quota applies to it. `carryforwardFrom` is the gains
@@ -1298,9 +1299,10 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
   "Recompensa" on screen and keeps the BUY out of contributions. The notes stay for
   `symbol-check`, which excludes the BUY because its price came from a history.
 - **No tax figure reads this income, and its classification is pending.** `/tax` lists the
-  year's `IN_KIND` dividends in their own block, "pendiente de verificar", added to nothing;
-  a test pins that `computeTaxHistory` and `buildTaxYearView` are unchanged by them. Do not
-  write a classification into a comment or a total until it is verified.
+  year's Kraken rewards in their own block, "pendiente de verificar", added to nothing; a
+  test pins that `computeTaxHistory` and `buildTaxYearView` are unchanged by them. Do not
+  write a classification into a comment or a total until it is verified. Trade Republic's
+  saveback is not in that block: see below.
 
 ## Trade Republic saveback
 
@@ -1321,6 +1323,11 @@ amount alone decides there.
 - **A pair is one operation in two rows**, like a Kraken reward: the purchase as `IN_KIND`,
   and the saveback as an `IN_KIND` `DIVIDEND` in that fund, carrying the retention from
   whichever row holds it. Movements then nets each pair to exactly the cash that moved.
+- **For tax, the saveback is account income, not a dividend.** Trade Republic declares it
+  among bank accounts, in money, at 19%, so its `IN_KIND` `DIVIDEND` (source
+  `TRADE_REPUBLIC_SOURCE`) enters the income pool at its value on receipt with its
+  withholding, and the Art. 9.24 exemption never reaches it. Only the classification moves:
+  the rows stay `IN_KIND`, out of contributions.
 - **The only write that changes a stored ledger row is `markInKind`.** Saveback rows were
   discarded before this existed, so past purchases sit in the ledger as `CASH` and only a
   re-import can mark them; `append` skips existing rows, so `persistBatch` calls

@@ -15,15 +15,23 @@ import type { DividendExemptionRule } from "./territory";
 
 /**
  * Income from movable capital in the savings base: interest and dividends paid
- * in cash, gross. A dividend received in kind (a reward, a saveback) stays out:
- * its classification is pending.
+ * in cash, gross, and Trade Republic's saveback, which it declares as account
+ * income in money with its withholding, at its value on receipt. Any other
+ * income received in kind (a Kraken reward) stays out: its classification is pending.
  */
 export function isSavingsIncome(
   event: LedgerEvent,
 ): event is DividendEvent | InterestEvent {
   return (
-    event.type === "INTEREST" || (event.type === "DIVIDEND" && !isInKind(event))
+    event.type === "INTEREST" ||
+    (event.type === "DIVIDEND" &&
+      (!isInKind(event) || isTradeRepublicSaveback(event)))
   );
+}
+
+/** Trade Republic's only income in kind is the saveback (`pairSavebacks`). */
+function isTradeRepublicSaveback(event: DividendEvent): boolean {
+  return isInKind(event) && event.source === TRADE_REPUBLIC_SOURCE;
 }
 
 /**
@@ -77,7 +85,12 @@ export function savingsIncomeOf(
     const year = incomeYearOf(e, zone);
     const amount = baseOf(e, "grossAmount").toString();
     add(gross, year, amount);
-    if (exemption && e.type === "DIVIDEND" && isExemptible(e, exemption)) {
+    if (
+      exemption &&
+      e.type === "DIVIDEND" &&
+      !isInKind(e) &&
+      isExemptible(e, exemption)
+    ) {
       add(eligible, year, amount);
     }
   }
