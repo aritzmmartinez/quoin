@@ -79,7 +79,7 @@ pnpm projection:converge              # seed-to-seed spread of p10/p50/p90 at se
 pnpm projection:converge [--sims=1000,3000] [--seeds=8] [--horizon=240] [--contribution=…]
 pnpm twr:explain [--top=N]            # print the portfolio TWR chain, worst link first
 pnpm twr:explain --around=YYYY-MM-DD  # open one link: holdings and implied prices at both ends
-pnpm tax:explain [YYYY|--year=YYYY]   # replay the Bizkaia foral FIFO, lot by lot
+pnpm tax:explain [YYYY|--year=YYYY]   # replay the residence's FIFO, lot by lot, and the year's base
 pnpm sync:export <file>.quoin.json    # whole user state of DATABASE_URL, for another device
 pnpm sync:import <file> [--dry-run]   # merge an export into DATABASE_URL; backs the ledger up first
 ```
@@ -125,18 +125,24 @@ and nowhere else**: `dayOf`, `periodOf`, `fiscalYearOf`, `today(zone, now)`,
 piece of the contract with the mobile client, which must assign the same days.
 
 - **The zone comes from the residence setting, resolved in one place.** `Settings` has
-  one row (`CHECK id = 1`); `residence` (today only `bizkaia`) has no CHECK — the
+  one row (`CHECK id = 1`); `residence` (`bizkaia`, `comun`, `canarias`) has no CHECK — the
   vocabulary grows, `residenceSchema` validates at write. A value this version does not
   know can still arrive from a newer device through a sync, which stores it untouched so
   nothing is lost; its read throws `UnsupportedResidenceError`, and `loadResidence()`
   turns that into a 409 carrying `unsupported-residence`, because an `Error` reaches the
   browser sanitised and a code does not. Both boundaries then ask to update Quoin and
   never offer to reset to Bizkaia: the reset would sync back to that device. Core maps it two
-  ways, `territoryOfResidence` and `zoneOfResidence`, and they are separate because the
-  régimen común will be one territory in two zones (Canarias). `loadResidence()` is the
+  ways, `territoryOfResidence` and `zoneOfResidence`, and they are separate because
+  régimen común is one territory in two zones (`comun` in Madrid, `canarias` in
+  Atlantic/Canary). `loadResidence()` is the
   server's only reader: it yields the `Jurisdiction` (territory + zone, what AVCO, FIFO
   and the swap rule take), the **calendar zone** and the **display zone** — the same zone
   today, two decisions. The root loader hands both to the client.
+- **Changing the residence recalculates nothing stored.** It is set in Settings, synced like
+  any setting, and every read takes the new zone and rules. The days already written in
+  the old zone stay as they are: a plan's `activeFrom`, the day `saveDaily` grouped a
+  price under and the rate a ledger row was booked at. They are facts written once, and
+  rewriting them would move a frozen booked amount.
 - **`toCalendarDate` caches by `(zone, UTC minute)`, bounded LRU, from 1980.** Not by
   quarter-hour: offsets since 1980 are multiples of 15 minutes, but Goose Bay and St
   John's switched at 00:01 local until 2011 and Casey did in 2020–2022, so one UTC
@@ -166,9 +172,10 @@ piece of the contract with the mobile client, which must assign the same days.
   - `sync` — `merge`; its expectations are written by hand, never by running it.
   - `sync-prices` — what `POST /v1/prices` answers for one instrument (`answerPrices`).
   - `sync-pairing` — the six digit pairing code; its cases were worked out with openssl.
-  - `tax` — foral FIFO, Art. 43, deferred losses, carryforward, quota, and the figures of
-    `buildTaxYearView` (not `pendingBySale`: it breaks ties on names, by locale): both
-    savings pools, the base and the withholdings.
+  - `tax` — FIFO by residence (Bizkaia, común, Canarias), the repurchase rule, deferred
+    losses, carryforward, quota, and the figures of `buildTaxYearView` (not
+    `pendingBySale`: it breaks ties on names, by locale): both savings pools, the base
+    and the withholdings.
   - `carryforward` — `carryforwardPool` and `carryforwardPools` as pure functions over
     each year's net: carry, expiry and the cross limit.
   - `realized` — AVCO realised gains per sale.
@@ -459,7 +466,9 @@ ledger while that rule is in force. Useful, but do not mistake it for a sandbox.
   `sync:import` and the sync server. A row-count mismatch is taken again once, because a
   write between `VACUUM INTO` and the count is not corruption; a failed
   `integrity_check` never is. Two snapshots in the same minute get `-01`…`-99`. The sync
-  server's go to `data/backups/sync/quoin-sync-YYYY-MM-DD.sqlite`, one per Madrid day,
+  server's go to `data/backups/sync/quoin-sync-YYYY-MM-DD.sqlite`, one per day in the
+  stored residence's zone (`backupZoneOf`; UTC for a residence this version does not
+  know, so the backup is never skipped),
   before the first apply that brings changes, keeping 14 in a window of their own so a
   phone's syncs never rotate out the 30 in `data/backups/`.
 - **Every script that opens the database calls `announceDatabase()` first**, on stderr:
@@ -1158,7 +1167,23 @@ manual aliasing was abandoned — 726 confirmations is not a system.
 
 ## Fiscal
 
-Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never régimen común.
+Two territories, chosen by the residence: the **Bizkaia foral regime** (NF 13/2013) and
+**régimen común** (Ley 35/2006, LIRPF), which covers the peninsula, the Balearic Islands,
+Ceuta, Melilla and, in its own zone, the Canary Islands. There is no autonomous community:
+the savings scale does not depend on one. Every rule, citation and text that differs
+between them comes from `TerritoryRules` (`citations` for what the screens and
+`tax:explain` cite) or from a `Record<Territory, …>` in the copy, never from an
+`if (territory === …)`. A repurchase is cited by its rule's `source`, never by its letter:
+`g` is two months in Bizkaia and one year in común.
+
+- **Régimen común, as modelled.** Scale of arts. 66.1 and 76 LIRPF from 2025 (none
+  before; art. 76 alone is the regional half). Repurchase: art. 33.5.f, two months, for
+  STOCK and ETF; letter g gives one year to securities not admitted to trading, and Quoin
+  does not know the market, so it never applies it. Crypto has no repurchase rule: FIFO
+  per asset (DGT V1604-18, V0975-22), the loss computes whole, and a repurchase within a
+  year raises the notice for art. 33.5.e, unsettled by the DGT. Swaps at the greater value
+  (art. 37.1.h, V0999-18). No dividend exemption. The Ceuta and Melilla deduction (art.
+  68.4) is not calculated, and Settings says so.
 
 - **Never cite an NF 13/2013 article number without a verifiable source for it.** Two
   were fabricated during initial development (`Art. 47.2` for the wash-sale rule, `Art.
@@ -1205,13 +1230,14 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
   `compareTrades` (`core/domain/ledger.ts`) drives `walkFifo`, the rule, AVCO, the cost
   line, an instrument's TWR and the opportunity cost; the repository's `orderBy` sorts by
   `ts` alone and SQLite breaks ties however it likes. Before/after a sale is by instant, never by
-  calendar day — the window itself is Madrid calendar days (`washSaleWindow`).
+  calendar day — the window itself is calendar days in the residence's zone (`washSaleWindow`).
 - **Nothing FIFO is persisted, and it is one pass.** `computeTaxHistory` walks the whole
   ledger once — a deferred loss can compute years after the sale that created it — and
-  `taxYearOf` / `carryforwardFrom` are views over it. No lot table, no stored deferral, no
+  `taxYearOf` and the two pools of `carryforwardPools` are views over it. No lot table, no stored deferral, no
   carryforward countdown. A deferred loss counts in the year it computes, so its
   carryforward window starts there; restricting the walk to
-  `[targetYear − lossCarryforwardYears, targetYear]` (`TerritoryRules`; 4 in Bizkaia, Art. 66)
+  `[targetYear − lossCarryforwardYears, targetYear]` (`TerritoryRules`; 4 in both, Art. 66
+  NF 13/2013 and art. 49 LIRPF)
   is still what enforces expiry.
 - **Everything the tax engine reads per territory is one `TerritoryRules`**
   (`core/tax/territory.ts`, `satisfies Record<Territory, …>`): savings scales, repurchase
@@ -1228,12 +1254,20 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
   capital gains and income from movable capital — interest and cash dividends, gross in
   euros (`savingsIncomeOf`), plus Trade Republic's saveback (below); other in-kind income
   stays out. Each carries its own losses for
-  `lossCarryforwardYears`; a year's negative balance offsets the other pool's same-year
-  positive one up to `crossOffsetLimit` (0 in Bizkaia, Art. 66.1). The base adds the
-  positive final balances and the quota applies to it. `carryforwardFrom` is the gains
-  pool alone, unchanged. Bonds never reach the ledger (Trade Republic sets them aside), so
-  nothing yet produces negative income: the `carryforward` contract pins that branch.
-- **Trade Republic interest counts on the Madrid day before its payment** (`incomeYearOf`):
+  `lossCarryforwardYears`. Each year, in order: a pool's negative balance offsets the
+  other's positive one up to `crossOffsetLimit` of it; each positive remainder absorbs its
+  own pool's pending losses without limit; then what one pool still has pending offsets
+  what the other has left, within the same limit, which is one per year and receiving pool,
+  over its positive own net (art. 49 LIRPF and the AEAT manual). The limit is 0 in Bizkaia
+  (Art. 66.1), which keeps the pools apart, and 0.25 in común. The base adds the positive
+  final balances and the quota applies to it. One walk, `consumePending`, serves both
+  steps; `carryforwardPool` is it with an empty second pool. The tax view, its table,
+  `tax.json` and `tax:explain` all read the gains pool of that walk, never a gains-only
+  walk, which in común would disagree. Bonds never reach the ledger (Trade Republic sets
+  them aside), so nothing yet produces negative income: the `carryforward` contract pins
+  that branch.
+- **Trade Republic interest counts on the day before its payment** (`incomeYearOf`, in the
+  residence's zone):
   TR pays on the 1st the interest of the month before and declares it in that month, so a
   payment on 1 January belongs to the year before. A rule of the tax calculation, by
   `source` (`TRADE_REPUBLIC_SOURCE`); the stored `ts` is never moved. The current year's
