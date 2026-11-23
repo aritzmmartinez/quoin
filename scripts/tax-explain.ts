@@ -15,6 +15,7 @@ import {
   computeTaxHistory,
   getTaxScale,
   taxYearOf,
+  territoryRules,
   type Jurisdiction,
   type RealizedGainDetail,
 } from "~/core/tax";
@@ -51,9 +52,9 @@ function day(t: Date): string {
 function printSale(gain: RealizedGainDetail, names: Map<string, string>): void {
   const name = names.get(gain.instrumentId) ?? gain.instrumentId;
   const flag = gain.washSale
-    ? "  <-- ART. 43 REPURCHASE"
+    ? "  <-- REPURCHASE"
     : gain.unlistedNotice
-      ? "  <-- NOTE (unlisted)"
+      ? "  <-- NOTE (no repurchase rule)"
       : "";
   console.log(
     `  ${day(gain.ts)}  ${gain.instrumentId.padEnd(14)} qty ${gain.quantity.padStart(12)}` +
@@ -71,7 +72,7 @@ function printSale(gain: RealizedGainDetail, names: Map<string, string>): void {
   const ws = gain.washSale;
   if (ws) {
     console.log(
-      `      window: [${toIsoDate(ws.window.start)} .. ${toIsoDate(ws.window.end)}]  (Art. 43.${ws.letter}, sale ± ${ws.windowMonths}m, Madrid)`,
+      `      window: [${toIsoDate(ws.window.start)} .. ${toIsoDate(ws.window.end)}]  (${ws.source}, sale ± ${ws.windowMonths}m, ${JURISDICTION.zone})`,
     );
     console.log(
       `      before ${ws.before}  R ${ws.remainingAfter}  repurchase_before ${ws.repurchaseBefore}` +
@@ -93,7 +94,7 @@ function printSale(gain: RealizedGainDetail, names: Map<string, string>): void {
   }
   if (gain.unlistedNotice) {
     console.log(
-      `      outside Art. 43 (not admitted to trading); acquired again ${day(gain.unlistedNotice.buyTs)}` +
+      `      no repurchase rule covers this sale; acquired again ${day(gain.unlistedNotice.buyTs)}` +
         ` (${gain.unlistedNotice.buyEventId}) — informative only, nothing changes`,
     );
   }
@@ -169,12 +170,13 @@ async function main(): Promise<void> {
   const nonComputable = sum(result.gains.map((g) => g.nonComputable));
   const integrated = sum(result.integrations.map((i) => i.amount));
   const affected = result.gains.filter((g) => g.washSale).length;
+  const repurchase = territoryRules(result.territory).citations.repurchase;
 
   console.log(
     `\nOwn-year result of the sales:            ${eur(ownNet)}` +
-      `  (${result.gains.length} sales, ${affected} with an Art. 43 repurchase)`,
+      `  (${result.gains.length} sales, ${affected} with a repurchase, ${repurchase})`,
   );
-  console.log(`Non-computable, deferred (Art. 43):      ${eur(nonComputable)}`);
+  console.log(`Non-computable, deferred:                ${eur(nonComputable)}`);
   console.log(`Deferred losses computing this year:     ${eur(integrated)}`);
   console.log(
     `Computable net for the year:             ${eur(result.computableNet)}\n`,

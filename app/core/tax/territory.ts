@@ -26,8 +26,16 @@ export interface DividendExemptionRule {
   readonly source: string;
 }
 
+/** Where a territory's rules are written, for the screens and the scripts that cite them. */
+export interface TerritoryCitations {
+  readonly repurchase: string;
+  readonly incomeCarryforward: string;
+  readonly gainsCarryforward: string;
+}
+
 /** Everything the tax engine reads that depends on the territory, and only that. */
 export interface TerritoryRules {
+  readonly citations: TerritoryCitations;
   readonly savingsScales: readonly SavingsBaseTaxScale[];
   readonly repurchase: readonly RepurchaseRule[];
   readonly swapValuation: readonly SwapValuationRule[];
@@ -43,6 +51,11 @@ export interface TerritoryRules {
 
 const TERRITORY_RULES = {
   bizkaia: {
+    citations: {
+      repurchase: "Art. 43 NF 13/2013",
+      incomeCarryforward: "Art. 66.1.a NF 13/2013",
+      gainsCarryforward: "Art. 66.1.b NF 13/2013",
+    },
     savingsScales: [
       {
         year: 2025,
@@ -81,7 +94,6 @@ const TERRITORY_RULES = {
      */
     repurchase: [
       {
-        letter: "g",
         assetClass: "listed-security",
         windowMonths: 2,
         homogeneity: "instrument",
@@ -91,7 +103,6 @@ const TERRITORY_RULES = {
         source: "Art. 43.g NF 13/2013 de Bizkaia",
       },
       {
-        letter: "i",
         assetClass: "fungible-crypto",
         windowMonths: 2,
         homogeneity: "instrument",

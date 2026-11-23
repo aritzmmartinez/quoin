@@ -28,7 +28,6 @@ import {
   type Withholdings,
   type RealizedGainDetail,
   type RepurchaseAssetClass,
-  type RepurchaseLetter,
   type TaxBracket,
   type Jurisdiction,
   type TaxOptions,
@@ -172,7 +171,8 @@ export interface TaxRecipientRow {
 }
 
 export interface TaxWashSaleRow {
-  letter: RepurchaseLetter;
+  source: string;
+  assetClass: RepurchaseAssetClass;
   windowMonths: number;
   before: string;
   remainingAfter: string;
@@ -509,7 +509,8 @@ function toSaleRow(
     nonComputable: gain.nonComputable,
     carriedOver: gain.carriedOver,
     washSale: gain.washSale && {
-      letter: gain.washSale.letter,
+      source: gain.washSale.source,
+      assetClass: gain.washSale.assetClass,
       windowMonths: gain.washSale.windowMonths,
       before: gain.washSale.before,
       remainingAfter: gain.washSale.remainingAfter,

@@ -34,8 +34,6 @@ export type RepurchaseAssetClass =
   | "fungible-crypto"
   | "unclassified";
 
-export type RepurchaseLetter = "g" | "i";
-
 /**
  * Pérdidas patrimoniales no computables por recompra. Each rule is one entry
  * over one engine (wash-sale.ts, deferred-loss.ts); rules differ in the assets
@@ -61,7 +59,6 @@ export type RepurchaseLetter = "g" | "i";
  * instead.
  */
 export interface RepurchaseRule {
-  letter: RepurchaseLetter;
   assetClass: RepurchaseAssetClass;
   windowMonths: number;
   homogeneity: "instrument";

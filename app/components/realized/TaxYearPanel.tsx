@@ -44,16 +44,19 @@ export function TaxYearPanel({
   years,
   year,
   currentYear,
+  territory,
   view,
 }: {
   years: number[];
   year: number | null;
   currentYear: number;
+  territory: Territory;
   view: TaxYearView | null;
 }) {
   const { formatMoney } = useFormat();
   const t = useCopy();
   const copy = t.realized.fiscal;
+  const { citations, lossCarryforwardYears } = territoryRules(territory);
 
   if (years.length === 0 || year === null) {
     return (
@@ -72,7 +75,11 @@ export function TaxYearPanel({
           {copy.yearLabel}
         </span>
         <TaxYearSelect years={years} year={year} />
-        <InfoHint size={18} name={copy.about} label={copy.intro} />
+        <InfoHint
+          size={18}
+          name={copy.about}
+          label={copy.intro[territory]}
+        />
       </div>
 
       {view && (
@@ -96,7 +103,7 @@ export function TaxYearPanel({
               </SummaryFigure>
             </div>
             <p className="mt-4 text-[11.5px] text-muted">
-              {copy.summary.pools}
+              {copy.summary.pools[territory]}
             </p>
             <p className="mt-2 text-[11.5px] text-muted">
               {copy.summary.withheldNote}
@@ -111,7 +118,13 @@ export function TaxYearPanel({
                 ? copy.summary.scale(view.scale.source)
                 : copy.summary.noScale}
               {view.scaleYear !== null && view.scaleYear < view.year && (
-                <> {copy.summary.scaleInForce(view.scaleYear)}</>
+                <>
+                  {" "}
+                  {copy.summary.scaleInForce(
+                    view.scaleYear,
+                    copy.territoryName[territory],
+                  )}
+                </>
               )}
             </p>
           </Card>
@@ -127,7 +140,7 @@ export function TaxYearPanel({
               <NetLine label={copy.net.own} value={view.ownNet} />
               {view.nonComputableSum !== "0.00" && (
                 <NetLine
-                  label={copy.net.nonComputable}
+                  label={copy.net.nonComputable(citations.repurchase)}
                   value={negate(view.nonComputableSum)}
                 />
               )}
@@ -177,7 +190,11 @@ export function TaxYearPanel({
                   </div>
                   <ul>
                     {view.sales.map((sale) => (
-                      <TaxSaleItem key={sale.id} sale={sale} />
+                      <TaxSaleItem
+                        key={sale.id}
+                        sale={sale}
+                        territory={territory}
+                      />
                     ))}
                   </ul>
                 </div>
@@ -188,7 +205,7 @@ export function TaxYearPanel({
           {view.integrations.length > 0 && (
             <DeferredCard
               title={copy.integrationsTitle}
-              body={copy.integrationsBody}
+              body={copy.integrationsBody(citations.repurchase)}
               columns={copy.integrationsColumns}
               rows={view.integrations.map((i) => ({
                 key: `${i.integratedByEventId}:${i.originEventId}`,
@@ -202,6 +219,7 @@ export function TaxYearPanel({
 
           {view.pending.length > 0 && (
             <PendingDeferralsCard
+              citation={citations.repurchase}
               year={view.year}
               groups={view.pendingBySale}
             />
@@ -211,7 +229,7 @@ export function TaxYearPanel({
             view.savingsIncome.finalNet !== "0") && (
             <SavingsIncomeCard
               income={view.savingsIncome}
-              territory={view.territory}
+              territory={territory}
               current={view.year === currentYear}
             />
           )}
@@ -223,7 +241,8 @@ export function TaxYearPanel({
           <Card className="p-6">
             <h2 className="mb-3 text-[14px] font-semibold">
               {copy.carryforwardTitle(
-                territoryRules(view.territory).lossCarryforwardYears,
+                lossCarryforwardYears,
+                citations.gainsCarryforward,
               )}
             </h2>
             <div className="overflow-x-auto">
@@ -314,7 +333,7 @@ function SavingsIncomeCard({
   return (
     <FiguresCard
       title={copy.title}
-      body={copy.body}
+      body={copy.body[territory]}
       figures={[
         { label: copy.count, value: String(income.count) },
         { label: copy.gross, value: formatMoney(income.gross) },

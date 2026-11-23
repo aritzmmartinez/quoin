@@ -382,7 +382,8 @@
               "nonComputable": "-60",
               "carriedOver": "0",
               "washSale": {
-                "letter": "g",
+                "source": "Art. 43.g NF 13/2013 de Bizkaia",
+                "assetClass": "listed-security",
                 "windowMonths": 2,
                 "window": {
                   "start": {
@@ -412,7 +413,7 @@
                 ]
               },
               "repurchaseWindow": {
-                "letter": "g",
+                "source": "Art. 43.g NF 13/2013 de Bizkaia",
                 "window": {
                   "start": {
                     "year": 2025,
@@ -450,7 +451,7 @@
               "carriedOver": "0",
               "washSale": null,
               "repurchaseWindow": {
-                "letter": "g",
+                "source": "Art. 43.g NF 13/2013 de Bizkaia",
                 "window": {
                   "start": {
                     "year": 2026,
@@ -521,7 +522,8 @@
                   "nonComputable": "-60",
                   "carriedOver": "0",
                   "washSale": {
-                    "letter": "g",
+                    "source": "Art. 43.g NF 13/2013 de Bizkaia",
+                    "assetClass": "listed-security",
                     "windowMonths": 2,
                     "window": {
                       "start": {
@@ -551,7 +553,7 @@
                     ]
                   },
                   "repurchaseWindow": {
-                    "letter": "g",
+                    "source": "Art. 43.g NF 13/2013 de Bizkaia",
                     "window": {
                       "start": {
                         "year": 2025,
@@ -709,7 +711,7 @@
                   "carriedOver": "0",
                   "washSale": null,
                   "repurchaseWindow": {
-                    "letter": "g",
+                    "source": "Art. 43.g NF 13/2013 de Bizkaia",
                     "window": {
                       "start": {
                         "year": 2026,
@@ -986,7 +988,8 @@
               "nonComputable": "-100",
               "carriedOver": "0",
               "washSale": {
-                "letter": "g",
+                "source": "Art. 43.g NF 13/2013 de Bizkaia",
+                "assetClass": "listed-security",
                 "windowMonths": 2,
                 "window": {
                   "start": {
@@ -1016,7 +1019,7 @@
                 ]
               },
               "repurchaseWindow": {
-                "letter": "g",
+                "source": "Art. 43.g NF 13/2013 de Bizkaia",
                 "window": {
                   "start": {
                     "year": 2025,
@@ -1053,7 +1056,8 @@
               "nonComputable": "-25",
               "carriedOver": "-100",
               "washSale": {
-                "letter": "g",
+                "source": "Art. 43.g NF 13/2013 de Bizkaia",
+                "assetClass": "listed-security",
                 "windowMonths": 2,
                 "window": {
                   "start": {
@@ -1083,7 +1087,7 @@
                 ]
               },
               "repurchaseWindow": {
-                "letter": "g",
+                "source": "Art. 43.g NF 13/2013 de Bizkaia",
                 "window": {
                   "start": {
                     "year": 2025,
@@ -1121,7 +1125,7 @@
               "carriedOver": "0",
               "washSale": null,
               "repurchaseWindow": {
-                "letter": "g",
+                "source": "Art. 43.g NF 13/2013 de Bizkaia",
                 "window": {
                   "start": {
                     "year": 2025,
@@ -1204,7 +1208,8 @@
                   "nonComputable": "-100",
                   "carriedOver": "0",
                   "washSale": {
-                    "letter": "g",
+                    "source": "Art. 43.g NF 13/2013 de Bizkaia",
+                    "assetClass": "listed-security",
                     "windowMonths": 2,
                     "window": {
                       "start": {
@@ -1234,7 +1239,7 @@
                     ]
                   },
                   "repurchaseWindow": {
-                    "letter": "g",
+                    "source": "Art. 43.g NF 13/2013 de Bizkaia",
                     "window": {
                       "start": {
                         "year": 2025,
@@ -1271,7 +1276,8 @@
                   "nonComputable": "-25",
                   "carriedOver": "-100",
                   "washSale": {
-                    "letter": "g",
+                    "source": "Art. 43.g NF 13/2013 de Bizkaia",
+                    "assetClass": "listed-security",
                     "windowMonths": 2,
                     "window": {
                       "start": {
@@ -1301,7 +1307,7 @@
                     ]
                   },
                   "repurchaseWindow": {
-                    "letter": "g",
+                    "source": "Art. 43.g NF 13/2013 de Bizkaia",
                     "window": {
                       "start": {
                         "year": 2025,
@@ -1463,7 +1469,7 @@
                   "carriedOver": "0",
                   "washSale": null,
                   "repurchaseWindow": {
-                    "letter": "g",
+                    "source": "Art. 43.g NF 13/2013 de Bizkaia",
                     "window": {
                       "start": {
                         "year": 2025,
@@ -1761,7 +1767,8 @@
               "nonComputable": "-150",
               "carriedOver": "0",
               "washSale": {
-                "letter": "i",
+                "source": "Art. 43.i NF 13/2013, redacción de la NF 6/2025, de 12 de diciembre (BOB 15/12/2025)",
+                "assetClass": "fungible-crypto",
                 "windowMonths": 2,
                 "window": {
                   "start": {
@@ -1791,7 +1798,7 @@
                 ]
               },
               "repurchaseWindow": {
-                "letter": "i",
+                "source": "Art. 43.i NF 13/2013, redacción de la NF 6/2025, de 12 de diciembre (BOB 15/12/2025)",
                 "window": {
                   "start": {
                     "year": 2024,
@@ -1959,7 +1966,8 @@
                   "nonComputable": "-150",
                   "carriedOver": "0",
                   "washSale": {
-                    "letter": "i",
+                    "source": "Art. 43.i NF 13/2013, redacción de la NF 6/2025, de 12 de diciembre (BOB 15/12/2025)",
+                    "assetClass": "fungible-crypto",
                     "windowMonths": 2,
                     "window": {
                       "start": {
@@ -1989,7 +1997,7 @@
                     ]
                   },
                   "repurchaseWindow": {
-                    "letter": "i",
+                    "source": "Art. 43.i NF 13/2013, redacción de la NF 6/2025, de 12 de diciembre (BOB 15/12/2025)",
                     "window": {
                       "start": {
                         "year": 2024,
@@ -2608,7 +2616,7 @@
               "carriedOver": "0",
               "washSale": null,
               "repurchaseWindow": {
-                "letter": "g",
+                "source": "Art. 43.g NF 13/2013 de Bizkaia",
                 "window": {
                   "start": {
                     "year": 2021,
@@ -3457,7 +3465,7 @@
               "carriedOver": "0",
               "washSale": null,
               "repurchaseWindow": {
-                "letter": "g",
+                "source": "Art. 43.g NF 13/2013 de Bizkaia",
                 "window": {
                   "start": {
                     "year": 2026,
@@ -3507,7 +3515,7 @@
                   "carriedOver": "0",
                   "washSale": null,
                   "repurchaseWindow": {
-                    "letter": "g",
+                    "source": "Art. 43.g NF 13/2013 de Bizkaia",
                     "window": {
                       "start": {
                         "year": 2026,

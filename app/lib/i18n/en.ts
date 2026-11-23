@@ -9,7 +9,7 @@ import type {
   LeafKind,
   Thesis,
 } from "~/core/domain";
-import type { RepurchaseLetter } from "~/core/tax";
+import type { RepurchaseAssetClass, Territory } from "~/core/tax";
 
 import type { ExcludedNotice } from "./es";
 import type { Copy } from "./types";
@@ -123,8 +123,8 @@ export const en: Copy = {
     },
     noRateTax: (names: string): string =>
       `No exchange rate: ${names}. Their trades could not be converted to euros and are not part of this calculation. Check them before using these figures in a tax return.`,
-    unclassifiedTax: (names: string): string =>
-      `No repurchase rule: ${names}. Its type (bond, commodity or cash) is neither a listed security nor a crypto asset: a bond held directly yields income from movable capital, to which Art. 43 does not apply, and a commodity held directly would have a rule of its own, which Quoin does not model. Its sales are computed with no repurchase rule. Check them before using these figures in a tax return.`,
+    unclassifiedTax: (names: string, citation: string): string =>
+      `No repurchase rule: ${names}. Its type (bond, commodity or cash) is neither a listed security nor a crypto asset: a bond held directly yields income from movable capital, to which the repurchase rule (${citation}) does not apply, and a commodity held directly would have a rule of its own, which Quoin does not model. Its sales are computed with no repurchase rule. Check them before using these figures in a tax return.`,
   },
   notFound: {
     title: "Page not found",
@@ -1391,7 +1391,7 @@ export const en: Copy = {
     views: {
       label: "View",
       sales: "Sales",
-      tax: "Tax (Bizkaia)",
+      tax: (territory: string): string => `Tax (${territory})`,
     },
     intro:
       "Every closed sale, with the cost it consumed at the moment of selling. Purchase fees are already inside the cost and sale fees are subtracted from the gross.",
@@ -1421,16 +1421,23 @@ export const en: Copy = {
     },
     fiscal: {
       about: "About the tax basis",
-      intro:
-        "The same sales, on a FIFO basis instead of AVCO, which is what the Bizkaia foral tax return (NF 13/2013) requires and not what the Sales tab uses. A loss with a repurchase in the two months before or after is deferred under Art. 43 (letter g for homogeneous securities and, for transmissions from 1 January 2025, letter i for crypto assets of the same type), in the proportion repurchased, and computes when the repurchased units are transmitted; offsetting against earlier years follows Art. 66. The repurchase arithmetic follows the DGT rulings V1403-21, V1117-21 and V3282-18 on the parallel state rule, which do not bind the Hacienda Foral.",
+      territoryName: {
+        bizkaia: "Bizkaia",
+      } satisfies Record<Territory, string>,
+      intro: {
+        bizkaia:
+          "The same sales, on a FIFO basis instead of AVCO, which is what the Bizkaia foral tax return (NF 13/2013) requires and not what the Sales tab uses. A loss with a repurchase in the two months before or after is deferred under Art. 43 (letter g for homogeneous securities and, for transmissions from 1 January 2025, letter i for crypto assets of the same type), in the proportion repurchased, and computes when the repurchased units are transmitted; offsetting against earlier years follows Art. 66. The repurchase arithmetic follows the DGT rulings V1403-21, V1117-21 and V3282-18 on the parallel state rule, which do not bind the Hacienda Foral.",
+      } satisfies Record<Territory, string>,
       yearLabel: "Tax year",
       noYears: "There are no sales or income recorded in any year yet.",
       summary: {
         netBase: "Taxable savings base",
         gainsBalance: "Capital gains and losses balance",
         incomeBalance: "Income from movable capital balance",
-        pools:
-          "Income from movable capital and capital gains and losses compensate only within their own pool (Art. 66.1): the base is the sum of the positive balances.",
+        pools: {
+          bizkaia:
+            "Income from movable capital and capital gains and losses compensate only within their own pool (Art. 66.1): the base is the sum of the positive balances.",
+        } satisfies Record<Territory, string>,
         quota: "Resulting tax",
         withheld: "Recorded withholdings",
         withheldNote:
@@ -1438,14 +1445,15 @@ export const en: Copy = {
         interestWithoutWithholding:
           "Some interest this year has no recorded withholding. Interest imported before this version may lack its withholding even if it had one: check it against the broker's statement.",
         scale: (source: string): string => `Scale applied: ${source}`,
-        scaleInForce: (year: number): string =>
-          `The scale in force since ${year} applies. If Bizkaia approves a new one for this year, the tax will change.`,
+        scaleInForce: (year: number, territory: string): string =>
+          `The scale in force in ${territory} since ${year} applies. If a new one is approved for this year, the tax will change.`,
         noScale:
           "No tax scale on file for this year. The tax cannot be computed.",
       },
       net: {
         own: "Own result of the year's sales",
-        nonComputable: "Not computable for repurchase (Art. 43)",
+        nonComputable: (citation: string): string =>
+          `Not computable for repurchase (${citation})`,
         integrated: "Deferred losses that compute this year",
         computable: "Computable net for the year",
         counts: (sales: number, affected: number): string =>
@@ -1473,11 +1481,11 @@ export const en: Copy = {
         unitCost: "Unit cost",
       },
       washSaleReason: (
-        letter: RepurchaseLetter,
+        source: string,
         repurchased: string,
         sold: string,
       ): string =>
-        `Art. 43.${letter}: ${repurchased} of the ${sold} units sold were repurchased.`,
+        `${source}: ${repurchased} of the ${sold} units sold were repurchased.`,
       ownDeferredReason: (share: string, amount: string): string =>
         `${share} of the loss (${amount}) does not compute this year: it stays deferred on the repurchased units and computes when they are sold.`,
       minorDeferralReason: (share: string, cent: string): string =>
@@ -1486,13 +1494,16 @@ export const en: Copy = {
         `The units sold carried deferred loss from earlier sales; ${amount} moves on to the new repurchased units, even when this sale is at a gain. Its own gain is never held back.`,
       windowOpenReason: (date: string): string =>
         `Repurchase window open until ${date}: a purchase of the same asset up to that day can still defer this loss, so the year's figure may change.`,
-      unlistedReason: (date: string): string =>
-        `Crypto sold before 2025: the repurchase rule for crypto assets (Art. 43.i) governs transmissions from 1 January 2025, so the loss counts in full. There is a new purchase on ${date}; some doctrine would apply the one-year repurchase rule. This is unsettled and changes no figures.`,
+      unlistedReason: {
+        bizkaia: (date: string): string =>
+          `Crypto sold before 2025: the repurchase rule for crypto assets (Art. 43.i) governs transmissions from 1 January 2025, so the loss counts in full. There is a new purchase on ${date}; some doctrine would apply the one-year repurchase rule. This is unsettled and changes no figures.`,
+      } satisfies Record<Territory, (date: string) => string>,
       breakdown: {
         title: {
-          g: "Repurchase of homogeneous securities (Art. 43.g)",
-          i: "Repurchase of crypto assets of the same type (Art. 43.i)",
-        },
+          "listed-security": "Repurchase of homogeneous securities",
+          "fungible-crypto": "Repurchase of crypto assets of the same type",
+          unclassified: "Repurchase",
+        } satisfies Record<RepurchaseAssetClass, string>,
         before: (months: number): string =>
           `Acquired in the ${months} months before`,
         remainingAfter: "Position left after the sale",
@@ -1511,8 +1522,8 @@ export const en: Copy = {
         },
       },
       integrationsTitle: "Deferred losses that compute this year",
-      integrationsBody:
-        "The repurchased units were sold with no new repurchase in their window, so the deferred loss computes now, as a line apart from the sale's own result (Art. 43).",
+      integrationsBody: (citation: string): string =>
+        `The repurchased units were sold with no new repurchase in their window, so the deferred loss computes now, as a line apart from the sale's own result (${citation}).`,
       integrationsColumns: {
         t: "Sale",
         name: "Instrument",
@@ -1521,8 +1532,8 @@ export const en: Copy = {
       },
       pendingTitle: (year: number): string =>
         `Deferred losses pending at 31 December ${year}`,
-      pendingBody:
-        "Still attached to units held. They count in no year until those units are sold with no new repurchase (Art. 43).",
+      pendingBody: (citation: string): string =>
+        `Still attached to units held. They count in no year until those units are sold with no new repurchase (${citation}).`,
       pendingGroupColumns: {
         saleDate: "Sale of",
         name: "Instrument",
@@ -1544,7 +1555,10 @@ export const en: Copy = {
       },
       savingsIncome: {
         title: "Income from movable capital",
-        body: "Interest and dividends paid in cash, and Trade Republic's saveback, which the broker declares as account income. Gross amounts. They compensate only among themselves, and a negative balance is carried to the following years (Art. 66.1.a).",
+        body: {
+          bizkaia:
+            "Interest and dividends paid in cash, and Trade Republic's saveback, which the broker declares as account income. Gross amounts. They compensate only among themselves, and a negative balance is carried to the following years (Art. 66.1.a).",
+        } satisfies Record<Territory, string>,
         count: "Payments",
         gross: "Gross this year",
         exempt: "Exempt dividends",
@@ -1561,8 +1575,8 @@ export const en: Copy = {
         gross: "Value on receipt",
         withheld: "Withheld",
       },
-      carryforwardTitle: (years: number) =>
-        `Capital loss carryforward, last ${years} years (Art. 66.1.b)`,
+      carryforwardTitle: (years: number, citation: string) =>
+        `Capital loss carryforward, last ${years} years (${citation})`,
       carryforwardColumns: {
         year: "Year",
         ownNet: "Own net",

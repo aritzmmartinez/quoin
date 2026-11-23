@@ -10,7 +10,7 @@ import type {
   LeafKind,
   Thesis,
 } from "~/core/domain";
-import type { RepurchaseLetter } from "~/core/tax";
+import type { RepurchaseAssetClass, Territory } from "~/core/tax";
 
 export interface ExcludedNotice {
   symbol: string;
@@ -151,8 +151,8 @@ export const es = {
     },
     noRateTax: (names: string): string =>
       `Sin tipo de cambio: ${names}. Sus operaciones no se han podido convertir a euros y no entran en este cálculo. Revísalo antes de usar estas cifras en la declaración.`,
-    unclassifiedTax: (names: string): string =>
-      `Sin regla de recompra: ${names}. Su tipo (bono, materia prima o efectivo) no es un valor cotizado ni un criptoactivo: un bono directo da rendimiento del capital mobiliario, al que el Art. 43 no se aplica, y una materia prima directa tendría su propia regla, que Quoin no modela. Sus ventas se calculan sin regla de recompra. Revísalas antes de usar estas cifras en la declaración.`,
+    unclassifiedTax: (names: string, citation: string): string =>
+      `Sin regla de recompra: ${names}. Su tipo (bono, materia prima o efectivo) no es un valor cotizado ni un criptoactivo: un bono directo da rendimiento del capital mobiliario, al que la regla de recompra (${citation}) no se aplica, y una materia prima directa tendría su propia regla, que Quoin no modela. Sus ventas se calculan sin regla de recompra. Revísalas antes de usar estas cifras en la declaración.`,
   },
   notFound: {
     title: "Página no encontrada",
@@ -1407,7 +1407,7 @@ export const es = {
     views: {
       label: "Vista",
       sales: "Ventas",
-      tax: "Fiscal (Bizkaia)",
+      tax: (territory: string): string => `Fiscal (${territory})`,
     },
     intro:
       "Cada venta cerrada, con el coste que consumió en el momento de venderla. Las comisiones de compra ya van dentro del coste y las de venta se restan del bruto.",
@@ -1438,16 +1438,23 @@ export const es = {
     },
     fiscal: {
       about: "Sobre el criterio fiscal",
-      intro:
-        "Mismas ventas, con criterio FIFO en vez de AVCO, que es el que exige la declaración foral de Bizkaia (NF 13/2013) y no el de la pestaña de Ventas. Las pérdidas con recompra en los dos meses anteriores o posteriores se difieren según el Art. 43 (letra g para valores homogéneos y, en las transmisiones desde el 1 de enero de 2025, letra i para criptoactivos del mismo tipo), en la proporción recomprada, y se integran cuando se transmiten los recomprados; la compensación con años anteriores sigue el Art. 66. La aritmética de la recompra sigue las consultas de la DGT V1403-21, V1117-21 y V3282-18 sobre la norma estatal paralela, que no vinculan a la Hacienda Foral.",
+      territoryName: {
+        bizkaia: "Bizkaia",
+      } satisfies Record<Territory, string>,
+      intro: {
+        bizkaia:
+          "Mismas ventas, con criterio FIFO en vez de AVCO, que es el que exige la declaración foral de Bizkaia (NF 13/2013) y no el de la pestaña de Ventas. Las pérdidas con recompra en los dos meses anteriores o posteriores se difieren según el Art. 43 (letra g para valores homogéneos y, en las transmisiones desde el 1 de enero de 2025, letra i para criptoactivos del mismo tipo), en la proporción recomprada, y se integran cuando se transmiten los recomprados; la compensación con años anteriores sigue el Art. 66. La aritmética de la recompra sigue las consultas de la DGT V1403-21, V1117-21 y V3282-18 sobre la norma estatal paralela, que no vinculan a la Hacienda Foral.",
+      } satisfies Record<Territory, string>,
       yearLabel: "Año fiscal",
       noYears: "No hay ventas ni rendimientos registrados todavía en ningún año.",
       summary: {
         netBase: "Base liquidable del ahorro",
         gainsBalance: "Saldo de ganancias y pérdidas",
         incomeBalance: "Saldo de rendimientos del capital mobiliario",
-        pools:
-          "Los rendimientos del capital mobiliario y las ganancias y pérdidas se compensan solo dentro de su propia bolsa (Art. 66.1): la base es la suma de los saldos positivos.",
+        pools: {
+          bizkaia:
+            "Los rendimientos del capital mobiliario y las ganancias y pérdidas se compensan solo dentro de su propia bolsa (Art. 66.1): la base es la suma de los saldos positivos.",
+        } satisfies Record<Territory, string>,
         quota: "Cuota resultante",
         withheld: "Retenciones registradas",
         withheldNote:
@@ -1455,14 +1462,15 @@ export const es = {
         interestWithoutWithholding:
           "Algún interés de este año no tiene retención registrada. Los intereses importados antes de esta versión pueden no traer su retención aunque la tuvieran: compruébalos con el extracto del bróker.",
         scale: (source: string): string => `Escala aplicada: ${source}`,
-        scaleInForce: (year: number): string =>
-          `Se aplica la escala vigente desde ${year}. Si Bizkaia aprueba una nueva para este año, la cuota cambiará.`,
+        scaleInForce: (year: number, territory: string): string =>
+          `Se aplica la escala vigente desde ${year} en ${territory}. Si se aprueba una nueva para este año, la cuota cambiará.`,
         noScale:
           "Sin escala fiscal cargada para este año. No se puede calcular la cuota.",
       },
       net: {
         own: "Resultado propio de las ventas del año",
-        nonComputable: "No computable por recompra (Art. 43)",
+        nonComputable: (citation: string): string =>
+          `No computable por recompra (${citation})`,
         integrated: "Pérdidas diferidas que se integran este año",
         computable: "Neto computable del año",
         counts: (sales: number, affected: number): string =>
@@ -1490,11 +1498,11 @@ export const es = {
         unitCost: "Coste unitario",
       },
       washSaleReason: (
-        letter: RepurchaseLetter,
+        source: string,
         repurchased: string,
         sold: string,
       ): string =>
-        `Art. 43.${letter}: se recompraron ${repurchased} de las ${sold} uds vendidas.`,
+        `${source}: se recompraron ${repurchased} de las ${sold} uds vendidas.`,
       ownDeferredReason: (share: string, amount: string): string =>
         `El ${share} de la pérdida (${amount}) no computa este año: queda diferida en las uds recompradas y se integrará cuando se vendan.`,
       minorDeferralReason: (share: string, cent: string): string =>
@@ -1503,13 +1511,16 @@ export const es = {
         `Las uds vendidas traían pérdida diferida de ventas anteriores; ${amount} pasa a las nuevas uds recompradas, aunque esta venta sea con ganancia. La ganancia propia no se bloquea.`,
       windowOpenReason: (date: string): string =>
         `Ventana de recompra abierta hasta el ${date}: una compra del mismo activo hasta ese día todavía puede diferir esta pérdida, así que la cifra del año puede cambiar.`,
-      unlistedReason: (date: string): string =>
-        `Criptomoneda vendida antes de 2025: la regla de recompra de criptoactivos (Art. 43.i) rige para las transmisiones desde el 1 de enero de 2025, así que la pérdida computa entera. Hay una nueva compra el ${date}; parte de la doctrina aplicaría la regla de recompra en el año siguiente. No está resuelto y no cambia ninguna cifra.`,
+      unlistedReason: {
+        bizkaia: (date: string): string =>
+          `Criptomoneda vendida antes de 2025: la regla de recompra de criptoactivos (Art. 43.i) rige para las transmisiones desde el 1 de enero de 2025, así que la pérdida computa entera. Hay una nueva compra el ${date}; parte de la doctrina aplicaría la regla de recompra en el año siguiente. No está resuelto y no cambia ninguna cifra.`,
+      } satisfies Record<Territory, (date: string) => string>,
       breakdown: {
         title: {
-          g: "Recompra de valores homogéneos (Art. 43.g)",
-          i: "Recompra de criptoactivos del mismo tipo (Art. 43.i)",
-        } satisfies Record<RepurchaseLetter, string>,
+          "listed-security": "Recompra de valores homogéneos",
+          "fungible-crypto": "Recompra de criptoactivos del mismo tipo",
+          unclassified: "Recompra",
+        } satisfies Record<RepurchaseAssetClass, string>,
         before: (months: number): string =>
           `Adquiridas en los ${months} meses anteriores`,
         remainingAfter: "Posición que queda tras la venta",
@@ -1529,8 +1540,8 @@ export const es = {
         },
       },
       integrationsTitle: "Pérdidas diferidas que se integran este año",
-      integrationsBody:
-        "Se vendieron las uds recompradas sin nueva recompra en su ventana, así que la pérdida diferida computa ahora, como línea aparte del resultado de la venta (Art. 43).",
+      integrationsBody: (citation: string): string =>
+        `Se vendieron las uds recompradas sin nueva recompra en su ventana, así que la pérdida diferida computa ahora, como línea aparte del resultado de la venta (${citation}).`,
       integrationsColumns: {
         t: "Venta",
         name: "Instrumento",
@@ -1539,8 +1550,8 @@ export const es = {
       },
       pendingTitle: (year: number): string =>
         `Pérdidas diferidas pendientes a 31 de diciembre de ${year}`,
-      pendingBody:
-        "Siguen ligadas a uds en cartera. No cuentan en ningún año hasta que esas uds se vendan sin nueva recompra (Art. 43).",
+      pendingBody: (citation: string): string =>
+        `Siguen ligadas a uds en cartera. No cuentan en ningún año hasta que esas uds se vendan sin nueva recompra (${citation}).`,
       pendingGroupColumns: {
         saleDate: "Venta del",
         name: "Instrumento",
@@ -1562,7 +1573,10 @@ export const es = {
       },
       savingsIncome: {
         title: "Rendimientos del capital mobiliario",
-        body: "Intereses y dividendos cobrados en efectivo, y el saveback de Trade Republic, que el bróker declara como rendimiento de cuenta. Importes en bruto. Se compensan solo entre sí, y un saldo negativo se arrastra a los años siguientes (Art. 66.1.a).",
+        body: {
+          bizkaia:
+            "Intereses y dividendos cobrados en efectivo, y el saveback de Trade Republic, que el bróker declara como rendimiento de cuenta. Importes en bruto. Se compensan solo entre sí, y un saldo negativo se arrastra a los años siguientes (Art. 66.1.a).",
+        } satisfies Record<Territory, string>,
         count: "Cobros",
         gross: "Bruto del año",
         exempt: "Dividendos exentos",
@@ -1579,8 +1593,8 @@ export const es = {
         gross: "Valor al recibirlas",
         withheld: "Retenido",
       },
-      carryforwardTitle: (years: number) =>
-        `Arrastre de pérdidas patrimoniales, últimos ${years} años (Art. 66.1.b)`,
+      carryforwardTitle: (years: number, citation: string) =>
+        `Arrastre de pérdidas patrimoniales, últimos ${years} años (${citation})`,
       carryforwardColumns: {
         year: "Año",
         ownNet: "Neto propio",

@@ -5,6 +5,11 @@ import { territoryRules } from "./territory";
 describe("territoryRules", () => {
   it("pins every Bizkaia value, so a change to one is deliberate", () => {
     expect(territoryRules("bizkaia")).toEqual({
+      citations: {
+        repurchase: "Art. 43 NF 13/2013",
+        incomeCarryforward: "Art. 66.1.a NF 13/2013",
+        gainsCarryforward: "Art. 66.1.b NF 13/2013",
+      },
       savingsScales: [
         {
           year: 2025,
@@ -37,7 +42,6 @@ describe("territoryRules", () => {
       ],
       repurchase: [
         {
-          letter: "g",
           assetClass: "listed-security",
           windowMonths: 2,
           homogeneity: "instrument",
@@ -47,7 +51,6 @@ describe("territoryRules", () => {
           source: "Art. 43.g NF 13/2013 de Bizkaia",
         },
         {
-          letter: "i",
           assetClass: "fungible-crypto",
           windowMonths: 2,
           homogeneity: "instrument",

@@ -549,7 +549,7 @@ describe("buildTaxYearView", () => {
     );
 
     expect(view.sales[0]!.washSale).toMatchObject({
-      letter: "i",
+      assetClass: "fungible-crypto",
       windowMonths: 2,
       repurchased: "1",
     });
