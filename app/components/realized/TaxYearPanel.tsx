@@ -222,7 +222,9 @@ export function TaxYearPanel({
 
           <Card className="p-6">
             <h2 className="mb-3 text-[14px] font-semibold">
-              {copy.carryforwardTitle}
+              {copy.carryforwardTitle(
+                territoryRules(view.territory).lossCarryforwardYears,
+              )}
             </h2>
             <div className="overflow-x-auto">
               <table className="w-full min-w-140 text-[12.5px] tabular-nums">

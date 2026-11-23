@@ -1434,7 +1434,7 @@ export const en: Copy = {
         quota: "Resulting tax",
         withheld: "Recorded withholdings",
         withheldNote:
-          "Withholdings are payments on account of the whole income tax, not only of the savings base, and are not subtracted from the tax. This adds up what was withheld this year on interest and dividends paid in cash, with no split between Spanish and foreign withholdings.",
+          "Withholdings are payments on account of the whole income tax, not only of the savings base, and are not subtracted from the tax. This adds up what was withheld this year on interest and dividends paid in cash and on Trade Republic's saveback, with no split between Spanish and foreign withholdings.",
         interestWithoutWithholding:
           "Some interest this year has no recorded withholding. Interest imported before this version may lack its withholding even if it had one: check it against the broker's statement.",
         scale: (source: string): string => `Scale applied: ${source}`,
@@ -1544,7 +1544,7 @@ export const en: Copy = {
       },
       savingsIncome: {
         title: "Income from movable capital",
-        body: "Interest and dividends paid in cash, and Trade Republic's saveback, which it declares as account income; gross. They compensate only among themselves, and a negative balance is carried to the following years (Art. 66.1.a).",
+        body: "Interest and dividends paid in cash, and Trade Republic's saveback, which the broker declares as account income. Gross amounts. They compensate only among themselves, and a negative balance is carried to the following years (Art. 66.1.a).",
         count: "Payments",
         gross: "Gross this year",
         exempt: "Exempt dividends",
@@ -1561,7 +1561,8 @@ export const en: Copy = {
         gross: "Value on receipt",
         withheld: "Withheld",
       },
-      carryforwardTitle: "Loss carryforward, last 4 years (Art. 66)",
+      carryforwardTitle: (years: number) =>
+        `Capital loss carryforward, last ${years} years (Art. 66.1.b)`,
       carryforwardColumns: {
         year: "Year",
         ownNet: "Own net",

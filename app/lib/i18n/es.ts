@@ -1451,7 +1451,7 @@ export const es = {
         quota: "Cuota resultante",
         withheld: "Retenciones registradas",
         withheldNote:
-          "Las retenciones son pagos a cuenta de todo el IRPF, no solo de la base del ahorro, y no se restan de la cuota. Suma lo retenido este año en intereses y dividendos cobrados en efectivo, sin separar retenciones españolas y extranjeras.",
+          "Las retenciones son pagos a cuenta de todo el IRPF, no solo de la base del ahorro, y no se restan de la cuota. Suma lo retenido este año en intereses y dividendos cobrados en efectivo y en el saveback de Trade Republic, sin separar retenciones españolas y extranjeras.",
         interestWithoutWithholding:
           "Algún interés de este año no tiene retención registrada. Los intereses importados antes de esta versión pueden no traer su retención aunque la tuvieran: compruébalos con el extracto del bróker.",
         scale: (source: string): string => `Escala aplicada: ${source}`,
@@ -1562,7 +1562,7 @@ export const es = {
       },
       savingsIncome: {
         title: "Rendimientos del capital mobiliario",
-        body: "Intereses y dividendos cobrados en efectivo, y el saveback de Trade Republic, que declara como rendimiento de cuenta; en bruto. Se compensan solo entre sí, y un saldo negativo se arrastra a los años siguientes (Art. 66.1.a).",
+        body: "Intereses y dividendos cobrados en efectivo, y el saveback de Trade Republic, que el bróker declara como rendimiento de cuenta. Importes en bruto. Se compensan solo entre sí, y un saldo negativo se arrastra a los años siguientes (Art. 66.1.a).",
         count: "Cobros",
         gross: "Bruto del año",
         exempt: "Dividendos exentos",
@@ -1579,7 +1579,8 @@ export const es = {
         gross: "Valor al recibirlas",
         withheld: "Retenido",
       },
-      carryforwardTitle: "Arrastre de pérdidas, últimos 4 años (Art. 66)",
+      carryforwardTitle: (years: number) =>
+        `Arrastre de pérdidas patrimoniales, últimos ${years} años (Art. 66.1.b)`,
       carryforwardColumns: {
         year: "Año",
         ownNet: "Neto propio",
