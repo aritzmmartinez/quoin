@@ -222,6 +222,9 @@ export const ledgerEventWriteSchema = ledgerEventSchema.superRefine(
   },
 );
 
+/** The source Trade Republic's adapter stamps on every row it maps. */
+export const TRADE_REPUBLIC_SOURCE = "TR_CSV";
+
 export function isInKind(event: LedgerEvent): boolean {
   return "funding" in event && event.funding === "IN_KIND";
 }

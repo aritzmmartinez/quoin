@@ -1566,6 +1566,8 @@ export const es = {
         count: "Cobros",
         gross: "Bruto del año",
         exempt: "Dividendos exentos",
+        decemberInterest:
+          "Los intereses de diciembre se cobran el 1 de enero y cuentan para este año.",
         exemptNote: (source: string, limit: string) =>
           `Los dividendos de acciones están exentos hasta ${limit} al año; los de ETF y fondos, no (${source}). Salen del saldo, pero sus retenciones siguen en las registradas. No se comprueba la regla de los dos meses.`,
         finalNet: "Saldo tras el arrastre",

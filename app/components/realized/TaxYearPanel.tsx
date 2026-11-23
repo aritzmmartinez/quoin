@@ -43,10 +43,12 @@ function TaxYearSelect({ years, year }: { years: number[]; year: number }) {
 export function TaxYearPanel({
   years,
   year,
+  currentYear,
   view,
 }: {
   years: number[];
   year: number | null;
+  currentYear: number;
   view: TaxYearView | null;
 }) {
   const { formatMoney } = useFormat();
@@ -210,6 +212,7 @@ export function TaxYearPanel({
             <SavingsIncomeCard
               income={view.savingsIncome}
               territory={view.territory}
+              current={view.year === currentYear}
             />
           )}
 
@@ -297,9 +300,11 @@ function SummaryFigure({
 function SavingsIncomeCard({
   income,
   territory,
+  current,
 }: {
   income: TaxSavingsIncome;
   territory: Territory;
+  current: boolean;
 }) {
   const { formatMoney } = useFormat();
   const copy = useCopy().realized.fiscal.savingsIncome;
@@ -316,11 +321,12 @@ function SavingsIncomeCard({
           : []),
         { label: copy.finalNet, value: formatMoney(income.finalNet) },
       ]}
-      note={
-        income.exemptSource !== null && limit !== undefined
-          ? copy.exemptNote(income.exemptSource, formatMoney(limit, 0))
-          : undefined
-      }
+      notes={[
+        ...(income.exemptSource !== null && limit !== undefined
+          ? [copy.exemptNote(income.exemptSource, formatMoney(limit, 0))]
+          : []),
+        ...(current ? [copy.decemberInterest] : []),
+      ]}
     />
   );
 }
@@ -345,12 +351,12 @@ function FiguresCard({
   title,
   body,
   figures,
-  note,
+  notes = [],
 }: {
   title: string;
   body: string;
   figures: { label: string; value: string }[];
-  note?: string;
+  notes?: string[];
 }) {
   return (
     <Card className="p-6">
@@ -370,7 +376,11 @@ function FiguresCard({
           </div>
         ))}
       </dl>
-      {note && <p className="mt-4 text-[11.5px] text-muted">{note}</p>}
+      {notes.map((note) => (
+        <p key={note} className="mt-4 text-[11.5px] text-muted">
+          {note}
+        </p>
+      ))}
     </Card>
   );
 }

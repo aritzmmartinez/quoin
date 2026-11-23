@@ -1,7 +1,7 @@
 {
   "contract": "tax",
   "version": 1,
-  "description": "The Bizkaia foral tax view: FIFO, the Art. 43 repurchase rule (letter g for listed securities, letter i for crypto from 2025-01-01, a notice for a crypto loss before), deferred losses and where they integrate, four-year carryforward (Art. 66) and the savings-base quota. Shared with the mobile client: both implementations must reproduce every case. Events are LedgerEvents; an absent fxSource is IDENTITY and an absent funding is CASH. assetClasses comes from each instrument's type (ETF, STOCK listed-security; CRYPTO fungible-crypto; BOND, COMMODITY, CASH unclassified). history is computeTaxHistory over the whole ledger; years holds, per requested year, taxYearOf, carryforwardFrom, and the figures of buildTaxYearView (sums to two places, the scale in force, the latest on file whose year is not after the requested one, and the quota: both null for a year before the first scale on file, because a scale never reaches back to a year before its own). The savings base has two pools, carried forward together as in carryforward.json: capital gains (netSavingsBase, the gains pool's final balance) and income from movable capital (savingsIncome: interest and cash dividends, gross in euros, in-kind dividends left out; count and gross are the year's own, finalNet the pool's balance after its carryforward). Cash dividends are exempt up to the territory's yearly limit in euros (Bizkaia: 1500, Art. 9.24 NF 13/2013); an ETF's never are, nor are those of an instrument missing from instruments; savingsIncome.exempt is the year's exempt amount, to two places, and the pool takes the year's gross less it. The two-month rule of Art. 9.24 is not applied. Bizkaia's cross limit is 0, so the pools never offset each other; savingsBase adds their positive final balances and the quota applies to it. withholdings.total is every withholding recorded on that income (cash dividends and interest; in-kind income keeps its own in inKindIncome), in euros at each row's rate, to two places: payments on account of the whole IRPF, never subtracted from the quota; interestWithoutWithholding is true when some interest of the year records 0, only for a notice. The repurchase rules, the swap valuation, the dividend exemption and the scales are tables both sides carry. Fiscal years and repurchase windows are Madrid calendar days. Instants are ISO strings; a calendar day is {year, month, day}. Pending deferrals list oldest acquisition first, then by buy id. expect is written by running the TypeScript core; byHand.figures, where a case has it, are worked out by hand, its arithmetic says how, and each key is a dotted path into expect.",
+  "description": "The Bizkaia foral tax view: FIFO, the Art. 43 repurchase rule (letter g for listed securities, letter i for crypto from 2025-01-01, a notice for a crypto loss before), deferred losses and where they integrate, four-year carryforward (Art. 66) and the savings-base quota. Shared with the mobile client: both implementations must reproduce every case. Events are LedgerEvents; an absent fxSource is IDENTITY and an absent funding is CASH. assetClasses comes from each instrument's type (ETF, STOCK listed-security; CRYPTO fungible-crypto; BOND, COMMODITY, CASH unclassified). history is computeTaxHistory over the whole ledger; years holds, per requested year, taxYearOf, carryforwardFrom, and the figures of buildTaxYearView (sums to two places, the scale in force, the latest on file whose year is not after the requested one, and the quota: both null for a year before the first scale on file, because a scale never reaches back to a year before its own). The savings base has two pools, carried forward together as in carryforward.json: capital gains (netSavingsBase, the gains pool's final balance) and income from movable capital (savingsIncome: interest and cash dividends, gross in euros, in-kind dividends left out; count and gross are the year's own (an INTEREST whose source is TR_CSV counts in the fiscal year of the Madrid day before its own, because Trade Republic pays on the 1st the interest of the month before; every other income counts in the year of its own day), finalNet the pool's balance after its carryforward). Cash dividends are exempt up to the territory's yearly limit in euros (Bizkaia: 1500, Art. 9.24 NF 13/2013); an ETF's never are, nor are those of an instrument missing from instruments; savingsIncome.exempt is the year's exempt amount, to two places, and the pool takes the year's gross less it. The two-month rule of Art. 9.24 is not applied. Bizkaia's cross limit is 0, so the pools never offset each other; savingsBase adds their positive final balances and the quota applies to it. withholdings.total is every withholding recorded on that income (cash dividends and interest; in-kind income keeps its own in inKindIncome), in euros at each row's rate, to two places: payments on account of the whole IRPF, never subtracted from the quota; interestWithoutWithholding is true when some interest of the year records 0, only for a notice. The repurchase rules, the swap valuation, the dividend exemption and the scales are tables both sides carry. Fiscal years and repurchase windows are Madrid calendar days. Instants are ISO strings; a calendar day is {year, month, day}. Pending deferrals list oldest acquisition first, then by buy id. expect is written by running the TypeScript core; byHand.figures, where a case has it, are worked out by hand, its arithmetic says how, and each key is a dotted path into expect.",
   "cases": [
     {
       "name": "FIFO over two lots with fees on every trade, a partial sale, in a year with a scale",
@@ -4361,6 +4361,293 @@
               "quota": "95",
               "withholdings": {
                 "total": "380.00",
+                "interestWithoutWithholding": false
+              },
+              "inKindIncome": {
+                "count": 0,
+                "gross": "0.00",
+                "withheld": "0.00"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Trade Republic interest paid on 1 January counts for the year before",
+      "residence": "bizkaia",
+      "instruments": [],
+      "events": [
+        {
+          "id": "i-3",
+          "ts": "2026-01-01T13:10:00.000Z",
+          "type": "INTEREST",
+          "grossAmount": "20",
+          "taxWithheld": "3.8",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TR_CSV",
+          "externalId": "xi-3"
+        },
+        {
+          "id": "i-4",
+          "ts": "2026-02-01T03:08:00.000Z",
+          "type": "INTEREST",
+          "grossAmount": "10",
+          "taxWithheld": "1.9",
+          "currency": "EUR",
+          "account": "test",
+          "source": "TR_CSV",
+          "externalId": "xi-4"
+        }
+      ],
+      "years": [
+        2025,
+        2026
+      ],
+      "byHand": {
+        "arithmetic": "Trade Republic pays on the 1st the interest of the month before, so its interest counts on the Madrid day before the payment. The 20 paid on 1 January 2026 counts in 2025: base 20, quota 20 × 0.20 = 4 on the 2025 scale, withholding 3.80. The 10 paid on 1 February stays in 2026: base 10, quota 10 × 0.19 = 1.9, withholding 1.90.",
+        "figures": {
+          "years.2025.view.savingsIncome.gross": "20.00",
+          "years.2025.view.quota": "4",
+          "years.2025.view.withholdings.total": "3.80",
+          "years.2026.view.savingsIncome.gross": "10.00",
+          "years.2026.view.quota": "1.9"
+        }
+      },
+      "expect": {
+        "assetClasses": {},
+        "history": {
+          "gains": [],
+          "integrations": [],
+          "pendingByYear": {}
+        },
+        "years": {
+          "2025": {
+            "taxYear": {
+              "year": 2025,
+              "territory": "bizkaia",
+              "gains": [],
+              "integrations": [],
+              "pending": [],
+              "computableNet": "0"
+            },
+            "carryforward": {
+              "targetYear": 2025,
+              "steps": [
+                {
+                  "year": 2021,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2022,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2023,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2024,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2025,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                }
+              ],
+              "netSavingsBase": "0"
+            },
+            "view": {
+              "affectedCount": 0,
+              "ownNet": "0.00",
+              "nonComputableSum": "0.00",
+              "integratedSum": "0.00",
+              "computableNet": "0",
+              "pendingSum": "0.00",
+              "netSavingsBase": "0",
+              "savingsIncome": {
+                "count": 1,
+                "gross": "20.00",
+                "exempt": "0.00",
+                "finalNet": "20"
+              },
+              "savingsBase": "20",
+              "scale": {
+                "source": "Art. 76 NF 13/2013 de Bizkaia, redacción anterior a la NF 2/2025, vigente hasta 31-12-2025",
+                "brackets": [
+                  {
+                    "from": "0",
+                    "to": "2500",
+                    "rate": "0.20"
+                  },
+                  {
+                    "from": "2500",
+                    "to": "10000",
+                    "rate": "0.21"
+                  },
+                  {
+                    "from": "10000",
+                    "to": "15000",
+                    "rate": "0.22"
+                  },
+                  {
+                    "from": "15000",
+                    "to": "30000",
+                    "rate": "0.23"
+                  },
+                  {
+                    "from": "30000",
+                    "to": null,
+                    "rate": "0.25"
+                  }
+                ]
+              },
+              "quota": "4",
+              "withholdings": {
+                "total": "3.80",
+                "interestWithoutWithholding": false
+              },
+              "inKindIncome": {
+                "count": 0,
+                "gross": "0.00",
+                "withheld": "0.00"
+              }
+            }
+          },
+          "2026": {
+            "taxYear": {
+              "year": 2026,
+              "territory": "bizkaia",
+              "gains": [],
+              "integrations": [],
+              "pending": [],
+              "computableNet": "0"
+            },
+            "carryforward": {
+              "targetYear": 2026,
+              "steps": [
+                {
+                  "year": 2022,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2023,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2024,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2025,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                },
+                {
+                  "year": 2026,
+                  "ownNet": "0",
+                  "consumedFromCarryforward": "0",
+                  "finalNet": "0",
+                  "pendingLossRemaining": "0"
+                }
+              ],
+              "netSavingsBase": "0"
+            },
+            "view": {
+              "affectedCount": 0,
+              "ownNet": "0.00",
+              "nonComputableSum": "0.00",
+              "integratedSum": "0.00",
+              "computableNet": "0",
+              "pendingSum": "0.00",
+              "netSavingsBase": "0",
+              "savingsIncome": {
+                "count": 1,
+                "gross": "10.00",
+                "exempt": "0.00",
+                "finalNet": "10"
+              },
+              "savingsBase": "10",
+              "scale": {
+                "source": "Art. 76 NF 13/2013 de Bizkaia, redacción NF 2/2025, efectos 1-1-2026",
+                "brackets": [
+                  {
+                    "from": "0",
+                    "to": "7500",
+                    "rate": "0.19"
+                  },
+                  {
+                    "from": "7500",
+                    "to": "15000",
+                    "rate": "0.20"
+                  },
+                  {
+                    "from": "15000",
+                    "to": "30000",
+                    "rate": "0.22"
+                  },
+                  {
+                    "from": "30000",
+                    "to": "50000",
+                    "rate": "0.24"
+                  },
+                  {
+                    "from": "50000",
+                    "to": "90000",
+                    "rate": "0.255"
+                  },
+                  {
+                    "from": "90000",
+                    "to": "120000",
+                    "rate": "0.26"
+                  },
+                  {
+                    "from": "120000",
+                    "to": "240000",
+                    "rate": "0.265"
+                  },
+                  {
+                    "from": "240000",
+                    "to": "300000",
+                    "rate": "0.27"
+                  },
+                  {
+                    "from": "300000",
+                    "to": null,
+                    "rate": "0.28"
+                  }
+                ]
+              },
+              "quota": "1.9",
+              "withholdings": {
+                "total": "1.90",
                 "interestWithoutWithholding": false
               },
               "inKindIncome": {

@@ -1,6 +1,7 @@
 import Decimal from "decimal.js";
 
 import {
+  TRADE_REPUBLIC_SOURCE,
   dividendEventSchema,
   cashEventSchema,
   instrumentSchema,
@@ -71,7 +72,7 @@ function base(row: TradeRepublicRow) {
     currency: row.currency,
     ...originals(row),
     account: "trade-republic",
-    source: "TR_CSV",
+    source: TRADE_REPUBLIC_SOURCE,
     externalId: row.transaction_id,
     note: null,
   };

@@ -16,6 +16,7 @@ import {
   computeTaxHistory,
   gainsNetOf,
   getTaxScale,
+  incomeYearOf,
   isSavingsIncome,
   savingsIncomeCountOf,
   savingsIncomeOf,
@@ -81,7 +82,9 @@ export function listTaxYears(
   const years = new Set(
     events
       .filter((e) => isSellTrade(e) || isDividendOrInterest(e))
-      .map((e) => fiscalYearOf(e.ts, zone)),
+      .map((e) =>
+        isSavingsIncome(e) ? incomeYearOf(e, zone) : fiscalYearOf(e.ts, zone),
+      ),
   );
   return [...years].sort((a, b) => b - a);
 }

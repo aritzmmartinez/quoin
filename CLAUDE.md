@@ -1232,6 +1232,11 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
   positive final balances and the quota applies to it. `carryforwardFrom` is the gains
   pool alone, unchanged. Bonds never reach the ledger (Trade Republic sets them aside), so
   nothing yet produces negative income: the `carryforward` contract pins that branch.
+- **Trade Republic interest counts on the Madrid day before its payment** (`incomeYearOf`):
+  TR pays on the 1st the interest of the month before and declares it in that month, so a
+  payment on 1 January belongs to the year before. A rule of the tax calculation, by
+  `source` (`TRADE_REPUBLIC_SOURCE`); the stored `ts` is never moved. The current year's
+  income block says so.
 - **Dividends are exempt up to `dividendExemption.limit` a year** (1500 €, Art. 9.24 NF
   13/2013; none in régimen común since 2015), gross in euros, before the income pool.
   Never an ETF's (`isCollectiveInvestment`: Trade Republic stores funds as ETF), nor an

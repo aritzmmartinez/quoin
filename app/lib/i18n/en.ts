@@ -1548,6 +1548,8 @@ export const en: Copy = {
         count: "Payments",
         gross: "Gross this year",
         exempt: "Exempt dividends",
+        decemberInterest:
+          "December's interest is paid on 1 January and counts for this year.",
         exemptNote: (source: string, limit: string) =>
           `A stock's dividends are exempt up to ${limit} a year; an ETF's or a fund's are not (${source}). They leave the balance, but their withholdings still count among those recorded. The two-month rule is not checked.`,
         finalNet: "Balance after carryforward",

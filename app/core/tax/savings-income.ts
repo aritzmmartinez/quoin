@@ -1,7 +1,8 @@
 import Decimal from "decimal.js";
 
-import { fiscalYearOf } from "../calendar";
+import { dayOf, fiscalYearOf } from "../calendar";
 import {
+  TRADE_REPUBLIC_SOURCE,
   isInKind,
   type DividendEvent,
   type InterestEvent,
@@ -25,8 +26,25 @@ export function isSavingsIncome(
   );
 }
 
+/**
+ * The fiscal year an income counts in. Trade Republic pays on the 1st the
+ * interest of the month before and declares it in that month, so its interest
+ * counts on the Madrid day before the payment: 1 January goes to the year before.
+ */
+export function incomeYearOf(event: LedgerEvent, zone: string): number {
+  if (event.type === "INTEREST" && event.source === TRADE_REPUBLIC_SOURCE) {
+    const day = dayOf(event.ts, zone);
+    const year = Number(day.slice(0, 4));
+    return day.endsWith("-01-01") ? year - 1 : year;
+  }
+  return fiscalYearOf(event.ts, zone);
+}
+
 function inYear(events: readonly LedgerEvent[], year: number, zone: string) {
-  return bookable(events).filter((e) => fiscalYearOf(e.ts, zone) === year);
+  return bookable(events).filter(
+    (e): e is DividendEvent | InterestEvent =>
+      isSavingsIncome(e) && incomeYearOf(e, zone) === year,
+  );
 }
 
 export interface DividendExemption {
@@ -56,7 +74,7 @@ export function savingsIncomeOf(
 
   for (const e of bookable(events)) {
     if (!isSavingsIncome(e)) continue;
-    const year = fiscalYearOf(e.ts, zone);
+    const year = incomeYearOf(e, zone);
     const amount = baseOf(e, "grossAmount").toString();
     add(gross, year, amount);
     if (exemption && e.type === "DIVIDEND" && isExemptible(e, exemption)) {
@@ -89,7 +107,7 @@ export function withholdingsOf(
   year: number,
   zone: string,
 ): Withholdings {
-  const withheld = inYear(events, year, zone).filter(isSavingsIncome);
+  const withheld = inYear(events, year, zone);
   return {
     total: withheld
       .reduce(
@@ -108,5 +126,5 @@ export function savingsIncomeCountOf(
   year: number,
   zone: string,
 ): number {
-  return inYear(events, year, zone).filter(isSavingsIncome).length;
+  return inYear(events, year, zone).length;
 }

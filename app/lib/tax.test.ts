@@ -1,9 +1,11 @@
+import Decimal from "decimal.js";
 import { describe, expect, it } from "vitest";
 
 import {
   instrumentTypeSchema,
   type DividendEvent,
   type Instrument,
+  type InterestEvent,
   type LedgerEvent,
   type TradeEvent,
 } from "~/core/domain";
@@ -984,5 +986,43 @@ describe("the dividend exemption", () => {
     expect(view(events, 2025).savingsIncome.exempt).toBe("1000.00");
     expect(view(events, 2026).savingsIncome.exempt).toBe("1200.00");
     expect(view(events, 2026).savingsIncome.finalNet).toBe("0");
+  });
+});
+
+describe("Trade Republic interest", () => {
+  function interest(ts: string, grossAmount: string, source: string) {
+    const income: InterestEvent = {
+      id: `evt-${seq++}`,
+      ts: new Date(ts),
+      type: "INTEREST",
+      grossAmount,
+      taxWithheld: new Decimal(grossAmount).times("0.19").toFixed(2),
+      currency: "EUR",
+      account: "test",
+      source,
+    };
+    return income;
+  }
+  const view = (events: readonly LedgerEvent[], year: number) =>
+    buildTaxYearView(events, [], year, BIZKAIA, "2026-12-31");
+
+  it("paid on 1 January in Madrid counts for the year before, withholding and count included", () => {
+    const events = [
+      interest("2025-12-31T23:30:00Z", "20", "TR_CSV"),
+      interest("2026-01-02T09:00:00Z", "10", "TR_CSV"),
+    ];
+    expect(view(events, 2025).savingsIncome).toMatchObject({
+      count: 1,
+      gross: "20.00",
+    });
+    expect(view(events, 2025).withholdings.total).toBe("3.80");
+    expect(view(events, 2026).savingsIncome.gross).toBe("10.00");
+    expect(listTaxYears(events, MADRID)).toEqual([2026, 2025]);
+  });
+
+  it("from another source keeps the year of its own day", () => {
+    const events = [interest("2026-01-01T09:00:00Z", "20", "TEST")];
+    expect(view(events, 2026).savingsIncome.gross).toBe("20.00");
+    expect(view(events, 2025).savingsIncome.gross).toBe("0.00");
   });
 });
