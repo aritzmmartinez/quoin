@@ -1,14 +1,6 @@
 import Decimal from "decimal.js";
 
-import type { LedgerEvent } from "../domain";
-
-import { territoryRules } from "./territory";
-import {
-  computeTaxHistory,
-  taxYearOf,
-  type TaxHistory,
-  type TaxOptions,
-} from "./tax-lots";
+import { taxYearOf, type TaxHistory } from "./tax-lots";
 
 export interface CarryforwardStep {
   year: number;
@@ -18,15 +10,17 @@ export interface CarryforwardStep {
   pendingLossRemaining: string;
 }
 
-export interface CarryforwardResult {
-  targetYear: number;
-  steps: CarryforwardStep[];
-  netSavingsBase: string;
-}
-
-/** A year's step in one pool. `crossOffset` is what the other pool moved into it: positive absorbs a loss, negative gives up a gain. */
+/**
+ * A year's step in one pool. `crossOffset` is what the other pool's balance
+ * of the year moved into it: positive absorbs a loss, negative gives up a
+ * gain. `absorbedFromOther` is the other pool's pending losses that this
+ * pool's positive balance took; `crossedToOther` is this pool's pending
+ * losses that the other took.
+ */
 export interface PoolStep extends CarryforwardStep {
   crossOffset: string;
+  absorbedFromOther: string;
+  crossedToOther: string;
 }
 
 export interface PoolResult {
@@ -47,48 +41,34 @@ interface Pool {
   steps: PoolStep[];
 }
 
-/**
- * One year of one pool: the cross offset applies first, then a positive
- * remainder consumes pending losses oldest first, and a negative one becomes
- * a pending loss of that year.
- */
-function settle(pool: Pool, year: number, ownNet: Decimal, cross: Decimal) {
-  const afterCross = ownNet.plus(cross);
-  let consumed = new Decimal(0);
+const ZERO = new Decimal(0);
 
-  if (afterCross.lt(0)) {
-    pool.pending.push({ year, remaining: afterCross.abs() });
-  } else if (afterCross.gt(0)) {
-    let remaining = afterCross;
-    for (const loss of pool.pending) {
-      if (remaining.lte(0)) break;
-      if (loss.remaining.lte(0)) continue;
-      const applied = Decimal.min(loss.remaining, remaining);
-      loss.remaining = loss.remaining.minus(applied);
-      remaining = remaining.minus(applied);
-      consumed = consumed.plus(applied);
-    }
+/** Takes up to `amount` of a pool's pending losses, oldest year first, and returns what it took. */
+function consumePending(pool: Pool, amount: Decimal): Decimal {
+  let consumed = ZERO;
+  for (const loss of pool.pending) {
+    const left = amount.minus(consumed);
+    if (left.lte(0)) break;
+    const applied = Decimal.min(loss.remaining, left);
+    loss.remaining = loss.remaining.minus(applied);
+    consumed = consumed.plus(applied);
   }
+  return consumed;
+}
 
-  pool.steps.push({
-    year,
-    ownNet: ownNet.toFixed(),
-    crossOffset: cross.toFixed(),
-    consumedFromCarryforward: consumed.toFixed(),
-    finalNet: afterCross.minus(consumed).toFixed(),
-    pendingLossRemaining: pool.pending
-      .reduce((sum, loss) => sum.plus(loss.remaining), new Decimal(0))
-      .toFixed(),
-  });
+function pendingOf(pool: Pool): Decimal {
+  return pool.pending.reduce((sum, loss) => sum.plus(loss.remaining), ZERO);
 }
 
 /**
  * A year's negative balance in one pool offsets the other's positive balance
  * of that same year, up to `limit` of it.
- * ponytail: only same-year balances cross; régimen común also crosses pending
- * losses from earlier years, add it with that territory.
  */
-function crossOffsets(a: Decimal, b: Decimal, limit: Decimal): [Decimal, Decimal] {
+function crossOffsets(
+  a: Decimal,
+  b: Decimal,
+  limit: Decimal,
+): [Decimal, Decimal] {
   if (a.lt(0) && b.gt(0)) {
     const x = Decimal.min(a.abs(), b.times(limit));
     return [x, x.neg()];
@@ -97,7 +77,7 @@ function crossOffsets(a: Decimal, b: Decimal, limit: Decimal): [Decimal, Decimal
     const x = Decimal.min(b.abs(), a.times(limit));
     return [x.neg(), x];
   }
-  return [new Decimal(0), new Decimal(0)];
+  return [ZERO, ZERO];
 }
 
 /**
@@ -111,17 +91,25 @@ export function carryforwardPool(
   year: number,
   years: number,
 ): PoolResult {
-  const pool: Pool = { pending: [], steps: [] };
-  for (let y = year - years; y <= year; y++) {
-    settle(pool, y, netOf(y), new Decimal(0));
-  }
-  return { steps: pool.steps, finalNet: pool.steps[pool.steps.length - 1]!.finalNet };
+  return carryforwardPools([netOf, () => ZERO], year, years, "0").pools[0];
 }
 
 /**
  * Two pools advancing year by year together, because what one absorbs from
- * the other in a year is no longer a loss it carries. The savings base is the
- * sum of their positive final balances.
+ * the other is no longer a loss it carries. Each year:
+ *
+ * 1. A pool's negative balance offsets the other's positive one, up to
+ *    `limit` of that positive balance.
+ * 2. Each positive remainder consumes its own pool's pending losses, oldest
+ *    first, without limit.
+ * 3. Pending losses still left in one pool offset what remains positive in
+ *    the other, oldest first, up to what the limit has left after step 1: the
+ *    limit is one per year and receiving pool, over its own positive balance.
+ *
+ * Only earlier years' losses are pending in step 3; the year's own negative
+ * balance joins them after it. At most one direction applies in step 3: a
+ * pool still positive after step 2 has no pending loss left. The savings base
+ * is the sum of the positive final balances.
  */
 export function carryforwardPools(
   netsOf: readonly [NetOf, NetOf],
@@ -130,16 +118,46 @@ export function carryforwardPools(
   crossOffsetLimit: string,
 ): PoolsResult {
   const limit = new Decimal(crossOffsetLimit);
-  const a: Pool = { pending: [], steps: [] };
-  const b: Pool = { pending: [], steps: [] };
+  const pair: [Pool, Pool] = [
+    { pending: [], steps: [] },
+    { pending: [], steps: [] },
+  ];
   for (let y = year - years; y <= year; y++) {
-    const netA = netsOf[0](y);
-    const netB = netsOf[1](y);
-    const [crossA, crossB] = crossOffsets(netA, netB, limit);
-    settle(a, y, netA, crossA);
-    settle(b, y, netB, crossB);
+    const own = [netsOf[0](y), netsOf[1](y)];
+    const cross = crossOffsets(own[0]!, own[1]!, limit);
+    const after = own.map((net, i) => net.plus(cross[i]!));
+    const consumed = pair.map((pool, i) =>
+      after[i]!.gt(0) ? consumePending(pool, after[i]!) : ZERO,
+    );
+    const absorbed = pair.map((_, i) => {
+      const other = pair[1 - i]!;
+      const room = limit
+        .times(Decimal.max(own[i]!, 0))
+        .minus(Decimal.max(cross[1 - i]!, 0));
+      const rest = after[i]!.minus(consumed[i]!);
+      return rest.gt(0) && room.gt(0)
+        ? consumePending(other, Decimal.min(rest, room))
+        : ZERO;
+    });
+
+    pair.forEach((pool, i) => {
+      const finalNet = after[i]!.minus(consumed[i]!).minus(absorbed[i]!);
+      if (finalNet.lt(0)) {
+        pool.pending.push({ year: y, remaining: finalNet.abs() });
+      }
+      pool.steps.push({
+        year: y,
+        ownNet: own[i]!.toFixed(),
+        crossOffset: cross[i]!.toFixed(),
+        consumedFromCarryforward: consumed[i]!.toFixed(),
+        absorbedFromOther: absorbed[i]!.toFixed(),
+        crossedToOther: absorbed[1 - i]!.toFixed(),
+        finalNet: finalNet.toFixed(),
+        pendingLossRemaining: pendingOf(pool).toFixed(),
+      });
+    });
   }
-  const pools: [PoolResult, PoolResult] = [a, b].map((pool) => ({
+  const pools: [PoolResult, PoolResult] = pair.map((pool) => ({
     steps: pool.steps,
     finalNet: pool.steps[pool.steps.length - 1]!.finalNet,
   })) as [PoolResult, PoolResult];
@@ -153,35 +171,11 @@ export function carryforwardPools(
 }
 
 /**
- * The capital-gains pool alone. A year's own net is its computable net: the
- * deferred losses that compute in it are already inside, so a year that ends
- * negative because of one starts that loss's window in that year, not in the
- * year of the sale that deferred it.
+ * The capital-gains pool's net of a year is its computable net: the deferred
+ * losses that compute in it are already inside, so a year that ends negative
+ * because of one starts that loss's window in that year, not in the year of
+ * the sale that deferred it.
  */
-export function computeNetWithCarryforward(
-  events: readonly LedgerEvent[],
-  year: number,
-  options: TaxOptions,
-): CarryforwardResult {
-  return carryforwardFrom(computeTaxHistory(events, options), year);
-}
-
-export function carryforwardFrom(
-  history: TaxHistory,
-  year: number,
-): CarryforwardResult {
-  const { steps, finalNet } = carryforwardPool(
-    gainsNetOf(history),
-    year,
-    territoryRules(history.territory).lossCarryforwardYears,
-  );
-  return {
-    targetYear: year,
-    steps: steps.map(({ crossOffset: _, ...step }) => step),
-    netSavingsBase: finalNet,
-  };
-}
-
 export function gainsNetOf(history: TaxHistory): NetOf {
   return (y) => new Decimal(taxYearOf(history, y).computableNet);
 }

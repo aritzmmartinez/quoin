@@ -52,7 +52,7 @@ Three decisions worth keeping:
 - `domain/`      value objects (Money as string + decimal.js), ledger event types, exposure leaves, `resolveIntrinsic` / `resolveWithHoldings` / `canonicaliseLeaves`, `InflationIndex` + `Period` / `periodOf` / `deflate` and the `Revalue` function every projection takes to work in real terms, the portfolio target and `getActiveTarget`
 - `ports/`       interfaces: `LedgerRepository`, `InstrumentRepository`, `MarketDataProvider`, `PriceRepository`, `HoldingsRepository`, `SecurityIdentityResolver`, `SecurityIdentityRepository`, `InflationRepository`, `TargetRepository` (planned: `FxProvider`)
 - `projections/` pure functions: `walkAvco` and the two views over it (`computePositions`, `computeRealizedGains`), `computeTradeMeta`, `computeMarketValues`, `computeCostBasisTimeline`, `computeInvestedVsValueSeries`, `computePortfolioSummary` / `computeAllocation` / `computeTopPositions`, `computeReturns` and `computePortfolioReturns` over the shared `xirr` solver, `computeExposures` (look-through), `computeCurrencyExposure`, `computeFundOverlap` / `computeAllFundOverlaps`, `realBasis`, `deriveTargetWeights`, `computeRebalance`, `computeProjection` / `projectionWindow` / `solveContribution` / `solveHorizon`
-- `tax/`         the Bizkaia *foral* capital-gains projection, separate from `projections/` because it answers a different question about the same ledger: `walkFifo` (the shared FIFO fold, in the one trade order core fixes), `assessWashSales` (how much of each loss sale was repurchased, and by which units), `walkDeferredLosses` (where each non-computable loss travels and when it computes), `computeTaxHistory` (one pass over the whole ledger) with `taxYearOf` / `computeTaxLots` (one fiscal year) and `computeNetWithCarryforward` over it, and `territory.ts` (`TerritoryRules`: scales, repurchase and swap rules, carryforward years, the unlisted notice). `Territory` is `"bizkaia"` only — Spanish IRPF, not a multi-country abstraction.
+- `tax/`         the capital-gains projection of the residence's territory (Bizkaia *foral* or régimen común), separate from `projections/` because it answers a different question about the same ledger: `walkFifo` (the shared FIFO fold, in the one trade order core fixes), `assessWashSales` (how much of each loss sale was repurchased, and by which units), `walkDeferredLosses` (where each non-computable loss travels and when it computes), `computeTaxHistory` (one pass over the whole ledger) with `taxYearOf` / `computeTaxLots` (one fiscal year) and `carryforwardPools` over it, and `territory.ts` (`TerritoryRules`: citations, scales, repurchase and swap rules, carryforward years, the cross limit, the unlisted notice). `Territory` is `"bizkaia" | "comun"` — Spanish IRPF, not a multi-country abstraction.
 
 ### adapters
 - `ingestion/`   `TradeRepublicCsvAdapter` + `KrakenCsvAdapter` (CSV -> events; filter card spending / non-BTC crypto; dedup by transaction id) and `holdings/`, one issuer-agnostic parser for fund compositions
@@ -234,11 +234,11 @@ fund is not part of today's concentration.
 
 #### The foral return is FIFO, and it is a separate projection
 
-The Bizkaia foral return pairs a disposal with the **oldest lots first**, where the
+The tax return, foral or común, pairs a disposal with the **oldest lots first**, where the
 portfolio view uses AVCO. `walkFifo` is the counterpart to `walkAvco` — one fold, per
 instrument queue, that both `computeTaxLots` (one fiscal year) and
-`computeNetWithCarryforward` (the target year and the four before it) are views over. The
-fiscal year is Madrid's calendar, the same timezone rule as `periodOf`. Nothing FIFO is
+`carryforwardPools` (the target year and the four before it) are views over. The
+fiscal year is the residence zone's calendar, the same timezone rule as `periodOf`. Nothing FIFO is
 persisted: every figure is recomputed from the ledger on read, so it can never drift from
 the events, and the AVCO realised view is untouched beside it.
 
@@ -262,7 +262,7 @@ rule, rather than trusting the repository's `orderBy`. A unit repurchases one sa
 assigned to the oldest sale first; that, and which held units receive a deferral, are
 Quoin's own criteria and say so beside the code. Because a year can depend on a sale from
 any earlier year, everything is **one pass over the whole ledger** split into years
-afterwards, never a per-year recomputation. **Carryforward is recomputed, not tracked.** `computeNetWithCarryforward`
+afterwards, never a per-year recomputation. **Carryforward is recomputed, not tracked.** `carryforwardPools`
 walks `targetYear − 4 .. targetYear` over that single pass, consuming pending losses
 oldest-first; restricting the window to four years is what enforces expiry without storing
 a countdown. A deferred loss counts in the year it computes, so a year that ends negative

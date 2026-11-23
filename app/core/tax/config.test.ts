@@ -2,7 +2,24 @@ import { describe, expect, it } from "vitest";
 
 import { Money } from "../domain";
 
-import { computeSavingsQuota, getTaxScale } from "./config";
+import { computeSavingsQuota, getTaxScale, jurisdictionOf } from "./config";
+
+describe("jurisdictionOf", () => {
+  it("puts the peninsula and the islands under régimen común, each in its own zone", () => {
+    expect(jurisdictionOf("bizkaia")).toEqual({
+      territory: "bizkaia",
+      zone: "Europe/Madrid",
+    });
+    expect(jurisdictionOf("comun")).toEqual({
+      territory: "comun",
+      zone: "Europe/Madrid",
+    });
+    expect(jurisdictionOf("canarias")).toEqual({
+      territory: "comun",
+      zone: "Atlantic/Canary",
+    });
+  });
+});
 
 describe("getTaxScale", () => {
   it("finds the 2026 Bizkaia scale", () => {
@@ -23,6 +40,16 @@ describe("getTaxScale", () => {
 
   it("returns null for a year before the first scale on file", () => {
     expect(getTaxScale("bizkaia", 2024)).toBeNull();
+    expect(getTaxScale("comun", 2024)).toBeNull();
+  });
+
+  it("taxes régimen común from 2025 at 19% up to 6000 and 30% above 300000", () => {
+    const scale = getTaxScale("comun", 2026)!;
+    expect(scale.year).toBe(2025);
+    expect(computeSavingsQuota(Money.fromString("6000"), scale).toString()).toBe("1140");
+    expect(computeSavingsQuota(Money.fromString("310000"), scale).toString()).toBe(
+      "74880",
+    );
   });
 });
 

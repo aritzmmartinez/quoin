@@ -6,10 +6,12 @@ import { Money, type Residence } from "../domain";
 import { territoryRules } from "./territory";
 
 /** Spanish IRPF territories only (foral and común) — not a multi-country abstraction. */
-export type Territory = "bizkaia";
+export type Territory = "bizkaia" | "comun";
 
 const TERRITORIES: Record<Residence, Territory> = {
   bizkaia: "bizkaia",
+  comun: "comun",
+  canarias: "comun",
 };
 
 export function territoryOfResidence(residence: Residence): Territory {
@@ -33,8 +35,6 @@ export type RepurchaseAssetClass =
   | "listed-security"
   | "fungible-crypto"
   | "unclassified";
-
-export type RepurchaseLetter = "g" | "i";
 
 /**
  * Pérdidas patrimoniales no computables por recompra. Each rule is one entry
@@ -61,7 +61,6 @@ export type RepurchaseLetter = "g" | "i";
  * instead.
  */
 export interface RepurchaseRule {
-  letter: RepurchaseLetter;
   assetClass: RepurchaseAssetClass;
   windowMonths: number;
   homogeneity: "instrument";

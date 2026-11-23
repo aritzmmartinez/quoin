@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const RESIDENCES = ["bizkaia"] as const;
+export const RESIDENCES = ["bizkaia", "comun", "canarias"] as const;
 export const residenceSchema = z.enum(RESIDENCES);
 export type Residence = z.infer<typeof residenceSchema>;
 

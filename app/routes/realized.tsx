@@ -20,6 +20,7 @@ import {
 } from "~/components";
 import { fiscalYearOf, today } from "~/core/calendar";
 import { computeRealizedGains } from "~/core/projections";
+import { territoryRules } from "~/core/tax";
 import {
   buildTaxYearView,
   type Copy,
@@ -62,7 +63,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const locale = parseLocale(request.headers.get("Cookie"));
   const tag = intlTag(locale);
 
-  const [events, instruments, { jurisdiction }] = await Promise.all([
+  const [events, instruments, { jurisdiction, residence }] = await Promise.all([
     new PrismaLedgerRepository().list(),
     new PrismaInstrumentRepository().list(),
     loadResidence(),
@@ -95,6 +96,8 @@ export async function loader({ request }: Route.LoaderArgs) {
       checkStale: real.checkStale,
     },
     fiscal: {
+      territory: jurisdiction.territory,
+      residence,
       noRate: taxExclusions(events, instruments),
       unclassified: unclassifiedSales(events, instruments),
       years: taxYears,
@@ -125,7 +128,7 @@ export default function Realized({ loaderData }: Route.ComponentProps) {
     return (
       <>
         <header className="mb-4">
-          <RealizedViewTabs value={view} />
+          <RealizedViewTabs value={view} residence={fiscal.residence} />
         </header>
         {fiscal.noRate.length > 0 && (
           <Explainer tone="notice" className="mb-4">
@@ -134,13 +137,17 @@ export default function Realized({ loaderData }: Route.ComponentProps) {
         )}
         {fiscal.unclassified.length > 0 && (
           <Explainer tone="notice" className="mb-4">
-            {t.common.unclassifiedTax(fiscal.unclassified.join(", "))}
+            {t.common.unclassifiedTax(
+              fiscal.unclassified.join(", "),
+              territoryRules(fiscal.territory).citations.repurchase,
+            )}
           </Explainer>
         )}
         <TaxYearPanel
           years={fiscal.years}
           year={fiscal.year}
           currentYear={fiscal.currentYear}
+          territory={fiscal.territory}
           view={fiscal.view}
         />
       </>
@@ -150,7 +157,7 @@ export default function Realized({ loaderData }: Route.ComponentProps) {
   return (
     <div className="flex flex-col gap-4">
       <header className="flex flex-wrap items-center justify-between gap-4">
-        <RealizedViewTabs value={view} />
+        <RealizedViewTabs value={view} residence={fiscal.residence} />
         <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted">
           {totals.count > 0 && (
             <>

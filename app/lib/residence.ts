@@ -1,5 +1,9 @@
 import { zoneOfResidence } from "~/core/calendar";
-import { UnsupportedResidenceError, type Residence } from "~/core/domain";
+import {
+  residenceSchema,
+  UnsupportedResidenceError,
+  type Residence,
+} from "~/core/domain";
 import { jurisdictionOf, type Jurisdiction } from "~/core/tax";
 
 export const UNSUPPORTED_RESIDENCE = "unsupported-residence";
@@ -9,6 +13,16 @@ export function isUnsupportedResidence(error: unknown): boolean {
   const data = (error as { data?: { code?: unknown } } | null | undefined)
     ?.data;
   return data?.code === UNSUPPORTED_RESIDENCE;
+}
+
+/**
+ * The zone a sync backup's day is named in. A residence this version does not
+ * know still gets its backup, named in UTC: a file name is no reason to skip
+ * one.
+ */
+export function backupZoneOf(residence: string): string {
+  const parsed = residenceSchema.safeParse(residence);
+  return parsed.success ? zoneOfResidence(parsed.data) : "UTC";
 }
 
 export interface ResidenceContext {

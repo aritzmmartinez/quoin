@@ -457,7 +457,7 @@ describe("repurchase rules", () => {
       expect(
         repurchaseRuleFor("bizkaia", "listed-security", day),
       ).toMatchObject({
-        letter: "g",
+        assetClass: "listed-security",
         windowMonths: 2,
         homogeneity: "instrument",
         acquisitions: "all",
@@ -477,7 +477,7 @@ describe("repurchase rules", () => {
       expect(
         repurchaseRuleFor("bizkaia", "fungible-crypto", day),
       ).toMatchObject({
-        letter: "i",
+        assetClass: "fungible-crypto",
         windowMonths: 2,
         homogeneity: "instrument",
         acquisitions: "all",
@@ -489,7 +489,7 @@ describe("repurchase rules", () => {
     const buy = trade("BUY", "X", "10", "1000", { ts: "2025-01-01" });
     const sell = trade("SELL", "X", "10", "700", { ts: "2025-03-01" });
 
-    expect(assess([buy, sell]).bySale.get(sell.id)?.rule.letter).toBe("g");
+    expect(assess([buy, sell]).bySale.get(sell.id)?.rule.assetClass).toBe("listed-security");
   });
 });
 
@@ -545,7 +545,7 @@ describe("Art. 43.i — fungible crypto from 1 January 2025", () => {
     const after = trade("BUY", "BTC", "1", "52000", { ts: "2025-07-10" });
 
     const assessment = assessed([lot, sell, after]);
-    expect(assessment?.rule.letter).toBe("i");
+    expect(assessment?.rule.assetClass).toBe("fungible-crypto");
     expect(assessment?.repurchased.toFixed()).toBe("1");
   });
 

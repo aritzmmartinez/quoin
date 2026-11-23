@@ -4,8 +4,8 @@ import type { TradeEvent } from "../domain";
 
 import Decimal from "decimal.js";
 
-import { carryforwardPools, computeNetWithCarryforward } from "./carryforward";
-import type { TaxOptions } from "./tax-lots";
+import { carryforwardPool, carryforwardPools, gainsNetOf } from "./carryforward";
+import { computeTaxHistory, type TaxOptions } from "./tax-lots";
 
 const MADRID = "Europe/Madrid";
 
@@ -56,13 +56,21 @@ function listed(events: readonly TradeEvent[]): TaxOptions {
   };
 }
 
-describe("computeNetWithCarryforward", () => {
+function gainsPool(events: readonly TradeEvent[], year: number) {
+  return carryforwardPool(
+    gainsNetOf(computeTaxHistory(events, listed(events))),
+    year,
+    4,
+  );
+}
+
+describe("the capital-gains pool over a ledger", () => {
   it("passes a year through unchanged when nothing was ever negative", () => {
     const events = yearRoundTrip("X", 2026, 2026, "1000", "1300");
 
-    const result = computeNetWithCarryforward(events, 2026, listed(events));
+    const result = gainsPool(events, 2026);
 
-    expect(result.netSavingsBase).toBe("300");
+    expect(result.finalNet).toBe("300");
     expect(result.steps.every((s) => s.consumedFromCarryforward === "0")).toBe(
       true,
     );
@@ -77,7 +85,7 @@ describe("computeNetWithCarryforward", () => {
       ...yearRoundTrip("E", 2026, 2026, "1000", "2000"), // +1000
     ];
 
-    const result = computeNetWithCarryforward(events, 2026, listed(events));
+    const result = gainsPool(events, 2026);
 
     expect(result.steps.map((s) => [s.year, s.ownNet, s.finalNet])).toEqual([
       [2022, "-1000", "-1000"],
@@ -87,7 +95,7 @@ describe("computeNetWithCarryforward", () => {
       [2026, "1000", "500"], // consumes the last 300 from 2022, then 200 from 2024
     ]);
     expect(result.steps[4]!.consumedFromCarryforward).toBe("500");
-    expect(result.netSavingsBase).toBe("500");
+    expect(result.finalNet).toBe("500");
   });
 
   it("lets a loss older than 4 years expire unused", () => {
@@ -96,10 +104,10 @@ describe("computeNetWithCarryforward", () => {
       ...yearRoundTrip("B", 2026, 2026, "1000", "1500"), // +500 in the target year
     ];
 
-    const result = computeNetWithCarryforward(events, 2026, listed(events));
+    const result = gainsPool(events, 2026);
 
     expect(result.steps[0]!.year).toBe(2022);
-    expect(result.netSavingsBase).toBe("500");
+    expect(result.finalNet).toBe("500");
   });
 
   it("never lets pending losses go negative or overshoot the offsetting gain", () => {
@@ -108,7 +116,7 @@ describe("computeNetWithCarryforward", () => {
       ...yearRoundTrip("B", 2026, 2026, "1000", "1100"), // +100, less than the loss
     ];
 
-    const result = computeNetWithCarryforward(events, 2026, listed(events));
+    const result = gainsPool(events, 2026);
 
     const finalStep = result.steps[result.steps.length - 1]!;
     expect(finalStep.consumedFromCarryforward).toBe("100");
@@ -124,7 +132,7 @@ describe("computeNetWithCarryforward", () => {
       ...yearRoundTrip("Y", 2027, 2027, "1000", "1400"), // +400
     ];
 
-    const result = computeNetWithCarryforward(events, 2027, listed(events));
+    const result = gainsPool(events, 2027);
 
     expect(result.steps.map((s) => [s.year, s.ownNet, s.finalNet])).toEqual([
       [2023, "0", "0"],
@@ -133,7 +141,7 @@ describe("computeNetWithCarryforward", () => {
       [2026, "-250", "-250"],
       [2027, "400", "150"],
     ]);
-    expect(result.netSavingsBase).toBe("150");
+    expect(result.finalNet).toBe("150");
   });
   it("the four years run from the year a deferred loss computes, not from the sale that deferred it", () => {
     const events = [
@@ -144,10 +152,10 @@ describe("computeNetWithCarryforward", () => {
       ...yearRoundTrip("Y", 2029, 2029, "1000", "1400"), // +400
     ];
 
-    const result = computeNetWithCarryforward(events, 2029, listed(events));
+    const result = gainsPool(events, 2029);
 
     expect(result.steps[0]).toMatchObject({ year: 2025, ownNet: "-250" });
-    expect(result.netSavingsBase).toBe("150");
+    expect(result.finalNet).toBe("150");
   });
 });
 
@@ -170,5 +178,51 @@ describe("carryforwardPools", () => {
     expect(gains.steps[4]).toMatchObject({ crossOffset: "75", finalNet: "-925" });
     expect(income.finalNet).toBe("225");
     expect(result.savingsBase).toBe("225");
+  });
+
+  const cross = (gains: Record<number, string>, income: Record<number, string>) =>
+    carryforwardPools([nets(gains), nets(income)], 2025, 4, "0.25");
+
+  it("lets the year's cross and an earlier loss's cross share one 25% limit", () => {
+    const result = cross({ 2024: "-3000", 2025: "-400" }, { 2025: "2000" });
+    const [gains, income] = result.pools;
+    expect(income.steps[4]).toMatchObject({
+      crossOffset: "-400",
+      absorbedFromOther: "100",
+      finalNet: "1500",
+    });
+    expect(gains.steps[4]).toMatchObject({
+      crossOffset: "400",
+      crossedToOther: "100",
+      finalNet: "0",
+      pendingLossRemaining: "2900",
+    });
+  });
+
+  it("absorbs a pool's own pending loss before crossing what is left", () => {
+    const [gains, income] = cross({ 2024: "-1000", 2025: "600" }, { 2025: "2000" }).pools;
+    expect(gains.steps[4]).toMatchObject({
+      consumedFromCarryforward: "600",
+      crossedToOther: "400",
+      pendingLossRemaining: "0",
+    });
+    expect(income.finalNet).toBe("1600");
+  });
+
+  it("crosses an earlier loss only into what the other pool has left after its own", () => {
+    const [gains, income] = cross({ 2024: "-1000" }, { 2024: "-1900", 2025: "2000" }).pools;
+    expect(income.steps[4]).toMatchObject({
+      consumedFromCarryforward: "1900",
+      absorbedFromOther: "100",
+      finalNet: "0",
+    });
+    expect(gains.finalNet).toBe("0");
+    expect(gains.steps[4]!.pendingLossRemaining).toBe("900");
+  });
+
+  it("never crosses a year's own loss as if it were pending", () => {
+    const [gains, income] = cross({ 2025: "-1000" }, { 2025: "2000" }).pools;
+    expect(gains.steps[4]).toMatchObject({ crossOffset: "500", crossedToOther: "0", finalNet: "-500" });
+    expect(income.finalNet).toBe("1500");
   });
 });

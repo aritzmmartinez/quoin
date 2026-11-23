@@ -33,7 +33,7 @@ describe("PrismaSettingsRepository (integration)", () => {
 
   it("refuses to write a residence the domain does not know", async () => {
     const repo = new persistence.PrismaSettingsRepository();
-    await expect(repo.setResidence("canarias" as Residence)).rejects.toThrow();
+    await expect(repo.setResidence("atlantis" as Residence)).rejects.toThrow();
     expect(await repo.residence()).toBe("bizkaia");
   });
 

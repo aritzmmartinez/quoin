@@ -3,7 +3,7 @@ import Decimal from "decimal.js";
 import { fiscalYearOf } from "../calendar";
 import { Money, type LedgerEvent, type Revalue } from "../domain";
 
-import type { RepurchaseLetter, Territory } from "./config";
+import type { RepurchaseAssetClass, Territory } from "./config";
 import {
   walkDeferredLosses,
   type DeferredLossPiece,
@@ -40,7 +40,8 @@ export interface WashSaleRecipientDetail {
 }
 
 export interface WashSaleDetail {
-  letter: RepurchaseLetter;
+  source: string;
+  assetClass: RepurchaseAssetClass;
   windowMonths: number;
   window: WashSaleWindow;
   before: string;
@@ -76,7 +77,7 @@ export interface RealizedGainDetail {
 }
 
 export interface RepurchaseWindowDetail {
-  letter: RepurchaseLetter;
+  source: string;
   window: WashSaleWindow;
 }
 
@@ -139,7 +140,7 @@ export function computeTaxHistory(
           ? washSaleDetail(assessment, deferral.shares)
           : null,
       repurchaseWindow: assessment
-        ? { letter: assessment.rule.letter, window: assessment.window }
+        ? { source: assessment.rule.source, window: assessment.window }
         : null,
       unlistedNotice: notice
         ? { buyEventId: notice.buyEventId, buyTs: notice.buyTs }
@@ -248,7 +249,8 @@ function washSaleDetail(
     shares.map((s) => [s.buyEventId, total(s.pieces)]),
   );
   return {
-    letter: assessment.rule.letter,
+    source: assessment.rule.source,
+    assetClass: assessment.rule.assetClass,
     windowMonths: assessment.rule.windowMonths,
     window: assessment.window,
     before: assessment.before.toFixed(),
