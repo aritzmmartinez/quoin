@@ -10,6 +10,7 @@ import {
   useCopy,
   useFormat,
 } from "~/lib";
+import { territoryRules, type Territory } from "~/core/tax";
 
 import { Card } from "../ui/Card";
 import { InfoHint } from "../ui/Hint";
@@ -206,7 +207,10 @@ export function TaxYearPanel({
 
           {(view.savingsIncome.count > 0 ||
             view.savingsIncome.finalNet !== "0") && (
-            <SavingsIncomeCard income={view.savingsIncome} />
+            <SavingsIncomeCard
+              income={view.savingsIncome}
+              territory={view.territory}
+            />
           )}
 
           {view.inKindIncome.count > 0 && (
@@ -290,9 +294,16 @@ function SummaryFigure({
   );
 }
 
-function SavingsIncomeCard({ income }: { income: TaxSavingsIncome }) {
+function SavingsIncomeCard({
+  income,
+  territory,
+}: {
+  income: TaxSavingsIncome;
+  territory: Territory;
+}) {
   const { formatMoney } = useFormat();
   const copy = useCopy().realized.fiscal.savingsIncome;
+  const limit = territoryRules(territory).dividendExemption?.limit;
   return (
     <FiguresCard
       title={copy.title}
@@ -306,8 +317,8 @@ function SavingsIncomeCard({ income }: { income: TaxSavingsIncome }) {
         { label: copy.finalNet, value: formatMoney(income.finalNet) },
       ]}
       note={
-        income.exemptSource !== null
-          ? copy.exemptNote(income.exemptSource)
+        income.exemptSource !== null && limit !== undefined
+          ? copy.exemptNote(income.exemptSource, formatMoney(limit, 0))
           : undefined
       }
     />
