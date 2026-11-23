@@ -1441,11 +1441,22 @@ export const es = {
       intro:
         "Mismas ventas, con criterio FIFO en vez de AVCO, que es el que exige la declaración foral de Bizkaia (NF 13/2013) y no el de la pestaña de Ventas. Las pérdidas con recompra en los dos meses anteriores o posteriores se difieren según el Art. 43 (letra g para valores homogéneos y, en las transmisiones desde el 1 de enero de 2025, letra i para criptoactivos del mismo tipo), en la proporción recomprada, y se integran cuando se transmiten los recomprados; la compensación con años anteriores sigue el Art. 66. La aritmética de la recompra sigue las consultas de la DGT V1403-21, V1117-21 y V3282-18 sobre la norma estatal paralela, que no vinculan a la Hacienda Foral.",
       yearLabel: "Año fiscal",
-      noYears: "No hay ventas registradas todavía en ningún año.",
+      noYears: "No hay ventas ni rendimientos registrados todavía en ningún año.",
       summary: {
         netBase: "Base liquidable del ahorro",
+        gainsBalance: "Saldo de ganancias y pérdidas",
+        incomeBalance: "Saldo de rendimientos del capital mobiliario",
+        pools:
+          "Los rendimientos del capital mobiliario y las ganancias y pérdidas se compensan solo dentro de su propia bolsa (Art. 66.1): la base es la suma de los saldos positivos.",
         quota: "Cuota resultante",
+        withheld: "Retenciones registradas",
+        withheldNote:
+          "Las retenciones son pagos a cuenta de todo el IRPF, no solo de la base del ahorro, y no se restan de la cuota. Suma lo retenido este año en intereses y dividendos cobrados en efectivo y en el saveback de Trade Republic, sin separar retenciones españolas y extranjeras.",
+        interestWithoutWithholding:
+          "Algún interés de este año no tiene retención registrada. Los intereses importados antes de esta versión pueden no traer su retención aunque la tuvieran: compruébalos con el extracto del bróker.",
         scale: (source: string): string => `Escala aplicada: ${source}`,
+        scaleInForce: (year: number): string =>
+          `Se aplica la escala vigente desde ${year}. Si Bizkaia aprueba una nueva para este año, la cuota cambiará.`,
         noScale:
           "Sin escala fiscal cargada para este año. No se puede calcular la cuota.",
       },
@@ -1546,15 +1557,30 @@ export const es = {
       empty: {
         title: "Sin ventas en este año",
         body: "Elige otro año fiscal en el desplegable.",
+        incomeBody:
+          "Este año no tiene ventas, pero sí rendimientos: sus cifras están en el resumen y más abajo.",
+      },
+      savingsIncome: {
+        title: "Rendimientos del capital mobiliario",
+        body: "Intereses y dividendos cobrados en efectivo, y el saveback de Trade Republic, que el bróker declara como rendimiento de cuenta. Importes en bruto. Se compensan solo entre sí, y un saldo negativo se arrastra a los años siguientes (Art. 66.1.a).",
+        count: "Cobros",
+        gross: "Bruto del año",
+        exempt: "Dividendos exentos",
+        decemberInterest:
+          "Los intereses de diciembre se cobran el 1 de enero y cuentan para este año.",
+        exemptNote: (source: string, limit: string) =>
+          `Los dividendos de acciones están exentos hasta ${limit} al año; los de ETF y fondos, no (${source}). Salen del saldo, pero sus retenciones siguen en las registradas. No se comprueba la regla de los dos meses.`,
+        finalNet: "Saldo tras el arrastre",
       },
       inKind: {
         title: "Ingresos en especie",
-        body: "Recompensas de Kraken y saveback de Trade Republic recibidos en participaciones. Clasificación fiscal pendiente de verificar: no se suman a ninguna cifra de esta vista.",
+        body: "Recompensas de Kraken recibidas en participaciones. Clasificación fiscal pendiente de verificar: no se suman a ninguna cifra de esta vista.",
         count: "Recepciones",
         gross: "Valor al recibirlas",
         withheld: "Retenido",
       },
-      carryforwardTitle: "Arrastre de pérdidas, últimos 4 años (Art. 66)",
+      carryforwardTitle: (years: number) =>
+        `Arrastre de pérdidas patrimoniales, últimos ${years} años (Art. 66.1.b)`,
       carryforwardColumns: {
         year: "Año",
         ownNet: "Neto propio",

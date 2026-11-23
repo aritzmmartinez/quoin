@@ -16,18 +16,46 @@ export interface UnlistedNoticeRule {
   readonly windowMonths: number;
 }
 
+/**
+ * Dividends exempt up to `limit` euros a year. With `excludesCollectiveInvestment`,
+ * those of a fund or ETF are never exempt.
+ */
+export interface DividendExemptionRule {
+  readonly limit: string;
+  readonly excludesCollectiveInvestment: boolean;
+  readonly source: string;
+}
+
 /** Everything the tax engine reads that depends on the territory, and only that. */
 export interface TerritoryRules {
   readonly savingsScales: readonly SavingsBaseTaxScale[];
   readonly repurchase: readonly RepurchaseRule[];
   readonly swapValuation: readonly SwapValuationRule[];
   readonly lossCarryforwardYears: number;
+  /**
+   * Share of one savings pool's positive balance that the other pool's negative
+   * balance may offset, as a decimal string. Zero keeps the pools apart.
+   */
+  readonly crossOffsetLimit: string;
+  readonly dividendExemption: DividendExemptionRule | null;
   readonly unlistedNotice: UnlistedNoticeRule;
 }
 
 const TERRITORY_RULES = {
   bizkaia: {
     savingsScales: [
+      {
+        year: 2025,
+        source:
+          "Art. 76 NF 13/2013 de Bizkaia, redacción anterior a la NF 2/2025, vigente hasta 31-12-2025",
+        brackets: [
+          { from: "0", to: "2500", rate: "0.20" },
+          { from: "2500", to: "10000", rate: "0.21" },
+          { from: "10000", to: "15000", rate: "0.22" },
+          { from: "15000", to: "30000", rate: "0.23" },
+          { from: "30000", to: null, rate: "0.25" },
+        ],
+      },
       {
         year: 2026,
         source:
@@ -96,6 +124,18 @@ const TERRITORY_RULES = {
     ],
     /** Art. 66 NF 13/2013 de Bizkaia — integración y compensación de rentas en la base imponible del ahorro (límite de cuatro años). */
     lossCarryforwardYears: 4,
+    /** Art. 66.1 NF 13/2013 de Bizkaia: income and gains compensate only within their own pool. */
+    crossOffsetLimit: "0",
+    /**
+     * Art. 9.24 NF 13/2013 de Bizkaia, over Art. 34.a and b. The exemption does
+     * not reach shares bought in the two months before the payment when
+     * homogeneous ones are sold in the two after; that is not applied.
+     */
+    dividendExemption: {
+      limit: "1500",
+      excludesCollectiveInvestment: true,
+      source: "Art. 9.24 NF 13/2013 de Bizkaia",
+    },
     /** Crypto before letter i: whether a one-year repurchase rule reached those sales is unsettled. */
     unlistedNotice: { assetClass: "fungible-crypto", windowMonths: 12 },
   },

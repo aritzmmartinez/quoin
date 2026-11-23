@@ -208,7 +208,8 @@
             "externalId": "t5",
             "note": null,
             "type": "INTEREST",
-            "grossAmount": "1.23"
+            "grossAmount": "1.23",
+            "taxWithheld": "0"
           },
           {
             "ts": "2025-05-02T09:00:00.000Z",
@@ -249,6 +250,49 @@
         "ratesNeeded": {},
         "failed": 0,
         "imported": 7,
+        "completed": 0,
+        "duplicates": 0
+      }
+    },
+    {
+      "name": "Trade Republic interest with its withholding: gross amount and tax withheld, both kept",
+      "zone": "Europe/Madrid",
+      "encoding": "utf-8",
+      "csv": "datetime,category,type,asset_class,name,symbol,shares,price,amount,fee,tax,currency,transaction_id\n2026-02-01T09:00:00Z,CASH,INTEREST_PAYMENT,,,,,,10,,-1.9,EUR,i1",
+      "rates": [],
+      "prices": [],
+      "stored": {
+        "names": {},
+        "rewardRefids": [],
+        "existing": []
+      },
+      "expect": {
+        "broker": "trade-republic",
+        "total": 1,
+        "instruments": [],
+        "events": [
+          {
+            "ts": "2026-02-01T09:00:00.000Z",
+            "currency": "EUR",
+            "account": "trade-republic",
+            "source": "TR_CSV",
+            "externalId": "i1",
+            "note": null,
+            "type": "INTEREST",
+            "grossAmount": "10",
+            "taxWithheld": "1.9"
+          }
+        ],
+        "operationOf": [
+          0
+        ],
+        "discarded": {},
+        "discardedDetails": {},
+        "noticed": {},
+        "errors": [],
+        "ratesNeeded": {},
+        "failed": 0,
+        "imported": 1,
         "completed": 0,
         "duplicates": 0
       }

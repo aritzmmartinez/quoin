@@ -5,3 +5,4 @@ export * from "./deferred-loss";
 export * from "./tax-lots";
 export * from "./carryforward";
 export * from "./territory";
+export * from "./savings-income";

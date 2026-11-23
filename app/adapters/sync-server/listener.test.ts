@@ -17,6 +17,8 @@ let errors: unknown[] = [];
 let fail: Error | null = null;
 
 const MAX_BODY = 1024;
+/** Generating the identity loads @peculiar/x509, 0.7 s alone and far longer with the whole suite running. */
+const SETUP_TIMEOUT_MS = 60_000;
 const MAX_DECOMPRESSED = 4096;
 
 interface Reply {
@@ -84,10 +86,11 @@ beforeAll(async () => {
       };
     },
   });
-});
+}, SETUP_TIMEOUT_MS);
 
 afterAll(async () => {
-  await listener.close();
+  // A setup that failed leaves no listener, and its own error is the one to read.
+  if (listener !== undefined) await listener.close();
   rmSync(directory, { recursive: true, force: true });
 });
 

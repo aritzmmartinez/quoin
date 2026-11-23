@@ -1424,11 +1424,22 @@ export const en: Copy = {
       intro:
         "The same sales, on a FIFO basis instead of AVCO, which is what the Bizkaia foral tax return (NF 13/2013) requires and not what the Sales tab uses. A loss with a repurchase in the two months before or after is deferred under Art. 43 (letter g for homogeneous securities and, for transmissions from 1 January 2025, letter i for crypto assets of the same type), in the proportion repurchased, and computes when the repurchased units are transmitted; offsetting against earlier years follows Art. 66. The repurchase arithmetic follows the DGT rulings V1403-21, V1117-21 and V3282-18 on the parallel state rule, which do not bind the Hacienda Foral.",
       yearLabel: "Tax year",
-      noYears: "There are no sales recorded in any year yet.",
+      noYears: "There are no sales or income recorded in any year yet.",
       summary: {
         netBase: "Taxable savings base",
+        gainsBalance: "Capital gains and losses balance",
+        incomeBalance: "Income from movable capital balance",
+        pools:
+          "Income from movable capital and capital gains and losses compensate only within their own pool (Art. 66.1): the base is the sum of the positive balances.",
         quota: "Resulting tax",
+        withheld: "Recorded withholdings",
+        withheldNote:
+          "Withholdings are payments on account of the whole income tax, not only of the savings base, and are not subtracted from the tax. This adds up what was withheld this year on interest and dividends paid in cash and on Trade Republic's saveback, with no split between Spanish and foreign withholdings.",
+        interestWithoutWithholding:
+          "Some interest this year has no recorded withholding. Interest imported before this version may lack its withholding even if it had one: check it against the broker's statement.",
         scale: (source: string): string => `Scale applied: ${source}`,
+        scaleInForce: (year: number): string =>
+          `The scale in force since ${year} applies. If Bizkaia approves a new one for this year, the tax will change.`,
         noScale:
           "No tax scale on file for this year. The tax cannot be computed.",
       },
@@ -1528,15 +1539,30 @@ export const en: Copy = {
       empty: {
         title: "No sales in this year",
         body: "Pick another tax year from the dropdown.",
+        incomeBody:
+          "This year has no sales, but it has income: its figures are in the summary and below.",
+      },
+      savingsIncome: {
+        title: "Income from movable capital",
+        body: "Interest and dividends paid in cash, and Trade Republic's saveback, which the broker declares as account income. Gross amounts. They compensate only among themselves, and a negative balance is carried to the following years (Art. 66.1.a).",
+        count: "Payments",
+        gross: "Gross this year",
+        exempt: "Exempt dividends",
+        decemberInterest:
+          "December's interest is paid on 1 January and counts for this year.",
+        exemptNote: (source: string, limit: string) =>
+          `A stock's dividends are exempt up to ${limit} a year; an ETF's or a fund's are not (${source}). They leave the balance, but their withholdings still count among those recorded. The two-month rule is not checked.`,
+        finalNet: "Balance after carryforward",
       },
       inKind: {
         title: "Income received in kind",
-        body: "Kraken rewards and Trade Republic saveback, received as units. Tax classification pending verification: none of it is added to any figure in this view.",
+        body: "Kraken rewards, received as units. Tax classification pending verification: none of it is added to any figure in this view.",
         count: "Receipts",
         gross: "Value on receipt",
         withheld: "Withheld",
       },
-      carryforwardTitle: "Loss carryforward, last 4 years (Art. 66)",
+      carryforwardTitle: (years: number) =>
+        `Capital loss carryforward, last ${years} years (Art. 66.1.b)`,
       carryforwardColumns: {
         year: "Year",
         ownNet: "Own net",

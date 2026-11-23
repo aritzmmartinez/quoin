@@ -18,7 +18,7 @@ import {
   InfoHint,
   signClass,
 } from "~/components";
-import { today } from "~/core/calendar";
+import { fiscalYearOf, today } from "~/core/calendar";
 import { computeRealizedGains } from "~/core/projections";
 import {
   buildTaxYearView,
@@ -99,6 +99,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       unclassified: unclassifiedSales(events, instruments),
       years: taxYears,
       year: taxYear,
+      currentYear: fiscalYearOf(now, zone),
       view:
         view !== "tax" || taxYear === null
           ? null
@@ -139,6 +140,7 @@ export default function Realized({ loaderData }: Route.ComponentProps) {
         <TaxYearPanel
           years={fiscal.years}
           year={fiscal.year}
+          currentYear={fiscal.currentYear}
           view={fiscal.view}
         />
       </>

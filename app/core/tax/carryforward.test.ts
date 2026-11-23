@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import type { TradeEvent } from "../domain";
 
-import { computeNetWithCarryforward } from "./carryforward";
+import Decimal from "decimal.js";
+
+import { carryforwardPools, computeNetWithCarryforward } from "./carryforward";
 import type { TaxOptions } from "./tax-lots";
 
 const MADRID = "Europe/Madrid";
@@ -146,5 +148,27 @@ describe("computeNetWithCarryforward", () => {
 
     expect(result.steps[0]).toMatchObject({ year: 2025, ownNet: "-250" });
     expect(result.netSavingsBase).toBe("150");
+  });
+});
+
+describe("carryforwardPools", () => {
+  const nets =
+    (byYear: Record<number, string>) =>
+    (year: number): Decimal =>
+      new Decimal(byYear[year] ?? "0");
+
+  it("crosses a year's negative pool against up to the limit of the other's same-year balance", () => {
+    const result = carryforwardPools(
+      [nets({ 2025: "200", 2026: "-1000" }), nets({ 2025: "-50", 2026: "300" })],
+      2026,
+      4,
+      "0.25",
+    );
+    const [gains, income] = result.pools;
+    expect(gains.steps[3]).toMatchObject({ crossOffset: "-50", finalNet: "150" });
+    expect(income.steps[3]).toMatchObject({ crossOffset: "50", finalNet: "0" });
+    expect(gains.steps[4]).toMatchObject({ crossOffset: "75", finalNet: "-925" });
+    expect(income.finalNet).toBe("225");
+    expect(result.savingsBase).toBe("225");
   });
 });

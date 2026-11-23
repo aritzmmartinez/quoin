@@ -5,10 +5,12 @@ import {
   DASH,
   taxYearHref,
   type TaxInKindIncome,
+  type TaxSavingsIncome,
   type TaxYearView,
   useCopy,
   useFormat,
 } from "~/lib";
+import { territoryRules, type Territory } from "~/core/tax";
 
 import { Card } from "../ui/Card";
 import { InfoHint } from "../ui/Hint";
@@ -41,10 +43,12 @@ function TaxYearSelect({ years, year }: { years: number[]; year: number }) {
 export function TaxYearPanel({
   years,
   year,
+  currentYear,
   view,
 }: {
   years: number[];
   year: number | null;
+  currentYear: number;
   view: TaxYearView | null;
 }) {
   const { formatMoney } = useFormat();
@@ -74,28 +78,41 @@ export function TaxYearPanel({
       {view && (
         <>
           <Card className="p-6">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <div className="text-[11px] uppercase tracking-[0.08em] text-muted">
-                  {copy.summary.netBase}
-                </div>
-                <div className="mt-1 text-[20px] font-semibold tabular-nums">
-                  <SignedMoney value={view.netSavingsBase} />
-                </div>
-              </div>
-              <div>
-                <div className="text-[11px] uppercase tracking-[0.08em] text-muted">
-                  {copy.summary.quota}
-                </div>
-                <div className="mt-1 text-[20px] font-semibold tabular-nums">
-                  {view.quota === null ? DASH : formatMoney(view.quota)}
-                </div>
-              </div>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <SummaryFigure label={copy.summary.gainsBalance}>
+                <SignedMoney value={view.netSavingsBase} />
+              </SummaryFigure>
+              <SummaryFigure label={copy.summary.incomeBalance}>
+                <SignedMoney value={view.savingsIncome.finalNet} />
+              </SummaryFigure>
+              <SummaryFigure label={copy.summary.netBase}>
+                {formatMoney(view.savingsBase)}
+              </SummaryFigure>
+              <SummaryFigure label={copy.summary.quota}>
+                {view.quota === null ? DASH : formatMoney(view.quota)}
+              </SummaryFigure>
+              <SummaryFigure label={copy.summary.withheld}>
+                {formatMoney(view.withholdings.total)}
+              </SummaryFigure>
             </div>
             <p className="mt-4 text-[11.5px] text-muted">
+              {copy.summary.pools}
+            </p>
+            <p className="mt-2 text-[11.5px] text-muted">
+              {copy.summary.withheldNote}
+            </p>
+            {view.withholdings.interestWithoutWithholding && (
+              <p className="mt-2 text-[11.5px] text-body">
+                {copy.summary.interestWithoutWithholding}
+              </p>
+            )}
+            <p className="mt-2 text-[11.5px] text-muted">
               {view.scale
                 ? copy.summary.scale(view.scale.source)
                 : copy.summary.noScale}
+              {view.scaleYear !== null && view.scaleYear < view.year && (
+                <> {copy.summary.scaleInForce(view.scaleYear)}</>
+              )}
             </p>
           </Card>
 
@@ -133,7 +150,9 @@ export function TaxYearPanel({
                   {copy.empty.title}
                 </div>
                 <p className="mx-auto mt-1.5 max-w-sm text-[13px] text-muted">
-                  {copy.empty.body}
+                  {view.savingsIncome.count > 0 || view.inKindIncome.count > 0
+                    ? copy.empty.incomeBody
+                    : copy.empty.body}
                 </p>
               </div>
             ) : (
@@ -188,13 +207,24 @@ export function TaxYearPanel({
             />
           )}
 
+          {(view.savingsIncome.count > 0 ||
+            view.savingsIncome.finalNet !== "0") && (
+            <SavingsIncomeCard
+              income={view.savingsIncome}
+              territory={view.territory}
+              current={view.year === currentYear}
+            />
+          )}
+
           {view.inKindIncome.count > 0 && (
             <InKindIncomeCard income={view.inKindIncome} />
           )}
 
           <Card className="p-6">
             <h2 className="mb-3 text-[14px] font-semibold">
-              {copy.carryforwardTitle}
+              {copy.carryforwardTitle(
+                territoryRules(view.territory).lossCarryforwardYears,
+              )}
             </h2>
             <div className="overflow-x-auto">
               <table className="w-full min-w-140 text-[12.5px] tabular-nums">
@@ -250,20 +280,93 @@ export function TaxYearPanel({
   );
 }
 
+function SummaryFigure({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div className="text-[11px] uppercase tracking-[0.08em] text-muted">
+        {label}
+      </div>
+      <div className="mt-1 font-mono text-[20px] font-semibold tabular-nums">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function SavingsIncomeCard({
+  income,
+  territory,
+  current,
+}: {
+  income: TaxSavingsIncome;
+  territory: Territory;
+  current: boolean;
+}) {
+  const { formatMoney } = useFormat();
+  const copy = useCopy().realized.fiscal.savingsIncome;
+  const limit = territoryRules(territory).dividendExemption?.limit;
+  return (
+    <FiguresCard
+      title={copy.title}
+      body={copy.body}
+      figures={[
+        { label: copy.count, value: String(income.count) },
+        { label: copy.gross, value: formatMoney(income.gross) },
+        ...(income.exemptSource !== null
+          ? [{ label: copy.exempt, value: formatMoney(income.exempt) }]
+          : []),
+        { label: copy.finalNet, value: formatMoney(income.finalNet) },
+      ]}
+      notes={[
+        ...(income.exemptSource !== null && limit !== undefined
+          ? [copy.exemptNote(income.exemptSource, formatMoney(limit, 0))]
+          : []),
+        ...(current ? [copy.decemberInterest] : []),
+      ]}
+    />
+  );
+}
+
 function InKindIncomeCard({ income }: { income: TaxInKindIncome }) {
   const { formatMoney } = useFormat();
   const copy = useCopy().realized.fiscal.inKind;
-  const figures = [
-    { label: copy.count, value: String(income.count) },
-    { label: copy.gross, value: formatMoney(income.gross) },
-    { label: copy.withheld, value: formatMoney(income.withheld) },
-  ];
+  return (
+    <FiguresCard
+      title={copy.title}
+      body={copy.body}
+      figures={[
+        { label: copy.count, value: String(income.count) },
+        { label: copy.gross, value: formatMoney(income.gross) },
+        { label: copy.withheld, value: formatMoney(income.withheld) },
+      ]}
+    />
+  );
+}
 
+function FiguresCard({
+  title,
+  body,
+  figures,
+  notes = [],
+}: {
+  title: string;
+  body: string;
+  figures: { label: string; value: string }[];
+  notes?: string[];
+}) {
   return (
     <Card className="p-6">
-      <h2 className="text-[14px] font-semibold">{copy.title}</h2>
-      <p className="mt-1 mb-4 text-[11.5px] text-muted">{copy.body}</p>
-      <dl className="grid gap-4 sm:grid-cols-3">
+      <h2 className="text-[14px] font-semibold">{title}</h2>
+      <p className="mt-1 mb-4 text-[11.5px] text-muted">{body}</p>
+      <dl
+        className={`grid gap-4 ${figures.length > 3 ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}
+      >
         {figures.map((f) => (
           <div key={f.label}>
             <dt className="text-[11px] uppercase tracking-[0.08em] text-muted">
@@ -275,6 +378,11 @@ function InKindIncomeCard({ income }: { income: TaxInKindIncome }) {
           </div>
         ))}
       </dl>
+      {notes.map((note) => (
+        <p key={note} className="mt-4 text-[11.5px] text-muted">
+          {note}
+        </p>
+      ))}
     </Card>
   );
 }

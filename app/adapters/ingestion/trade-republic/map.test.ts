@@ -67,6 +67,17 @@ describe("mapRow", () => {
     }
   });
 
+  it("maps INTEREST_PAYMENT with tax withheld", () => {
+    const result = mapRow(
+      row({ category: "CASH", type: "INTEREST_PAYMENT", amount: "10", tax: "-1.9" }),
+    );
+    expect(result.kind === "domain" && result.event).toMatchObject({
+      type: "INTEREST",
+      grossAmount: "10",
+      taxWithheld: "1.9",
+    });
+  });
+
   it("maps cash movements (interest, deposit variants, withdrawal)", () => {
     const interest = mapRow(
       row({ category: "CASH", type: "INTEREST_PAYMENT", amount: "1.2" }),

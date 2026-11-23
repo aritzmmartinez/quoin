@@ -167,7 +167,10 @@ piece of the contract with the mobile client, which must assign the same days.
   - `sync-prices` — what `POST /v1/prices` answers for one instrument (`answerPrices`).
   - `sync-pairing` — the six digit pairing code; its cases were worked out with openssl.
   - `tax` — foral FIFO, Art. 43, deferred losses, carryforward, quota, and the figures of
-    `buildTaxYearView` (not `pendingBySale`: it breaks ties on names, by locale).
+    `buildTaxYearView` (not `pendingBySale`: it breaks ties on names, by locale): both
+    savings pools, the base and the withholdings.
+  - `carryforward` — `carryforwardPool` and `carryforwardPools` as pure functions over
+    each year's net: carry, expiry and the cross limit.
   - `realized` — AVCO realised gains per sale.
   - `returns` — TWR, MWR/XIRR, `periodReturns`, range and hero changes.
   - `series` — cost line, value against invested, the portfolio merge, prices in euros.
@@ -178,7 +181,7 @@ piece of the contract with the mobile client, which must assign the same days.
     for a crypto code and `quoteSourceOf`.
 
   Except `ingest`, `sync` and `sync-pairing`, results come from the core, and `byHand` figures in some
-  cases (a dotted path into `expect` for the last seven), worked out by hand and checked
+  cases (a dotted path into `expect` for the last eight), worked out by hand and checked
   against the core, are what stop a regenerated file from blessing a regression.
   **Any sort whose ties could reach a contract states its tie-break**: Dart's `List.sort`
   is not stable, so an order left to the engine is one the mobile client cannot reproduce
@@ -1212,10 +1215,45 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
   is still what enforces expiry.
 - **Everything the tax engine reads per territory is one `TerritoryRules`**
   (`core/tax/territory.ts`, `satisfies Record<Territory, …>`): savings scales, repurchase
-  rules, swap valuation, carryforward years and the unlisted notice. Scales are per year;
-  a year not on file returns `null` from `getTaxScale` and the screen states the absence —
-  never fall back to the nearest year's brackets. A rate is data; a superseded scale is a
-  wrong number that looks right.
+  rules, swap valuation, carryforward years, the cross-pool offset limit and the unlisted
+  notice. A scale applies from its year until the next one on file: `getTaxScale` returns
+  the latest whose year is not after the one asked, so a scale with no end date (the NF
+  2/2025 one, from 2026) covers the years after it. A year before the first scale returns
+  `null` and the screen states the absence — a scale never reaches back. When a territory
+  publishes a new scale it must be added here the same day: until then the old one is
+  applied, and a superseded scale is a wrong number that looks right. The tax view says
+  so beside the citation whenever the scale starts before the year shown (`scaleYear`,
+  compared in the web view only; the contract carries no such field).
+- **The savings base has two pools, carried forward together** (`carryforwardPools`):
+  capital gains and income from movable capital — interest and cash dividends, gross in
+  euros (`savingsIncomeOf`), plus Trade Republic's saveback (below); other in-kind income
+  stays out. Each carries its own losses for
+  `lossCarryforwardYears`; a year's negative balance offsets the other pool's same-year
+  positive one up to `crossOffsetLimit` (0 in Bizkaia, Art. 66.1). The base adds the
+  positive final balances and the quota applies to it. `carryforwardFrom` is the gains
+  pool alone, unchanged. Bonds never reach the ledger (Trade Republic sets them aside), so
+  nothing yet produces negative income: the `carryforward` contract pins that branch.
+- **Trade Republic interest counts on the Madrid day before its payment** (`incomeYearOf`):
+  TR pays on the 1st the interest of the month before and declares it in that month, so a
+  payment on 1 January belongs to the year before. A rule of the tax calculation, by
+  `source` (`TRADE_REPUBLIC_SOURCE`); the stored `ts` is never moved. The current year's
+  income block says so.
+- **Dividends are exempt up to `dividendExemption.limit` a year** (1500 €, Art. 9.24 NF
+  13/2013; none in régimen común since 2015), gross in euros, before the income pool.
+  Never an ETF's (`isCollectiveInvestment`: Trade Republic stores funds as ETF), nor an
+  instrument missing from the list. Their withholdings still count: they pay on account.
+  **Known limitation:** the exemption does not reach shares bought in the two months
+  before the payment when homogeneous ones are sold in the two after, and nothing applies
+  that. The repurchase evaluator cannot tell: it only opens windows around sales at a
+  loss, never around a dividend, and this rule bites on gains too.
+- **Withholdings are shown, never subtracted.** They pay on account of the whole IRPF, not
+  of the savings quota. `withholdingsOf` adds those recorded on the year's savings income,
+  with no split by origin: Trade Republic's single `tax` column cannot tell Spanish from
+  foreign. Interest carries `taxWithheld` only since it got its own schema; rows stored
+  before say 0 and nothing rewrites them (that would be a second `markInKind`, and the
+  sync's ledger merge sets any other difference aside). A year with Trade Republic interest at
+  0 shows a notice, and that test decides no figure; interest at 0 from any other source is
+  legitimate and raises nothing.
 - **The fiscal year is the calendar year in the residence's zone** (`fiscalYearOf`, Madrid
   for Bizkaia), same trap as `periodOf` — the last hours of 31 December are already the
   next year locally. The zone travels in `RepurchaseScope` beside the territory.
@@ -1262,9 +1300,10 @@ Always the **Bizkaia foral regime** (Norma Foral de IRPF de Bizkaia). Never rég
   "Recompensa" on screen and keeps the BUY out of contributions. The notes stay for
   `symbol-check`, which excludes the BUY because its price came from a history.
 - **No tax figure reads this income, and its classification is pending.** `/tax` lists the
-  year's `IN_KIND` dividends in their own block, "pendiente de verificar", added to nothing;
-  a test pins that `computeTaxHistory` and `buildTaxYearView` are unchanged by them. Do not
-  write a classification into a comment or a total until it is verified.
+  year's Kraken rewards in their own block, "pendiente de verificar", added to nothing; a
+  test pins that `computeTaxHistory` and `buildTaxYearView` are unchanged by them. Do not
+  write a classification into a comment or a total until it is verified. Trade Republic's
+  saveback is not in that block: see below.
 
 ## Trade Republic saveback
 
@@ -1285,6 +1324,11 @@ amount alone decides there.
 - **A pair is one operation in two rows**, like a Kraken reward: the purchase as `IN_KIND`,
   and the saveback as an `IN_KIND` `DIVIDEND` in that fund, carrying the retention from
   whichever row holds it. Movements then nets each pair to exactly the cash that moved.
+- **For tax, the saveback is account income, not a dividend.** Trade Republic declares it
+  among bank accounts, in money, at 19%, so its `IN_KIND` `DIVIDEND` (source
+  `TRADE_REPUBLIC_SOURCE`) enters the income pool at its value on receipt with its
+  withholding, and the Art. 9.24 exemption never reaches it. Only the classification moves:
+  the rows stay `IN_KIND`, out of contributions.
 - **The only write that changes a stored ledger row is `markInKind`.** Saveback rows were
   discarded before this existed, so past purchases sit in the ledger as `CASH` and only a
   re-import can mark them; `append` skips existing rows, so `persistBatch` calls
