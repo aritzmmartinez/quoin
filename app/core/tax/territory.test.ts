@@ -79,4 +79,50 @@ describe("territoryRules", () => {
       unlistedNotice: { assetClass: "fungible-crypto", windowMonths: 12 },
     });
   });
+
+  it("pins every régimen común value, so a change to one is deliberate", () => {
+    expect(territoryRules("comun")).toEqual({
+      citations: {
+        repurchase: "art. 33.5 LIRPF",
+        incomeCarryforward: "art. 49.1.a LIRPF",
+        gainsCarryforward: "art. 49.1.b LIRPF",
+      },
+      savingsScales: [
+        {
+          year: 2025,
+          source:
+            "Arts. 66.1 y 76 Ley 35/2006 del IRPF, redacción de la Ley 7/2024, efectos 1-1-2025",
+          brackets: [
+            { from: "0", to: "6000", rate: "0.19" },
+            { from: "6000", to: "50000", rate: "0.21" },
+            { from: "50000", to: "200000", rate: "0.23" },
+            { from: "200000", to: "300000", rate: "0.27" },
+            { from: "300000", to: null, rate: "0.30" },
+          ],
+        },
+      ],
+      repurchase: [
+        {
+          assetClass: "listed-security",
+          windowMonths: 2,
+          homogeneity: "instrument",
+          acquisitions: "all",
+          from: null,
+          to: null,
+          source: "Art. 33.5.f Ley 35/2006 del IRPF",
+        },
+      ],
+      swapValuation: [
+        {
+          from: null,
+          to: null,
+          source: "Art. 37.1.h Ley 35/2006 del IRPF; DGT V0999-18",
+        },
+      ],
+      lossCarryforwardYears: 4,
+      crossOffsetLimit: "0.25",
+      dividendExemption: null,
+      unlistedNotice: { assetClass: "fungible-crypto", windowMonths: 12 },
+    });
+  });
 });

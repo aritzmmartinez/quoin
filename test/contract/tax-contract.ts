@@ -3,7 +3,6 @@ import { fileURLToPath } from "node:url";
 
 import { instrumentSchema, type InstrumentType } from "../../app/core/domain";
 import {
-  carryforwardFrom,
   computeTaxHistory,
   jurisdictionOf,
   taxYearOf,
@@ -393,7 +392,11 @@ export function evaluate(input: TaxInput) {
           year,
           {
             taxYear: taxYearOf(history, year),
-            carryforward: carryforwardFrom(history, year),
+            carryforward: {
+              targetYear: year,
+              steps: view.carryforward,
+              netSavingsBase: view.netSavingsBase,
+            },
             view: {
               affectedCount: view.affectedCount,
               ownNet: view.ownNet,

@@ -1440,10 +1440,13 @@ export const es = {
       about: "Sobre el criterio fiscal",
       territoryName: {
         bizkaia: "Bizkaia",
+        comun: "régimen común",
       } satisfies Record<Territory, string>,
       intro: {
         bizkaia:
           "Mismas ventas, con criterio FIFO en vez de AVCO, que es el que exige la declaración foral de Bizkaia (NF 13/2013) y no el de la pestaña de Ventas. Las pérdidas con recompra en los dos meses anteriores o posteriores se difieren según el Art. 43 (letra g para valores homogéneos y, en las transmisiones desde el 1 de enero de 2025, letra i para criptoactivos del mismo tipo), en la proporción recomprada, y se integran cuando se transmiten los recomprados; la compensación con años anteriores sigue el Art. 66. La aritmética de la recompra sigue las consultas de la DGT V1403-21, V1117-21 y V3282-18 sobre la norma estatal paralela, que no vinculan a la Hacienda Foral.",
+        comun:
+          "Mismas ventas, con criterio FIFO en vez de AVCO, que es el que exige el IRPF (Ley 35/2006) y no el de la pestaña de Ventas; en criptomonedas, FIFO por activo (DGT V1604-18 y V0975-22). Las pérdidas de acciones y ETF con recompra en los dos meses anteriores o posteriores no computan según el art. 33.5.f, en la proporción recomprada, y se integran cuando se transmiten los recomprados. Esa es la regla de los valores admitidos a negociación en un mercado regulado del EEE o equivalente (EE. UU. incluido, DGT V0778-25); los no admitidos tienen un año (art. 33.5.g), y Quoin no sabe en qué mercado cotiza cada valor. Las criptomonedas no tienen regla de recompra: su pérdida computa entera. Las permutas se valoran por el mayor de los dos valores (art. 37.1.h, DGT V0999-18). La compensación entre bolsas y con años anteriores sigue el art. 49. La aritmética de la recompra sigue las consultas de la DGT V1403-21, V1117-21 y V3282-18.",
       } satisfies Record<Territory, string>,
       yearLabel: "Año fiscal",
       noYears: "No hay ventas ni rendimientos registrados todavía en ningún año.",
@@ -1454,6 +1457,8 @@ export const es = {
         pools: {
           bizkaia:
             "Los rendimientos del capital mobiliario y las ganancias y pérdidas se compensan solo dentro de su propia bolsa (Art. 66.1): la base es la suma de los saldos positivos.",
+          comun:
+            "Los rendimientos del capital mobiliario y las ganancias y pérdidas se integran cada uno en su bolsa. El saldo negativo de una compensa el positivo de la otra hasta el 25 % de ese positivo, y lo pendiente de años anteriores que su propia bolsa no absorba también, con el mismo límite del 25 % para todo el año (art. 49): la base es la suma de los saldos positivos.",
         } satisfies Record<Territory, string>,
         quota: "Cuota resultante",
         withheld: "Retenciones registradas",
@@ -1514,6 +1519,8 @@ export const es = {
       unlistedReason: {
         bizkaia: (date: string): string =>
           `Criptomoneda vendida antes de 2025: la regla de recompra de criptoactivos (Art. 43.i) rige para las transmisiones desde el 1 de enero de 2025, así que la pérdida computa entera. Hay una nueva compra el ${date}; parte de la doctrina aplicaría la regla de recompra en el año siguiente. No está resuelto y no cambia ninguna cifra.`,
+        comun: (date: string): string =>
+          `Criptomoneda vendida con pérdida y comprada de nuevo el ${date}. En régimen común no hay regla de recompra específica para criptoactivos. Podría aplicarse el art. 33.5.e (recompra del mismo activo en el año siguiente), pero la DGT no lo ha resuelto. Quoin no difiere la pérdida: computa entera.`,
       } satisfies Record<Territory, (date: string) => string>,
       breakdown: {
         title: {
@@ -1576,6 +1583,8 @@ export const es = {
         body: {
           bizkaia:
             "Intereses y dividendos cobrados en efectivo, y el saveback de Trade Republic, que el bróker declara como rendimiento de cuenta. Importes en bruto. Se compensan solo entre sí, y un saldo negativo se arrastra a los años siguientes (Art. 66.1.a).",
+          comun:
+            "Intereses y dividendos cobrados en efectivo, y el saveback de Trade Republic, que el bróker declara como rendimiento de cuenta. Importes en bruto. Un saldo negativo compensa las ganancias patrimoniales hasta el 25 % de su saldo positivo, y lo que quede se arrastra a los años siguientes (art. 49.1.a).",
         } satisfies Record<Territory, string>,
         count: "Cobros",
         gross: "Bruto del año",
@@ -1599,6 +1608,9 @@ export const es = {
         year: "Año",
         ownNet: "Neto propio",
         consumedFromCarryforward: "Consumido del arrastre",
+        crossOffset: "Cruce del año con rendimientos",
+        absorbedFromOther: "Pendiente de rendimientos absorbido",
+        crossedToOther: "Pendiente compensado con rendimientos",
         finalNet: "Neto final",
         pendingLossRemaining: "Pérdida pendiente",
       },

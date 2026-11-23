@@ -1,7 +1,7 @@
 {
   "contract": "carryforward",
   "version": 1,
-  "description": "The generic carryforward of one savings pool (carryforwardPool) and of two pools advancing together (carryforwardPools), as pure functions over each year's own net. pools holds one or two maps from year to that year's own net; a year missing is 0. The window is targetYear − years through targetYear: a loss older than that has expired and is never seen. Each year, in order: a positive own net consumes pending losses oldest year first, and a negative one becomes that year's pending loss. finalNet is the last year's balance after both; savingsBase adds the two pools' finalNet where positive. Every case has a cross limit of 0, Bizkaia's, so crossOffset is always 0: how two pools cross at a positive limit is not pinned here and will be with régimen común, whose carried losses cross too. Amounts are decimal strings. Shared with the mobile client: both implementations must reproduce every case. expect is written by running the TypeScript core; byHand.figures, where a case has it, are worked out by hand, its arithmetic says how, and each key is a dotted path into expect.",
+  "description": "The generic carryforward of one savings pool (carryforwardPool) and of two pools advancing together (carryforwardPools), as pure functions over each year's own net. pools holds one or two maps from year to that year's own net; a year missing is 0. The window is targetYear − years through targetYear: a loss older than that has expired and is never seen. Each year, in order: (1) a pool's negative own net offsets the other's positive own net up to crossOffsetLimit of it (crossOffset); (2) each pool's positive remainder consumes its own pending losses, oldest year first, without limit (consumedFromCarryforward); (3) pending losses one pool still has offset what remains positive in the other, oldest year first, up to the limit left after step 1, computed over that other pool's positive own net: one limit per year and receiving pool (absorbedFromOther on the receiving pool, crossedToOther on the giving one). Only earlier years' losses are pending in step 3; the year's own negative balance becomes a pending loss after it. finalNet is the last year's balance; savingsBase adds the two pools' finalNet where positive. A cross limit of 0 is Bizkaia's (Art. 66 NF 13/2013) and keeps the pools apart; 0.25 is régimen común's (art. 49 LIRPF). A single pool is the two-pool walk with an empty second pool and a limit of 0. Amounts are decimal strings. Shared with the mobile client: both implementations must reproduce every case. expect is written by running the TypeScript core; byHand.figures, where a case has it, are worked out by hand, its arithmetic says how, and each key is a dotted path into expect.",
   "cases": [
     {
       "name": "One pool: a negative net carried and absorbed by the years after it",
@@ -31,6 +31,8 @@
             "ownNet": "0",
             "crossOffset": "0",
             "consumedFromCarryforward": "0",
+            "absorbedFromOther": "0",
+            "crossedToOther": "0",
             "finalNet": "0",
             "pendingLossRemaining": "0"
           },
@@ -39,6 +41,8 @@
             "ownNet": "-300",
             "crossOffset": "0",
             "consumedFromCarryforward": "0",
+            "absorbedFromOther": "0",
+            "crossedToOther": "0",
             "finalNet": "-300",
             "pendingLossRemaining": "300"
           },
@@ -47,6 +51,8 @@
             "ownNet": "100",
             "crossOffset": "0",
             "consumedFromCarryforward": "100",
+            "absorbedFromOther": "0",
+            "crossedToOther": "0",
             "finalNet": "0",
             "pendingLossRemaining": "200"
           },
@@ -55,6 +61,8 @@
             "ownNet": "50",
             "crossOffset": "0",
             "consumedFromCarryforward": "50",
+            "absorbedFromOther": "0",
+            "crossedToOther": "0",
             "finalNet": "0",
             "pendingLossRemaining": "150"
           },
@@ -63,6 +71,8 @@
             "ownNet": "400",
             "crossOffset": "0",
             "consumedFromCarryforward": "150",
+            "absorbedFromOther": "0",
+            "crossedToOther": "0",
             "finalNet": "250",
             "pendingLossRemaining": "0"
           }
@@ -95,6 +105,8 @@
             "ownNet": "-500",
             "crossOffset": "0",
             "consumedFromCarryforward": "0",
+            "absorbedFromOther": "0",
+            "crossedToOther": "0",
             "finalNet": "-500",
             "pendingLossRemaining": "500"
           },
@@ -103,6 +115,8 @@
             "ownNet": "200",
             "crossOffset": "0",
             "consumedFromCarryforward": "200",
+            "absorbedFromOther": "0",
+            "crossedToOther": "0",
             "finalNet": "0",
             "pendingLossRemaining": "300"
           },
@@ -111,6 +125,8 @@
             "ownNet": "0",
             "crossOffset": "0",
             "consumedFromCarryforward": "0",
+            "absorbedFromOther": "0",
+            "crossedToOther": "0",
             "finalNet": "0",
             "pendingLossRemaining": "300"
           },
@@ -119,6 +135,8 @@
             "ownNet": "0",
             "crossOffset": "0",
             "consumedFromCarryforward": "0",
+            "absorbedFromOther": "0",
+            "crossedToOther": "0",
             "finalNet": "0",
             "pendingLossRemaining": "300"
           },
@@ -127,6 +145,8 @@
             "ownNet": "400",
             "crossOffset": "0",
             "consumedFromCarryforward": "300",
+            "absorbedFromOther": "0",
+            "crossedToOther": "0",
             "finalNet": "100",
             "pendingLossRemaining": "0"
           }
@@ -161,6 +181,8 @@
             "ownNet": "200",
             "crossOffset": "0",
             "consumedFromCarryforward": "0",
+            "absorbedFromOther": "0",
+            "crossedToOther": "0",
             "finalNet": "200",
             "pendingLossRemaining": "0"
           },
@@ -169,6 +191,8 @@
             "ownNet": "0",
             "crossOffset": "0",
             "consumedFromCarryforward": "0",
+            "absorbedFromOther": "0",
+            "crossedToOther": "0",
             "finalNet": "0",
             "pendingLossRemaining": "0"
           },
@@ -177,6 +201,8 @@
             "ownNet": "0",
             "crossOffset": "0",
             "consumedFromCarryforward": "0",
+            "absorbedFromOther": "0",
+            "crossedToOther": "0",
             "finalNet": "0",
             "pendingLossRemaining": "0"
           },
@@ -185,6 +211,8 @@
             "ownNet": "400",
             "crossOffset": "0",
             "consumedFromCarryforward": "0",
+            "absorbedFromOther": "0",
+            "crossedToOther": "0",
             "finalNet": "400",
             "pendingLossRemaining": "0"
           },
@@ -193,6 +221,8 @@
             "ownNet": "400",
             "crossOffset": "0",
             "consumedFromCarryforward": "0",
+            "absorbedFromOther": "0",
+            "crossedToOther": "0",
             "finalNet": "400",
             "pendingLossRemaining": "0"
           }
@@ -234,6 +264,8 @@
                 "ownNet": "0",
                 "crossOffset": "0",
                 "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
                 "finalNet": "0",
                 "pendingLossRemaining": "0"
               },
@@ -242,6 +274,8 @@
                 "ownNet": "0",
                 "crossOffset": "0",
                 "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
                 "finalNet": "0",
                 "pendingLossRemaining": "0"
               },
@@ -250,6 +284,8 @@
                 "ownNet": "0",
                 "crossOffset": "0",
                 "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
                 "finalNet": "0",
                 "pendingLossRemaining": "0"
               },
@@ -258,6 +294,8 @@
                 "ownNet": "200",
                 "crossOffset": "0",
                 "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
                 "finalNet": "200",
                 "pendingLossRemaining": "0"
               },
@@ -266,6 +304,8 @@
                 "ownNet": "-1000",
                 "crossOffset": "0",
                 "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
                 "finalNet": "-1000",
                 "pendingLossRemaining": "1000"
               }
@@ -279,6 +319,8 @@
                 "ownNet": "0",
                 "crossOffset": "0",
                 "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
                 "finalNet": "0",
                 "pendingLossRemaining": "0"
               },
@@ -287,6 +329,8 @@
                 "ownNet": "0",
                 "crossOffset": "0",
                 "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
                 "finalNet": "0",
                 "pendingLossRemaining": "0"
               },
@@ -295,6 +339,8 @@
                 "ownNet": "0",
                 "crossOffset": "0",
                 "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
                 "finalNet": "0",
                 "pendingLossRemaining": "0"
               },
@@ -303,6 +349,8 @@
                 "ownNet": "-50",
                 "crossOffset": "0",
                 "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
                 "finalNet": "-50",
                 "pendingLossRemaining": "50"
               },
@@ -311,6 +359,8 @@
                 "ownNet": "300",
                 "crossOffset": "0",
                 "consumedFromCarryforward": "50",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
                 "finalNet": "250",
                 "pendingLossRemaining": "0"
               }
@@ -319,6 +369,573 @@
           }
         ],
         "savingsBase": "250"
+      }
+    },
+    {
+      "name": "Two pools at 25%: a year's negative gains offset the year's income up to a quarter of it",
+      "targetYear": 2025,
+      "years": 4,
+      "crossOffsetLimit": "0.25",
+      "pools": [
+        {
+          "2025": "-1000"
+        },
+        {
+          "2025": "2000"
+        }
+      ],
+      "byHand": {
+        "arithmetic": "Gains −1000, income +2000. Phase 1: the cross is min(1000, 25% × 2000 = 500) = 500, so income keeps 1500 and gains keep −500, pending from 2025. Nothing was pending before, so phase 2 does nothing; the year's own −500 never crosses as if it were an earlier loss. Base 1500.",
+        "figures": {
+          "pools.0.steps.4.crossOffset": "500",
+          "pools.0.steps.4.crossedToOther": "0",
+          "pools.0.finalNet": "-500",
+          "pools.1.steps.4.crossOffset": "-500",
+          "pools.1.finalNet": "1500",
+          "savingsBase": "1500"
+        }
+      },
+      "expect": {
+        "targetYear": 2025,
+        "pools": [
+          {
+            "steps": [
+              {
+                "year": 2021,
+                "ownNet": "0",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
+                "finalNet": "0",
+                "pendingLossRemaining": "0"
+              },
+              {
+                "year": 2022,
+                "ownNet": "0",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
+                "finalNet": "0",
+                "pendingLossRemaining": "0"
+              },
+              {
+                "year": 2023,
+                "ownNet": "0",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
+                "finalNet": "0",
+                "pendingLossRemaining": "0"
+              },
+              {
+                "year": 2024,
+                "ownNet": "0",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
+                "finalNet": "0",
+                "pendingLossRemaining": "0"
+              },
+              {
+                "year": 2025,
+                "ownNet": "-1000",
+                "crossOffset": "500",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
+                "finalNet": "-500",
+                "pendingLossRemaining": "500"
+              }
+            ],
+            "finalNet": "-500"
+          },
+          {
+            "steps": [
+              {
+                "year": 2021,
+                "ownNet": "0",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
+                "finalNet": "0",
+                "pendingLossRemaining": "0"
+              },
+              {
+                "year": 2022,
+                "ownNet": "0",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
+                "finalNet": "0",
+                "pendingLossRemaining": "0"
+              },
+              {
+                "year": 2023,
+                "ownNet": "0",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
+                "finalNet": "0",
+                "pendingLossRemaining": "0"
+              },
+              {
+                "year": 2024,
+                "ownNet": "0",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
+                "finalNet": "0",
+                "pendingLossRemaining": "0"
+              },
+              {
+                "year": 2025,
+                "ownNet": "2000",
+                "crossOffset": "-500",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
+                "finalNet": "1500",
+                "pendingLossRemaining": "0"
+              }
+            ],
+            "finalNet": "1500"
+          }
+        ],
+        "savingsBase": "1500"
+      }
+    },
+    {
+      "name": "Two pools at 25%: the year's cross and an earlier loss's cross share one limit",
+      "targetYear": 2025,
+      "years": 4,
+      "crossOffsetLimit": "0.25",
+      "pools": [
+        {
+          "2024": "-3000",
+          "2025": "-400"
+        },
+        {
+          "2025": "2000"
+        }
+      ],
+      "byHand": {
+        "arithmetic": "2024 leaves 3000 of gains pending (income is 0, nothing crosses). 2025, phase 1: gains −400 against income 2000, limit 500: 400 crosses, gains 0, income 1600. Phase 2, step 1: income has nothing of its own pending; gains have no positive balance. Step 2: the 2024 gains loss crosses into income's 1600, but the limit is one per year: 500 − 400 already used = 100. Income ends at 1500; 2900 of the 2024 loss stays pending.",
+        "figures": {
+          "pools.0.steps.4.crossOffset": "400",
+          "pools.0.steps.4.crossedToOther": "100",
+          "pools.0.steps.4.pendingLossRemaining": "2900",
+          "pools.1.steps.4.absorbedFromOther": "100",
+          "pools.1.finalNet": "1500",
+          "savingsBase": "1500"
+        }
+      },
+      "expect": {
+        "targetYear": 2025,
+        "pools": [
+          {
+            "steps": [
+              {
+                "year": 2021,
+                "ownNet": "0",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
+                "finalNet": "0",
+                "pendingLossRemaining": "0"
+              },
+              {
+                "year": 2022,
+                "ownNet": "0",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
+                "finalNet": "0",
+                "pendingLossRemaining": "0"
+              },
+              {
+                "year": 2023,
+                "ownNet": "0",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
+                "finalNet": "0",
+                "pendingLossRemaining": "0"
+              },
+              {
+                "year": 2024,
+                "ownNet": "-3000",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
+                "finalNet": "-3000",
+                "pendingLossRemaining": "3000"
+              },
+              {
+                "year": 2025,
+                "ownNet": "-400",
+                "crossOffset": "400",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "100",
+                "finalNet": "0",
+                "pendingLossRemaining": "2900"
+              }
+            ],
+            "finalNet": "0"
+          },
+          {
+            "steps": [
+              {
+                "year": 2021,
+                "ownNet": "0",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
+                "finalNet": "0",
+                "pendingLossRemaining": "0"
+              },
+              {
+                "year": 2022,
+                "ownNet": "0",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
+                "finalNet": "0",
+                "pendingLossRemaining": "0"
+              },
+              {
+                "year": 2023,
+                "ownNet": "0",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
+                "finalNet": "0",
+                "pendingLossRemaining": "0"
+              },
+              {
+                "year": 2024,
+                "ownNet": "0",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
+                "finalNet": "0",
+                "pendingLossRemaining": "0"
+              },
+              {
+                "year": 2025,
+                "ownNet": "2000",
+                "crossOffset": "-400",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "100",
+                "crossedToOther": "0",
+                "finalNet": "1500",
+                "pendingLossRemaining": "0"
+              }
+            ],
+            "finalNet": "1500"
+          }
+        ],
+        "savingsBase": "1500"
+      }
+    },
+    {
+      "name": "Two pools at 25%: a pool absorbs its own pending loss first, and only the rest crosses",
+      "targetYear": 2025,
+      "years": 4,
+      "crossOffsetLimit": "0.25",
+      "pools": [
+        {
+          "2024": "-1000",
+          "2025": "600"
+        },
+        {
+          "2025": "2000"
+        }
+      ],
+      "byHand": {
+        "arithmetic": "2024 leaves 1000 of gains pending. 2025: both pools positive, so phase 1 crosses nothing. Step 1: gains 600 absorb 600 of their own 2024 loss, 400 left. Step 2: those 400 cross into income, limit 25% × 2000 = 500, so all 400 go: income 1600, gains 0, nothing pending. Base 1600. With a limit of 0 the base would be 2000 and 400 would stay pending.",
+        "figures": {
+          "pools.0.steps.4.consumedFromCarryforward": "600",
+          "pools.0.steps.4.crossedToOther": "400",
+          "pools.0.steps.4.pendingLossRemaining": "0",
+          "pools.1.steps.4.absorbedFromOther": "400",
+          "pools.1.finalNet": "1600",
+          "savingsBase": "1600"
+        }
+      },
+      "expect": {
+        "targetYear": 2025,
+        "pools": [
+          {
+            "steps": [
+              {
+                "year": 2021,
+                "ownNet": "0",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
+                "finalNet": "0",
+                "pendingLossRemaining": "0"
+              },
+              {
+                "year": 2022,
+                "ownNet": "0",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
+                "finalNet": "0",
+                "pendingLossRemaining": "0"
+              },
+              {
+                "year": 2023,
+                "ownNet": "0",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
+                "finalNet": "0",
+                "pendingLossRemaining": "0"
+              },
+              {
+                "year": 2024,
+                "ownNet": "-1000",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
+                "finalNet": "-1000",
+                "pendingLossRemaining": "1000"
+              },
+              {
+                "year": 2025,
+                "ownNet": "600",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "600",
+                "absorbedFromOther": "0",
+                "crossedToOther": "400",
+                "finalNet": "0",
+                "pendingLossRemaining": "0"
+              }
+            ],
+            "finalNet": "0"
+          },
+          {
+            "steps": [
+              {
+                "year": 2021,
+                "ownNet": "0",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
+                "finalNet": "0",
+                "pendingLossRemaining": "0"
+              },
+              {
+                "year": 2022,
+                "ownNet": "0",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
+                "finalNet": "0",
+                "pendingLossRemaining": "0"
+              },
+              {
+                "year": 2023,
+                "ownNet": "0",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
+                "finalNet": "0",
+                "pendingLossRemaining": "0"
+              },
+              {
+                "year": 2024,
+                "ownNet": "0",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
+                "finalNet": "0",
+                "pendingLossRemaining": "0"
+              },
+              {
+                "year": 2025,
+                "ownNet": "2000",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "400",
+                "crossedToOther": "0",
+                "finalNet": "1600",
+                "pendingLossRemaining": "0"
+              }
+            ],
+            "finalNet": "1600"
+          }
+        ],
+        "savingsBase": "1600"
+      }
+    },
+    {
+      "name": "Two pools at 25%: an earlier loss crosses only into what the other pool has left after its own",
+      "targetYear": 2025,
+      "years": 4,
+      "crossOffsetLimit": "0.25",
+      "pools": [
+        {
+          "2024": "-1000"
+        },
+        {
+          "2024": "-1900",
+          "2025": "2000"
+        }
+      ],
+      "byHand": {
+        "arithmetic": "2024: both pools negative, nothing crosses; 1000 of gains and 1900 of income pending. 2025: income 2000 absorbs its own 1900 first, 100 left. The gains loss crosses into that 100, under the 500 limit: income 0, 900 of gains pending. Base 0.",
+        "figures": {
+          "pools.1.steps.4.consumedFromCarryforward": "1900",
+          "pools.1.steps.4.absorbedFromOther": "100",
+          "pools.1.finalNet": "0",
+          "pools.0.steps.4.crossedToOther": "100",
+          "pools.0.steps.4.pendingLossRemaining": "900",
+          "savingsBase": "0"
+        }
+      },
+      "expect": {
+        "targetYear": 2025,
+        "pools": [
+          {
+            "steps": [
+              {
+                "year": 2021,
+                "ownNet": "0",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
+                "finalNet": "0",
+                "pendingLossRemaining": "0"
+              },
+              {
+                "year": 2022,
+                "ownNet": "0",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
+                "finalNet": "0",
+                "pendingLossRemaining": "0"
+              },
+              {
+                "year": 2023,
+                "ownNet": "0",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
+                "finalNet": "0",
+                "pendingLossRemaining": "0"
+              },
+              {
+                "year": 2024,
+                "ownNet": "-1000",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
+                "finalNet": "-1000",
+                "pendingLossRemaining": "1000"
+              },
+              {
+                "year": 2025,
+                "ownNet": "0",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "100",
+                "finalNet": "0",
+                "pendingLossRemaining": "900"
+              }
+            ],
+            "finalNet": "0"
+          },
+          {
+            "steps": [
+              {
+                "year": 2021,
+                "ownNet": "0",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
+                "finalNet": "0",
+                "pendingLossRemaining": "0"
+              },
+              {
+                "year": 2022,
+                "ownNet": "0",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
+                "finalNet": "0",
+                "pendingLossRemaining": "0"
+              },
+              {
+                "year": 2023,
+                "ownNet": "0",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
+                "finalNet": "0",
+                "pendingLossRemaining": "0"
+              },
+              {
+                "year": 2024,
+                "ownNet": "-1900",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "0",
+                "absorbedFromOther": "0",
+                "crossedToOther": "0",
+                "finalNet": "-1900",
+                "pendingLossRemaining": "1900"
+              },
+              {
+                "year": 2025,
+                "ownNet": "2000",
+                "crossOffset": "0",
+                "consumedFromCarryforward": "1900",
+                "absorbedFromOther": "100",
+                "crossedToOther": "0",
+                "finalNet": "0",
+                "pendingLossRemaining": "0"
+              }
+            ],
+            "finalNet": "0"
+          }
+        ],
+        "savingsBase": "0"
       }
     }
   ]

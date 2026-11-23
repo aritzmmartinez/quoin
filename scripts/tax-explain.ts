@@ -8,12 +8,8 @@ import {
   prisma,
 } from "~/adapters/persistence";
 import { dayOf, toIsoDate, today } from "~/core/calendar";
-import { Money } from "~/core/domain";
 import {
-  carryforwardFrom,
-  computeSavingsQuota,
   computeTaxHistory,
-  getTaxScale,
   taxYearOf,
   territoryRules,
   type Jurisdiction,
@@ -21,6 +17,7 @@ import {
 } from "~/core/tax";
 import { loadResidence } from "~/lib/residence.server";
 import {
+  buildTaxYearView,
   taxExclusions,
   taxOptionsFor,
   unclassifiedSales,
@@ -195,37 +192,40 @@ async function main(): Promise<void> {
     console.log("");
   }
 
-  const carry = carryforwardFrom(history, YEAR);
-  console.log(
-    `Carryforward chain, ${carry.steps[0]!.year}..${YEAR} (max 4 prior years):\n`,
+  const view = buildTaxYearView(
+    events,
+    instruments,
+    YEAR,
+    JURISDICTION,
+    TODAY,
   );
   console.log(
-    "year   ownNet          consumedFromCarry   finalNet        pendingLossRemaining",
+    `Capital gains carryforward, ${view.carryforward[0]!.year}..${YEAR}` +
+      ` (${territoryRules(result.territory).citations.gainsCarryforward}):\n`,
   );
-  for (const step of carry.steps) {
+  console.log(
+    "year   ownNet          crossOffset     consumedFromCarry   absorbedFromOther   crossedToOther   finalNet        pendingLossRemaining",
+  );
+  for (const step of view.carryforward) {
     console.log(
-      `${step.year}  ${eur(step.ownNet)}   ${eur(step.consumedFromCarryforward)}` +
-        `      ${eur(step.finalNet)}   ${eur(step.pendingLossRemaining)}`,
+      `${step.year}  ${eur(step.ownNet)}   ${eur(step.crossOffset)}   ${eur(step.consumedFromCarryforward)}` +
+        `        ${eur(step.absorbedFromOther)}        ${eur(step.crossedToOther)}     ${eur(step.finalNet)}   ${eur(step.pendingLossRemaining)}`,
     );
   }
 
-  console.log(`\nNet savings base for ${YEAR}: ${eur(carry.netSavingsBase)}`);
+  console.log(`\nCapital gains balance:          ${eur(view.netSavingsBase)}`);
+  console.log(`Income from movable capital:    ${eur(view.savingsIncome.finalNet)}`);
+  console.log(`Savings base for ${YEAR}:          ${eur(view.savingsBase)}`);
 
-  const scale = getTaxScale(result.territory, YEAR);
-  if (!scale) {
+  if (!view.scale || view.quota === null) {
     console.log(
       `\nNo tax scale on file for ${result.territory} ${YEAR} — cannot compute quota.`,
     );
     return;
   }
 
-  const netBase = new Decimal(carry.netSavingsBase);
-  const quota = netBase.gt(0)
-    ? computeSavingsQuota(Money.fromString(carry.netSavingsBase), scale)
-    : Money.zero();
-
-  console.log(`Scale in force: ${scale.source}`);
-  console.log(`Quota: ${eur(quota.toString())} EUR`);
+  console.log(`Scale in force: ${view.scale.source}`);
+  console.log(`Quota: ${eur(view.quota)} EUR`);
 }
 
 main()

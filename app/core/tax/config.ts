@@ -6,7 +6,7 @@ import { Money, type Residence } from "../domain";
 import { territoryRules } from "./territory";
 
 /** Spanish IRPF territories only (foral and común) — not a multi-country abstraction. */
-export type Territory = "bizkaia";
+export type Territory = "bizkaia" | "comun";
 
 const TERRITORIES: Record<Residence, Territory> = {
   bizkaia: "bizkaia",

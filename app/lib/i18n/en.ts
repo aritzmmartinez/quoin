@@ -1423,10 +1423,13 @@ export const en: Copy = {
       about: "About the tax basis",
       territoryName: {
         bizkaia: "Bizkaia",
+        comun: "common regime",
       } satisfies Record<Territory, string>,
       intro: {
         bizkaia:
           "The same sales, on a FIFO basis instead of AVCO, which is what the Bizkaia foral tax return (NF 13/2013) requires and not what the Sales tab uses. A loss with a repurchase in the two months before or after is deferred under Art. 43 (letter g for homogeneous securities and, for transmissions from 1 January 2025, letter i for crypto assets of the same type), in the proportion repurchased, and computes when the repurchased units are transmitted; offsetting against earlier years follows Art. 66. The repurchase arithmetic follows the DGT rulings V1403-21, V1117-21 and V3282-18 on the parallel state rule, which do not bind the Hacienda Foral.",
+        comun:
+          "The same sales, on a FIFO basis instead of AVCO, which is what income tax (Ley 35/2006) requires and not what the Sales tab uses; for crypto, FIFO per asset (DGT V1604-18 and V0975-22). A loss on a stock or ETF with a repurchase in the two months before or after does not compute under art. 33.5.f, in the proportion repurchased, and computes when the repurchased units are transmitted. That is the rule for securities admitted to trading on a regulated EEA market or an equivalent one (the US included, DGT V0778-25); those not admitted have one year (art. 33.5.g), and Quoin does not know which market each security trades on. Crypto has no repurchase rule: its loss counts in full. Swaps are valued at the greater of the two values (art. 37.1.h, DGT V0999-18). Offsetting between the pools and against earlier years follows art. 49. The repurchase arithmetic follows the DGT rulings V1403-21, V1117-21 and V3282-18.",
       } satisfies Record<Territory, string>,
       yearLabel: "Tax year",
       noYears: "There are no sales or income recorded in any year yet.",
@@ -1437,6 +1440,8 @@ export const en: Copy = {
         pools: {
           bizkaia:
             "Income from movable capital and capital gains and losses compensate only within their own pool (Art. 66.1): the base is the sum of the positive balances.",
+          comun:
+            "Income from movable capital and capital gains and losses are each integrated in their own pool. One pool's negative balance offsets the other's positive one up to 25% of it, and so do earlier years' pending losses its own pool does not absorb, within the same 25% for the whole year (art. 49): the base is the sum of the positive balances.",
         } satisfies Record<Territory, string>,
         quota: "Resulting tax",
         withheld: "Recorded withholdings",
@@ -1446,7 +1451,7 @@ export const en: Copy = {
           "Some interest this year has no recorded withholding. Interest imported before this version may lack its withholding even if it had one: check it against the broker's statement.",
         scale: (source: string): string => `Scale applied: ${source}`,
         scaleInForce: (year: number, territory: string): string =>
-          `The scale in force in ${territory} since ${year} applies. If a new one is approved for this year, the tax will change.`,
+          `The ${territory} scale in force since ${year} applies. If a new one is approved for this year, the tax will change.`,
         noScale:
           "No tax scale on file for this year. The tax cannot be computed.",
       },
@@ -1497,6 +1502,8 @@ export const en: Copy = {
       unlistedReason: {
         bizkaia: (date: string): string =>
           `Crypto sold before 2025: the repurchase rule for crypto assets (Art. 43.i) governs transmissions from 1 January 2025, so the loss counts in full. There is a new purchase on ${date}; some doctrine would apply the one-year repurchase rule. This is unsettled and changes no figures.`,
+        comun: (date: string): string =>
+          `Crypto sold at a loss and bought again on ${date}. The common regime has no specific repurchase rule for crypto assets. Art. 33.5.e (repurchase of the same asset within the following year) could apply, but the DGT has not settled it. Quoin does not defer the loss: it counts in full.`,
       } satisfies Record<Territory, (date: string) => string>,
       breakdown: {
         title: {
@@ -1558,6 +1565,8 @@ export const en: Copy = {
         body: {
           bizkaia:
             "Interest and dividends paid in cash, and Trade Republic's saveback, which the broker declares as account income. Gross amounts. They compensate only among themselves, and a negative balance is carried to the following years (Art. 66.1.a).",
+          comun:
+            "Interest and dividends paid in cash, and Trade Republic's saveback, which the broker declares as account income. Gross amounts. A negative balance offsets capital gains up to 25% of their positive balance, and what is left is carried to the following years (art. 49.1.a).",
         } satisfies Record<Territory, string>,
         count: "Payments",
         gross: "Gross this year",
@@ -1581,6 +1590,9 @@ export const en: Copy = {
         year: "Year",
         ownNet: "Own net",
         consumedFromCarryforward: "Consumed from carryforward",
+        crossOffset: "Same-year cross with income",
+        absorbedFromOther: "Pending income losses absorbed",
+        crossedToOther: "Pending offset against income",
         finalNet: "Final net",
         pendingLossRemaining: "Pending loss",
       },

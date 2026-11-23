@@ -56,7 +56,9 @@ export function TaxYearPanel({
   const { formatMoney } = useFormat();
   const t = useCopy();
   const copy = t.realized.fiscal;
-  const { citations, lossCarryforwardYears } = territoryRules(territory);
+  const { citations, lossCarryforwardYears, crossOffsetLimit } =
+    territoryRules(territory);
+  const crosses = !new Decimal(crossOffsetLimit).isZero();
 
   if (years.length === 0 || year === null) {
     return (
@@ -258,6 +260,19 @@ export function TaxYearPanel({
                     <th className="py-2 pr-2 text-right">
                       {copy.carryforwardColumns.consumedFromCarryforward}
                     </th>
+                    {crosses && (
+                      <>
+                        <th className="py-2 pr-2 text-right">
+                          {copy.carryforwardColumns.crossOffset}
+                        </th>
+                        <th className="py-2 pr-2 text-right">
+                          {copy.carryforwardColumns.absorbedFromOther}
+                        </th>
+                        <th className="py-2 pr-2 text-right">
+                          {copy.carryforwardColumns.crossedToOther}
+                        </th>
+                      </>
+                    )}
                     <th className="py-2 pr-2 text-right">
                       {copy.carryforwardColumns.finalNet}
                     </th>
@@ -281,6 +296,19 @@ export function TaxYearPanel({
                       <td className="py-2 pr-2 text-right">
                         {formatMoney(step.consumedFromCarryforward)}
                       </td>
+                      {crosses && (
+                        <>
+                          <td className="py-2 pr-2 text-right">
+                            <SignedMoney value={step.crossOffset} />
+                          </td>
+                          <td className="py-2 pr-2 text-right">
+                            {formatMoney(step.absorbedFromOther)}
+                          </td>
+                          <td className="py-2 pr-2 text-right">
+                            {formatMoney(step.crossedToOther)}
+                          </td>
+                        </>
+                      )}
                       <td className="py-2 pr-2 text-right">
                         <SignedMoney value={step.finalNet} />
                       </td>
